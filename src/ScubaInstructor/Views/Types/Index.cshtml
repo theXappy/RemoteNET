@@ -1,0 +1,14 @@
+﻿@using ScubaDiver
+@model TypesDump
+<div class="row">
+    <h2>Assembly: @Model.AssemblyName</h2>
+    <p>FullTypeFullNameNames:</p>
+    <ol>
+        @foreach (var type in Model.Types)
+        {
+            <li>
+                <text style="font-weight: bold">@type.TypeName</text> (MethodTable = @type.MethodTable.ToString("x8"), Token = @type.Token) [<a href="/heap/index?type_filter=@type.TypeName">Search In Heap</a>]
+            </li>
+        }
+    </ol>
+</div>
