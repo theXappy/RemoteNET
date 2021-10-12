@@ -1,0 +1,40 @@
+﻿@using ScubaDiver
+@model HeapDump
+<div class="row">
+    <h2>Heap</h2>
+    <form method="get" >
+        <fieldset>
+            <h3>Filter</h3>
+            <div>
+                <label for="type_filter">FullTypeFullNameName:</label>
+                <input id="type_filter" name="type_filter" list="known_types">
+                <datalist id="known_types">
+                    @foreach (var type in Model.Objects.Select(obj => obj.Type).Distinct())
+                    {
+                        <option value="@type" />
+                    }
+                </datalist>
+                <input type="submit" value="Submit" class="submit" />
+            </div>
+        </fieldset>
+    </form>
+    <h3>Dump</h3>
+    <p>
+        @Model.Objects.Count
+        Objects found.
+    </p>
+    <ol>
+        @foreach (var obj in Model.Objects)
+        {
+            if (obj.Type == "Free")
+            {
+                continue;
+            }
+            <li>
+                @{string hexAddress = "0x"+obj.Address.ToString("x8");}
+                [<a href="/object/index?address=@obj.Address">@hexAddress</a>] Object of type 
+                <a href="/type/index?name=@obj.Type">@obj.Type</a>
+            </li>
+        }
+    </ol>
+</div>

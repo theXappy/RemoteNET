@@ -1,0 +1,179 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Dynamic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using Microsoft.CSharp.RuntimeBinder;
+
+namespace RemoteObject.Internal
+{
+    class DynamicRemoteObject : DynamicObject
+    {
+        enum MemberType
+        {
+            Unknown,
+            Field,
+            Property,
+            Method
+        }
+
+        private class MethodOverload
+        {
+            public List<Type> ArgumentsTypes { get; set; }
+            public Func<object[],object> Proxy { get; set; }
+        }
+
+        private Dictionary<string, MemberType> _members = new Dictionary<string, MemberType>();
+
+        private Dictionary<string, object> _fields = new Dictionary<string, object>();
+        private Dictionary<string, Action<object>> _propertiesSetters = new Dictionary<string, Action<object>>();
+        private Dictionary<string, Func<object>> _propertiesGetters = new Dictionary<string, Func<object>>();
+        private Dictionary<string, List<MethodOverload>> _methods = new Dictionary<string, List<MethodOverload>>();
+
+        // Expansion API
+        /// <summary>
+        /// Define a new field for the remote object
+        /// </summary>
+        /// <param name="fieldName">The field's name</param>
+        /// <param name="value">The field's value</param>
+        public void AddField(string fieldName, object value)
+        {
+            if (_members.ContainsKey(fieldName))
+                throw new Exception($"A member with the name \"{fieldName}\" already exists");
+
+            _members[fieldName] = MemberType.Field;
+            _fields[fieldName] = value;
+        }
+
+        /// <summary>
+        /// Define a new property for the remote object
+        /// </summary>
+        /// <param name="propName">Name of the property</param>
+        /// <param name="getter">Getter function. Can be null if getting is not available</param>
+        /// <param name="setter">Setter function. Can be null if setting is not available</param>
+        public void AddProperty(string propName, Func<object> getter, Action<object> setter)
+        {
+            if (_members.ContainsKey(propName))
+                throw new Exception($"A member with the name \"{propName}\" already exists");
+
+            if (getter == null && setter == null)
+                throw new Exception("A property must be set with at least a setter/getter.");
+
+            _members[propName] = MemberType.Property;
+            if (getter != null)
+                _propertiesGetters[propName] = getter;
+            if (setter != null)
+                _propertiesSetters[propName] = setter;
+        }
+
+        /// <summary>
+        /// Defines a new method for the remote object
+        /// </summary>
+        /// <param name="methodName">Method name</param>
+        /// <param name="proxy">Function to invoke when the method is called by the <see cref="DynamicRemoteObject"/></param>
+        public void AddMethod(string methodName, List<Type> argTypes, Func<object[],object> proxy)
+        {
+            // Disallowing other members of this name except other methods
+            // overloading is allowed.
+            if (_members.TryGetValue(methodName, out MemberType memType) && memType != MemberType.Method)
+                throw new Exception($"A member with the name \"{methodName}\" already exists");
+
+            _members[methodName] = MemberType.Method;
+            if (!_methods.ContainsKey(methodName))
+            {
+                _methods[methodName] = new List<MethodOverload>();
+            }
+            _methods[methodName].Add(new MethodOverload{ArgumentsTypes = argTypes, Proxy = proxy});
+        }
+
+        //
+        // Dynamic Object API 
+        //
+
+        public override bool TryGetMember(GetMemberBinder binder, out object result)
+        {
+            if (!_members.TryGetValue(binder.Name, out MemberType memberType))
+                throw new Exception($"No such member \"{binder.Name}\"");
+
+            switch (memberType)
+            {
+                case MemberType.Field:
+                    result = _fields[binder.Name];
+                    break;
+                case MemberType.Property:
+                    if (!_propertiesGetters.TryGetValue(binder.Name, out Func<object> getter))
+                    {
+                        throw new Exception($"Property \"{binder.Name}\" does not have a getter.");
+                    }
+                    result = getter();
+                    break;
+                case MemberType.Method:
+                    var overloads = _methods[binder.Name];
+                    if (overloads.Count == 1)
+                    {
+                        // Easy case - a unique function name so we can just return it.
+                        result = overloads.Single();
+                    }
+                    else
+                    {
+                        // Multiple overloads. This sucks because we need to... return some "Router" func...
+                        throw new NotImplementedException($"Multiple overloads aren't supported at the moment. " +
+                                                          $"Method `{binder.Name}` had {overloads.Count} overloads registered.");
+                    }
+                    break;
+                default:
+                    throw new Exception($"No such member \"{binder.Name}\"");
+            }
+            return true;
+        }
+
+        public override bool TrySetMember(SetMemberBinder binder, object value)
+        {
+            if (!_members.TryGetValue(binder.Name, out MemberType memberType))
+                throw new Exception($"No such member \"{binder.Name}\"");
+
+            switch (memberType)
+            {
+                case MemberType.Field:
+                    throw new NotImplementedException("Modifying remote fields not yet supported.");
+                case MemberType.Property:
+                    if (!_propertiesSetters.TryGetValue(binder.Name, out Action<object> setter))
+                    {
+                        throw new Exception($"Property \"{binder.Name}\" does not have a setter.");
+                    }
+                    setter(value);
+                    break;
+                case MemberType.Method:
+                    throw new Exception("Can't modifying method members.");
+                default:
+                    throw new Exception($"No such member \"{binder.Name}\".");
+            }
+            return true;
+        }
+
+        static object GetDynamicMember(object obj, string memberName)
+        {
+            var binder = Binder.GetMember(CSharpBinderFlags.None, memberName, obj.GetType(),
+                new[] { CSharpArgumentInfo.Create(CSharpArgumentInfoFlags.None, null) });
+            var callsite = CallSite<Func<CallSite, object, object>>.Create(binder);
+            return callsite.Target(callsite, obj);
+        }
+
+        public override string ToString()
+        {
+            return _methods[nameof(ToString)].Single().Proxy(new object[0]) as string;
+        }
+
+        public override int GetHashCode()
+        {
+            // ReSharper disable once NonReadonlyMemberInGetHashCode
+            return (int)(_methods[nameof(GetHashCode)].Single().Proxy(new object[0]));
+        }
+
+        public override bool Equals(object obj)
+        {
+            throw new NotImplementedException($"Can not call `Equals` on {nameof(DynamicRemoteObject)} instances");
+        }
+    }
+}
