@@ -79,5 +79,15 @@ namespace RemoteObject.Properties {
                 return ((byte[])(obj));
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] ScubaDiver {
+            get {
+                object obj = ResourceManager.GetObject("ScubaDiver", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }

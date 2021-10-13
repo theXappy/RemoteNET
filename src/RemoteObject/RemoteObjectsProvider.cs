@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Resources;
@@ -50,7 +51,7 @@ namespace RemoteObject
         public static RemoteObjectsProvider Create(Process target)
         {
             // Dumping injector + bootstrap DLL to a temp dir
-            var tempDir = Path.GetFileNameWithoutExtension(Path.GetTempPath());
+            var tempDir = Path.Combine(Path.GetTempPath(), (new Random()).Next(10_000,int.MaxValue).ToString());
             Directory.CreateDirectory(tempDir);
 
             var injectorPath = Path.Combine(tempDir, "Injector.exe");
@@ -58,13 +59,13 @@ namespace RemoteObject
             File.WriteAllBytes(injectorPath, Resources.Injector);
             File.WriteAllBytes(bootstrapPath, Resources.BootstrapDLL);
 
-            // Copy scuba diver and dependencies
+            // Unzip scuba diver and dependencies into their own directory
             var scubaPath = Path.Combine(tempDir, "Scuba");
             Directory.CreateDirectory(scubaPath);
-            foreach (var file in Directory.GetFiles(Assembly.GetEntryAssembly().Location))
+            using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDiver))
             {
-                string dst = Path.Combine(scubaPath, Path.GetFileName(file));
-                File.Copy(file, dst);
+                ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
+                diverZip.ExtractToDirectory(scubaPath);
             }
 
             var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id}");
