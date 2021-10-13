@@ -25,6 +25,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BootstrapDLL", "BootstrapDL
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemoteObject", "RemoteObject\RemoteObject.csproj", "{35EEE1BC-604F-4737-A6CD-21FF5A88D9E8}"
+	ProjectSection(ProjectDependencies) = postProject
+		{5DE7F97C-B97B-489F-A1E4-9F9656317F94} = {5DE7F97C-B97B-489F-A1E4-9F9656317F94}
+		{0C3EB2F7-92BA-4895-99FC-7098A16FFE8C} = {0C3EB2F7-92BA-4895-99FC-7098A16FFE8C}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

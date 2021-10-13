@@ -47,6 +47,11 @@
     <Compile Include="Internal\Reflection\RemoteType.cs" />
     <Compile Include="Internal\Reflection\RemoteTypesFactory.cs" />
     <Compile Include="Internal\Reflection\TypesResolver.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
     <Compile Include="RemoteObject.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Internal\RemoteObjectRef.cs" />
@@ -61,5 +66,20 @@
   <ItemGroup>
     <None Include="app.config" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\BootstrapDLL.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Injector.exe" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\Win32\" "$(ProjectDir)\Resources"</PreBuildEvent>
+  </PropertyGroup>
 </Project>
