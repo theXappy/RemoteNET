@@ -1,9 +1,14 @@
 ﻿using System;
+using System.CodeDom.Compiler;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Resources;
 using RemoteObject.Internal;
+using RemoteObject.Properties;
 using ScubaDiver;
 
 namespace RemoteObject
@@ -44,8 +49,27 @@ namespace RemoteObject
 
         public static RemoteObjectsProvider Create(Process target)
         {
-            // TODO: Get inject, bootstrap and ScubaDiver from resources...
-            var injectorProc = Process.Start("Injector.exe", $"{target.Id}");
+            // Dumping injector + bootstrap DLL to a temp dir
+            var tempDir = Path.GetFileNameWithoutExtension(Path.GetTempPath());
+            Directory.CreateDirectory(tempDir);
+
+            var injectorPath = Path.Combine(tempDir, "Injector.exe");
+            var bootstrapPath = Path.Combine(tempDir, "BootstrapDLL.dll");
+            File.WriteAllBytes(injectorPath, Resources.Injector);
+            File.WriteAllBytes(bootstrapPath, Resources.BootstrapDLL);
+
+            // Copy scuba diver and dependencies
+            var scubaPath = Path.Combine(tempDir, "Scuba");
+            Directory.CreateDirectory(scubaPath);
+            foreach (var file in Directory.GetFiles(Assembly.GetEntryAssembly().Location))
+            {
+                string dst = Path.Combine(scubaPath, Path.GetFileName(file));
+                File.Copy(file, dst);
+            }
+
+            var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id}");
+            startInfo.WorkingDirectory = tempDir;
+            var injectorProc = Process.Start(startInfo);
             // TODO: Get results of injector
 
             // TODO: Make it configurable
