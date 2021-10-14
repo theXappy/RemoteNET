@@ -32,6 +32,7 @@ namespace ScubaDiver
             public string Name { get; set; }
             public string ReturnTypeFullName { get; set; }
             public List<MethodParameter> Parameters { get; set; }
+            public string ReturnTypeAssembly { get; set; }
 
             public TypeMethod()
             {
@@ -42,6 +43,7 @@ namespace ScubaDiver
                 Visibility = mi.IsPublic ? "Public" : "Private";
                 Name = mi.Name;
                 ReturnTypeFullName = mi.ReturnType.FullName;
+                ReturnTypeAssembly = mi.ReturnType.Assembly.GetName().Name;
                 Parameters = mi.GetParameters().Select(pi => new MethodParameter(pi)).ToList();
             }
 

@@ -65,7 +65,7 @@ namespace ScubaDiver
             else
             {
                 // Object not pinned, try get it the hard way
-                    return "{\"error\":\"Object at given address wasn't pinned\"}";
+                return "{\"error\":\"Object at given address wasn't pinned\"}";
             }
         }
 
@@ -165,7 +165,7 @@ namespace ScubaDiver
             if (method.ReturnType == typeof(void))
             {
                 // Not expecting results.
-                invocResults = new() {VoidReturnType = true};
+                invocResults = new() { VoidReturnType = true };
                 return $"{{results:\"Done.\"}}";
             }
             else
@@ -188,7 +188,7 @@ namespace ScubaDiver
 
                 invocResults = new()
                 {
-                    VoidReturnType = false, 
+                    VoidReturnType = false,
                     ReturnedObjectOrAddress = returnValue
                 };
             }
@@ -349,7 +349,7 @@ namespace ScubaDiver
         {
             // Need to pin the object (and it's not already pinned)
             GCHandle handle = GCHandle.Alloc(instance);
-            objAddress ??= (ulong) GCHandle.ToIntPtr(handle);
+            objAddress ??= (ulong)GCHandle.ToIntPtr(handle);
             _pinnedObjects[objAddress.Value] = instance;
             return objAddress.Value;
         }
@@ -542,17 +542,20 @@ namespace ScubaDiver
 
         private Type ResolveType(string name, string assembly = null)
         {
+            Console.WriteLine($"[Diver] Trying to resolve type. [Assembly:{assembly}, Type:{name}]");
             IList<ClrModule> assembliesToSearch = _runtime.AppDomains.First().Modules;
             if (assembly != null)
                 assembliesToSearch = assembliesToSearch.Where(mod => Path.GetFileNameWithoutExtension(mod.Name) == assembly).ToList();
             if (!assembliesToSearch.Any())
             {
                 // No such assembly
+                Console.WriteLine($"[Diver] No such assembly \"{assembly}\"");
                 return null;
             }
 
             foreach (ClrModule module in assembliesToSearch)
             {
+                Console.WriteLine($"Mod Candidate for type resolution! { Path.GetFileNameWithoutExtension(module.Name)}");
                 var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
                 var typeNames = (from tuple in x
                                  let token = tuple.Token
@@ -582,6 +585,7 @@ namespace ScubaDiver
             }
 
             string assembly = req.QueryString.Get("assembly");
+            Console.WriteLine($"[Diver] Type query for: [Assembly:{assembly}, Type:{type}]");
             Type resolvedType = ResolveType(type, assembly);
 
             TypeDump ParseType(Type typeObj)

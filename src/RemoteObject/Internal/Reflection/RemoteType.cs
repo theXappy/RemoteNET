@@ -174,5 +174,7 @@ namespace RemoteObject.Internal.Reflection
         {
             throw new NotImplementedException();
         }
+
+        public override string ToString() => FullName;
     }
 }

@@ -65,7 +65,8 @@ namespace RemoteObject
             using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDiver))
             {
                 ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
-                diverZip.ExtractToDirectory(scubaPath);
+                // This extracts the "Scuba" directory from the zip to *tempDir*
+                diverZip.ExtractToDirectory(tempDir);
             }
 
             var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id}");
@@ -73,7 +74,13 @@ namespace RemoteObject
             startInfo.UseShellExecute = false;
             startInfo.RedirectStandardOutput = true;
             var injectorProc = Process.Start(startInfo);
-            var stdout = injectorProc.StandardOutput.ReadToEnd();
+            if (injectorProc != null && injectorProc.WaitForExit(5000))
+            {
+                // Injector finished early, there's probably an error.
+                var stdout = injectorProc.StandardOutput.ReadToEnd();
+                Console.WriteLine("Error with injector. Raw STDOUT:\n" + stdout);
+                return null;
+            }
             // TODO: Get results of injector
 
             // TODO: Make it configurable
