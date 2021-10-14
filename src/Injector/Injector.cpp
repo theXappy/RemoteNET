@@ -24,7 +24,7 @@ int main(int argc, char** argv)
 	// Path to DLL - Injected payload C# code
 	wchar_t DllNameW[MAX_PATH];
 	GetCurrentDirectory(MAX_PATH, DllNameW);
-	wcscat_s(DllNameW, L"\\ScubaDiver.dll");
+	wcscat_s(DllNameW, L"\\Scuba\\ScubaDiver.dll");
 	printf("Payload DLL Path: %ls\n", DllNameW);
 
 

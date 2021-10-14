@@ -70,7 +70,10 @@ namespace RemoteObject
 
             var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id}");
             startInfo.WorkingDirectory = tempDir;
+            startInfo.UseShellExecute = false;
+            startInfo.RedirectStandardOutput = true;
             var injectorProc = Process.Start(startInfo);
+            var stdout = injectorProc.StandardOutput.ReadToEnd();
             // TODO: Get results of injector
 
             // TODO: Make it configurable

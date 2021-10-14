@@ -13,7 +13,7 @@ DllExport void LoadManagedProject(const wchar_t * managedDllLocation)
 	HRESULT hr;
 
 	// All of this code is to spawn a console.
-	if (false) {
+	if (true) {
 		BOOL res = AllocConsole();
 		HANDLE stdHandle;
 		int hConsole;
@@ -25,6 +25,7 @@ DllExport void LoadManagedProject(const wchar_t * managedDllLocation)
 		// End of cosole spawning
 
 		printf("[Bootstrap] Can you see me?\n");
+		printf("[Bootstrap] managedDllLocation = %ls\n", managedDllLocation);
 		fflush(stdout);
 	}
 
