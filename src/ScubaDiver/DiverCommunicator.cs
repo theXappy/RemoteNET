@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -86,7 +87,19 @@ namespace ScubaDiver
             }
 
             string body = SendRequest("type", queryParams);
-            TypeDump typeDump = JsonConvert.DeserializeObject<TypeDump>(body);
+            var settings = new JsonSerializerSettings
+            {
+                MissingMemberHandling = MissingMemberHandling.Error
+            };
+            TypeDump typeDump;
+            try
+            {
+                typeDump = JsonConvert.DeserializeObject<TypeDump>(body, settings);
+            }
+            catch
+            {
+                typeDump = null;
+            }
             return typeDump;
         }
 

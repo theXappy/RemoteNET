@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using Microsoft.Diagnostics.Runtime;
 
 namespace ScubaDiver
@@ -42,13 +43,12 @@ namespace ScubaDiver
             if (domain == null) domain = AppDomain.CurrentDomain;
 
             var fullTypeName = type.Name;
-            var assemblyNamePrefix = fullTypeName.Substring(0, fullTypeName.IndexOf("."));
+            var assemblyNamePrefix = Path.GetFileNameWithoutExtension(type.Module.AssemblyName);
             foreach (var assembly in domain.GetAssemblies())
             {
                 string assmName = assembly.GetName().Name;
                 if (assmName.StartsWith(assemblyNamePrefix) || (assmName == "mscorlib" && assemblyNamePrefix.StartsWith("System")))
                 {
-                    Console.WriteLine("Assembly candidate! " + assmName);
                     Type match = assembly.GetType(fullTypeName);
                     if (match != null)
                     {

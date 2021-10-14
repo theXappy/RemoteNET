@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using RemoteObject;
@@ -45,7 +46,9 @@ namespace ScubaDiver.Tester
                 Console.WriteLine("1. Query Remote Instances");
                 Console.WriteLine("2. Get Remote Object");
                 Console.WriteLine("3. Call `ToString` of Remote Object");
-                Console.WriteLine("4. Exit");
+                Console.WriteLine("4. Print Key & IV for SessionKeyManagers (Sam Flow)");
+                Console.WriteLine("5. Print methods of Remote Object");
+                Console.WriteLine("6. Exit");
                 string input = Console.ReadLine();
                 ulong addr;
                 uint index;
@@ -104,7 +107,6 @@ namespace ScubaDiver.Tester
                                 Console.WriteLine(toStringRes);
 
                                 var type = remoteObj.GetType();
-                                int x = 3;
                             }
                             break;
                         case 4:
@@ -127,6 +129,27 @@ namespace ScubaDiver.Tester
                             }
                             break;
                         case 5:
+                            // Getting object
+                            Console.WriteLine("Enter local index of remote object:");
+                            if (!uint.TryParse(Console.ReadLine(), out  index) || index >= remoteObjects.Count)
+                            {
+                                Console.WriteLine("Bad input.");
+                            }
+                            else
+                            {
+                                var remoteObj = remoteObjects[(int)index];
+                                var type = remoteObj.GetType();
+                                Console.WriteLine($"Methods of {type.FullName}:");
+                                int i = 1;
+                                foreach (MethodInfo methodInfo in type.GetMethods())
+                                {
+                                    var argsString = string.Join(", ",
+                                        methodInfo.GetParameters().Select(arg => arg.ParameterType + " " + arg.Name));
+                                    Console.WriteLine($"{i++}. {methodInfo.ReturnType} {methodInfo.Name}({argsString})");
+                                }
+                            }
+                            break;
+                        case 6:
                             // Exiting
                             return;
                     }

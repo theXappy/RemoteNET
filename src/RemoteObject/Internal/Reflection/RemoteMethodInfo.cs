@@ -10,17 +10,19 @@ namespace RemoteObject.Internal.Reflection
         public override ICustomAttributeProvider ReturnTypeCustomAttributes => throw new NotImplementedException();
         public override string Name { get; }
         public override Type DeclaringType { get; }
+        public override Type ReturnType { get; }
         public override Type ReflectedType => throw new NotImplementedException();
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
         public override MethodAttributes Attributes => throw new NotImplementedException();
 
         private ParameterInfo[] _paramInfos;
 
-        public RemoteMethodInfo(string name,Type declaringType,ParameterInfo[] paramInfos)
+        public RemoteMethodInfo(Type declaringType, Type returnType, string name, ParameterInfo[] paramInfos)
         {
             Name = name;
             DeclaringType = declaringType;
             _paramInfos = paramInfos;
+            ReturnType = returnType;
         }
 
         public override object[] GetCustomAttributes(bool inherit)
