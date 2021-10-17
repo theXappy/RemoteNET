@@ -9,6 +9,7 @@ using System.Linq;
 using System.Reflection;
 using System.Resources;
 using RemoteObject.Internal;
+using RemoteObject.Internal.Reflection;
 using RemoteObject.Properties;
 using ScubaDiver;
 
@@ -28,6 +29,14 @@ namespace RemoteObject
         public IEnumerable<CandidateObject> QueryRemoteInstances(string typeFilter)
         {
             return _communicator.DumpHeap(typeFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type));
+        }
+
+        public Type GetRemoteType(string typeFullName,string assembly = null)
+        {
+            RemoteTypesFactory rtf = new RemoteTypesFactory(TypesResolver.Instance);
+            rtf.AllowOwnDumping(_communicator);
+            var dumpedType = _communicator.DumpType(typeFullName, assembly);
+            return rtf.Create(dumpedType);
         }
 
         public RemoteObject CreateRemoteObject(CandidateObject candidate) => CreateRemoteObject(candidate.Address);
@@ -106,7 +115,6 @@ namespace RemoteObject
                 }
                 // TODO: Get results of injector
             }
-            // TODO: Get results of injector
 
             // TODO: Make it configurable
             string diverAddr = "127.0.0.1";
