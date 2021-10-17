@@ -25,6 +25,11 @@ namespace ScubaDiver.Tester
                 Console.WriteLine("Enter process name (or substring)");
                 string procName = Console.ReadLine();
                 var candidateProcs = Process.GetProcesses().Where(proc=>proc.ProcessName.Contains(procName)).ToArray();
+                if (candidateProcs.Length == 0)
+                {
+                    Console.WriteLine("No processes found.");
+                    continue;
+                }
                 if (candidateProcs.Length == 1)
                 {
                     target = candidateProcs.Single();
@@ -35,6 +40,9 @@ namespace ScubaDiver.Tester
                 {
                     Console.WriteLine($"{i + 1}. {candidateProcs[i].ProcessName}");
                 }
+
+                target = candidateProcs.First();
+                break;
             }
             Console.WriteLine($"Target Process: {target.ProcessName}");
             RemoteObjectsProvider provider = RemoteObjectsProvider.Create(target);
@@ -47,7 +55,8 @@ namespace ScubaDiver.Tester
                 Console.WriteLine("2. Get Remote Object");
                 Console.WriteLine("3. Call `ToString` of Remote Object");
                 Console.WriteLine("4. Print methods of Remote Object");
-                Console.WriteLine("5. Exit");
+                Console.WriteLine("5. Create remote object");
+                Console.WriteLine("6. Exit");
                 string input = Console.ReadLine();
                 ulong addr;
                 uint index;
@@ -63,11 +72,11 @@ namespace ScubaDiver.Tester
                                 // Assuming user wants all types
                                 typeName = null;
                             }
-                            var res = provider.QueryRemoteInstances(typeName);
+                            var res = provider.QueryRemoteInstances(typeName).ToList();
                             Console.WriteLine("Instances:");
                             for (int i = 0; i < res.Count; i++)
                             {
-                                Console.WriteLine($"{i + 1}. {res[i].Address}, TypeFullName: {res[i].Type}");
+                                Console.WriteLine($"{i + 1}. {res[i].Address}, TypeFullName: {res[i].TypeFullName}");
                             }
 
                             break;
@@ -79,7 +88,7 @@ namespace ScubaDiver.Tester
                             {
                                 try
                                 {
-                                    RemoteObject.RemoteObject remoteObject = provider.CreateRemoteObject(addr);
+                                    RemoteObject.RemoteObject remoteObject = provider.GetRemoteObject(addr);
                                     remoteObjects.Add(remoteObject);
                                     Console.WriteLine($"Get back this object: {remoteObject}");
                                     Console.WriteLine($"This object's local index is {remoteObjects.IndexOf(remoteObject)}");
@@ -130,6 +139,13 @@ namespace ScubaDiver.Tester
                             }
                             break;
                         case 5:
+                            Console.WriteLine("Getting MMSData type...");
+                            var typeToCreate = provider.GetRemoteType("Samsung.SamsungFlow.Notification.Data.MMSData", "SamsungFlowFramework.NET");
+                            Console.WriteLine($"The Type is: {typeToCreate}");
+                            Console.WriteLine("Calling activator");
+                            var obj = Activator.CreateInstance(typeToCreate);
+                            break;
+                        case 6:
                             // Exiting
                             return;
                     }

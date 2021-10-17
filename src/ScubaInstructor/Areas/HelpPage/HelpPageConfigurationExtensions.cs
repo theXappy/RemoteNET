@@ -13,6 +13,7 @@ using System.Web.Http.Controllers;
 using System.Web.Http.Description;
 using ScubaInstructor.Areas.HelpPage.ModelDescriptions;
 using ScubaInstructor.Areas.HelpPage.Models;
+using ScubaInstructor.Areas.HelpPage.SampleGeneration;
 
 namespace ScubaInstructor.Areas.HelpPage
 {

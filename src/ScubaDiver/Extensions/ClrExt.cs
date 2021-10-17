@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using Microsoft.Diagnostics.Runtime;
 
-namespace ScubaDiver
+namespace ScubaDiver.Extensions
 {
     public static class ClrExt
     {

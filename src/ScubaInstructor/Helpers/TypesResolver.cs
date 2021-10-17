@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net.Http;
 using ScubaDiver;
+using ScubaDiver.API;
 
 namespace ScubaInstructor.Helpers
 {

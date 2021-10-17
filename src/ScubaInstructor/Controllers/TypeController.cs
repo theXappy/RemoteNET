@@ -7,6 +7,7 @@ using System.Web;
 using System.Web.Mvc;
 using Microsoft.Ajax.Utilities;
 using ScubaDiver;
+using ScubaDiver.API;
 using ScubaInstructor.Helpers;
 using ScubaInstructor.Models;
 

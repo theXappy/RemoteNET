@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Reflection;
 using ScubaDiver;
+using ScubaDiver.Extensions;
 
 namespace RemoteObject.Internal.Reflection
 {
@@ -45,7 +46,13 @@ namespace RemoteObject.Internal.Reflection
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
             // invokeAttr, binder and culture currently ignored
-            // TODO: support static calls?
+
+            if (obj == null)
+            {
+                // TODO: support static calls
+                throw new NotImplementedException("Static calls (where no object is provided) are not yet supported.");
+            }
+
             if (obj is RemoteObject ro)
             {
                 ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];

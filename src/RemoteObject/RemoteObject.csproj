@@ -45,8 +45,8 @@
   <ItemGroup>
     <Compile Include="CandidateObject.cs" />
     <Compile Include="Internal\DynamicRemoteObject.cs" />
-    <Compile Include="Internal\NativeMethods.cs" />
-    <Compile Include="Internal\ProcessModuleCollectionExt.cs" />
+    <Compile Include="Internal\Extensions\NativeMethods.cs" />
+    <Compile Include="Internal\Extensions\ProcessModuleCollectionExt.cs" />
     <Compile Include="Internal\Reflection\RemoteMethodInfo.cs" />
     <Compile Include="Internal\Reflection\RemoteParameterInfo.cs" />
     <Compile Include="Internal\Reflection\RemoteType.cs" />
@@ -57,6 +57,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <Compile Include="RemoteActivator.cs" />
     <Compile Include="RemoteObject.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Internal\RemoteObjectRef.cs" />
@@ -90,6 +91,7 @@
   <ItemGroup>
     <None Include="Resources\Injector64.exe" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PreBuildEvent>xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\Win32\" "$(ProjectDir)\Resources"

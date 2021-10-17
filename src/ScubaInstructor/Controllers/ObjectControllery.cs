@@ -8,6 +8,7 @@ using System.Web;
 using System.Web.Http;
 using System.Web.Mvc;
 using ScubaDiver;
+using ScubaDiver.API;
 using ScubaInstructor.Models;
 
 namespace ScubaInstructor.Controllers

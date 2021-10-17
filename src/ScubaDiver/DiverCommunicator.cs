@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Diagnostics.Runtime;
 using Newtonsoft.Json;
+using ScubaDiver.API;
 
 namespace ScubaDiver
 {
@@ -17,6 +18,11 @@ namespace ScubaDiver
     /// </summary>
     public class DiverCommunicator
     {
+        JsonSerializerSettings _withErrors = new()
+        {
+            MissingMemberHandling = MissingMemberHandling.Error
+        };
+
         private string _hostname;
         private int _port;
 
@@ -78,7 +84,7 @@ namespace ScubaDiver
         {
             Dictionary<string, string> queryParams = new()
             {
-                {"name", type}
+                { "name", type }
             };
             if (assembly != null)
             {
@@ -86,14 +92,10 @@ namespace ScubaDiver
             }
 
             string body = SendRequest("type", queryParams);
-            var settings = new JsonSerializerSettings
-            {
-                MissingMemberHandling = MissingMemberHandling.Error
-            };
             TypeDump typeDump;
             try
             {
-                typeDump = JsonConvert.DeserializeObject<TypeDump>(body, settings);
+                typeDump = JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
             }
             catch
             {
@@ -106,8 +108,8 @@ namespace ScubaDiver
         {
             Dictionary<string, string> queryParams = new()
             {
-                {"address", address.ToString()},
-                {"pinRequest", pinObject.ToString()}
+                { "address", address.ToString() },
+                { "pinRequest", pinObject.ToString() }
             };
             string body = SendRequest("object", queryParams);
             if (body.Contains("\"error\":"))
@@ -117,24 +119,24 @@ namespace ScubaDiver
             ObjectDump objectDump = JsonConvert.DeserializeObject<ObjectDump>(body);
             return objectDump;
         }
-        
+
         public bool UnpinObject(ulong address)
         {
             Dictionary<string, string> queryParams = new()
             {
-                {"address", address.ToString()},
+                { "address", address.ToString() },
             };
             string body = SendRequest("unpin", queryParams);
             return body.Contains("OK");
         }
-        
+
         public InvocationResults InvokeMethod(ulong addr, string methodName,
             params ObjectOrRemoteAddress[] args)
         {
-            var convertedArgs = new List<InvocationRequest.InvocationArgument>();
+            var convertedArgs = new List<InvocationArgument>();
             foreach (var arg in args)
             {
-                InvocationRequest.InvocationArgument invocArg = new();
+                InvocationArgument invocArg = new();
                 invocArg.Type = arg.Type;
                 if (arg.IsRemoteAddress)
                 {
@@ -161,6 +163,39 @@ namespace ScubaDiver
 
             InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson);
             return res;
+        }
+
+        public ObjectDump CreateObject(string typeFullName, ObjectOrRemoteAddress[] args)
+        {
+            var convertedArgs = new List<InvocationArgument>();
+            foreach (var arg in args)
+            {
+                InvocationArgument invocArg = new();
+                invocArg.Type = arg.Type;
+                if (arg.IsRemoteAddress)
+                {
+                    invocArg.PinnedObjectAddress = arg.RemoteAddress;
+                }
+                else
+                {
+                    // Hopefully it's a primitive that can be restored using `Parse` on the Diver's end
+                    invocArg.EncodedValue = arg.EncodedObject;
+                }
+
+                convertedArgs.Add(invocArg);
+            }
+
+            var ctorInvocReq = new CtorInvocationRequest()
+            {
+                TypeFullName = typeFullName,
+                Parameters = convertedArgs
+            };
+            var requestJsonBody = JsonConvert.SerializeObject(ctorInvocReq);
+
+            var resJson = SendRequest("invoke", null, requestJsonBody);
+            ObjectDump res = JsonConvert.DeserializeObject<ObjectDump>(resJson, _withErrors);
+            return res;
+
         }
     }
 }

@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Reflection;
 
-namespace ScubaDiver
+namespace ScubaDiver.Extensions
 {
     public static class TypeExt
     {

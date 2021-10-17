@@ -1,4 +1,4 @@
-namespace ScubaInstructor.Areas.HelpPage
+namespace ScubaInstructor.Areas.HelpPage.SampleGeneration
 {
     /// <summary>
     /// Indicates whether the sample is used for request or response
