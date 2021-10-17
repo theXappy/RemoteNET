@@ -19,7 +19,7 @@ DllExport void LoadManagedProject(const wchar_t * managedDllLocation)
 		int hConsole;
 		FILE* fp;
 		stdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-		hConsole = _open_osfhandle((long)stdHandle, _O_TEXT);
+		hConsole = _open_osfhandle((intptr_t)stdHandle, _O_TEXT);
 		fp = _fdopen(hConsole, "w");
 		freopen_s(&fp, "CONOUT$", "w", stdout);
 		// End of cosole spawning

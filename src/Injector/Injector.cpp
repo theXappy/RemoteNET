@@ -16,7 +16,13 @@ int main(int argc, char** argv)
 	if (argc < 2) {
 		printf("Usage: %s PID\nPID - Process ID to inject into.", argv[0]);
 	}
-	printf("Starting...");
+	printf("Starting...\n");
+#ifdef _WIN64
+	printf("x64 Version\n");
+#else
+	printf("x32 Version\n");
+#endif
+
 	// Bootstrapper
 	char DllName[MAX_PATH];
 	GetCurrentDirectoryA(MAX_PATH, DllName);
@@ -29,7 +35,11 @@ int main(int argc, char** argv)
 
 
 	DWORD Pid = atoi(argv[1]);
+#ifdef _WIN64
+	strcat_s(DllName, "\\BootstrapDLL64.dll");
+#else
 	strcat_s(DllName, "\\BootstrapDLL.dll");
+#endif
 
 	printf("[.] Injecting BootstrapDLL into %d\n", Pid);
 	InjectAndRunThenUnload(Pid, DllName, "LoadManagedProject", DllNameW);

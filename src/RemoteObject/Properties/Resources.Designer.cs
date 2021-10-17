@@ -73,9 +73,29 @@ namespace RemoteObject.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] BootstrapDLL64 {
+            get {
+                object obj = ResourceManager.GetObject("BootstrapDLL64", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] Injector {
             get {
                 object obj = ResourceManager.GetObject("Injector", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Injector64 {
+            get {
+                object obj = ResourceManager.GetObject("Injector64", resourceCulture);
                 return ((byte[])(obj));
             }
         }

@@ -99,7 +99,7 @@ namespace RemoteObject.Internal
 
         public override string ToString()
         {
-            return $"RemoteObjectRef. Address: {_remoteObjectInfo.Address}, Type: {_typeInfo.Type}";
+            return $"RemoteObjectRef. Address: {_remoteObjectInfo.Address}, TypeFullName: {_typeInfo.Type}";
         }
     }
 }

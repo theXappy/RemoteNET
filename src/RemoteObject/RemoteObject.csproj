@@ -43,7 +43,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CandidateObject.cs" />
     <Compile Include="Internal\DynamicRemoteObject.cs" />
+    <Compile Include="Internal\NativeMethods.cs" />
     <Compile Include="Internal\Reflection\RemoteMethodInfo.cs" />
     <Compile Include="Internal\Reflection\RemoteParameterInfo.cs" />
     <Compile Include="Internal\Reflection\RemoteType.cs" />
@@ -81,9 +83,16 @@
   <ItemGroup>
     <None Include="Resources\Injector.exe" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\BootstrapDLL64.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Injector64.exe" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PreBuildEvent>xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\Win32\" "$(ProjectDir)\Resources"
+xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\Win64\" "$(ProjectDir)\Resources"
 
 powershell "Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force"</PreBuildEvent>
   </PropertyGroup>
