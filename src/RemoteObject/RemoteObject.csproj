@@ -46,6 +46,7 @@
     <Compile Include="CandidateObject.cs" />
     <Compile Include="Internal\DynamicRemoteObject.cs" />
     <Compile Include="Internal\NativeMethods.cs" />
+    <Compile Include="Internal\ProcessModuleCollectionExt.cs" />
     <Compile Include="Internal\Reflection\RemoteMethodInfo.cs" />
     <Compile Include="Internal\Reflection\RemoteParameterInfo.cs" />
     <Compile Include="Internal\Reflection\RemoteType.cs" />
