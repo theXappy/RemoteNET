@@ -168,7 +168,6 @@ namespace ScubaDiver
             {
                 // Not expecting results.
                 invocResults = new() { VoidReturnType = true };
-                return $"{{results:\"Done.\"}}";
             }
             else
             {
