@@ -25,9 +25,9 @@ namespace RemoteObject
             _communicator = communicator;
         }
 
-        public List<HeapDump.HeapObject> QueryRemoteInstances(string typeFilter)
+        public IEnumerable<CandidateObject> QueryRemoteInstances(string typeFilter)
         {
-            return _communicator.DumpHeap(typeFilter).Objects;
+            return _communicator.DumpHeap(typeFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type));
         }
 
         public RemoteObject CreateRemoteObject(ulong remoteAddress)
@@ -39,7 +39,7 @@ namespace RemoteObject
                 od = _communicator.DumpObject(remoteAddress, true);
                 td = _communicator.DumpType(od.Type);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 throw new Exception("Could not dump remote object/type.", e);
             }
@@ -48,16 +48,35 @@ namespace RemoteObject
             return remoteObject;
         }
 
+        /// <summary>
+        /// Creates a new provider.
+        /// </summary>
+        /// <param name="target">Process to create the provider for</param>
+        /// <returns>A provider for the given process</returns>
         public static RemoteObjectsProvider Create(Process target)
         {
+
             // Dumping injector + bootstrap DLL to a temp dir
-            var tempDir = Path.Combine(Path.GetTempPath(), (new Random()).Next(10_000,int.MaxValue).ToString());
+            var tempDir = Path.Combine(Path.GetTempPath(), (new Random()).Next(10_000, int.MaxValue).ToString());
             Directory.CreateDirectory(tempDir);
 
-            var injectorPath = Path.Combine(tempDir, "Injector.exe");
-            var bootstrapPath = Path.Combine(tempDir, "BootstrapDLL.dll");
-            File.WriteAllBytes(injectorPath, Resources.Injector);
-            File.WriteAllBytes(bootstrapPath, Resources.BootstrapDLL);
+
+            // Decide which injection toolkit to use x32 or x64
+            string injectorPath = Path.Combine(tempDir, "Injector.exe");
+            string bootstrapPath = Path.Combine(tempDir, "BootstrapDLL.dll");
+            byte[] injectorResource = Resources.Injector;
+            byte[] bootstrapDllResource = Resources.BootstrapDLL;
+            if (target.Is64Bit())
+            {
+                injectorPath = Path.Combine(tempDir, "Injector64.exe");
+                bootstrapPath = Path.Combine(tempDir, "BootstrapDLL64.dll");
+                injectorResource = Resources.Injector64;
+                bootstrapDllResource = Resources.BootstrapDLL64;
+            }
+
+            // Extract toolkit to disk
+            File.WriteAllBytes(injectorPath, injectorResource);
+            File.WriteAllBytes(bootstrapPath, bootstrapDllResource);
 
             // Unzip scuba diver and dependencies into their own directory
             var scubaPath = Path.Combine(tempDir, "Scuba");

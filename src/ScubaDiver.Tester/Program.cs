@@ -46,9 +46,8 @@ namespace ScubaDiver.Tester
                 Console.WriteLine("1. Query Remote Instances");
                 Console.WriteLine("2. Get Remote Object");
                 Console.WriteLine("3. Call `ToString` of Remote Object");
-                Console.WriteLine("4. Print Key & IV for SessionKeyManagers (Sam Flow)");
-                Console.WriteLine("5. Print methods of Remote Object");
-                Console.WriteLine("6. Exit");
+                Console.WriteLine("4. Print methods of Remote Object");
+                Console.WriteLine("5. Exit");
                 string input = Console.ReadLine();
                 ulong addr;
                 uint index;
@@ -112,25 +111,6 @@ namespace ScubaDiver.Tester
                         case 4:
                             // Getting object
                             Console.WriteLine("Enter local index of remote object:");
-                            if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
-                            {
-                                Console.WriteLine("Bad input.");
-                            }
-                            else
-                            {
-                                var remoteObj = remoteObjects[(int)index];
-                                var dynObject = remoteObj.Dynamify();
-                                byte[] keyBytes = dynObject._key as byte[];
-                                byte[] ivBytes = dynObject._iv as byte[];
-                                Console.WriteLine("Key:");
-                                Console.WriteLine(keyBytes.ToHex());
-                                Console.WriteLine("IV:");
-                                Console.WriteLine(ivBytes.ToHex());
-                            }
-                            break;
-                        case 5:
-                            // Getting object
-                            Console.WriteLine("Enter local index of remote object:");
                             if (!uint.TryParse(Console.ReadLine(), out  index) || index >= remoteObjects.Count)
                             {
                                 Console.WriteLine("Bad input.");
@@ -149,7 +129,7 @@ namespace ScubaDiver.Tester
                                 }
                             }
                             break;
-                        case 6:
+                        case 5:
                             // Exiting
                             return;
                     }

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace RemoteObject.Internal.Reflection
 {
     /// <summary>
-    /// Resolves local and remote types. Contains a cache so the same Type object is returned for different
+    /// Resolves local and remote types. Contains a cache so the same TypeFullName object is returned for different
     /// resolutions for the same remote type.
     /// </summary>
     public class TypesResolver

@@ -371,12 +371,12 @@ namespace ScubaDiver
             HttpListener listener = new HttpListener();
             listener.Prefixes.Add("http://127.0.0.1:9977/");
             listener.Start();
-            Console.WriteLine("Listening...");
+            Console.WriteLine("[Diver] Listening...");
 
-            var dispatcherTask = Task.Run(() => Dispatcher(listener));
+            Dispatcher(listener);
 
-
-            dispatcherTask.Wait();
+            listener.Close();
+            Console.WriteLine("[Diver] Dispatcher returned, Dive is complete.");
         }
 
         private void Dispatcher(HttpListener listener)
@@ -410,11 +410,12 @@ namespace ScubaDiver
                     break;
             }
 
-            listener.Stop();
+            Console.WriteLine("[Diver] HTTP Loop ended. Closing HTTP listener");
         }
 
         private string MakeDieResponse(HttpListenerRequest req)
         {
+            Console.WriteLine("[Diver] Die command received");
             return "{\"error\":\"Goodbye\"}";
         }
 
@@ -627,8 +628,12 @@ namespace ScubaDiver
 
         public static int EntryPoint(string pwzArgument)
         {
-            string folderPath = System.IO.Path.GetDirectoryName(typeof(Diver).Assembly.Location);
+            // Bootstrap needs to call a C# function with exactly this signature.
+            // So we use it to just create a diver, and run the Dive func (blocking)
 
+            // Diver needs some assemblies which might not be loaded in the target process
+            // so starting off with registering an assembly resolver to the Diver's dll's directory
+            string folderPath = System.IO.Path.GetDirectoryName(typeof(Diver).Assembly.Location);
             AppDomain.CurrentDomain.AssemblyResolve += (object sender, ResolveEventArgs args) =>
             {
                 string assemblyPath = Path.Combine(folderPath, new AssemblyName(args.Name).Name + ".dll");
@@ -640,18 +645,17 @@ namespace ScubaDiver
 
             try
             {
-                // Bootstrap needs to call a C# function with exactly this signature.
-                // So we use it to just create a diver, keep it aside (so it isn't GC'd) and run the Diver func (blocking)
                 _instance = new Diver();
                 _instance.Dive();
 
                 // Diver killed
+                Console.WriteLine("[Diver] Diver finished gracefully, Entry point returning");
                 return 0;
             }
             catch (Exception e)
             {
                 Console.WriteLine(e);
-                Console.WriteLine("Going to die in 60 secs...");
+                Console.WriteLine("[Diver] Exiting entry point in 60 secs...");
                 Thread.Sleep(TimeSpan.FromSeconds(60));
                 return 1;
             }
