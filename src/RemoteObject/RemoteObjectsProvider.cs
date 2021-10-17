@@ -56,50 +56,55 @@ namespace RemoteObject
         /// <returns>A provider for the given process</returns>
         public static RemoteObjectsProvider Create(Process target)
         {
+            bool alreadyInjected = target.Modules.AsEnumerable().Any(module=>module.ModuleName.Contains("BootstrapDLL"));
 
-            // Dumping injector + bootstrap DLL to a temp dir
-            var tempDir = Path.Combine(Path.GetTempPath(), (new Random()).Next(10_000, int.MaxValue).ToString());
-            Directory.CreateDirectory(tempDir);
-
-
-            // Decide which injection toolkit to use x32 or x64
-            string injectorPath = Path.Combine(tempDir, "Injector.exe");
-            string bootstrapPath = Path.Combine(tempDir, "BootstrapDLL.dll");
-            byte[] injectorResource = Resources.Injector;
-            byte[] bootstrapDllResource = Resources.BootstrapDLL;
-            if (target.Is64Bit())
+            if (!alreadyInjected)
             {
-                injectorPath = Path.Combine(tempDir, "Injector64.exe");
-                bootstrapPath = Path.Combine(tempDir, "BootstrapDLL64.dll");
-                injectorResource = Resources.Injector64;
-                bootstrapDllResource = Resources.BootstrapDLL64;
-            }
+                // Dumping injector + bootstrap DLL to a temp dir
+                var tempDir = Path.Combine(Path.GetTempPath(), (new Random()).Next(10_000, int.MaxValue).ToString());
+                Directory.CreateDirectory(tempDir);
 
-            // Extract toolkit to disk
-            File.WriteAllBytes(injectorPath, injectorResource);
-            File.WriteAllBytes(bootstrapPath, bootstrapDllResource);
 
-            // Unzip scuba diver and dependencies into their own directory
-            var scubaPath = Path.Combine(tempDir, "Scuba");
-            Directory.CreateDirectory(scubaPath);
-            using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDiver))
-            {
-                ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
-                // This extracts the "Scuba" directory from the zip to *tempDir*
-                diverZip.ExtractToDirectory(tempDir);
-            }
+                // Decide which injection toolkit to use x32 or x64
+                string injectorPath = Path.Combine(tempDir, "Injector.exe");
+                string bootstrapPath = Path.Combine(tempDir, "BootstrapDLL.dll");
+                byte[] injectorResource = Resources.Injector;
+                byte[] bootstrapDllResource = Resources.BootstrapDLL;
+                if (target.Is64Bit())
+                {
+                    injectorPath = Path.Combine(tempDir, "Injector64.exe");
+                    bootstrapPath = Path.Combine(tempDir, "BootstrapDLL64.dll");
+                    injectorResource = Resources.Injector64;
+                    bootstrapDllResource = Resources.BootstrapDLL64;
+                }
 
-            var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id}");
-            startInfo.WorkingDirectory = tempDir;
-            startInfo.UseShellExecute = false;
-            startInfo.RedirectStandardOutput = true;
-            var injectorProc = Process.Start(startInfo);
-            if (injectorProc != null && injectorProc.WaitForExit(5000))
-            {
-                // Injector finished early, there's probably an error.
-                var stdout = injectorProc.StandardOutput.ReadToEnd();
-                Console.WriteLine("Error with injector. Raw STDOUT:\n" + stdout);
-                return null;
+                // Extract toolkit to disk
+                File.WriteAllBytes(injectorPath, injectorResource);
+                File.WriteAllBytes(bootstrapPath, bootstrapDllResource);
+
+                // Unzip scuba diver and dependencies into their own directory
+                var scubaPath = Path.Combine(tempDir, "Scuba");
+                Directory.CreateDirectory(scubaPath);
+                using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDiver))
+                {
+                    ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
+                    // This extracts the "Scuba" directory from the zip to *tempDir*
+                    diverZip.ExtractToDirectory(tempDir);
+                }
+
+                var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id}");
+                startInfo.WorkingDirectory = tempDir;
+                startInfo.UseShellExecute = false;
+                startInfo.RedirectStandardOutput = true;
+                var injectorProc = Process.Start(startInfo);
+                if (injectorProc != null && injectorProc.WaitForExit(5000))
+                {
+                    // Injector finished early, there's probably an error.
+                    var stdout = injectorProc.StandardOutput.ReadToEnd();
+                    Console.WriteLine("Error with injector. Raw STDOUT:\n" + stdout);
+                    return null;
+                }
+                // TODO: Get results of injector
             }
             // TODO: Get results of injector
 
