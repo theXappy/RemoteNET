@@ -30,6 +30,7 @@ namespace RemoteObject
             return _communicator.DumpHeap(typeFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type));
         }
 
+        public RemoteObject CreateRemoteObject(CandidateObject candidate) => CreateRemoteObject(candidate.Address);
         public RemoteObject CreateRemoteObject(ulong remoteAddress)
         {
             ObjectDump od;
