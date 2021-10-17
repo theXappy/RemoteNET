@@ -556,23 +556,33 @@ namespace ScubaDiver
 
             foreach (ClrModule module in assembliesToSearch)
             {
-                Console.WriteLine($"Mod Candidate for type resolution! { Path.GetFileNameWithoutExtension(module.Name)}");
-                var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
-                var typeNames = (from tuple in x
-                                 let token = tuple.Token
-                                 let resolvedType = module.ResolveToken(token) ?? null
-                                 where resolvedType?.Name == name
-                                 select new { MethodTable = tuple.MethodTable, Token = token, ClrType = resolvedType }).ToList();
-                if (!typeNames.Any())
+                ClrType clrTypeInfo = module.GetTypeByName(name);
+                if (clrTypeInfo == null)
+                {
+                    Console.WriteLine(
+                        $"Mod Candidate for type resolution! {Path.GetFileNameWithoutExtension(module.Name)}");
+                    var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
+                    var typeNames = (from tuple in x
+                        let token = tuple.Token
+                        let resolvedType = module.ResolveToken(token) ?? null
+                        where resolvedType?.Name == name
+                        select new {MethodTable = tuple.MethodTable, Token = token, ClrType = resolvedType}).ToList();
+                    if (typeNames.Any())
+                    {
+                        clrTypeInfo = typeNames.First().ClrType;
+                    }
+                }
+
+                if (clrTypeInfo == null)
                 {
                     continue;
                 }
 
                 // Found it
-                var clrTypeInfo = typeNames.First();
-                Type typeObj = clrTypeInfo.ClrType.GetRealType();
+                Type typeObj = clrTypeInfo.GetRealType();
                 return typeObj;
             }
+
 
             return null;
         }
