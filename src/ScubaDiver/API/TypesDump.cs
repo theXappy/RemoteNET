@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ScubaDiver
+namespace ScubaDiver.API
 {
     public class TypesDump
     {

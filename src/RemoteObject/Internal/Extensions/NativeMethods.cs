@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace RemoteObject.Internal
+namespace RemoteObject.Internal.Extensions
 {
     // Source: https://stackoverflow.com/a/33206186/4075549
     internal static class NativeMethods

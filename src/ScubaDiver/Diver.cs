@@ -11,6 +11,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Diagnostics.Runtime;
 using Newtonsoft.Json;
+using ScubaDiver.API;
+using ScubaDiver.Extensions;
 using ScubaDiver.Utils;
 
 namespace ScubaDiver

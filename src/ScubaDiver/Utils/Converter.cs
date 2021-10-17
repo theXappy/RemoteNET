@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Reflection.Emit;
 
-namespace ScubaDiver
+namespace ScubaDiver.Utils
 {
     /// <summary>
     /// This mind bending class is taken from https://github.com/denandz/KeeFarce

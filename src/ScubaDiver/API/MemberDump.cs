@@ -1,4 +1,4 @@
-﻿namespace ScubaDiver
+﻿namespace ScubaDiver.API
 {
     /// <summary>
     /// Dump of a specific member (field, property) of a specific object

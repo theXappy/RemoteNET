@@ -9,9 +9,11 @@ using System.Linq;
 using System.Reflection;
 using System.Resources;
 using RemoteObject.Internal;
+using RemoteObject.Internal.Extensions;
 using RemoteObject.Internal.Reflection;
 using RemoteObject.Properties;
 using ScubaDiver;
+using ScubaDiver.API;
 
 namespace RemoteObject
 {
@@ -39,8 +41,8 @@ namespace RemoteObject
             return rtf.Create(dumpedType);
         }
 
-        public RemoteObject CreateRemoteObject(CandidateObject candidate) => CreateRemoteObject(candidate.Address);
-        public RemoteObject CreateRemoteObject(ulong remoteAddress)
+        public RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address);
+        public RemoteObject GetRemoteObject(ulong remoteAddress)
         {
             ObjectDump od;
             TypeDump td;

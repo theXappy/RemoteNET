@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
 using ScubaDiver;
+using ScubaDiver.API;
 
 namespace RemoteObject.Internal.Reflection
 {

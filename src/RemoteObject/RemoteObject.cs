@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using RemoteObject.Internal;
 using RemoteObject.Internal.Reflection;
 using ScubaDiver;
+using ScubaDiver.API;
+using ScubaDiver.Extensions;
 using ScubaDiver.Utils;
 
 namespace RemoteObject

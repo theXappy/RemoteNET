@@ -1,9 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace ScubaDiver
+namespace ScubaDiver.API
 {
     public class TypeDump
     {
