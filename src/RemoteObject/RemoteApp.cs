@@ -67,7 +67,7 @@ namespace RemoteObject
         /// </summary>
         /// <param name="target">Process to create the provider for</param>
         /// <returns>A provider for the given process</returns>
-        public static RemoteApp Create(Process target)
+        public static RemoteApp Connect(Process target)
         {
             bool alreadyInjected = target.Modules.AsEnumerable().Any(module => module.ModuleName.Contains("BootstrapDLL"));
 
