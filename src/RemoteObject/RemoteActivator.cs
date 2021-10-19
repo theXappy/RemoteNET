@@ -14,12 +14,12 @@ namespace RemoteObject
     {
         private DiverCommunicator _communicator;
 
-        public RemoteActivator(DiverCommunicator communicator)
+        internal RemoteActivator(DiverCommunicator communicator)
         {
             _communicator = communicator;
         }
 
-        public RemoteObject Create(Type t, params object[] parameters)
+        public RemoteObject CreateInstance(Type t, params object[] parameters)
         {
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
@@ -35,7 +35,7 @@ namespace RemoteObject
                 }
                 else
                 {
-                    throw new Exception($"{nameof(RemoteActivator)}.{nameof(Create)} only works with primitive (int, " +
+                    throw new Exception($"{nameof(RemoteActivator)}.{nameof(CreateInstance)} only works with primitive (int, " +
                                         $"double, string,...) or remote (in {nameof(RemoteObject)}) parameters. " +
                                         $"The parameter at index {i} was of unsupported type {parameters.GetType()}");
                 }

@@ -41,6 +41,7 @@ namespace ScubaDiver
                 {"/domains", MakeDomainsResponse},
                 {"/heap", MakeHeapResponse},
                 {"/invoke", MakeInvokeResponse},
+                {"/create_object", MakeCreateObjectResponse},
                 {"/object", MakeObjectResponse},
                 {"/unpin", MakeUnpinResponse},
                 {"/types", MakeTypesResponse},
@@ -69,6 +70,107 @@ namespace ScubaDiver
                 // Object not pinned, try get it the hard way
                 return "{\"error\":\"Object at given address wasn't pinned\"}";
             }
+        }
+
+        private string MakeCreateObjectResponse(HttpListenerRequest arg)
+        {
+            Console.WriteLine("[Diver] Got /create_object request!");
+            string body = null;
+            using (StreamReader sr = new(arg.InputStream))
+            {
+                body = sr.ReadToEnd();
+            }
+
+            if (string.IsNullOrEmpty(body))
+            {
+                return "{\"error\":\"Missing body\"}";
+            }
+
+            TextReader textReader = new StringReader(body);
+            JsonReader jr = new JsonTextReader(textReader);
+            JsonSerializer js = new JsonSerializer();
+            var request = js.Deserialize<CtorInvocationRequest>(jr);
+            if (request == null)
+            {
+                return "{\"error\":\"Failed to deserialize body\"}";
+            }
+
+            Type t = ResolveType(request.TypeFullName);
+            if (t == null)
+            {
+                return "{\"error\":\"Failed to resolve type\"}";
+            }
+
+            List<object> paramsList = new();
+            if (request.Parameters.Any())
+            {
+                Console.WriteLine($"[Diver] Ctor'ing with parameters. Count: {request.Parameters.Count}");
+                foreach (var param in request.Parameters)
+                {
+                    Type paramType = ResolveType(param.Type);
+                    if (paramType == typeof(string))
+                    {
+                        // String are not encoded - they are themselves.
+                        paramsList.Add(param.EncodedValue);
+                        continue;
+                    }
+                    if (paramType.IsPrimitive)
+                    {
+                        // Call 'Parse' static method of the relevant type
+                        var parserMethod = paramType.GetMethodRecursive("Parse", new[] { typeof(string) });
+                        object parsedParam = parserMethod.Invoke(null, new object[1] { param.EncodedValue });
+                        paramsList.Add(parsedParam);
+                        continue;
+                    }
+                    else
+                    {
+                        throw new NotImplementedException(
+                            $"Don't know how to parse this parameter into an object of type `{paramType.FullName}`");
+                    }
+                }
+            }
+            else
+            {
+                // No parameters.
+                Console.WriteLine("[Diver] Ctor'ing without parameters");
+            }
+
+            object createdObject = null;
+            try
+            {
+                object[] paramsArray = paramsList.ToArray();
+                createdObject = Activator.CreateInstance(t, paramsArray);
+            }
+            catch
+            {
+                Debugger.Launch();
+                return "{\"error\":\"Activator.CreateInstance threw an exception\"}";
+            }
+
+            if (createdObject == null)
+            {
+                return "{\"error\":\"Activator.CreateInstance returned null\"}";
+            }
+
+            // Need to return the results. If it's primitive we'll encode it
+            // If it's non-primitive we pin it and send the address.
+            ulong resultsAddress;
+            if (createdObject.GetType().IsPrimitiveEtc())
+            {
+                // TODO: Something else?
+                resultsAddress = 0xeeffeeff;
+
+            }
+            else
+            {
+                // Pinning results
+                resultsAddress = PinObject(createdObject);
+            }
+
+
+            ObjectDump od = CreateObjectDump(createdObject, resultsAddress);
+            return JsonConvert.SerializeObject(od);
+
         }
 
         private string MakeInvokeResponse(HttpListenerRequest arg)
@@ -251,14 +353,21 @@ namespace ScubaDiver
                 PinObject(instance, objAddr);
             }
 
+            ObjectDump od = CreateObjectDump(instance, objAddr);
+            return JsonConvert.SerializeObject(od);
+        }
+
+        private static ObjectDump CreateObjectDump(object instance, ulong objAddr)
+        {
+            Type dumpedObjType = instance.GetType();
+            ObjectDump od;
             if (dumpedObjType.IsPrimitiveEtc() || instance is IEnumerable)
             {
-                var od = new ObjectDump()
+                od = new ObjectDump()
                 {
                     Address = objAddr,
                     PrimitiveValue = PrimitivesEncoder.Encode(instance)
                 };
-                return JsonConvert.SerializeObject(od);
             }
             else
             {
@@ -275,6 +384,7 @@ namespace ScubaDiver
                             hasEncValue = true;
                             encValue = PrimitivesEncoder.Encode(fieldValue);
                         }
+
                         fields.Add(new()
                         {
                             Name = fieldInfo.Name,
@@ -312,6 +422,7 @@ namespace ScubaDiver
                             hasEncValue = true;
                             encValue = PrimitivesEncoder.Encode(propValue);
                         }
+
                         props.Add(new()
                         {
                             Name = propInfo.Name,
@@ -330,15 +441,16 @@ namespace ScubaDiver
                     }
                 }
 
-                var od = new ObjectDump()
+                od = new ObjectDump()
                 {
                     Address = objAddr,
                     Type = dumpedObjType.ToString(),
                     Fields = fields,
                     Properties = props
                 };
-                return JsonConvert.SerializeObject(od);
             }
+
+            return od;
         }
 
         private bool UnpinObject(ulong objAddress)
@@ -564,10 +676,10 @@ namespace ScubaDiver
                         $"Mod Candidate for type resolution! {Path.GetFileNameWithoutExtension(module.Name)}");
                     var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
                     var typeNames = (from tuple in x
-                        let token = tuple.Token
-                        let resolvedType = module.ResolveToken(token) ?? null
-                        where resolvedType?.Name == name
-                        select new {MethodTable = tuple.MethodTable, Token = token, ClrType = resolvedType}).ToList();
+                                     let token = tuple.Token
+                                     let resolvedType = module.ResolveToken(token) ?? null
+                                     where resolvedType?.Name == name
+                                     select new { MethodTable = tuple.MethodTable, Token = token, ClrType = resolvedType }).ToList();
                     if (typeNames.Any())
                     {
                         clrTypeInfo = typeNames.First().ClrType;

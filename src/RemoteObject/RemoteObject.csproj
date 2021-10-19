@@ -61,7 +61,7 @@
     <Compile Include="RemoteObject.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Internal\RemoteObjectRef.cs" />
-    <Compile Include="RemoteObjectsProvider.cs" />
+    <Compile Include="RemoteApp.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ScubaDiver\ScubaDiver.csproj">

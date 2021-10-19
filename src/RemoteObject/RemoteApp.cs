@@ -1,13 +1,9 @@
 ﻿using System;
-using System.CodeDom.Compiler;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Reflection;
-using System.Resources;
 using RemoteObject.Internal;
 using RemoteObject.Internal.Extensions;
 using RemoteObject.Internal.Reflection;
@@ -17,23 +13,29 @@ using ScubaDiver.API;
 
 namespace RemoteObject
 {
-    public class RemoteObjectsProvider
+    public class RemoteApp
     {
         private readonly Process _procWithDiver;
         private readonly DiverCommunicator _communicator;
 
-        private RemoteObjectsProvider(Process procWithDiver, DiverCommunicator communicator)
+        public RemoteActivator Activator { get; private set; }
+
+        public DiverCommunicator Communicator => _communicator;
+
+        private RemoteApp(Process procWithDiver, DiverCommunicator communicator)
         {
             _procWithDiver = procWithDiver;
             _communicator = communicator;
+            Activator = new RemoteActivator(communicator);
         }
 
-        public IEnumerable<CandidateObject> QueryRemoteInstances(string typeFilter)
+        public IEnumerable<CandidateObject> QueryInstances(Type typeFilter) => QueryInstances(typeFilter.FullName);
+        public IEnumerable<CandidateObject> QueryInstances(string typeFullNameFilter)
         {
-            return _communicator.DumpHeap(typeFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type));
+            return _communicator.DumpHeap(typeFullNameFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type));
         }
 
-        public Type GetRemoteType(string typeFullName,string assembly = null)
+        public Type GetRemoteType(string typeFullName, string assembly = null)
         {
             RemoteTypesFactory rtf = new RemoteTypesFactory(TypesResolver.Instance);
             rtf.AllowOwnDumping(_communicator);
@@ -65,9 +67,9 @@ namespace RemoteObject
         /// </summary>
         /// <param name="target">Process to create the provider for</param>
         /// <returns>A provider for the given process</returns>
-        public static RemoteObjectsProvider Create(Process target)
+        public static RemoteApp Create(Process target)
         {
-            bool alreadyInjected = target.Modules.AsEnumerable().Any(module=>module.ModuleName.Contains("BootstrapDLL"));
+            bool alreadyInjected = target.Modules.AsEnumerable().Any(module => module.ModuleName.Contains("BootstrapDLL"));
 
             if (!alreadyInjected)
             {
@@ -123,7 +125,7 @@ namespace RemoteObject
             int diverPort = 9977;
             DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
 
-            return new RemoteObjectsProvider(target, com);
+            return new RemoteApp(target, com);
         }
 
     }

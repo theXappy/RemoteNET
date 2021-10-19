@@ -192,10 +192,9 @@ namespace ScubaDiver
             };
             var requestJsonBody = JsonConvert.SerializeObject(ctorInvocReq);
 
-            var resJson = SendRequest("invoke", null, requestJsonBody);
+            var resJson = SendRequest("create_object", null, requestJsonBody);
             ObjectDump res = JsonConvert.DeserializeObject<ObjectDump>(resJson, _withErrors);
             return res;
-
         }
     }
 }
