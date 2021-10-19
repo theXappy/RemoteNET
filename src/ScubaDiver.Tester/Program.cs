@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using RemoteObject;
@@ -45,7 +47,7 @@ namespace ScubaDiver.Tester
                 break;
             }
             Console.WriteLine($"Target Process: {target.ProcessName}");
-            RemoteObjectsProvider provider = RemoteObjectsProvider.Create(target);
+            RemoteApp remoteApp = RemoteApp.Create(target);
 
             List<RemoteObject.RemoteObject> remoteObjects = new List<RemoteObject.RemoteObject>();
             while (true)
@@ -72,7 +74,7 @@ namespace ScubaDiver.Tester
                                 // Assuming user wants all types
                                 typeName = null;
                             }
-                            var res = provider.QueryRemoteInstances(typeName).ToList();
+                            var res = remoteApp.QueryInstances(typeName).ToList();
                             Console.WriteLine("Instances:");
                             for (int i = 0; i < res.Count; i++)
                             {
@@ -88,7 +90,7 @@ namespace ScubaDiver.Tester
                             {
                                 try
                                 {
-                                    RemoteObject.RemoteObject remoteObject = provider.GetRemoteObject(addr);
+                                    RemoteObject.RemoteObject remoteObject = remoteApp.GetRemoteObject(addr);
                                     remoteObjects.Add(remoteObject);
                                     Console.WriteLine($"Get back this object: {remoteObject}");
                                     Console.WriteLine($"This object's local index is {remoteObjects.IndexOf(remoteObject)}");
@@ -140,10 +142,12 @@ namespace ScubaDiver.Tester
                             break;
                         case 5:
                             Console.WriteLine("Getting MMSData type...");
-                            var typeToCreate = provider.GetRemoteType("Samsung.SamsungFlow.Notification.Data.MMSData", "SamsungFlowFramework.NET");
+                            var typeToCreate = remoteApp.GetRemoteType("Samsung.SamsungFlow.Notification.Data.MMSData", "SamsungFlowFramework.NET");
                             Console.WriteLine($"The Type is: {typeToCreate}");
                             Console.WriteLine("Calling activator");
-                            var obj = Activator.CreateInstance(typeToCreate);
+
+                            var obj = remoteApp.Activator.CreateInstance(typeToCreate);
+                            Console.WriteLine("Got new object? "+obj);
                             break;
                         case 6:
                             // Exiting
