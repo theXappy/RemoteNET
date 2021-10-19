@@ -47,7 +47,7 @@ namespace ScubaDiver.Tester
                 break;
             }
             Console.WriteLine($"Target Process: {target.ProcessName}");
-            RemoteApp remoteApp = RemoteApp.Create(target);
+            RemoteApp remoteApp = RemoteApp.Connect(target);
 
             List<RemoteObject.RemoteObject> remoteObjects = new List<RemoteObject.RemoteObject>();
             while (true)
