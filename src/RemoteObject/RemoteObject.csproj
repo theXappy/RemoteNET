@@ -95,7 +95,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PreBuildEvent>xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\Win32\" "$(ProjectDir)\Resources"
-xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\Win64\" "$(ProjectDir)\Resources"
+xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\x64\" "$(ProjectDir)\Resources"
 
 powershell "Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force"</PreBuildEvent>
   </PropertyGroup>

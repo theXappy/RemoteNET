@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Reflection;
-using ScubaDiver;
+﻿using ScubaDiver;
 using ScubaDiver.API;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace RemoteObject.Internal.Reflection
 {
@@ -93,6 +93,11 @@ namespace RemoteObject.Internal.Reflection
 
             foreach (TypeDump.TypeMethod methodDump in typeDump.Methods)
             {
+                if (methodDump.ContainsGenericParameters)
+                {
+                    Debug.Write($"[RemoteTypesFactory] Skipping method {methodDump.Name} of {typeDump.Type} because it contains generic parameters.");
+                    continue;
+                }
                 List<ParameterInfo> parameters = new List<ParameterInfo>(methodDump.Parameters.Count);
                 foreach (TypeDump.TypeMethod.MethodParameter methodParameter in methodDump.Parameters)
                 {
@@ -104,24 +109,40 @@ namespace RemoteObject.Internal.Reflection
                             methodParameter.Type);
                         if (paramType == null)
                         {
-                            throw new Exception(
-                                $"Could not resolve type {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
+                            // TODO: Add stub method to indicate this error to the users?
+                            Debug.WriteLine(
+                                $"[RemoteTypesFactory] Could not resolve method {methodDump.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
                                 $"and it did not throw any exceptions (returned NULL).");
+                            continue;
                         }
                     }
-                    catch
+                    catch (Exception e)
                     {
-                        // remove on-going creation indication
-                        _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
-                        throw;
+                        // TODO: Add stub method to indicate this error to the users?
+                        Debug.WriteLine(
+                            $"[RemoteTypesFactory] Could not resolve method {methodDump.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
+                            $"and it threw this exception: " + e);
+                        continue;
                     }
 
                     RemoteParameterInfo rpi = new RemoteParameterInfo(methodParameter.Name, paramType);
                     parameters.Add(rpi);
                 }
 
-                Type returnType = ResolveTypeWhileCreating(typeDump.Type, methodDump.Name,
+                Type returnType;
+                try
+                {
+                    returnType = ResolveTypeWhileCreating(typeDump.Type, methodDump.Name,
                     methodDump.ReturnTypeAssembly, methodDump.ReturnTypeFullName);
+                }
+                catch (Exception e)
+                {
+                    // TODO: This sometimes throws because of generic results (like List<SomeAssembly.SomeObject>)
+                    Debug.WriteLine($"[RemoteTypesFactory] failed to create method {methodDump.Name} because it's return type could be created.\n" +
+                                    "The throw exception was: " + e);
+                    // TODO: Add stub method to indicate this error to the users?
+                    continue;
+                }
 
                 RemoteMethodInfo methodInfo =
                     new RemoteMethodInfo(output, returnType, methodDump.Name, parameters.ToArray());

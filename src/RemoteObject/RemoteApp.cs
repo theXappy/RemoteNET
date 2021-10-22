@@ -26,7 +26,7 @@ namespace RemoteObject
         {
             _procWithDiver = procWithDiver;
             _communicator = communicator;
-            Activator = new RemoteActivator(communicator);
+            Activator = new RemoteActivator(communicator, this);
         }
 
         public IEnumerable<CandidateObject> QueryInstances(Type typeFilter) => QueryInstances(typeFilter.FullName);
@@ -57,8 +57,9 @@ namespace RemoteObject
             {
                 throw new Exception("Could not dump remote object/type.", e);
             }
+            
 
-            var remoteObject = new RemoteObject(new RemoteObjectRef(od, td, _communicator));
+            var remoteObject = new RemoteObject(new RemoteObjectRef(od, td, _communicator), this);
             return remoteObject;
         }
 

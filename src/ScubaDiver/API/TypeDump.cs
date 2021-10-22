@@ -25,6 +25,15 @@ namespace ScubaDiver.API
                     Type = pi.ParameterType.FullName;
                     Assembly = pi.ParameterType.Assembly.GetName().Name;
                 }
+
+                public override string ToString()
+                {
+                    return 
+                        (string.IsNullOrEmpty(Assembly) ? string.Empty : (Assembly+".")) +
+                        (string.IsNullOrEmpty(Type) ? "UNKNOWN_TYPE" : Type) + " " +
+                           (string.IsNullOrEmpty(Name) ? "MISSING_NAME" : Name);
+
+                }
             }
 
             public string Visibility { get; set; }
@@ -32,6 +41,7 @@ namespace ScubaDiver.API
             public string ReturnTypeFullName { get; set; }
             public List<MethodParameter> Parameters { get; set; }
             public string ReturnTypeAssembly { get; set; }
+            public bool ContainsGenericParameters { get; set; }
 
             public TypeMethod()
             {
@@ -40,6 +50,7 @@ namespace ScubaDiver.API
             public TypeMethod(MethodInfo mi)
             {
                 Visibility = mi.IsPublic ? "Public" : "Private";
+                ContainsGenericParameters = mi.ContainsGenericParameters;
                 Name = mi.Name;
                 ReturnTypeFullName = mi.ReturnType.FullName;
                 ReturnTypeAssembly = mi.ReturnType.Assembly.GetName().Name;
@@ -58,6 +69,12 @@ namespace ScubaDiver.API
                            param1.Type == param2.Type;
                 });
                 return paramMatches.All(match => match == true);
+            }
+
+            public override string ToString()
+            {
+
+                return $"{this.ReturnTypeFullName} {this.Name}({string.Join(",", Parameters)})";
             }
         }
         public class TypeField

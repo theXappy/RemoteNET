@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -8,6 +9,7 @@ using Microsoft.CSharp.RuntimeBinder;
 
 namespace RemoteObject.Internal
 {
+    [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "}")]
     class DynamicRemoteObject : DynamicObject
     {
         enum MemberType
@@ -30,6 +32,14 @@ namespace RemoteObject.Internal
         private Dictionary<string, Action<object>> _propertiesSetters = new Dictionary<string, Action<object>>();
         private Dictionary<string, Func<object>> _propertiesGetters = new Dictionary<string, Func<object>>();
         private Dictionary<string, List<MethodOverload>> _methods = new Dictionary<string, List<MethodOverload>>();
+
+        public RemoteObject __ro;
+        private string __typeFullName;
+        public DynamicRemoteObject(RemoteObject ro)
+        {
+            __ro = ro;
+            __typeFullName = ro.GetType().FullName;
+        }
 
         // Expansion API
         /// <summary>
@@ -109,11 +119,32 @@ namespace RemoteObject.Internal
                     result = getter();
                     break;
                 case MemberType.Method:
+                    // Methods should go to "TryInvokeMember"
+                    result = null;
+                    return false;
+                default:
+                    throw new Exception($"No such member \"{binder.Name}\"");
+            }
+            return true;
+        }
+
+        public override bool TryInvokeMember(
+            InvokeMemberBinder binder,
+            object[] args,
+            out object result)
+        {
+            Console.WriteLine("[DynamicRemoteObject] TryInvokeMember called ~");
+            if (!_members.TryGetValue(binder.Name, out MemberType memberType))
+                throw new Exception($"No such member \"{binder.Name}\"");
+
+            switch (memberType)
+            {
+                case MemberType.Method:
                     var overloads = _methods[binder.Name];
                     if (overloads.Count == 1)
                     {
                         // Easy case - a unique function name so we can just return it.
-                        result = overloads.Single();
+                        result = overloads.Single().Proxy(args);
                     }
                     else
                     {
@@ -122,11 +153,14 @@ namespace RemoteObject.Internal
                                                           $"Method `{binder.Name}` had {overloads.Count} overloads registered.");
                     }
                     break;
+                case MemberType.Field:
+                case MemberType.Property:
                 default:
-                    throw new Exception($"No such member \"{binder.Name}\"");
+                    throw new Exception($"No such method \"{binder.Name}\"");
             }
             return true;
         }
+
 
         public override bool TrySetMember(SetMemberBinder binder, object value)
         {

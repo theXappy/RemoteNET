@@ -12,12 +12,18 @@ namespace RemoteObject
 {
     public class RemoteActivator
     {
+        private RemoteApp _app;
         private DiverCommunicator _communicator;
 
-        internal RemoteActivator(DiverCommunicator communicator)
+        internal RemoteActivator(DiverCommunicator communicator, RemoteApp app)
         {
             _communicator = communicator;
+            _app = app;
         }
+
+
+        public RemoteObject CreateInstance(string typeFullName, params object[] parameters)
+            => CreateInstance(_app.GetRemoteType(typeFullName), parameters);
 
         public RemoteObject CreateInstance(Type t, params object[] parameters)
         {
@@ -25,13 +31,18 @@ namespace RemoteObject
             for (int i = 0; i < parameters.Length; i++)
             {
                 object parameter = parameters[i];
-                if (parameter.GetType().IsPrimitiveEtc())
+                if (parameter.GetType().IsPrimitiveEtc() || parameter.GetType().IsEnum)
                 {
                     remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
                 }
                 else if (parameter is RemoteObject remoteArg)
                 {
                     remoteParams[i] = ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetType().FullName);
+                }
+                else if (parameter is DynamicRemoteObject dro)
+                {
+                    RemoteObject originRemoteObject = dro.__ro;
+                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetType().FullName);
                 }
                 else
                 {
@@ -53,7 +64,7 @@ namespace RemoteObject
                 throw new Exception("Could not dump remote object/type.", e);
             }
 
-            var remoteObject = new RemoteObject(new RemoteObjectRef(od, td, _communicator));
+            var remoteObject = new RemoteObject(new RemoteObjectRef(od, td, _communicator),_app);
             return remoteObject;
         }
     }
