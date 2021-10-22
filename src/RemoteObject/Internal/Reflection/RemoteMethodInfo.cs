@@ -4,7 +4,7 @@ using System.Reflection;
 using ScubaDiver;
 using ScubaDiver.Extensions;
 
-namespace RemoteObject.Internal.Reflection
+namespace RemoteNET.Internal.Reflection
 {
     public class RemoteMethodInfo : MethodInfo
     {

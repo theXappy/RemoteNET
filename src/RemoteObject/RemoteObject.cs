@@ -1,20 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Dynamic;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.Remoting.Messaging;
-using System.Text;
-using System.Threading.Tasks;
-using RemoteObject.Internal;
-using RemoteObject.Internal.Reflection;
+using RemoteNET.Internal;
+using RemoteNET.Internal.Reflection;
 using ScubaDiver;
 using ScubaDiver.API;
 using ScubaDiver.Extensions;
 using ScubaDiver.Utils;
 
-namespace RemoteObject
+namespace RemoteNET
 {
     public class RemoteObject : IDisposable
     {

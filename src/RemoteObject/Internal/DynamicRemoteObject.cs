@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CSharp.RuntimeBinder;
 
-namespace RemoteObject.Internal
+namespace RemoteNET.Internal
 {
     [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "}")]
     class DynamicRemoteObject : DynamicObject

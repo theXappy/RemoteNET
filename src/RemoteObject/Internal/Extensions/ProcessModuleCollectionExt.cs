@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace RemoteObject.Internal.Extensions
+namespace RemoteNET.Internal.Extensions
 {
     public static class ProcessModuleCollectionExt
     {

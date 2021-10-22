@@ -1,14 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using RemoteObject.Internal;
+using RemoteNET.Internal;
 using ScubaDiver;
 using ScubaDiver.API;
 using ScubaDiver.Extensions;
 
-namespace RemoteObject
+namespace RemoteNET
 {
     public class RemoteActivator
     {

@@ -1,11 +1,11 @@
-﻿using ScubaDiver;
-using ScubaDiver.API;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
+using ScubaDiver;
+using ScubaDiver.API;
 
-namespace RemoteObject.Internal.Reflection
+namespace RemoteNET.Internal.Reflection
 {
     public class RemoteTypesFactory
     {

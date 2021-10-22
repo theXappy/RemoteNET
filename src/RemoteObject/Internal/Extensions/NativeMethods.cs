@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace RemoteObject.Internal.Extensions
+namespace RemoteNET.Internal.Extensions
 {
     // Source: https://stackoverflow.com/a/33206186/4075549
     internal static class NativeMethods

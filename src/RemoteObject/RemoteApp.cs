@@ -4,14 +4,13 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using RemoteObject.Internal;
-using RemoteObject.Internal.Extensions;
-using RemoteObject.Internal.Reflection;
-using RemoteObject.Properties;
+using RemoteNET.Internal;
+using RemoteNET.Internal.Extensions;
+using RemoteNET.Internal.Reflection;
 using ScubaDiver;
 using ScubaDiver.API;
 
-namespace RemoteObject
+namespace RemoteNET
 {
     public class RemoteApp
     {

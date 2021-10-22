@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 
-namespace RemoteObject.Internal.Reflection
+namespace RemoteNET.Internal.Reflection
 {
     public class RemoteType : Type
     {

@@ -2,10 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace RemoteObject.Internal.Reflection
+namespace RemoteNET.Internal.Reflection
 {
     /// <summary>
     /// Resolves local and remote types. Contains a cache so the same TypeFullName object is returned for different

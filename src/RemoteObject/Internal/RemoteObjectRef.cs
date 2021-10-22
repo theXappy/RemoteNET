@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Linq;
-using RemoteObject.Internal.Reflection;
 using ScubaDiver;
 using ScubaDiver.API;
 
-namespace RemoteObject.Internal
+namespace RemoteNET.Internal
 {
     internal class RemoteObjectRef
     {
