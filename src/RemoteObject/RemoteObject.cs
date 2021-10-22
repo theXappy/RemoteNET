@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
 using System.Reflection;
@@ -17,13 +18,15 @@ namespace RemoteObject
 {
     public class RemoteObject : IDisposable
     {
+        private RemoteApp _app;
         private RemoteObjectRef _ref;
         private Type _type = null;
 
         public ulong RemoteToken => _ref.Token;
 
-        internal RemoteObject(RemoteObjectRef reference)
+        internal RemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
         {
+            _app = remoteApp;
             _ref = reference;
         }
 
@@ -52,7 +55,7 @@ namespace RemoteObject
 
         public dynamic Dynamify()
         {
-            DynamicRemoteObject dro = new DynamicRemoteObject();
+            DynamicRemoteObject dro = new DynamicRemoteObject(this);
             // Adding fields 
             TypeDump typeDump = _ref.GetTypeDump();
             foreach (var fieldInfo in typeDump.Fields)
@@ -80,7 +83,7 @@ namespace RemoteObject
                 }
             }
             // Adding properties
-            foreach (var propInfo in typeDump.Properties)
+            foreach (TypeDump.TypeProperty propInfo in typeDump.Properties)
             {
                 Action<object> setter = null;
                 Func<object> getter = null;
@@ -99,10 +102,17 @@ namespace RemoteObject
                         }
                         else
                         {
-                            // TODO: This is a non-primitive object so it's not encoded...
-                            // Don't know what to do here yet.
-                            // Skipping this property for now...
-                            throw new NotImplementedException("Can't get non-primitive properties yet");
+                            // Non primitive property - getting remote object.
+                            (bool hasResults, ObjectOrRemoteAddress returnedValue) = InvokeMethod("get_" + propInfo.Name, new ObjectOrRemoteAddress[0]);
+                            if (!hasResults || !returnedValue.IsRemoteAddress)
+                            {
+                                throw new NotImplementedException("Trying to call getter of remote " +
+                                                                  "property but either hasResults or " +
+                                                                  "returnedValue.IsRemoteAddress were false");
+                            }
+                            RemoteObject rObj = _app.GetRemoteObject(returnedValue.RemoteAddress);
+                            return rObj.Dynamify();
+                            //throw new NotImplementedException("Can't get non-primitive properties yet");
                         }
                     });
                 }
@@ -142,15 +152,26 @@ namespace RemoteObject
                 currTypeDump = currTypeDump.ParentDump;
             }
             // Adding all collected methods to the object
-            foreach (var methodInfo in allMethods)
+            foreach (TypeDump.TypeMethod methodInfo in allMethods)
             {
+                if (methodInfo.ContainsGenericParameters)
+                {
+                    // TODO: Support generic methods. For now their parameters aren't cprrectly parse
+                    // in the diver leaving us with missing types for them.
+                    continue;
+                }
+
                 // Creating proxy method
                 Func<object[], object> proxy = (args) =>
                  {
-                     var encodedArgs = new ObjectOrRemoteAddress[args.Length];
+                     ObjectOrRemoteAddress[] encodedArgs = new ObjectOrRemoteAddress[args.Length];
                      for (int i = 0; i < args.Length; i++)
                      {
-                         if (args[i] is RemoteObject remoteArg)
+                         if (args[i] == null)
+                         {
+                             encodedArgs[i] = ObjectOrRemoteAddress.Null;
+                         }
+                         else if (args[i] is RemoteObject remoteArg)
                          {
                              // Other remote object used as argument
                              encodedArgs[i] = ObjectOrRemoteAddress.FromToken(remoteArg._ref.Token, remoteArg._ref.GetTypeDump().Type);
@@ -189,6 +210,7 @@ namespace RemoteObject
                          }
                      }
                  };
+                Debug.WriteLine("@@@ HANDLING METHOD: " + methodInfo.ToString());
                 List<Type> argTypes = (from prmtr in methodInfo.Parameters
                                        let typeFullName = prmtr.Type
                                        let resolvedType = AppDomain.CurrentDomain.GetType(typeFullName)
@@ -206,7 +228,7 @@ namespace RemoteObject
 
         public override string ToString()
         {
-            return $"RemoteObject. Reference: [{_ref}]";
+            return $"RemoteObject. Type: {_type.FullName ?? "UNK"} Reference: [{_ref}]";
         }
     }
 }

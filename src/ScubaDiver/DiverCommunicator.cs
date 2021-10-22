@@ -133,62 +133,26 @@ namespace ScubaDiver
         public InvocationResults InvokeMethod(ulong addr, string methodName,
             params ObjectOrRemoteAddress[] args)
         {
-            var convertedArgs = new List<InvocationArgument>();
-            foreach (var arg in args)
-            {
-                InvocationArgument invocArg = new();
-                invocArg.Type = arg.Type;
-                if (arg.IsRemoteAddress)
-                {
-                    invocArg.PinnedObjectAddress = arg.RemoteAddress;
-                }
-                else
-                {
-                    // Hopefully it's a primitive that can be restored using `Parse` on the Diver's end
-                    invocArg.EncodedValue = arg.EncodedObject;
-                }
-
-                convertedArgs.Add(invocArg);
-            }
-
             InvocationRequest invocReq = new InvocationRequest()
             {
                 ObjAddress = addr,
                 MethodName = methodName,
-                Parameters = convertedArgs
+                Parameters = args.ToList()
             };
             var requestJsonBody = JsonConvert.SerializeObject(invocReq);
 
             var resJson = SendRequest("invoke", null, requestJsonBody);
 
-            InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson);
+            InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
             return res;
         }
 
         public ObjectDump CreateObject(string typeFullName, ObjectOrRemoteAddress[] args)
         {
-            var convertedArgs = new List<InvocationArgument>();
-            foreach (var arg in args)
-            {
-                InvocationArgument invocArg = new();
-                invocArg.Type = arg.Type;
-                if (arg.IsRemoteAddress)
-                {
-                    invocArg.PinnedObjectAddress = arg.RemoteAddress;
-                }
-                else
-                {
-                    // Hopefully it's a primitive that can be restored using `Parse` on the Diver's end
-                    invocArg.EncodedValue = arg.EncodedObject;
-                }
-
-                convertedArgs.Add(invocArg);
-            }
-
             var ctorInvocReq = new CtorInvocationRequest()
             {
                 TypeFullName = typeFullName,
-                Parameters = convertedArgs
+                Parameters = args.ToList()
             };
             var requestJsonBody = JsonConvert.SerializeObject(ctorInvocReq);
 

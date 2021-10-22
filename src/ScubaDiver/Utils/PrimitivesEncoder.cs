@@ -18,7 +18,7 @@ namespace ScubaDiver.Utils
         /// <returns>Encoded value as a string</returns>
         public static string Encode(object toEncode)
         {
-            if (toEncode.GetType().IsPrimitiveEtc())
+            if (toEncode.GetType().IsPrimitiveEtc() || toEncode.GetType().IsEnum)
             {
                 // These types can just be ".Parse()"-ed back
                 return toEncode.ToString();

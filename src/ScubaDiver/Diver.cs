@@ -105,29 +105,7 @@ namespace ScubaDiver
             if (request.Parameters.Any())
             {
                 Console.WriteLine($"[Diver] Ctor'ing with parameters. Count: {request.Parameters.Count}");
-                foreach (var param in request.Parameters)
-                {
-                    Type paramType = ResolveType(param.Type);
-                    if (paramType == typeof(string))
-                    {
-                        // String are not encoded - they are themselves.
-                        paramsList.Add(param.EncodedValue);
-                        continue;
-                    }
-                    if (paramType.IsPrimitive)
-                    {
-                        // Call 'Parse' static method of the relevant type
-                        var parserMethod = paramType.GetMethodRecursive("Parse", new[] { typeof(string) });
-                        object parsedParam = parserMethod.Invoke(null, new object[1] { param.EncodedValue });
-                        paramsList.Add(parsedParam);
-                        continue;
-                    }
-                    else
-                    {
-                        throw new NotImplementedException(
-                            $"Don't know how to parse this parameter into an object of type `{paramType.FullName}`");
-                    }
-                }
+                paramsList = request.Parameters.Select(ParseParameterObject).ToList();
             }
             else
             {
@@ -173,6 +151,45 @@ namespace ScubaDiver
 
         }
 
+        private object ParseParameterObject(ObjectOrRemoteAddress param)
+        {
+            if (param.IsNull)
+            {
+                // Address 0 indicates the null parameter (like in good ol' C)
+                return null;
+            }
+
+            Type paramType = ResolveType(param.Type);
+            if (paramType == typeof(string))
+            {
+                // String are not encoded - they are themselves.
+                return param.EncodedObject;
+            }
+
+            if (paramType.IsPrimitive)
+            {
+                // Call 'Parse' static method of the relevant type
+                var parserMethod = paramType.GetMethodRecursive("Parse", new[] {typeof(string)});
+                object parsedParam = parserMethod.Invoke(null, new object[1] {param.EncodedObject});
+                return (parsedParam);
+            }
+
+            if (paramType.IsEnum)
+            {
+                object parsedParam = Enum.Parse(paramType, param.EncodedObject);
+                return (parsedParam);
+            }
+
+            if (param.IsRemoteAddress && _pinnedObjects.TryGetValue(param.RemoteAddress, out object pinnedArg))
+            {
+                return (pinnedArg);
+            }
+
+            Debugger.Launch();
+            throw new NotImplementedException(
+                $"Don't know how to parse this parameter into an object of type `{paramType.FullName}`");
+        }
+
         private string MakeInvokeResponse(HttpListenerRequest arg)
         {
             Console.WriteLine("[Diver] Got /Invoke request!");
@@ -196,39 +213,41 @@ namespace ScubaDiver
                 return "{\"error\":\"Failed to deserialize body\"}";
             }
 
-            ClrObject clrObj = _runtime.Heap.GetObject(request.ObjAddress);
-            if (clrObj.Type == null)
+            // Check if we have this objects in our pinned pool
+            object instance = null;
+            Type dumpedObjType;
+            if (_pinnedObjects.TryGetValue(request.ObjAddress, out instance))
             {
-                return "{\"error\":\"'address' points at an invalid address\"}";
+                // Found pinned object!
+                dumpedObjType = instance.GetType();
+            }
+            else
+            {
+                // Object not pinned, try get it the hard way
+                ClrObject clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                if (clrObj.Type == null)
+                {
+                    return "{\"error\":\"'address' points at an invalid address\"}";
+                }
+
+                // Make sure it's still in place
+                RefreshRuntime();
+                clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                if (clrObj.Type == null)
+                {
+                    return
+                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address.\"}";
+                }
+
+                dumpedObjType = clrObj.Type.GetRealType();
+                instance = _converter.ConvertFromIntPtr(clrObj.Address);
             }
 
             List<object> paramsList = new();
             if (request.Parameters.Any())
             {
                 Console.WriteLine($"[Diver] Invoking with parameters. Count: {request.Parameters.Count}");
-                foreach (var param in request.Parameters)
-                {
-                    Type paramType = ResolveType(param.Type);
-                    if (paramType == typeof(string))
-                    {
-                        // String are not encoded - they are themselves.
-                        paramsList.Add(param.EncodedValue);
-                        continue;
-                    }
-                    if (paramType.IsPrimitive)
-                    {
-                        // Call 'Parse' static method of the relevant type
-                        var parserMethod = paramType.GetMethodRecursive("Parse", new[] { typeof(string) });
-                        object parsedParam = parserMethod.Invoke(null, new object[1] { param.EncodedValue });
-                        paramsList.Add(parsedParam);
-                        continue;
-                    }
-                    else
-                    {
-                        throw new NotImplementedException(
-                            $"Don't know how to parse this parameter into an object of type `{paramType.FullName}`");
-                    }
-                }
+                paramsList = request.Parameters.Select(ParseParameterObject).ToList();
             }
             else
             {
@@ -236,24 +255,20 @@ namespace ScubaDiver
                 Console.WriteLine("[Diver] Invoking without parameters");
             }
 
-            Type realType = clrObj.Type.GetRealType();
-            Console.WriteLine($"[Diver] Resolved target object type: {realType.FullName}");
-            var method = realType.GetMethodRecursive(request.MethodName, paramsList.Select(p => p.GetType()).ToArray());
+            Console.WriteLine($"[Diver] Resolved target object type: {dumpedObjType.FullName}");
+            // Infer parameter types from received parameters.
+            // Note that for 'null' arguments we don't know the type so we use a "Wild Card" type
+            Type[] argumentTypes = paramsList.Select(p => p?.GetType() ?? new WildCardType()).ToArray();
+
+            // Search the method with the matching signature
+            var method = dumpedObjType.GetMethodRecursive(request.MethodName, argumentTypes);
             if (method == null)
             {
+                Debugger.Launch();
                 Console.WriteLine($"[Diver] Failed to Resolved method :/");
                 return "{\"error\":\"Couldn't find method in type.\"}";
             }
             Console.WriteLine($"[Diver] Resolved method: {method.Name}, Containing Type: {method.DeclaringType}");
-
-            Console.WriteLine($"[Diver] Trying to get object at address {clrObj.Address}");
-            object instance;
-            if (!_pinnedObjects.TryGetValue(request.ObjAddress, out instance))
-            {
-                Console.WriteLine($"[Diver] Failed to get pinned object :/");
-                return "{\"error\":\"Couldn't find pinned object with given address.\"}";
-            }
-            Console.WriteLine($"[Diver] Results of object retrieval: {instance}");
 
             object results = null;
             try
@@ -463,6 +478,7 @@ namespace ScubaDiver
             // Need to pin the object (and it's not already pinned)
             GCHandle handle = GCHandle.Alloc(instance);
             objAddress ??= (ulong)GCHandle.ToIntPtr(handle);
+            Console.WriteLine($"[Diver] Pinning object {instance} with address {objAddress}");
             _pinnedObjects[objAddress.Value] = instance;
             return objAddress.Value;
         }
@@ -656,6 +672,11 @@ namespace ScubaDiver
 
         private Type ResolveType(string name, string assembly = null)
         {
+            if (string.IsNullOrEmpty(name))
+            {
+                Debugger.Launch();
+            }
+
             Console.WriteLine($"[Diver] Trying to resolve type. [Assembly:{assembly}, Type:{name}]");
             IList<ClrModule> assembliesToSearch = _runtime.AppDomains.First().Modules;
             if (assembly != null)

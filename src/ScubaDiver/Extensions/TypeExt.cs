@@ -1,11 +1,30 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace ScubaDiver.Extensions
 {
     public static class TypeExt
     {
+        public class WildCardEnabledTypesComparer : IEqualityComparer<Type>
+        {
+            public bool Equals(Type x, Type y)
+            {
+                return x is WildCardType ||
+                       y is WildCardType ||
+                       x.IsAssignableFrom(y);
+            }
+
+            public int GetHashCode(Type obj)
+            {
+                return obj.GetHashCode();
+            }
+        }
+
+        private static WildCardEnabledTypesComparer _wildCardTypesComparer = new WildCardEnabledTypesComparer();
+
         /// <summary>
         /// Searches a type for a specific method. If not found searches its ancestors.
         /// </summary>
@@ -15,9 +34,11 @@ namespace ScubaDiver.Extensions
         /// <returns></returns>
         public static MethodInfo GetMethodRecursive(this Type t, string methodName, Type[] parameterTypes)
         {
-            var method = t.GetMethods((BindingFlags)0xffff)
-                            .SingleOrDefault(m => m.Name == methodName && 
-                                                  m.GetParameters().Select(pi=>pi.ParameterType).SequenceEqual(parameterTypes));
+
+            var method = t.GetMethods((BindingFlags) 0xffff)
+                .SingleOrDefault(m => m.Name == methodName &&
+                                      m.GetParameters().Select(pi => pi.ParameterType)
+                                          .SequenceEqual(parameterTypes, _wildCardTypesComparer));
             if (method != null)
             {
                 return method;
