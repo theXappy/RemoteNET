@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using RemoteObject;
+using RemoteNET;
 
 namespace ScubaDiver.Tester
 {
@@ -49,7 +49,7 @@ namespace ScubaDiver.Tester
             Console.WriteLine($"Target Process: {target.ProcessName}");
             RemoteApp remoteApp = RemoteApp.Connect(target);
 
-            List<RemoteObject.RemoteObject> remoteObjects = new List<RemoteObject.RemoteObject>();
+            List<RemoteObject> remoteObjects = new List<RemoteObject>();
             while (true)
             {
                 Console.WriteLine("Menu:");
@@ -90,7 +90,7 @@ namespace ScubaDiver.Tester
                             {
                                 try
                                 {
-                                    RemoteObject.RemoteObject remoteObject = remoteApp.GetRemoteObject(addr);
+                                    RemoteObject remoteObject = remoteApp.GetRemoteObject(addr);
                                     remoteObjects.Add(remoteObject);
                                     Console.WriteLine($"Get back this object: {remoteObject}");
                                     Console.WriteLine($"This object's local index is {remoteObjects.IndexOf(remoteObject)}");

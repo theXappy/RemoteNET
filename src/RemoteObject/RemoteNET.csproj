@@ -7,8 +7,8 @@
     <ProjectGuid>{35EEE1BC-604F-4737-A6CD-21FF5A88D9E8}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>RemoteObject</RootNamespace>
-    <AssemblyName>RemoteObject</AssemblyName>
+    <RootNamespace>RemoteNET</RootNamespace>
+    <AssemblyName>RemoteNET</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>

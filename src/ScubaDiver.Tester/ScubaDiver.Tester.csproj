@@ -49,9 +49,9 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\RemoteObject\RemoteObject.csproj">
+    <ProjectReference Include="..\RemoteObject\RemoteNET.csproj">
       <Project>{35EEE1BC-604F-4737-A6CD-21FF5A88D9E8}</Project>
-      <Name>RemoteObject</Name>
+      <Name>RemoteNET</Name>
     </ProjectReference>
     <ProjectReference Include="..\ScubaDiver\ScubaDiver.csproj">
       <Project>{8df5d538-941d-44e8-803e-9e135926ebe8}</Project>
