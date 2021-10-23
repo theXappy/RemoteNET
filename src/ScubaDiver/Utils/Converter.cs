@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reflection.Emit;
+using ScubaDiver.Extensions;
 
 namespace ScubaDiver.Utils
 {
@@ -37,11 +38,17 @@ namespace ScubaDiver.Utils
             }
         }
 
-        public T ConvertFromIntPtr(IntPtr pObj)
+        public T ConvertFromIntPtr(IntPtr pObj, IntPtr expectedMethodTable)
         {
+            // Reading Method Table (MT) of the object to make sure we 
+            // aren't mistakenly pointing at another type by now (could be caused by the GC)
+            IntPtr actualMethodTable = pObj.GetMethodTable();
             return myConverter(pObj);
         }
 
-        public T ConvertFromIntPtr(ulong pObj) => ConvertFromIntPtr(new IntPtr((long) pObj));
+        public T ConvertFromIntPtr(ulong pObj, ulong expectedMethodTable) =>
+            ConvertFromIntPtr(
+                new IntPtr((long) pObj),
+                new IntPtr((long) expectedMethodTable));
     }
 }
