@@ -49,7 +49,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\RemoteObject\RemoteNET.csproj">
+    <ProjectReference Include="..\RemoteNET\RemoteNET.csproj">
       <Project>{35EEE1BC-604F-4737-A6CD-21FF5A88D9E8}</Project>
       <Name>RemoteNET</Name>
     </ProjectReference>
