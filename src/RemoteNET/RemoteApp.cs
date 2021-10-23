@@ -70,6 +70,8 @@ namespace RemoteNET
         /// <returns>A provider for the given process</returns>
         public static RemoteApp Connect(Process target)
         {
+            // TODO: If target is our own process run a local Diver without DLL injections
+
             bool alreadyInjected = target.Modules.AsEnumerable().Any(module => module.ModuleName.Contains("BootstrapDLL"));
 
             if (!alreadyInjected)
