@@ -43,6 +43,10 @@ namespace ScubaDiver.Utils
             // Reading Method Table (MT) of the object to make sure we 
             // aren't mistakenly pointing at another type by now (could be caused by the GC)
             IntPtr actualMethodTable = pObj.GetMethodTable();
+            if (actualMethodTable != expectedMethodTable)
+            {
+                throw new ArgumentException("Actual Method Table value was not as expected");
+            }
             return myConverter(pObj);
         }
 
