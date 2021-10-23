@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using ScubaDiver.API;
 using ScubaDiver.Extensions;
 using ScubaDiver.Utils;
+using Exception = System.Exception;
 
 namespace ScubaDiver
 {
@@ -239,8 +240,17 @@ namespace ScubaDiver
                         "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address.\"}";
                 }
 
+                ulong mt = clrObj.Type.MethodTable;
                 dumpedObjType = clrObj.Type.GetRealType();
-                instance = _converter.ConvertFromIntPtr(clrObj.Address);
+                try
+                {
+                    instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
+                }
+                catch(Exception)
+                {
+                    return
+                        "{\"error\":\"Couldn't get handle to requested object. It could be because the Method Table or a GC collection happened.\"}";
+                }
             }
 
             List<object> paramsList = new();
@@ -359,8 +369,8 @@ namespace ScubaDiver
 
                 dumpedObjType = clrObj.Type.GetRealType();
 
-                // Using a cool trick to get reference for the object
-                instance = _converter.ConvertFromIntPtr(clrObj.Address);
+                ulong mt = clrObj.Type.MethodTable;
+                instance = _converter.ConvertFromIntPtr(clrObj.Address,mt);
             }
 
             if (pinningRequested & !alreadyPinned)

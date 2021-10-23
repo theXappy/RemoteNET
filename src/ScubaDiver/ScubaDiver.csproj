@@ -41,6 +41,7 @@
     <Compile Include="DiverCommunicator.cs" />
     <Compile Include="Extensions\ClrExt.cs" />
     <Compile Include="API\InvocationRequest.cs" />
+    <Compile Include="Extensions\IntPtrExt.cs" />
     <Compile Include="Extensions\WildCardType.cs" />
     <Compile Include="ObjectOrRemoteAddress.cs" />
     <Compile Include="Utils\Converter.cs" />

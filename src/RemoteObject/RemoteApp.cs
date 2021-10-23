@@ -7,6 +7,7 @@ using System.Linq;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using RemoteNET.Internal.Reflection;
+using RemoteNET.Properties;
 using ScubaDiver;
 using ScubaDiver.API;
 
