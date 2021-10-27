@@ -1,3 +1,4 @@
+![icon](https://raw.githubusercontent.com/theXappy/RemoteNET/main/icon.png)
 # RemoteNET
 This library lets you examine, create and interact with remote objects in other .NET (framework) processes.  
 It's like [System.Runtime.Remoting](https://docs.microsoft.com/en-us/dotnet/api/system.runtime.remoting?view=net-5.0) except the other app doesn't need to be compiled (or consent) to support it.
