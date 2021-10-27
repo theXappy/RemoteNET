@@ -53,14 +53,14 @@ Process.Start(tempOutputFile);
 ## How To Use
 This section documents most parts of the library's API which you'll likely need.
 
-### Setup
+### ★ Setup
 To start playing with a remote process you need to create a `RemoteApp` object like so:
 ```C#
 Process target =  Process.GetProcessesByName("OtherDotNetAppName").Single();
 RemoteApp remoteApp = RemoteApp.Connect(target);
 ```
 
-### Getting Remote Objects
+### ★ Getting Remote Objects
 RemoteNET allows you to interact with existing objects and create new ones.  
 **To find existing objects** you'll need to search the remote heap.  
 Use `RemoteApp.QueryInstances` to find possible candidate for the desired object and `RemoteApp.GetRemoteObject` to get a handle of a candidate.  
@@ -83,7 +83,7 @@ RemoteObject remoteStringBuilder = remoteApp.Activator.CreateInstance(typeof(Str
 RemoteObject remoteStringWriter = remoteApp.Activator.CreateInstance(typeof(StringWriter), remoteStringBuilder);
 ```
 
-### Reading Remote Fields/Properties
+### ★ Reading Remote Fields/Properties
 To allow a smooth coding expereince RemoteNET is utilizing a special dynamic object which any `RemoteObject` can turn into.  
 This object can be used to access field/properties just if they were field/properties of a local object:
 ```C#
@@ -102,7 +102,7 @@ foreach (CandidateObject candidate in sqlConCandidates)
 }
 ```
 
-### Invoking Remote Methods
+### ★ Invoking Remote Methods
 Just like accessing fields, invoking methods can be done on the dynamic objects.  
 This fun examples dumps all private RSA keys (stored in `RSACryptoServiceProvider`s) which are found in the target's memory:
 ```C#
