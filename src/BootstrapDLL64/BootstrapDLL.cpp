@@ -8,9 +8,23 @@
 #include "BootstrapDLL.h"
 #include <stdio.h>
 
-DllExport void LoadManagedProject(const wchar_t * managedDllLocation)
+DllExport void LoadManagedProject(const wchar_t * bootstrapDllArg)
 {
 	HRESULT hr;
+	wchar_t argCopy[MAX_PATH];
+	wcscpy_s(argCopy, bootstrapDllArg);
+	argCopy[MAX_PATH - 1] = 0;
+	wchar_t* separator = wcsstr(argCopy, L"*");
+	if (separator == NULL)
+	{
+		printf("[Bootstrap ] ERROR: Failed to find separator (*) in BootstrapDLL argument:");
+		wprintf(L"%s\n", argCopy);
+		return;
+	}
+	// Splitting argument by replacing separator with null
+	*separator = NULL;
+	wchar_t* managedDllLocation = argCopy;
+	wchar_t* scubaDiverArg = separator + 1;
 
 	// All of this code is to spawn a console.
 	if (true) {
@@ -26,6 +40,7 @@ DllExport void LoadManagedProject(const wchar_t * managedDllLocation)
 
 		printf("[Bootstrap] Can you see me?\n");
 		printf("[Bootstrap] managedDllLocation = %ls\n", managedDllLocation);
+		printf("[Bootstrap] scubaDiverArg = %ls\n", scubaDiverArg);
 		fflush(stdout);
 	}
 
@@ -38,7 +53,7 @@ DllExport void LoadManagedProject(const wchar_t * managedDllLocation)
 			managedDllLocation,
 			L"ScubaDiver.Diver",
 			L"EntryPoint",
-			L"Argument",
+			scubaDiverArg,
 			&result);
 	}
 	else {

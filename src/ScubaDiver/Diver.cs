@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -503,14 +503,15 @@ namespace ScubaDiver
             _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
             _runtime = _dt.ClrVersions.Single().CreateRuntime();
         }
-        public void Dive()
+        public void Dive(ushort listenPort)
         {
             // Start session
             RefreshRuntime();
             HttpListener listener = new HttpListener();
-            listener.Prefixes.Add("http://127.0.0.1:9977/");
+            string listeningUrl = $"http://127.0.0.1:{listenPort}/";
+            listener.Prefixes.Add(listeningUrl);
             listener.Start();
-            Console.WriteLine("[Diver] Listening...");
+            Console.WriteLine($"[Diver] Listening on {listeningUrl}...");
 
             Dispatcher(listener);
 
@@ -800,7 +801,8 @@ namespace ScubaDiver
             try
             {
                 _instance = new Diver();
-                _instance.Dive();
+                ushort port = ushort.Parse(pwzArgument);
+                _instance.Dive(port);
 
                 // Diver killed
                 Console.WriteLine("[Diver] Diver finished gracefully, Entry point returning");

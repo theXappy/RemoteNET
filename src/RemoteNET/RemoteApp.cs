@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -73,6 +73,8 @@ namespace RemoteNET
             // TODO: If target is our own process run a local Diver without DLL injections
 
             bool alreadyInjected = target.Modules.AsEnumerable().Any(module => module.ModuleName.Contains("BootstrapDLL"));
+            // To make the Diver's port predicatable even when re-attaching we'll derieve it from the PID:
+            ushort diverPort = (ushort) target.Id;
 
             if (!alreadyInjected)
             {
@@ -108,7 +110,10 @@ namespace RemoteNET
                     diverZip.ExtractToDirectory(tempDir);
                 }
 
-                var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id}");
+                string scubaDiverDllPath = Directory.EnumerateFiles(scubaPath)
+                    .Single(scubaFile => scubaFile.EndsWith("ScubaDiver.dll"));
+
+                var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id} {scubaDiverDllPath} {diverPort}");
                 startInfo.WorkingDirectory = tempDir;
                 startInfo.UseShellExecute = false;
                 startInfo.RedirectStandardOutput = true;
@@ -125,7 +130,6 @@ namespace RemoteNET
 
             // TODO: Make it configurable
             string diverAddr = "127.0.0.1";
-            int diverPort = 9977;
             DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
 
             return new RemoteApp(target, com);

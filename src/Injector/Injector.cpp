@@ -13,8 +13,9 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-	if (argc < 2) {
-		printf("Usage: %s PID\nPID - Process ID to inject into.", argv[0]);
+	if (argc < 4) {
+		printf("Usage: %s PID\nPID SCUBA_DIVER_PATH SCUBA_DIVER_ARG", argv[0]);
+		return 1;
 	}
 	printf("Starting...\n");
 #ifdef _WIN64
@@ -27,12 +28,17 @@ int main(int argc, char** argv)
 	char DllName[MAX_PATH];
 	GetCurrentDirectoryA(MAX_PATH, DllName);
 
-	// Path to DLL - Injected payload C# code
-	wchar_t DllNameW[MAX_PATH];
-	GetCurrentDirectory(MAX_PATH, DllNameW);
-	wcscat_s(DllNameW, L"\\Scuba\\ScubaDiver.dll");
-	printf("Payload DLL Path: %ls\n", DllNameW);
+	// Convert arguments to wchar_t[] and concat
+	wchar_t BootstrapDllArg[MAX_PATH];
+	size_t convertedChars = 0;
+	mbstowcs_s(&convertedChars, BootstrapDllArg, MAX_PATH, argv[2], _TRUNCATE);
+	wcscat_s(BootstrapDllArg, L"*");
 
+	wchar_t ScubaDiverDllArg[MAX_PATH];
+	mbstowcs_s(&convertedChars, ScubaDiverDllArg, MAX_PATH, argv[3], _TRUNCATE);
+
+	wcscat_s(BootstrapDllArg, ScubaDiverDllArg);
+	printf("BootstrapDLL encoded argument: %ls\n", BootstrapDllArg);
 
 	DWORD Pid = atoi(argv[1]);
 #ifdef _WIN64
@@ -42,7 +48,7 @@ int main(int argc, char** argv)
 #endif
 
 	printf("[.] Injecting BootstrapDLL into %d\n", Pid);
-	InjectAndRunThenUnload(Pid, DllName, "LoadManagedProject", DllNameW);
+	InjectAndRunThenUnload(Pid, DllName, "LoadManagedProject", BootstrapDllArg);
 
 	printf("[.] Done!");
 
