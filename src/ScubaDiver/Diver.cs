@@ -214,45 +214,67 @@ namespace ScubaDiver
                 return "{\"error\":\"Failed to deserialize body\"}";
             }
 
-            // Check if we have this objects in our pinned pool
+            // Need to figure target instance and the target type.
+            // In case of a static call the target instance stays null.
             object instance = null;
             Type dumpedObjType;
-            if (_pinnedObjects.TryGetValue(request.ObjAddress, out instance))
+            if (request.ObjAddress == 0)
             {
-                // Found pinned object!
-                dumpedObjType = instance.GetType();
+                //
+                // Null target - static call
+                //
+
+                dumpedObjType = ResolveType(request.TypeFullName);
             }
             else
             {
-                // Object not pinned, try get it the hard way
-                ClrObject clrObj = _runtime.Heap.GetObject(request.ObjAddress);
-                if (clrObj.Type == null)
-                {
-                    return "{\"error\":\"'address' points at an invalid address\"}";
-                }
+                //
+                // Non-null target object address. Non-static call
+                //
 
-                // Make sure it's still in place
-                RefreshRuntime();
-                clrObj = _runtime.Heap.GetObject(request.ObjAddress);
-                if (clrObj.Type == null)
+                // Check if we have this objects in our pinned pool
+                if (_pinnedObjects.TryGetValue(request.ObjAddress, out instance))
                 {
-                    return
-                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address.\"}";
+                    // Found pinned object!
+                    dumpedObjType = instance.GetType();
                 }
+                else
+                {
+                    // Object not pinned, try get it the hard way
+                    ClrObject clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                    if (clrObj.Type == null)
+                    {
+                        return "{\"error\":\"'address' points at an invalid address\"}";
+                    }
 
-                ulong mt = clrObj.Type.MethodTable;
-                dumpedObjType = clrObj.Type.GetRealType();
-                try
-                {
-                    instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
-                }
-                catch(Exception)
-                {
-                    return
-                        "{\"error\":\"Couldn't get handle to requested object. It could be because the Method Table or a GC collection happened.\"}";
+                    // Make sure it's still in place
+                    RefreshRuntime();
+                    clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                    if (clrObj.Type == null)
+                    {
+                        return
+                            "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address.\"}";
+                    }
+
+                    ulong mt = clrObj.Type.MethodTable;
+                    dumpedObjType = clrObj.Type.GetRealType();
+                    try
+                    {
+                        instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
+                    }
+                    catch (Exception)
+                    {
+                        return
+                            "{\"error\":\"Couldn't get handle to requested object. It could be because the Method Table or a GC collection happened.\"}";
+                    }
                 }
             }
 
+
+            //
+            // We have our target and it's type. No look for a matching overload for the
+            // function to invoke.
+            //
             List<object> paramsList = new();
             if (request.Parameters.Any())
             {

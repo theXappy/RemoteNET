@@ -85,7 +85,7 @@ namespace RemoteNET.Internal
         public InvocationResults InvokeMethod(string methodName, ObjectOrRemoteAddress[] args)
         {
             ThrowIfReleased();
-            return _creatingCommunicator.InvokeMethod(_remoteObjectInfo.Address, methodName, args);
+            return _creatingCommunicator.InvokeMethod(_remoteObjectInfo.Address, _remoteObjectInfo.Type, methodName, args);
         }
 
         /// <summary>

@@ -31,7 +31,7 @@ namespace RemoteNET
             {
                 RemoteTypesFactory rtFactory = new RemoteTypesFactory(TypesResolver.Instance);
                 rtFactory.AllowOwnDumping(_ref.Communicator);
-                _type = rtFactory.Create(_ref.GetTypeDump());
+                _type = rtFactory.Create(this._app, _ref.GetTypeDump());
             }
 
             return _type;
