@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using RemoteNET;
+using RemoteNET.Internal.Extensions;
 
 namespace ScubaDiver.Tester
 {
@@ -26,7 +27,7 @@ namespace ScubaDiver.Tester
             {
                 Console.WriteLine("Enter process name (or substring)");
                 string procName = Console.ReadLine();
-                var candidateProcs = Process.GetProcesses().Where(proc=>proc.ProcessName.Contains(procName)).ToArray();
+                var candidateProcs = Process.GetProcesses().Where(proc => proc.ProcessName.Contains(procName)).ToArray();
                 if (candidateProcs.Length == 0)
                 {
                     Console.WriteLine("No processes found.");
@@ -40,14 +41,33 @@ namespace ScubaDiver.Tester
                 Console.WriteLine("There were too many results:");
                 for (int i = 0; i < candidateProcs.Length; i++)
                 {
-                    Console.WriteLine($"{i + 1}. {candidateProcs[i].ProcessName}");
+                    Process curr = candidateProcs[i];
+                    Console.WriteLine($"{i + 1}. {curr.ProcessName} " +
+                                      $"(ID = {curr.Id}) " +
+                                      $"[Parent: {curr.GetParent().ProcessName} (ID = {curr.GetParent().Id})]");
                 }
 
-                target = candidateProcs.First();
+                // Get the only process which doesn't have a parent with the same name.
+                Console.WriteLine("Assuming all process are in the same process tree.\n" +
+                                  "Getting root (First with different parent process name).");
+                target = candidateProcs.Single(proc =>
+                {
+                    var parentProc = proc.GetParent();
+                    Debug.WriteLine($"Procces {proc.ProcessName} (Id={proc.Id} is son of {parentProc.ProcessName} (Id={parentProc.Id})");
+                    return parentProc.ProcessName != proc.ProcessName;
+                });
                 break;
             }
-            Console.WriteLine($"Target Process: {target.ProcessName}");
+
+            Console.WriteLine($"Selected target: {target.ProcessName} " +
+                              $"(ID = {target.Id}) " +
+                              $"[Parent: {target.GetParent().ProcessName} (ID = {target.GetParent().Id})]");
             RemoteApp remoteApp = RemoteApp.Connect(target);
+            if (remoteApp == null)
+            {
+                Console.WriteLine("Something went wrong and we couldn't connect to the remote process... Aborting.");
+                return;
+            }
 
             List<RemoteObject> remoteObjects = new List<RemoteObject>();
             while (true)
@@ -58,7 +78,8 @@ namespace ScubaDiver.Tester
                 Console.WriteLine("3. Call `ToString` of Remote Object");
                 Console.WriteLine("4. Print methods of Remote Object");
                 Console.WriteLine("5. Create remote object");
-                Console.WriteLine("6. Exit");
+                Console.WriteLine("6. Invoke example static method (int.parse)");
+                Console.WriteLine("7. Exit");
                 string input = Console.ReadLine();
                 ulong addr;
                 uint index;
@@ -105,7 +126,7 @@ namespace ScubaDiver.Tester
                         case 3:
                             // Getting object
                             Console.WriteLine("Enter local index of remote object:");
-                            if (!uint.TryParse(Console.ReadLine(), out  index) || index >= remoteObjects.Count)
+                            if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
                             {
                                 Console.WriteLine("Bad input.");
                             }
@@ -122,7 +143,7 @@ namespace ScubaDiver.Tester
                         case 4:
                             // Getting object
                             Console.WriteLine("Enter local index of remote object:");
-                            if (!uint.TryParse(Console.ReadLine(), out  index) || index >= remoteObjects.Count)
+                            if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
                             {
                                 Console.WriteLine("Bad input.");
                             }
@@ -147,9 +168,17 @@ namespace ScubaDiver.Tester
                             Console.WriteLine("Calling activator");
 
                             var obj = remoteApp.Activator.CreateInstance(typeToCreate);
-                            Console.WriteLine("Got new object? "+obj);
+                            Console.WriteLine("Got new object? " + obj);
                             break;
                         case 6:
+                            Console.WriteLine("Invoking int.parse('123')");
+                            var remoteIntType = remoteApp.GetRemoteType(typeof(int).FullName);
+                            var remoteIntParse = remoteIntType.GetMethod("Parse", new[] { typeof(string) });
+                            object x = remoteIntParse.Invoke(null, new object[] { "123" });
+                            Console.WriteLine($"Result: {x}");
+                            Console.WriteLine($"Result Type: {x.GetType()}");
+                            break;
+                        case 7:
                             // Exiting
                             return;
                     }
@@ -161,7 +190,8 @@ namespace ScubaDiver.Tester
         private static void LocalDive()
         {
             using Diver dive = new();
-            dive.Dive();
+            ushort port = (ushort)(new Random()).Next();
+            dive.Dive(port);
         }
     }
 }
