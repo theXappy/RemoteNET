@@ -72,7 +72,17 @@ namespace RemoteNET
         {
             // TODO: If target is our own process run a local Diver without DLL injections
 
-            bool alreadyInjected = target.Modules.AsEnumerable().Any(module => module.ModuleName.Contains("BootstrapDLL"));
+            bool alreadyInjected =false;
+            try
+            {
+                alreadyInjected = target.Modules.AsEnumerable()
+                                        .Any(module => module.ModuleName.Contains("BootstrapDLL"));
+            }
+            catch
+            {
+                // Sometimes this happens because x32 vs x64 process interaction is not supported
+            }
+
             // To make the Diver's port predicatable even when re-attaching we'll derieve it from the PID:
             ushort diverPort = (ushort) target.Id;
 
