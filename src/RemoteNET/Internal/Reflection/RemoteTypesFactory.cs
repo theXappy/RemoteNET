@@ -34,7 +34,7 @@ namespace RemoteNET.Internal.Reflection
             new Dictionary<Tuple<string, string>, Type>();
 
 
-        public Type ResolveTypeWhileCreating(string typeInProgress, string methodName, string assembly, string type)
+        public Type ResolveTypeWhileCreating(RemoteApp app, string typeInProgress, string methodName, string assembly, string type)
         {
             Type paramType = _resolver.Resolve(assembly, type);
 
@@ -63,7 +63,7 @@ namespace RemoteNET.Internal.Reflection
                                 $"{typeInProgress} but the {nameof(DiverCommunicator)}.{nameof(DiverCommunicator.DumpType)} function failed.");
                         }
 
-                        Type newCreatedType = this.Create(dumpedArgType);
+                        Type newCreatedType = this.Create(app, dumpedArgType);
                         if (newCreatedType == null)
                         {
                             // remove on-going creation indication
@@ -78,7 +78,7 @@ namespace RemoteNET.Internal.Reflection
             return paramType;
         }
 
-        public Type Create(TypeDump typeDump)
+        public Type Create(RemoteApp app, TypeDump typeDump)
         {
             Type shortOutput = _resolver.Resolve(typeDump.Assembly, typeDump.Type);
             if (shortOutput != null)
@@ -86,7 +86,7 @@ namespace RemoteNET.Internal.Reflection
                 return shortOutput;
             }
 
-            RemoteType output = new RemoteType(typeDump.Type, typeDump.Assembly);
+            RemoteType output = new RemoteType(app, typeDump.Type, typeDump.Assembly);
 
             // Temporarily indicate we are on-going creation
             _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.Type)] = output;
@@ -105,7 +105,7 @@ namespace RemoteNET.Internal.Reflection
                     Type paramType = null;
                     try
                     {
-                        paramType = ResolveTypeWhileCreating(typeDump.Type, methodDump.Name, methodParameter.Assembly,
+                        paramType = ResolveTypeWhileCreating(app, typeDump.Type, methodDump.Name, methodParameter.Assembly,
                             methodParameter.Type);
                         if (paramType == null)
                         {
@@ -132,7 +132,7 @@ namespace RemoteNET.Internal.Reflection
                 Type returnType;
                 try
                 {
-                    returnType = ResolveTypeWhileCreating(typeDump.Type, methodDump.Name,
+                    returnType = ResolveTypeWhileCreating(app, typeDump.Type, methodDump.Name,
                     methodDump.ReturnTypeAssembly, methodDump.ReturnTypeFullName);
                 }
                 catch (Exception e)

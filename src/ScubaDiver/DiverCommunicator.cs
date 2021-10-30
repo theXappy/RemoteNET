@@ -130,12 +130,13 @@ namespace ScubaDiver
             return body.Contains("OK");
         }
 
-        public InvocationResults InvokeMethod(ulong addr, string methodName,
+        public InvocationResults InvokeMethod(ulong targetAddr, string targetTypeFullName, string methodName,
             params ObjectOrRemoteAddress[] args)
         {
             InvocationRequest invocReq = new InvocationRequest()
             {
-                ObjAddress = addr,
+                ObjAddress = targetAddr,
+                TypeFullName = targetTypeFullName,
                 MethodName = methodName,
                 Parameters = args.ToList()
             };
@@ -146,6 +147,9 @@ namespace ScubaDiver
             InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
             return res;
         }
+
+        public InvocationResults InvokeStaticMethod(string targetTypeFullName, string methodName,
+            params ObjectOrRemoteAddress[] args) => InvokeMethod(0, targetTypeFullName, methodName, args);
 
         public ObjectDump CreateObject(string typeFullName, ObjectOrRemoteAddress[] args)
         {

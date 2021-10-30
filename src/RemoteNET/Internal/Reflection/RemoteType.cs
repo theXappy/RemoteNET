@@ -11,8 +11,11 @@ namespace RemoteNET.Internal.Reflection
         public string RemoteAssemblyName { get; private set; }
         private List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
 
-        public RemoteType(string fullName, string assemblyName)
+        public RemoteApp App { get; set; }
+
+        public RemoteType(RemoteApp app, string fullName, string assemblyName)
         {
+            App = app;
             this.FullName = fullName;
             this.RemoteAssemblyName = assemblyName;
         }
