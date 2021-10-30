@@ -79,7 +79,8 @@ namespace ScubaDiver.Tester
                 Console.WriteLine("4. Print methods of Remote Object");
                 Console.WriteLine("5. Create remote object");
                 Console.WriteLine("6. Invoke example static method (int.parse)");
-                Console.WriteLine("7. Exit");
+                Console.WriteLine("7. Field write test");
+                Console.WriteLine("8. Exit");
                 string input = Console.ReadLine();
                 ulong addr;
                 uint index;
@@ -179,6 +180,21 @@ namespace ScubaDiver.Tester
                             Console.WriteLine($"Result Type: {x.GetType()}");
                             break;
                         case 7:
+                            Console.WriteLine("Value of Secrets.AlwaysOne:");
+                            var candidate = remoteApp.QueryInstances("*Secrets").Single();
+                            var remoteSecrets = remoteApp.GetRemoteObject(candidate);
+                            dynamic dynSecrets = remoteSecrets.Dynamify();
+                            Console.WriteLine(dynSecrets.AlwaysOne);
+                            Console.WriteLine("Enter new value:");
+                            int newValue = int.Parse(Console.ReadLine());
+                            dynSecrets.AlwaysOne = newValue;
+                            Console.WriteLine("Value of Secrets.AlwaysOne again:");
+                            Console.WriteLine(dynSecrets.AlwaysOne);
+                            Console.WriteLine("Trying fancy x = y = z; statement");
+                            int sanity = dynSecrets.AlwaysOne = 777;
+                            Console.WriteLine($"Is sanity set to 777? Value: {sanity}");
+                            break;
+                        case 8:
                             // Exiting
                             return;
                     }

@@ -37,6 +37,12 @@ namespace RemoteNET
             return _type;
         }
 
+        private ObjectOrRemoteAddress SetField(string fieldName, ObjectOrRemoteAddress newValue)
+        {
+            InvocationResults invokeRes = _ref.SetField(fieldName, newValue);
+            return invokeRes.ReturnedObjectOrAddress;
+
+        }
         public (bool hasResults, ObjectOrRemoteAddress returnedValue) InvokeMethod(string methodName,
             params ObjectOrRemoteAddress[] args)
         {
@@ -62,13 +68,25 @@ namespace RemoteNET
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"[WARN] Field `{fieldInfo}` could not be retrieved. Error: "+e);
+                    Console.WriteLine($"[WARN] Field `{fieldInfo}` could not be retrieved. Error: " + e);
                     continue;
                 }
                 if (fieldDump.HasEncodedValue)
                 {
-                    object value = PrimitivesEncoder.Decode(fieldDump.EncodedValue, fieldInfo.TypeFullName);
-                    dro.AddField(fieldDump.Name, value);
+                    Func<object> getter = () =>
+                    {
+                        // Re-dumping field to get fresh value
+                         fieldDump = _ref.GetField(fieldInfo.Name, refresh: true);
+                        object value = PrimitivesEncoder.Decode(fieldDump.EncodedValue, fieldInfo.TypeFullName);
+                        return value;
+                    };
+                    Action<object> setter = (newValue) =>
+                    {
+                        ObjectOrRemoteAddress newValOora = ObjectOrRemoteAddress.FromObj(newValue);
+                        ObjectOrRemoteAddress reflectedValue = SetField(fieldDump.Name, newValOora);
+                        // TODO: Return reflected field?
+                    };
+                    dro.AddField(fieldDump.Name, getter,setter);
                 }
                 else
                 {
@@ -116,9 +134,15 @@ namespace RemoteNET
                 {
                     // There's a setter! (some visibility means it exists. If it's missing GetVisibility = null)
                     // Creating proxy method
-                    setter = (obj) =>
+                    setter = (newValue) =>
                     {
-                        throw new NotImplementedException("Setter exists but setting remote properties not implemented yet.");
+                        // Non primitive property - getting remote object.
+                        (bool hasResults, ObjectOrRemoteAddress returnedValue) = InvokeMethod("set_" + propInfo.Name, new ObjectOrRemoteAddress[] { ObjectOrRemoteAddress.FromObj(newValue) });
+                        if (hasResults)
+                        {
+                            throw new NotImplementedException("Trying to call setter of remote " +
+                                                              "property but for some reason it returned some results...");
+                        }
                     };
                 }
 
@@ -215,6 +239,7 @@ namespace RemoteNET
 
             return dro;
         }
+
 
         public void Dispose()
         {

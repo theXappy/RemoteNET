@@ -55,6 +55,31 @@ namespace ScubaDiver.Extensions
             return t.BaseType.GetMethodRecursive(methodName, parameterTypes);
         }
 
+        /// <summary>
+        /// Searches a type for a specific field. If not found searches its ancestors.
+        /// </summary>
+        /// <param name="t">TypeFullName to search</param>
+        /// <param name="fieldName">Field name to search</param>
+        public static FieldInfo GetFieldRecursive(this Type t, string fieldName)
+        {
+            var field = t.GetFields((BindingFlags) 0xffff)
+                .SingleOrDefault(fi => fi.Name == fieldName);
+            if (field != null)
+            {
+                return field;
+            }
+            
+            // Not found in this type...
+            if (t == typeof(object))
+            {
+                // No more parents
+                return null;
+            }
+
+            // Check parent (until `object`)
+            return t.BaseType.GetFieldRecursive(fieldName);
+        }
+
         public static bool IsPrimitiveEtc(this Type realType)
         {
             return (realType.IsPrimitive || realType == typeof(string) || realType == typeof(decimal) ||

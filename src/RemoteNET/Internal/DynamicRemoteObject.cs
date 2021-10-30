@@ -27,7 +27,8 @@ namespace RemoteNET.Internal
 
         private Dictionary<string, MemberType> _members = new Dictionary<string, MemberType>();
 
-        private Dictionary<string, object> _fields = new Dictionary<string, object>();
+        private Dictionary<string, Action<object>> _fieldsSetters = new Dictionary<string, Action<object>>();
+        private Dictionary<string, Func<object>> _fieldsGetters = new Dictionary<string, Func<object>>();
         private Dictionary<string, Action<object>> _propertiesSetters = new Dictionary<string, Action<object>>();
         private Dictionary<string, Func<object>> _propertiesGetters = new Dictionary<string, Func<object>>();
         private Dictionary<string, List<MethodOverload>> _methods = new Dictionary<string, List<MethodOverload>>();
@@ -44,15 +45,19 @@ namespace RemoteNET.Internal
         /// <summary>
         /// Define a new field for the remote object
         /// </summary>
-        /// <param name="fieldName">The field's name</param>
-        /// <param name="value">The field's value</param>
-        public void AddField(string fieldName, object value)
+        public void AddField(string propName, Func<object> getter, Action<object> setter)
         {
-            if (_members.ContainsKey(fieldName))
-                throw new Exception($"A member with the name \"{fieldName}\" already exists");
+            if (_members.ContainsKey(propName))
+                throw new Exception($"A member with the name \"{propName}\" already exists");
 
-            _members[fieldName] = MemberType.Field;
-            _fields[fieldName] = value;
+            if (getter == null && setter == null)
+                throw new Exception("A property must be set with at least a setter/getter.");
+
+            _members[propName] = MemberType.Field;
+            if (getter != null)
+                _fieldsGetters[propName] = getter;
+            if (setter != null)
+                _fieldsSetters[propName] = setter;
         }
 
         /// <summary>
@@ -105,13 +110,19 @@ namespace RemoteNET.Internal
             if (!_members.TryGetValue(binder.Name, out MemberType memberType))
                 throw new Exception($"No such member \"{binder.Name}\"");
 
+            Func<object> getter;
+
             switch (memberType)
             {
                 case MemberType.Field:
-                    result = _fields[binder.Name];
+                    if (!_fieldsGetters.TryGetValue(binder.Name, out getter))
+                    {
+                        throw new Exception($"Field \"{binder.Name}\" does not have a getter.");
+                    }
+                    result = getter();
                     break;
                 case MemberType.Property:
-                    if (!_propertiesGetters.TryGetValue(binder.Name, out Func<object> getter))
+                    if (!_propertiesGetters.TryGetValue(binder.Name, out getter))
                     {
                         throw new Exception($"Property \"{binder.Name}\" does not have a getter.");
                     }
@@ -166,12 +177,18 @@ namespace RemoteNET.Internal
             if (!_members.TryGetValue(binder.Name, out MemberType memberType))
                 throw new Exception($"No such member \"{binder.Name}\"");
 
+            Action<object> setter;
             switch (memberType)
             {
                 case MemberType.Field:
-                    throw new NotImplementedException("Modifying remote fields not yet supported.");
+                    if (!_fieldsSetters.TryGetValue(binder.Name, out setter))
+                    {
+                        throw new Exception($"Field \"{binder.Name}\" does not have a setter.");
+                    }
+                    setter(value);
+                    break;
                 case MemberType.Property:
-                    if (!_propertiesSetters.TryGetValue(binder.Name, out Action<object> setter))
+                    if (!_propertiesSetters.TryGetValue(binder.Name, out setter))
                     {
                         throw new Exception($"Property \"{binder.Name}\" does not have a setter.");
                     }
