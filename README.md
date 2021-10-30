@@ -8,10 +8,13 @@ Basically this library lets you mess with objects of any other .NET (framework) 
 ## Compilation
 1. Clone
 2. Open `.sln` file in VisualStudio 2019
-3. Compile (`CTRL+B`)
+3. Select `Build` → `Batch Build`
+4. Make sure both x32 and x64 versions are ticked for C++ projects (Injector, BootstrapDLL)
+5. Make sure ScubaDiver and RemoteNET are ticked (Any CPU will do)
+6. Click `Build`
 
 If you get errors of missing exes/dlls make sure the compilation order is set such that  
-the C++ projects compile first, then **ScubaDiver** and then **RemoteNET**.
+the C++ projects compile first (BOTH x32 and x64 need to be compiled), then **ScubaDiver** and then **RemoteNET**.
 
 ## Minimal Working Example
 To get the essence of how easy and usefull this library can be, see below a re-implementation of [denandz/KeeFarce](https://github.com/denandz/KeeFarce).  
