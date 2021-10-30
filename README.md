@@ -3,7 +3,7 @@
 This library lets you examine, create and interact with remote objects in other .NET (framework) processes.  
 It's like [System.Runtime.Remoting](https://docs.microsoft.com/en-us/dotnet/api/system.runtime.remoting?view=net-5.0) except the other app doesn't need to be compiled (or consent) to support it.
 
-Basiclly this library lets you mess with objects of any other .NET (framework) app without asking for permissions :)
+Basically this library lets you mess with objects of any other .NET (framework) app without asking for permissions :)
 
 ## Compilation
 1. Clone
@@ -128,17 +128,18 @@ foreach (CandidateObject candidate in rsaProviderCandidates)
 
 ## TODOs
 1. Generics aren't completely supported
-2. Static members, Static functions
-3. Allow for multiple ScubaDivers to co-exist on the same system
-4. Support injecting to self with local diver
-5. Document "Reflection API" (RemoteType, RemoteMethodInfo, ... )
-6. .NET core/.NET 5
-7. Support other .NET framework CLR versions. Currently supports v4.0.30319
+2. Static members
+3. Support injecting to self with local diver
+4. Document "Reflection API" (RemoteType, RemoteMethodInfo, ... )
+5. .NET core/.NET 5
+6. Support other .NET framework CLR versions. Currently supports v4.0.30319
 
 
 ## Thanks
 **denandz** for his interesting project **KeeFarce** which was a major inspiration for this project.  
 Also multiple parts of this project are directly taken from KeeFarce (DLL Injection, Bootstrap, IntPtr-to-Object converter).
+
+**icons8** for the "Puppet" icon
 
 **Raymond Chen** for stating this project shouldn't be done in [this blog post from 2010](https://devblogs.microsoft.com/oldnewthing/20100812-00/?p=13163).  
 I really like this qoute from the post:
