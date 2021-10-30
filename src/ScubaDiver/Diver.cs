@@ -42,6 +42,7 @@ namespace ScubaDiver
                 {"/domains", MakeDomainsResponse},
                 {"/heap", MakeHeapResponse},
                 {"/invoke", MakeInvokeResponse},
+                {"/set_field", MakeSetFieldResponse},
                 {"/create_object", MakeCreateObjectResponse},
                 {"/object", MakeObjectResponse},
                 {"/unpin", MakeUnpinResponse},
@@ -345,6 +346,124 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(invocResults);
         }
 
+        private string MakeSetFieldResponse(HttpListenerRequest arg)
+        {
+            Console.WriteLine("[Diver] Got /set_field request!");
+            string body = null;
+            using (StreamReader sr = new(arg.InputStream))
+            {
+                body = sr.ReadToEnd();
+            }
+
+            if (string.IsNullOrEmpty(body))
+            {
+                return "{\"error\":\"Missing body\"}";
+            }
+
+            TextReader textReader = new StringReader(body);
+            JsonReader jr = new JsonTextReader(textReader);
+            JsonSerializer js = new JsonSerializer();
+            var request = js.Deserialize<FieldSetRequest>(jr);
+            if (request == null)
+            {
+                return "{\"error\":\"Failed to deserialize body\"}";
+            }
+
+            // Need to figure target instance and the target type.
+            // In case of a static call the target instance stays null.
+            object instance = null;
+            Type dumpedObjType;
+            if (request.ObjAddress == 0)
+            {
+                return "{\"error\":\"Can't set field of a null target\"}";
+            }
+
+            // Check if we have this objects in our pinned pool
+            if (_pinnedObjects.TryGetValue(request.ObjAddress, out instance))
+            {
+                // Found pinned object!
+                dumpedObjType = instance.GetType();
+            }
+            else
+            {
+                // Object not pinned, try get it the hard way
+                ClrObject clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                if (clrObj.Type == null)
+                {
+                    return "{\"error\":\"'address' points at an invalid address\"}";
+                }
+
+                // Make sure it's still in place
+                RefreshRuntime();
+                clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                if (clrObj.Type == null)
+                {
+                    return
+                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address.\"}";
+                }
+
+                ulong mt = clrObj.Type.MethodTable;
+                dumpedObjType = clrObj.Type.GetRealType();
+                try
+                {
+                    instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
+                }
+                catch (Exception)
+                {
+                    return
+                        "{\"error\":\"Couldn't get handle to requested object. It could be because the Method Table or a GC collection happened.\"}";
+                }
+            }
+
+            // Search the method with the matching signature
+            var fieldInfo = dumpedObjType.GetFieldRecursive(request.FieldName);
+            if (fieldInfo == null)
+            {
+                Debugger.Launch();
+                Console.WriteLine($"[Diver] Failed to Resolved field :/");
+                return "{\"error\":\"Couldn't find field in type.\"}";
+            }
+            Console.WriteLine($"[Diver] Resolved field: {fieldInfo.Name}, Containing Type: {fieldInfo.DeclaringType}");
+
+            object results = null;
+            try
+            {
+                object value = ParseParameterObject(request.Value);
+                fieldInfo.SetValue(instance, value);
+                // Reading back value to return to caller. This is expected C# behaviour:
+                // int x = this.field_y = 3; // Makes both x and field_y equal 3.
+                results = fieldInfo.GetValue(instance);
+            }
+            catch (Exception e)
+            {
+                return $"{{\"error\":\"Invocation caused exception: {e}\"}}";
+            }
+
+
+            // Return the value we just set to the field to the caller...
+            InvocationResults invocResults;
+            {
+                ObjectOrRemoteAddress returnValue;
+                if (results.GetType().IsPrimitiveEtc())
+                {
+                    returnValue = ObjectOrRemoteAddress.FromObj(results);
+                }
+                else
+                {
+                    // Pinning results
+                    ulong resultsAddress = PinObject(results);
+                    Type resultsType = results.GetType();
+                    returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
+                }
+
+                invocResults = new()
+                {
+                    VoidReturnType = false,
+                    ReturnedObjectOrAddress = returnValue
+                };
+            }
+            return JsonConvert.SerializeObject(invocResults);
+        }
 
 
         private string MakeObjectResponse(HttpListenerRequest arg)

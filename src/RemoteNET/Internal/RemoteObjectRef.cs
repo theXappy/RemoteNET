@@ -9,7 +9,7 @@ namespace RemoteNET.Internal
     {
         private bool _isReleased;
         private readonly TypeDump _typeInfo;
-        private readonly ObjectDump _remoteObjectInfo;
+        private ObjectDump _remoteObjectInfo;
         private readonly DiverCommunicator _creatingCommunicator;
 
         // TODO: I think addresses as token should be reworked
@@ -39,7 +39,7 @@ namespace RemoteNET.Internal
             ThrowIfReleased();
             if (refresh)
             {
-                throw new NotImplementedException("Refreshing values not supported yet");
+                _remoteObjectInfo = _creatingCommunicator.DumpObject(_remoteObjectInfo.Address);
             }
 
             var field = _remoteObjectInfo.Fields.Single(fld => fld.Name == name);
@@ -86,6 +86,12 @@ namespace RemoteNET.Internal
         {
             ThrowIfReleased();
             return _creatingCommunicator.InvokeMethod(_remoteObjectInfo.Address, _remoteObjectInfo.Type, methodName, args);
+        }
+
+        public InvocationResults SetField(string fieldName, ObjectOrRemoteAddress newValue)
+        {
+            ThrowIfReleased();
+            return _creatingCommunicator.SetField(_remoteObjectInfo.Address, _remoteObjectInfo.Type, fieldName, newValue);
         }
 
         /// <summary>
