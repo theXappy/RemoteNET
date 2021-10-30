@@ -25,6 +25,9 @@ namespace RemoteNET
             _ref = reference;
         }
 
+        /// <summary>
+        /// Gets the type of the proxied remote object, in the remote app. (This does not reutrn `typeof(RemoteObject)`)
+        /// </summary>
         public new Type GetType()
         {
             if (_type == null)
