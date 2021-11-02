@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{0C3EB2F7-92BA-4895-99FC-7098A16FFE8C}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>KeeFarce</RootNamespace>
+    <RootNamespace>Injector</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>Injector</ProjectName>
   </PropertyGroup>
