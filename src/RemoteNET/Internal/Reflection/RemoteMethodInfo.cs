@@ -2,7 +2,8 @@
 using System.Globalization;
 using System.Reflection;
 using ScubaDiver;
-using ScubaDiver.Extensions;
+using ScubaDiver.API;
+using ScubaDiver.API.Extensions;
 
 namespace RemoteNET.Internal.Reflection
 {

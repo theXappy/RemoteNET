@@ -1,103 +1,41 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{35EEE1BC-604F-4737-A6CD-21FF5A88D9E8}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>RemoteNET</RootNamespace>
-    <AssemblyName>RemoteNET</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <Deterministic>true</Deterministic>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <NoWin32Manifest>true</NoWin32Manifest>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.IO.Compression" />
-    <Reference Include="System.IO.Compression.FileSystem" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xml" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="CandidateObject.cs" />
-    <Compile Include="Internal\DynamicRemoteObject.cs" />
-    <Compile Include="Internal\Extensions\NativeMethods.cs" />
-    <Compile Include="Internal\Extensions\ProcessExt.cs" />
-    <Compile Include="Internal\Extensions\ProcessModuleCollectionExt.cs" />
-    <Compile Include="Internal\Reflection\RemoteMethodInfo.cs" />
-    <Compile Include="Internal\Reflection\RemoteParameterInfo.cs" />
-    <Compile Include="Internal\Reflection\RemoteType.cs" />
-    <Compile Include="Internal\Reflection\RemoteTypesFactory.cs" />
-    <Compile Include="Internal\Reflection\TypesResolver.cs" />
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
+    <ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp">
+      <HintPath>..\..\..\..\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8\Microsoft.CSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
       <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Include="RemoteActivator.cs" />
-    <Compile Include="RemoteObject.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Internal\RemoteObjectRef.cs" />
-    <Compile Include="RemoteApp.cs" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\ScubaDiver\ScubaDiver.csproj">
-      <Project>{8DF5D538-941D-44E8-803E-9E135926EBE8}</Project>
-      <Name>ScubaDiver</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="Resources\ScubaDiver.zip" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="Properties\Resources.resx">
+    <EmbeddedResource Update="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\BootstrapDLL.dll" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Injector.exe" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\BootstrapDLL64.dll" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Injector64.exe" />
-  </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
-    <PreBuildEvent>xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\Win32\" "$(ProjectDir)\Resources"
-xcopy /Y /s "$(SolutionDir)\dist\$(Configuration)\x64\" "$(ProjectDir)\Resources"
 
-powershell "Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force"</PreBuildEvent>
-  </PropertyGroup>
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force&quot;" />
+  </Target>
+
 </Project>
