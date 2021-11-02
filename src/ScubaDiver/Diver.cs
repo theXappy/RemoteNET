@@ -12,7 +12,9 @@ using System.Threading.Tasks;
 using Microsoft.Diagnostics.Runtime;
 using Newtonsoft.Json;
 using ScubaDiver.API;
-using ScubaDiver.Extensions;
+using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Extensions;
+using ScubaDiver.API.Utils;
 using ScubaDiver.Utils;
 using Exception = System.Exception;
 

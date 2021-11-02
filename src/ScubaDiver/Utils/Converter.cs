@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Reflection.Emit;
-using ScubaDiver.Extensions;
+using ScubaDiver.API.Extensions;
 
 namespace ScubaDiver.Utils
 {

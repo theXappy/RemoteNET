@@ -6,8 +6,9 @@ using RemoteNET.Internal;
 using RemoteNET.Internal.Reflection;
 using ScubaDiver;
 using ScubaDiver.API;
-using ScubaDiver.Extensions;
-using ScubaDiver.Utils;
+using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Extensions;
+using ScubaDiver.API.Utils;
 
 namespace RemoteNET
 {

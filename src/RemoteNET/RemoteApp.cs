@@ -8,8 +8,8 @@ using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using RemoteNET.Internal.Reflection;
 using RemoteNET.Properties;
-using ScubaDiver;
 using ScubaDiver.API;
+using ScubaDiver.API.Dumps;
 
 namespace RemoteNET
 {
