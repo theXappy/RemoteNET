@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -252,7 +252,7 @@ namespace RemoteNET
 
         public override string ToString()
         {
-            return $"RemoteObject. Type: {_type.FullName ?? "UNK"} Reference: [{_ref}]";
+            return $"RemoteObject. Type: {_type?.FullName ?? "UNK"} Reference: [{_ref}]";
         }
     }
 }
