@@ -21,7 +21,7 @@ Most of the Diver's power comes from the [ClrMD](https://github.com/microsoft/cl
 The Diver's class contains mostly HTTP handlers which reflect the entire protocol. These are the currently supported functions:
 * /type - Dumps a specific type (fields, properties, methods).
 * /heap - Dumps objects of the heap. Can be narrowed down using a filter on the objects' types.
-* /create_object -- Constructs a new remote object.
+* /create_object - Constructs a new remote object.
 * /object - Dumps object's address, type name, fields, properties. Also allows pinning of the object for later use.
 * /invoke - Invokes a function on a remote pinned object.
 * /unpin - Unpins an object pinned with '/object'.
@@ -34,9 +34,9 @@ The Diver's class contains mostly HTTP handlers which reflect the entire protoco
 A notable feature missing from ClrMD (but not from ScubaDiver) is the ability to invoke methods (including "getters" of properties).  
 This comes from ClrMD's approach to inspect memory dumps and not interact with live objects.  
 To overcome this the Diver first needs to get a reference to the manipulated object and then use reflection to invoke methods/read properties.  
-If you play with ClrMD for a while you'll find out that getting the object's address is quite easy but turning that `IntPtr` back into an object is a near impossible task in raw .NET.  
+If you play with ClrMD for a while you'll find out that getting the object's address is quite easy but turning that `IntPtr` back into an object is a near impossible task in raw C#.  
 Luckily, [KeeFarce](https://github.com/denandz/KeeFarce) had this figured out. Its ["Converter" Class](https://github.com/denandz/KeeFarce/blob/master/src/KeeFarceDLL/Converter.cs) is a very unique piece of code.  
-It uses a trick of compiling a function directly from IL to return the IntPtr it recieves. Luckily the runtime automagiclly converts this to an `object` when returned.  
+It uses a trick of compiling a function directly from IL to return the `IntPtr` it recieves as the "result's address". Luckily the runtime auto-magiclly converts this to an `object` when returned.  
 Getting that `object` gives us a lot of power - We can now use `.GetType()` on it, explore it's `MethodInfo`s and `PropertyInfos` and invoke them :)  
 Unfortunatly this power comes with a cost. Converting `IntPtr`s back to objects without the runtime to hold our hands is a very risky task.  
 .NET's GC just turned from our best friend into our enemy. If GC happens between retrival of the `IntPtr` address to actually making it into a reference the object might move around the program memory.  
