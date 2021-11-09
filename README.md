@@ -107,7 +107,7 @@ foreach (CandidateObject candidate in sqlConCandidates)
 
 ### ★ Invoking Remote Methods
 Just like accessing fields, invoking methods can be done on the dynamic objects.  
-This fun examples dumps all private RSA keys (stored in `RSACryptoServiceProvider`s) which are found in the target's memory:
+This fun example dumps all private RSA keys (which are stored in `RSACryptoServiceProvider`s) that are found in the target's memory:
 ```C#
 // Finding every RSACryptoServiceProvider instance
 var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
