@@ -7,8 +7,8 @@ Basically this library lets you mess with objects of any other .NET (framework) 
 
 ## Compilation
 1. Clone
-2. Open `.sln` file in VisualStudio 2019
-3. Select `Build` → `Batch Build`
+2. Open `RemoteNET.sln` file in VisualStudio 2019
+3. Build Solution (`Ctrl+Shift+B`)
 4. Make sure both x32 and x64 versions are ticked for C++ projects (Injector, BootstrapDLL)
 5. Make sure ScubaDiver and RemoteNET are ticked (Any CPU will do)
 6. Click `Build`
