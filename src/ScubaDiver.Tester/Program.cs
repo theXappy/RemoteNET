@@ -27,7 +27,7 @@ namespace ScubaDiver.Tester
             {
                 Console.WriteLine("Enter process name (or substring)");
                 string procName = Console.ReadLine();
-                var candidateProcs = Process.GetProcesses().Where(proc => proc.ProcessName.Contains(procName)).ToArray();
+                var candidateProcs = Process.GetProcesses().Where(proc => (proc.ProcessName+".exe").Contains(procName)).ToArray();
                 if (candidateProcs.Length == 0)
                 {
                     Console.WriteLine("No processes found.");
