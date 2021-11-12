@@ -224,12 +224,8 @@ namespace RemoteNET
                          }
                          else
                          {
-                             // TODO: Create RemoteObject for results? this implies creaing an IDisposable which the
-                             // user might not think should be disposed...
-                             throw new NotImplementedException(
-                                 $"Returned value from invocation of the method `{methodInfo.Name}` " +
-                                 $"was a non-primitive object and currently these types are not supported. " +
-                                 $"Returned type: {res.ReturnedObjectOrAddress.Type}");
+                             var remoteObject = _app.GetRemoteObject(res.ReturnedObjectOrAddress.RemoteAddress);
+                             return remoteObject.Dynamify();
                          }
                      }
                  };
