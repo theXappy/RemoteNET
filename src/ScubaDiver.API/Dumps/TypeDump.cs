@@ -125,7 +125,7 @@ namespace ScubaDiver.API.Dumps
         public string Type { get; set; }
         public string Assembly { get; set; }
 
-        public TypeDump ParentDump { get; set; }
+        public TypeDump? ParentDump { get; set; }
 
         public List<TypeMethod> Methods { get; set; }
         public List<TypeField> Fields { get; set; }
