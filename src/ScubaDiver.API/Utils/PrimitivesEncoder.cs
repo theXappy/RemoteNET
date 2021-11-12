@@ -73,6 +73,7 @@ namespace ScubaDiver.API.Utils
             if (resultType.IsArray)
             {
                 List<int> commas = new List<int>();
+                commas.Add(0); // To capture the first item we need to "imagine a comma" right before it.
                 for (int i = 1; i < toDecode.Length; i++)
                 {
                     if (toDecode[i] == ',' && toDecode[i - 1] != '\\')
