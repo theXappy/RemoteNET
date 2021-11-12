@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using RemoteNET;
@@ -80,7 +81,8 @@ namespace ScubaDiver.Tester
                 Console.WriteLine("5. Create remote object");
                 Console.WriteLine("6. Invoke example static method (int.parse)");
                 Console.WriteLine("7. Field write test");
-                Console.WriteLine("8. Exit");
+                Console.WriteLine("8. Steal RSA keys");
+                Console.WriteLine("9. Exit");
                 string input = Console.ReadLine();
                 ulong addr;
                 uint index;
@@ -195,6 +197,30 @@ namespace ScubaDiver.Tester
                             Console.WriteLine($"Is sanity set to 777? Value: {sanity}");
                             break;
                         case 8:
+                            Func<byte[], string> ToHex = arr => string.Join("", arr.Select(b => b.ToString("X2")).ToArray());
+
+                            // Finding every RSACryptoServiceProvider instance
+                            var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
+                            foreach (CandidateObject candidateRsa in rsaProviderCandidates)
+                            {
+                                RemoteObject rsaProv = remoteApp.GetRemoteObject(candidateRsa);
+                                dynamic dynamicRsaProv = rsaProv.Dynamify();
+                                // Calling remote `ExportParameters`.
+                                // First parameter (true) indicates we want the private key.
+                                Console.WriteLine(" * Key found:");
+                                dynamic parameters = dynamicRsaProv.ExportParameters(true);
+                                Console.WriteLine("Modulus: " + ToHex(parameters.Modulus));
+                                Console.WriteLine("Exponent: " + ToHex(parameters.Exponent));
+                                Console.WriteLine("D: " + ToHex(parameters.D));
+                                Console.WriteLine("P: " + ToHex(parameters.P));
+                                Console.WriteLine("Q: " + ToHex(parameters.Q));
+                                Console.WriteLine("DP: " + ToHex(parameters.DP));
+                                Console.WriteLine("DQ: " + ToHex(parameters.DQ));
+                                Console.WriteLine("InverseQ: " + ToHex(parameters.InverseQ));
+                            }
+
+                            break;
+                        case 9:
                             // Exiting
                             return;
                     }
