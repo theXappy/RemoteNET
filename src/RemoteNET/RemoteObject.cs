@@ -243,7 +243,14 @@ namespace RemoteNET
 
         public void Dispose()
         {
-            _ref.RemoteRelease();
+            _ref?.RemoteRelease();
+            _ref = null;
+        }
+
+        ~RemoteObject()
+        {
+            Dispose();
+
         }
 
         public override string ToString()
