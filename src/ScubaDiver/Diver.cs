@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,7 +32,7 @@ namespace ScubaDiver
         private Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
 
         // Pinning objects fields
-        private Dictionary<ulong, object> _pinnedObjects;
+        private Dictionary<ulong, PinnedObjectInfo> _pinnedObjects;
 
         // Singleton
         private static Diver _instance;
@@ -146,7 +147,8 @@ namespace ScubaDiver
             else
             {
                 // Pinning results
-                resultsAddress = PinObject(createdObject);
+                var pinnedObj = PinObject(createdObject);
+                resultsAddress = pinnedObj.Address;
             }
 
 
@@ -184,9 +186,9 @@ namespace ScubaDiver
                 return (parsedParam);
             }
 
-            if (param.IsRemoteAddress && _pinnedObjects.TryGetValue(param.RemoteAddress, out object pinnedArg))
+            if (param.IsRemoteAddress && _pinnedObjects.TryGetValue(param.RemoteAddress, out PinnedObjectInfo poi))
             {
-                return (pinnedArg);
+                return poi.Object;
             }
 
             Debugger.Launch();
@@ -236,9 +238,10 @@ namespace ScubaDiver
                 //
 
                 // Check if we have this objects in our pinned pool
-                if (_pinnedObjects.TryGetValue(request.ObjAddress, out instance))
+                if (_pinnedObjects.TryGetValue(request.ObjAddress, out PinnedObjectInfo poi))
                 {
                     // Found pinned object!
+                    instance = poi.Object;
                     dumpedObjType = instance.GetType();
                 }
                 else
@@ -333,7 +336,8 @@ namespace ScubaDiver
                 else
                 {
                     // Pinning results
-                    ulong resultsAddress = PinObject(results);
+                    PinnedObjectInfo poi =  PinObject(results);
+                    ulong resultsAddress = poi.Address;
                     Type resultsType = results.GetType();
                     returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
                 }
@@ -381,9 +385,10 @@ namespace ScubaDiver
             }
 
             // Check if we have this objects in our pinned pool
-            if (_pinnedObjects.TryGetValue(request.ObjAddress, out instance))
+            if (_pinnedObjects.TryGetValue(request.ObjAddress, out PinnedObjectInfo poi))
             {
                 // Found pinned object!
+                instance = poi.Object;
                 dumpedObjType = instance.GetType();
             }
             else
@@ -453,7 +458,8 @@ namespace ScubaDiver
                 else
                 {
                     // Pinning results
-                    ulong resultsAddress = PinObject(results);
+                    PinnedObjectInfo resultsPoi= PinObject(results);
+                    ulong resultsAddress = resultsPoi.Address;
                     Type resultsType = results.GetType();
                     returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
                 }
@@ -486,9 +492,10 @@ namespace ScubaDiver
             object instance = null;
             bool alreadyPinned = false;
             Type dumpedObjType;
-            if (_pinnedObjects.TryGetValue(objAddr, out instance))
+            if (_pinnedObjects.TryGetValue(objAddr, out PinnedObjectInfo poi))
             {
                 // Found pinned object!
+                instance = poi.Object;
                 dumpedObjType = instance.GetType();
                 alreadyPinned = true;
             }
@@ -626,14 +633,76 @@ namespace ScubaDiver
             bool removed = _pinnedObjects.Remove(objAddress);
             return removed;
         }
-        private ulong PinObject(object instance, ulong? objAddress = null)
+
+        /// <summary>
+        /// Pins an object, possibly at a specific address.
+        /// </summary>
+        /// <param name="instance">The object to pin</param>
+        /// <param name="requiredPinningAddress">Current objects address if keeping it is crucial or null if it doesn't matter</param>
+        /// <returns></returns>
+        private PinnedObjectInfo PinObject(object instance, ulong? requiredPinningAddress = null)
         {
-            // Need to pin the object (and it's not already pinned)
+            // Allows the freeze function to indicate freezing was done
+            ManualResetEvent freezeFeedback = new ManualResetEvent(false);
+            // Allows us to unfreeze later
+            ManualResetEvent unfreezeRequired = new ManualResetEvent(false);
+
+            var freezeTask = Task.Run(() => Freeze(instance, freezeFeedback, unfreezeRequired));
+            // Waiting for freezing task to run
+            freezeFeedback.WaitOne();
+
+            // Let's make sure we froze the object in the right address
+            // Note that some usages of `GCHandle` online are for "Pinning" objects. We are NOT doing it
+            // here since out (sometimes) complex objects can't be pinned because they might "contain non-primitive or non-blittable data"
+            // We are only using GCHandle here to read the address of the object.
             GCHandle handle = GCHandle.Alloc(instance);
-            objAddress ??= (ulong)GCHandle.ToIntPtr(handle);
-            Console.WriteLine($"[Diver] Pinning object {instance} with address {objAddress}");
-            _pinnedObjects[objAddress.Value] = instance;
-            return objAddress.Value;
+            ulong pinningAddress = (ulong)GCHandle.ToIntPtr(handle).ToInt64();
+            Console.WriteLine($"[Diver] Pinning object {instance}, GCHandle returned address {requiredPinningAddress:X16}");
+            handle.Free();
+
+            // If the caller wants the object pinned at a specific address make sure it happened.
+            if (requiredPinningAddress.HasValue)
+            {
+                if ((ulong) pinningAddress != requiredPinningAddress)
+                {
+                    // error...
+                    // Undo pinning - indicate unfreeze is required.
+                    Console.WriteLine($"[Diver] ERROR - Pinned object address mismatched. {pinningAddress:X16} != {requiredPinningAddress:X16}");
+                    unfreezeRequired.Set();
+                    return null;
+                }
+            }
+
+            // Object is pinned and it a good address
+            PinnedObjectInfo poi = new PinnedObjectInfo(instance, pinningAddress, unfreezeRequired, freezeTask);
+            _pinnedObjects[pinningAddress] = poi;
+            return poi;
+        }
+
+        /// <summary>
+        /// Freezes an object at it's current address
+        /// </summary>
+        /// <param name="o">Object to freeze</param>
+        /// <param name="freezeFeedback">Event which the freezer will call once the object is frozen</param>
+        /// <param name="unfreezeRequested">Event the freezer waits on until unfreezing is requested by the caller</param>
+        public static unsafe void Freeze(object o, ManualResetEvent freezeFeedback, ManualResetEvent unfreezeRequested)
+        {
+            // TODO: This "costs" us a thread (probably from the thread pool) for every pinned object.
+            // Maybe this should be done in another class and support multiple objects per thread
+            // something like:
+            // fixed(byte* first ...)
+            // fixed(byte* second...)
+            // fixed(byte* third ...)
+            // {
+            // ...
+            // }
+            fixed (byte* ptr = &Unsafe.As<Pinnable>(o).Data)
+            {
+                IntPtr iPtr = new IntPtr(ptr);
+                freezeFeedback.Set();
+                unfreezeRequested.WaitOne();
+                GC.KeepAlive(iPtr);
+            }
         }
 
         void RefreshRuntime()
@@ -646,6 +715,7 @@ namespace ScubaDiver
             _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
             _runtime = _dt.ClrVersions.Single().CreateRuntime();
         }
+
         public void Dive(ushort listenPort)
         {
             // Start session
