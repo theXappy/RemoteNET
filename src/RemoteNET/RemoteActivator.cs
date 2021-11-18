@@ -45,7 +45,9 @@ namespace RemoteNET
                 {
                     throw new Exception($"{nameof(RemoteActivator)}.{nameof(CreateInstance)} only works with primitive (int, " +
                                         $"double, string,...) or remote (in {nameof(RemoteObject)}) parameters. " +
-                                        $"The parameter at index {i} was of unsupported type {parameters.GetType()}");
+                                        $"The parameter at index {i} was of unsupported type {parameters.GetType()}. \n" +
+                                        $"If you are trying to pass a local object to a remote c'tor you need to construct " +
+                                        $"that object in the remote application instead.");
                 }
             }
 
