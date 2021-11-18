@@ -652,18 +652,10 @@ namespace ScubaDiver
             // Allows us to unfreeze later
             ManualResetEvent unfreezeRequired = new ManualResetEvent(false);
 
-            var freezeTask = Task.Run(() => Freeze(instance, freezeFeedback, unfreezeRequired));
+            ulong pinningAddress = 0;
+            var freezeTask = Task.Run(() => Freeze(instance, ref pinningAddress, freezeFeedback, unfreezeRequired));
             // Waiting for freezing task to run
             freezeFeedback.WaitOne();
-
-            // Let's make sure we froze the object in the right address
-            // Note that some usages of `GCHandle` online are for "Pinning" objects. We are NOT doing it
-            // here since out (sometimes) complex objects can't be pinned because they might "contain non-primitive or non-blittable data"
-            // We are only using GCHandle here to read the address of the object.
-            GCHandle handle = GCHandle.Alloc(instance);
-            ulong pinningAddress = (ulong)GCHandle.ToIntPtr(handle).ToInt64();
-            Console.WriteLine($"[Diver] Pinning object {instance}, GCHandle returned address {pinningAddress:X16}");
-            handle.Free();
 
             // Object is pinned and it a good address
             PinnedObjectInfo poi = new PinnedObjectInfo(instance, pinningAddress, unfreezeRequired, freezeTask);
@@ -675,9 +667,12 @@ namespace ScubaDiver
         /// Freezes an object at it's current address
         /// </summary>
         /// <param name="o">Object to freeze</param>
+        /// <param name="freezeAddr">
+        /// Used to report back the freezed object's address. Only valid after <see cref="freezeFeedback"/> was set!
+        /// </param>
         /// <param name="freezeFeedback">Event which the freezer will call once the object is frozen</param>
         /// <param name="unfreezeRequested">Event the freezer waits on until unfreezing is requested by the caller</param>
-        public static unsafe void Freeze(object o, ManualResetEvent freezeFeedback, ManualResetEvent unfreezeRequested)
+        public static unsafe void Freeze(object o, ref ulong freezeAddr, ManualResetEvent freezeFeedback, ManualResetEvent unfreezeRequested)
         {
             // TODO: This "costs" us a thread (probably from the thread pool) for every pinned object.
             // Maybe this should be done in another class and support multiple objects per thread
@@ -690,7 +685,20 @@ namespace ScubaDiver
             // }
             fixed (byte* ptr = &Unsafe.As<Pinnable>(o).Data)
             {
+                // Our fixed pointer to the first field of the class lets
+                // us calculate the address to the object.
+                // We have:
+                //                 🠗
+                // [ Method Table ][ Field 1 ][ Field 2 ]...
+                //
+                // And we want: 
+                // 🠗
+                // [ Method Table ][ Field 1 ][ Field 2 ]...
+                //
+                // As far as I understand the Method Table is a pointer which means
+                // it's 4 bytes in x32 and 8 bytes in x64 (Hence using `IntPtr.Size`)
                 IntPtr iPtr = new IntPtr(ptr);
+                freezeAddr = ((ulong)iPtr.ToInt64()) - (ulong)IntPtr.Size;
                 freezeFeedback.Set();
                 unfreezeRequested.WaitOne();
                 GC.KeepAlive(iPtr);
