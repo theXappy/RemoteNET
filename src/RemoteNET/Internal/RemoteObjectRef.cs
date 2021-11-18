@@ -14,7 +14,7 @@ namespace RemoteNET.Internal
         private readonly DiverCommunicator _creatingCommunicator;
 
         // TODO: I think addresses as token should be reworked
-        public ulong Token => _remoteObjectInfo.Address;
+        public ulong Token => _remoteObjectInfo.PinnedAddress;
         public DiverCommunicator Communicator => _creatingCommunicator;
 
         public RemoteObjectRef(ObjectDump remoteObjectInfo, TypeDump typeInfo, DiverCommunicator creatingCommunicator)
@@ -40,7 +40,7 @@ namespace RemoteNET.Internal
             ThrowIfReleased();
             if (refresh)
             {
-                _remoteObjectInfo = _creatingCommunicator.DumpObject(_remoteObjectInfo.Address);
+                _remoteObjectInfo = _creatingCommunicator.DumpObject(_remoteObjectInfo.PinnedAddress);
             }
 
             var field = _remoteObjectInfo.Fields.Single(fld => fld.Name == name);
@@ -86,13 +86,13 @@ namespace RemoteNET.Internal
         public InvocationResults InvokeMethod(string methodName, ObjectOrRemoteAddress[] args)
         {
             ThrowIfReleased();
-            return _creatingCommunicator.InvokeMethod(_remoteObjectInfo.Address, _remoteObjectInfo.Type, methodName, args);
+            return _creatingCommunicator.InvokeMethod(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, methodName, args);
         }
 
         public InvocationResults SetField(string fieldName, ObjectOrRemoteAddress newValue)
         {
             ThrowIfReleased();
-            return _creatingCommunicator.SetField(_remoteObjectInfo.Address, _remoteObjectInfo.Type, fieldName, newValue);
+            return _creatingCommunicator.SetField(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, fieldName, newValue);
         }
 
         /// <summary>
@@ -100,13 +100,13 @@ namespace RemoteNET.Internal
         /// </summary>
         public void RemoteRelease()
         {
-            _creatingCommunicator.UnpinObject(_remoteObjectInfo.Address);
+            _creatingCommunicator.UnpinObject(_remoteObjectInfo.PinnedAddress);
             _isReleased = true;
         }
 
         public override string ToString()
         {
-            return $"RemoteObjectRef. Address: {_remoteObjectInfo.Address}, TypeFullName: {_typeInfo.Type}";
+            return $"RemoteObjectRef. Address: {_remoteObjectInfo.PinnedAddress}, TypeFullName: {_typeInfo.Type}";
         }
     }
 }

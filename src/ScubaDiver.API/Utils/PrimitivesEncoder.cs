@@ -26,10 +26,8 @@ namespace ScubaDiver.API.Utils
 
             if (toEncode is Array enumerable)
             {
-                Console.WriteLine($"[Diver][PrimEnc] Trying to encode an array: {toEncode}");
                 object[] objectsEnumerable = enumerable.Cast<object>().ToArray();
                 Type elementsType = toEncode.GetType().GetElementType();
-                Console.WriteLine($"[Diver][PrimEnc] Trying to encode an array: {toEncode}. ElementType: {elementsType}");
                 if (!elementsType.IsPrimitiveEtc())
                 {
                     throw new Exception("At least one element in the array is not primitive");

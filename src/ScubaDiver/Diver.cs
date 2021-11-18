@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -62,6 +63,7 @@ namespace ScubaDiver
             {
                 return "{\"error\":\"Missing parameter 'address'\"}";
             }
+            Console.WriteLine($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}");
 
             // Check if we have this objects in our pinned pool
             if (_pinnedObjects.ContainsKey(objAddr))
@@ -137,22 +139,22 @@ namespace ScubaDiver
 
             // Need to return the results. If it's primitive we'll encode it
             // If it's non-primitive we pin it and send the address.
-            ulong resultsAddress;
+            ulong pinAddr;
             if (createdObject.GetType().IsPrimitiveEtc())
             {
                 // TODO: Something else?
-                resultsAddress = 0xeeffeeff;
-
+                pinAddr = 0xeeffeeff;
             }
             else
             {
                 // Pinning results
                 var pinnedObj = PinObject(createdObject);
-                resultsAddress = pinnedObj.Address;
+                pinAddr = pinnedObj.Address;
             }
 
 
-            ObjectDump od = CreateObjectDump(createdObject, resultsAddress);
+            ulong retrivalAddr = pinAddr; // New objects don't have a different address before pinning
+            ObjectDump od = CreateObjectDump(createdObject, retrivalAddr, pinAddr);
             return JsonConvert.SerializeObject(od);
 
         }
@@ -478,7 +480,6 @@ namespace ScubaDiver
         {
             string objAddrStr = arg.QueryString.Get("address");
             bool pinningRequested = arg.QueryString.Get("pinRequest") == "True";
-            Console.WriteLine($"[Diver][Debug](MakeObjectResponse) objAddrStr=\"{objAddrStr}\", pinningRequested={pinningRequested}");
             if (objAddrStr == null)
             {
                 return "{\"error\":\"Missing parameter 'address'\"}";
@@ -487,6 +488,7 @@ namespace ScubaDiver
             {
                 return "{\"error\":\"Parameter 'address' could not be parsed as ulong\"}";
             }
+            Console.WriteLine($"[Diver][Debug](MakeObjectResponse) objAddrStr={objAddr:X16}, pinningRequested={pinningRequested}");
 
             // Check if we have this objects in our pinned pool
             object instance = null;
@@ -525,14 +527,15 @@ namespace ScubaDiver
 
             if (pinningRequested & !alreadyPinned)
             {
-                PinObject(instance, objAddr);
+                poi = PinObject(instance);
             }
 
-            ObjectDump od = CreateObjectDump(instance, objAddr);
+            ulong pinAddr = poi?.Address ?? 0xeeffeeff;
+            ObjectDump od = CreateObjectDump(instance, objAddr, pinAddr);
             return JsonConvert.SerializeObject(od);
         }
 
-        private static ObjectDump CreateObjectDump(object instance, ulong objAddr)
+        private static ObjectDump CreateObjectDump(object instance, ulong retrievalAddr, ulong pinAddr)
         {
             Type dumpedObjType = instance.GetType();
             ObjectDump od;
@@ -540,7 +543,8 @@ namespace ScubaDiver
             {
                 od = new ObjectDump()
                 {
-                    Address = objAddr,
+                    RetrivalAddress = retrievalAddr,
+                    PinnedAddress = pinAddr,
                     PrimitiveValue = PrimitivesEncoder.Encode(instance)
                 };
             }
@@ -618,7 +622,8 @@ namespace ScubaDiver
 
                 od = new ObjectDump()
                 {
-                    Address = objAddr,
+                    RetrivalAddress = retrievalAddr,
+                    PinnedAddress = pinAddr,
                     Type = dumpedObjType.ToString(),
                     Fields = fields,
                     Properties = props
@@ -640,7 +645,7 @@ namespace ScubaDiver
         /// <param name="instance">The object to pin</param>
         /// <param name="requiredPinningAddress">Current objects address if keeping it is crucial or null if it doesn't matter</param>
         /// <returns></returns>
-        private PinnedObjectInfo PinObject(object instance, ulong? requiredPinningAddress = null)
+        private PinnedObjectInfo PinObject(object instance)
         {
             // Allows the freeze function to indicate freezing was done
             ManualResetEvent freezeFeedback = new ManualResetEvent(false);
@@ -657,21 +662,8 @@ namespace ScubaDiver
             // We are only using GCHandle here to read the address of the object.
             GCHandle handle = GCHandle.Alloc(instance);
             ulong pinningAddress = (ulong)GCHandle.ToIntPtr(handle).ToInt64();
-            Console.WriteLine($"[Diver] Pinning object {instance}, GCHandle returned address {requiredPinningAddress:X16}");
+            Console.WriteLine($"[Diver] Pinning object {instance}, GCHandle returned address {pinningAddress:X16}");
             handle.Free();
-
-            // If the caller wants the object pinned at a specific address make sure it happened.
-            if (requiredPinningAddress.HasValue)
-            {
-                if ((ulong) pinningAddress != requiredPinningAddress)
-                {
-                    // error...
-                    // Undo pinning - indicate unfreeze is required.
-                    Console.WriteLine($"[Diver] ERROR - Pinned object address mismatched. {pinningAddress:X16} != {requiredPinningAddress:X16}");
-                    unfreezeRequired.Set();
-                    return null;
-                }
-            }
 
             // Object is pinned and it a good address
             PinnedObjectInfo poi = new PinnedObjectInfo(instance, pinningAddress, unfreezeRequired, freezeTask);
