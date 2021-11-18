@@ -30,6 +30,7 @@ namespace ScubaDiver.API.Utils
                 Type elementsType = toEncode.GetType().GetElementType();
                 if (!elementsType.IsPrimitiveEtc())
                 {
+                    // TODO: Support arrays of RemoteObjects/DynamicRemoteObject
                     throw new Exception("At least one element in the array is not primitive");
                 }
 
