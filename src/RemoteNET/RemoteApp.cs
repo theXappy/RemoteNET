@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using RemoteNET.Internal.Reflection;
@@ -72,7 +73,7 @@ namespace RemoteNET
         {
             // TODO: If target is our own process run a local Diver without DLL injections
 
-            bool alreadyInjected =false;
+            bool alreadyInjected = false;
             try
             {
                 alreadyInjected = target.Modules.AsEnumerable()
@@ -83,48 +84,53 @@ namespace RemoteNET
                 // Sometimes this happens because x32 vs x64 process interaction is not supported
             }
 
-            // To make the Diver's port predicatable even when re-attaching we'll derieve it from the PID:
+            // To make the Diver's port predictable even when re-attaching we'll derive it from the PID:
             ushort diverPort = (ushort) target.Id;
 
             if (!alreadyInjected)
             {
                 // Dumping injector + bootstrap DLL to a temp dir
-                var tempDir = Path.Combine(Path.GetTempPath(), (new Random()).Next(10_000, int.MaxValue).ToString());
-                Directory.CreateDirectory(tempDir);
+                var tempDirPath = Path.Combine(Path.GetTempPath(), typeof(RemoteApp).Assembly.GetName().Name);
+                System.IO.DirectoryInfo tempDirInfo = new DirectoryInfo(tempDirPath);
+                if (tempDirInfo.Exists)
+                {
+                    tempDirInfo.Delete(true);
+                }
+                tempDirInfo.Create();
 
 
                 // Decide which injection toolkit to use x32 or x64
-                string injectorPath = Path.Combine(tempDir, "Injector.exe");
-                string bootstrapPath = Path.Combine(tempDir, "BootstrapDLL.dll");
+                string injectorPath = Path.Combine(tempDirPath, "Injector.exe");
+                string bootstrapPath = Path.Combine(tempDirPath, "BootstrapDLL.dll");
                 byte[] injectorResource = Resources.Injector;
                 byte[] bootstrapDllResource = Resources.BootstrapDLL;
                 if (target.Is64Bit())
                 {
-                    injectorPath = Path.Combine(tempDir, "Injector64.exe");
-                    bootstrapPath = Path.Combine(tempDir, "BootstrapDLL64.dll");
+                    injectorPath = Path.Combine(tempDirPath, "Injector64.exe");
+                    bootstrapPath = Path.Combine(tempDirPath, "BootstrapDLL64.dll");
                     injectorResource = Resources.Injector64;
                     bootstrapDllResource = Resources.BootstrapDLL64;
                 }
 
+                
                 // Extract toolkit to disk
                 File.WriteAllBytes(injectorPath, injectorResource);
                 File.WriteAllBytes(bootstrapPath, bootstrapDllResource);
 
                 // Unzip scuba diver and dependencies into their own directory
-                var scubaPath = Path.Combine(tempDir, "Scuba");
-                Directory.CreateDirectory(scubaPath);
+                var scubaDirInfo = tempDirInfo.CreateSubdirectory("Scuba");
                 using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDiver))
                 {
                     ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
                     // This extracts the "Scuba" directory from the zip to *tempDir*
-                    diverZip.ExtractToDirectory(tempDir);
+                    diverZip.ExtractToDirectory(tempDirPath);
                 }
 
-                string scubaDiverDllPath = Directory.EnumerateFiles(scubaPath)
+                string scubaDiverDllPath = Directory.EnumerateFiles(scubaDirInfo.Name)
                     .Single(scubaFile => scubaFile.EndsWith("ScubaDiver.dll"));
 
                 var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id} {scubaDiverDllPath} {diverPort}");
-                startInfo.WorkingDirectory = tempDir;
+                startInfo.WorkingDirectory = tempDirPath;
                 startInfo.UseShellExecute = false;
                 startInfo.RedirectStandardOutput = true;
                 var injectorProc = Process.Start(startInfo);
