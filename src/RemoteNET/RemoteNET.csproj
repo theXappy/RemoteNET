@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -39,7 +39,7 @@
   </Target>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="del /s /q &quot;$(ProjectDir)\Resources&quot;" />
+    <Exec Command="powershell &quot;Get-ChildItem -Path '$(ProjectDir)\Resources' -Exclude '*READ_ME*' | Set-Content -Value 'dummy'&quot;" />
   </Target>
 
 </Project>
