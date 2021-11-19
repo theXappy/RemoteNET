@@ -100,16 +100,16 @@ namespace RemoteNET
 
 
                 // Decide which injection toolkit to use x32 or x64
-                string injectorPath = Path.Combine(tempDirPath, "Injector.exe");
-                string bootstrapPath = Path.Combine(tempDirPath, "BootstrapDLL.dll");
+                string injectorPath = Path.Combine(tempDirPath, nameof(Resources.Injector)+".exe");
+                string bootstrapPath = Path.Combine(tempDirPath, nameof(Resources.BootstrapDLL)+".dll");
                 byte[] injectorResource = Resources.Injector;
                 byte[] bootstrapDllResource = Resources.BootstrapDLL;
                 if (target.Is64Bit())
                 {
-                    injectorPath = Path.Combine(tempDirPath, "Injector64.exe");
-                    bootstrapPath = Path.Combine(tempDirPath, "BootstrapDLL64.dll");
-                    injectorResource = Resources.Injector64;
-                    bootstrapDllResource = Resources.BootstrapDLL64;
+                    injectorPath = Path.Combine(tempDirPath, nameof(Resources.Injector_x64)+".exe");
+                    bootstrapPath = Path.Combine(tempDirPath, nameof(Resources.BootstrapDLL_x64)+".dll");
+                    injectorResource = Resources.Injector_x64;
+                    bootstrapDllResource = Resources.BootstrapDLL_x64;
                 }
 
                 

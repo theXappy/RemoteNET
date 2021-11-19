@@ -73,9 +73,9 @@ namespace RemoteNET.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
-        internal static byte[] BootstrapDLL64 {
+        internal static byte[] BootstrapDLL_x64 {
             get {
-                object obj = ResourceManager.GetObject("BootstrapDLL64", resourceCulture);
+                object obj = ResourceManager.GetObject("BootstrapDLL_x64", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -93,9 +93,9 @@ namespace RemoteNET.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
-        internal static byte[] Injector64 {
+        internal static byte[] Injector_x64 {
             get {
-                object obj = ResourceManager.GetObject("Injector64", resourceCulture);
+                object obj = ResourceManager.GetObject("Injector_x64", resourceCulture);
                 return ((byte[])(obj));
             }
         }
