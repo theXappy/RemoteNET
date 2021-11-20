@@ -36,6 +36,12 @@ namespace RemoteNET
             return _communicator.DumpHeap(typeFullNameFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type, heapObj.HashCode));
         }
 
+        /// <summary>
+        /// Gets a handle to a remote type (even ones from assemblies we aren't referencing/loading to the local process)
+        /// </summary>
+        /// <param name="typeFullName">Full name of the type to get. For example 'System.Xml.XmlDocument'</param>
+        /// <param name="assembly">Optional short name of the assembly containing the type. For example 'System.Xml.ReaderWriter.dll'</param>
+        /// <returns></returns>
         public Type GetRemoteType(string typeFullName, string assembly = null)
         {
             RemoteTypesFactory rtf = new RemoteTypesFactory(TypesResolver.Instance);
@@ -43,6 +49,10 @@ namespace RemoteNET
             var dumpedType = _communicator.DumpType(typeFullName, assembly);
             return rtf.Create(this, dumpedType);
         }
+        /// <summary>
+        /// Returns a handle to a remote type based on a given local type.
+        /// </summary>
+        public Type GetRemoteType(Type localType) => GetRemoteType(localType.FullName, localType.Assembly.GetName().Name);
 
         public RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.HashCode);
         public RemoteObject GetRemoteObject(ulong remoteAddress, int? hashCode = null)

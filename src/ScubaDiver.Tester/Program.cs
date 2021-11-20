@@ -180,7 +180,7 @@ namespace ScubaDiver.Tester
                     case 5:
                         {
                             Console.WriteLine("Invoking int.parse('123')");
-                            var remoteIntType = remoteApp.GetRemoteType(typeof(int).FullName);
+                            var remoteIntType = remoteApp.GetRemoteType(typeof(int));
                             var remoteIntParse = remoteIntType.GetMethod("Parse", new[] { typeof(string) });
                             object x = remoteIntParse.Invoke(null, new object[] { "123" });
                             Console.WriteLine($"Result: {x}");
