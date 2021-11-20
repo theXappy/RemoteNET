@@ -779,7 +779,7 @@ namespace ScubaDiver
         private string MakeDieResponse(HttpListenerRequest req)
         {
             Console.WriteLine("[Diver] Die command received");
-            return "{\"error\":\"Goodbye\"}";
+            return "{\"status\":\"Goodbye\"}";
         }
 
         private string MakeTypesResponse(HttpListenerRequest req)
