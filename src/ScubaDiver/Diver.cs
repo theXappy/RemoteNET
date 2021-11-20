@@ -1004,6 +1004,15 @@ namespace ScubaDiver
             return "{\"error\":\"Failed to find type in searched assemblies\"}";
         }
 
+        public static Assembly AssembliesResolverFunc(object sender, ResolveEventArgs args)
+        {
+            string folderPath = Path.GetDirectoryName(typeof(Diver).Assembly.Location);
+            string assemblyPath = Path.Combine(folderPath, new AssemblyName(args.Name).Name + ".dll");
+            if (!File.Exists(assemblyPath)) return null;
+            Assembly assembly = Assembly.LoadFrom(assemblyPath);
+            return assembly;
+        }
+
         public static int EntryPoint(string pwzArgument)
         {
             // Bootstrap needs to call a C# function with exactly this signature.
@@ -1011,14 +1020,7 @@ namespace ScubaDiver
 
             // Diver needs some assemblies which might not be loaded in the target process
             // so starting off with registering an assembly resolver to the Diver's dll's directory
-            string folderPath = System.IO.Path.GetDirectoryName(typeof(Diver).Assembly.Location);
-            AppDomain.CurrentDomain.AssemblyResolve += (object sender, ResolveEventArgs args) =>
-            {
-                string assemblyPath = Path.Combine(folderPath, new AssemblyName(args.Name).Name + ".dll");
-                if (!File.Exists(assemblyPath)) return null;
-                Assembly assembly = Assembly.LoadFrom(assemblyPath);
-                return assembly;
-            };
+            AppDomain.CurrentDomain.AssemblyResolve += AssembliesResolverFunc;
             Console.WriteLine("[Diver] Loaded + hooked assemblies resolver.");
 
             try
@@ -1037,6 +1039,11 @@ namespace ScubaDiver
                 Console.WriteLine("[Diver] Exiting entry point in 60 secs...");
                 Thread.Sleep(TimeSpan.FromSeconds(60));
                 return 1;
+            }
+            finally
+            {
+                AppDomain.CurrentDomain.AssemblyResolve -= AssembliesResolverFunc;
+                Console.WriteLine("[Diver] unhooked assemblies resolver.");
             }
         }
 
