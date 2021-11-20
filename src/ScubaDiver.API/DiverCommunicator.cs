@@ -63,6 +63,12 @@ namespace ScubaDiver.API
             return body;
         }
 
+        public bool KillDiver()
+        {
+            string body = SendRequest("die");
+            return body?.Contains("Goodbye") ?? false;
+        }
+
         /// <summary>
         /// Dumps the heap of the remote process
         /// </summary>
