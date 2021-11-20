@@ -17,7 +17,7 @@ DllExport void LoadManagedProject(const wchar_t * bootstrapDllArg)
 	wchar_t* separator = wcsstr(argCopy, L"*");
 	if (separator == NULL)
 	{
-		printf("[Bootstrap ] ERROR: Failed to find separator (*) in BootstrapDLL argument:");
+		printf("[Bootstrap] ERROR: Failed to find separator (*) in BootstrapDLL argument:");
 		wprintf(L"%s\n", argCopy);
 		return;
 	}
