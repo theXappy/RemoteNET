@@ -165,7 +165,6 @@ namespace RemoteNET
                     if (allMethods.Any(existingMethod => existingMethod.SignaturesEqual(method)))
                     {
                         // Method was overloaded!
-                        Console.WriteLine($"@@@ Method {method.Name} seems to be overloaded!");
                         continue;
                     }
                     // Method not overloaded
@@ -229,7 +228,6 @@ namespace RemoteNET
                          }
                      }
                  };
-                Debug.WriteLine("@@@ HANDLING METHOD: " + methodInfo.ToString());
                 List<Type> argTypes = (from prmtr in methodInfo.Parameters
                                        let typeFullName = prmtr.Type
                                        let resolvedType = AppDomain.CurrentDomain.GetType(typeFullName)

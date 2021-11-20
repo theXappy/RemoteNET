@@ -87,11 +87,9 @@ namespace ScubaDiver.Tester
             Console.WriteLine("2. Get Remote Object");
             Console.WriteLine("3. Call `ToString` of Remote Object");
             Console.WriteLine("4. Print methods of Remote Object");
-            Console.WriteLine("5. Create remote object");
-            Console.WriteLine("6. Invoke example static method (int.parse)");
-            Console.WriteLine("7. Field write test");
-            Console.WriteLine("8. Steal RSA keys");
-            Console.WriteLine("9. Exit");
+            Console.WriteLine("5. Invoke example static method (int.parse)");
+            Console.WriteLine("6. Steal RSA keys");
+            Console.WriteLine("7. Exit");
             string input = Console.ReadLine();
             ulong addr;
             uint index;
@@ -100,141 +98,119 @@ namespace ScubaDiver.Tester
                 switch (userChoice)
                 {
                     case 1:
-                        Console.WriteLine("Enter type name to query");
-                        string typeName = Console.ReadLine().Trim();
-                        if (string.IsNullOrWhiteSpace(typeName))
                         {
-                            // Assuming user wants all types
-                            typeName = null;
-                        }
+                            Console.WriteLine("Enter type name to query");
+                            string typeName = Console.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(typeName))
+                            {
+                                // Assuming user wants all types
+                                typeName = null;
+                            }
 
-                        var res = remoteApp.QueryInstances(typeName).ToList();
-                        Console.WriteLine("Instances:");
-                        for (int i = 0; i < res.Count; i++)
-                        {
-                            Console.WriteLine($"{i + 1}. {res[i].Address}, TypeFullName: {res[i].TypeFullName}");
+                            var res = remoteApp.QueryInstances(typeName).ToList();
+                            Console.WriteLine("Instances:");
+                            for (int i = 0; i < res.Count; i++)
+                            {
+                                Console.WriteLine($"{i + 1}. {res[i].Address}, TypeFullName: {res[i].TypeFullName}");
+                            }
                         }
-
                         break;
                     case 2:
-                        // Getting object
-                        Console.WriteLine("Enter address (decimal):");
-                        input = Console.ReadLine();
-                        if (ulong.TryParse(input, out addr))
                         {
-                            try
+                            // Getting object
+                            Console.WriteLine("Enter address (decimal):");
+                            input = Console.ReadLine();
+                            if (ulong.TryParse(input, out addr))
                             {
-                                RemoteObject remoteObject = remoteApp.GetRemoteObject(addr);
-                                remoteObjects.Add(remoteObject);
-                                Console.WriteLine($"Get back this object: {remoteObject}");
-                                Console.WriteLine($"This object's local index is {remoteObjects.IndexOf(remoteObject)}");
-                            }
-                            catch (Exception e)
-                            {
-                                Console.WriteLine("ERROR:");
-                                Console.WriteLine(e);
+                                try
+                                {
+                                    RemoteObject remoteObject = remoteApp.GetRemoteObject(addr);
+                                    remoteObjects.Add(remoteObject);
+                                    Console.WriteLine($"Get back this object: {remoteObject}");
+                                    Console.WriteLine($"This object's local index is {remoteObjects.IndexOf(remoteObject)}");
+                                }
+                                catch (Exception e)
+                                {
+                                    Console.WriteLine("ERROR:");
+                                    Console.WriteLine(e);
+                                }
                             }
                         }
-
                         break;
                     case 3:
-                        // Getting object
-                        Console.WriteLine("Enter local index of remote object:");
-                        if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
                         {
-                            Console.WriteLine("Bad input.");
-                        }
-                        else
-                        {
-                            var remoteObj = remoteObjects[(int) index];
-                            var dynObject = remoteObj.Dynamify();
-                            var toStringRes = dynObject.ToString();
-                            Console.WriteLine(toStringRes);
-
-                            var type = remoteObj.GetType();
-                        }
-
-                        break;
-                    case 4:
-                        // Getting object
-                        Console.WriteLine("Enter local index of remote object:");
-                        if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
-                        {
-                            Console.WriteLine("Bad input.");
-                        }
-                        else
-                        {
-                            var remoteObj = remoteObjects[(int) index];
-                            var type = remoteObj.GetType();
-                            Console.WriteLine($"Methods of {type.FullName}:");
-                            int i = 1;
-                            foreach (MethodInfo methodInfo in type.GetMethods())
+                            // Getting object
+                            Console.WriteLine("Enter local index of remote object:");
+                            if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
                             {
-                                var argsString = string.Join(", ",
-                                    methodInfo.GetParameters().Select(arg => arg.ParameterType + " " + arg.Name));
-                                Console.WriteLine($"{i++}. {methodInfo.ReturnType} {methodInfo.Name}({argsString})");
+                                Console.WriteLine("Bad input.");
+                            }
+                            else
+                            {
+                                var remoteObj = remoteObjects[(int)index];
+                                var dynObject = remoteObj.Dynamify();
+                                var toStringRes = dynObject.ToString();
+                                Console.WriteLine(toStringRes);
                             }
                         }
-
+                        break;
+                    case 4:
+                        {
+                            // Getting object
+                            Console.WriteLine("Enter local index of remote object:");
+                            if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
+                            {
+                                Console.WriteLine("Bad input.");
+                            }
+                            else
+                            {
+                                var remoteObj = remoteObjects[(int)index];
+                                var type = remoteObj.GetType();
+                                Console.WriteLine($"Methods of {type.FullName}:");
+                                int i = 1;
+                                foreach (MethodInfo methodInfo in type.GetMethods())
+                                {
+                                    var argsString = string.Join(", ",
+                                        methodInfo.GetParameters().Select(arg => arg.ParameterType + " " + arg.Name));
+                                    Console.WriteLine($"{i++}. {methodInfo.ReturnType} {methodInfo.Name}({argsString})");
+                                }
+                            }
+                        }
                         break;
                     case 5:
-                        Console.WriteLine("Getting MMSData type...");
-                        var typeToCreate = remoteApp.GetRemoteType("Samsung.SamsungFlow.Notification.Data.MMSData",
-                            "SamsungFlowFramework.NET");
-                        Console.WriteLine($"The Type is: {typeToCreate}");
-                        Console.WriteLine("Calling activator");
-
-                        var obj = remoteApp.Activator.CreateInstance(typeToCreate);
-                        Console.WriteLine("Got new object? " + obj);
+                        {
+                            Console.WriteLine("Invoking int.parse('123')");
+                            var remoteIntType = remoteApp.GetRemoteType(typeof(int).FullName);
+                            var remoteIntParse = remoteIntType.GetMethod("Parse", new[] { typeof(string) });
+                            object x = remoteIntParse.Invoke(null, new object[] { "123" });
+                            Console.WriteLine($"Result: {x}");
+                            Console.WriteLine($"Result Type: {x.GetType()}");
+                        }
                         break;
                     case 6:
-                        Console.WriteLine("Invoking int.parse('123')");
-                        var remoteIntType = remoteApp.GetRemoteType(typeof(int).FullName);
-                        var remoteIntParse = remoteIntType.GetMethod("Parse", new[] {typeof(string)});
-                        object x = remoteIntParse.Invoke(null, new object[] {"123"});
-                        Console.WriteLine($"Result: {x}");
-                        Console.WriteLine($"Result Type: {x.GetType()}");
+                        {
+                            // Finding every RSACryptoServiceProvider instance
+                            var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
+                            foreach (CandidateObject candidateRsa in rsaProviderCandidates)
+                            {
+                                RemoteObject rsaProv = remoteApp.GetRemoteObject(candidateRsa);
+                                dynamic dynamicRsaProv = rsaProv.Dynamify();
+                                // Calling remote `ExportParameters`.
+                                // First parameter (true) indicates we want the private key.
+                                Console.WriteLine(" * Key found:");
+                                dynamic parameters = dynamicRsaProv.ExportParameters(true);
+                                Console.WriteLine("Modulus: " + HexUtils.ToHex(parameters.Modulus));
+                                Console.WriteLine("Exponent: " + HexUtils.ToHex(parameters.Exponent));
+                                Console.WriteLine("D: " + HexUtils.ToHex(parameters.D));
+                                Console.WriteLine("P: " + HexUtils.ToHex(parameters.P));
+                                Console.WriteLine("Q: " + HexUtils.ToHex(parameters.Q));
+                                Console.WriteLine("DP: " + HexUtils.ToHex(parameters.DP));
+                                Console.WriteLine("DQ: " + HexUtils.ToHex(parameters.DQ));
+                                Console.WriteLine("InverseQ: " + HexUtils.ToHex(parameters.InverseQ));
+                            }
+                        }
                         break;
                     case 7:
-                        Console.WriteLine("Value of Secrets.AlwaysOne:");
-                        var candidate = remoteApp.QueryInstances("*Secrets").Single();
-                        var remoteSecrets = remoteApp.GetRemoteObject(candidate);
-                        dynamic dynSecrets = remoteSecrets.Dynamify();
-                        Console.WriteLine(dynSecrets.AlwaysOne);
-                        Console.WriteLine("Enter new value:");
-                        int newValue = int.Parse(Console.ReadLine());
-                        dynSecrets.AlwaysOne = newValue;
-                        Console.WriteLine("Value of Secrets.AlwaysOne again:");
-                        Console.WriteLine(dynSecrets.AlwaysOne);
-                        Console.WriteLine("Trying fancy x = y = z; statement");
-                        int sanity = dynSecrets.AlwaysOne = 777;
-                        Console.WriteLine($"Is sanity set to 777? Value: {sanity}");
-                        break;
-                    case 8:
-                        Func<byte[], string> ToHex = ba => BitConverter.ToString(ba).Replace("-", "");
-
-                        // Finding every RSACryptoServiceProvider instance
-                        var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
-                        foreach (CandidateObject candidateRsa in rsaProviderCandidates)
-                        {
-                            RemoteObject rsaProv = remoteApp.GetRemoteObject(candidateRsa);
-                            dynamic dynamicRsaProv = rsaProv.Dynamify();
-                            // Calling remote `ExportParameters`.
-                            // First parameter (true) indicates we want the private key.
-                            Console.WriteLine(" * Key found:");
-                            dynamic parameters = dynamicRsaProv.ExportParameters(true);
-                            Console.WriteLine("Modulus: " + ToHex(parameters.Modulus));
-                            Console.WriteLine("Exponent: " + ToHex(parameters.Exponent));
-                            Console.WriteLine("D: " + ToHex(parameters.D));
-                            Console.WriteLine("P: " + ToHex(parameters.P));
-                            Console.WriteLine("Q: " + ToHex(parameters.Q));
-                            Console.WriteLine("DP: " + ToHex(parameters.DP));
-                            Console.WriteLine("DQ: " + ToHex(parameters.DQ));
-                            Console.WriteLine("InverseQ: " + ToHex(parameters.InverseQ));
-                        }
-
-                        break;
-                    case 9:
                         // Exiting
                         return true;
                 }
