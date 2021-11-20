@@ -712,6 +712,10 @@ namespace ScubaDiver
             _dt?.Dispose();
             _dt = null;
 
+            // This works like 'fork()', it cretes does NOT create a dump file and uses it as the target
+            // Instead it creates a secondary processes which is a copy of the current one.
+            // This subprocess inherits handles to DLLs in the current process so it might "lock"
+            // both bootstrapDLL.dll and ScubaDiver.dll
             _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
             _runtime = _dt.ClrVersions.Single().CreateRuntime();
         }
@@ -729,6 +733,12 @@ namespace ScubaDiver
             Dispatcher(listener);
 
             listener.Close();
+            Console.WriteLine("[Diver] Closing ClrMD runtime and snapshot");
+            _runtime?.Dispose();
+            _runtime = null;
+            _dt?.Dispose();
+            _dt = null;
+
             Console.WriteLine("[Diver] Dispatcher returned, Dive is complete.");
         }
 
