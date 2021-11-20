@@ -106,23 +106,25 @@ foreach (CandidateObject candidate in sqlConCandidates)
 Just like accessing fields, invoking methods can be done on the dynamic objects.  
 This fun example dumps all private RSA keys (which are stored in `RSACryptoServiceProvider`s) that are found in the target's memory:
 ```C#
+Func<byte[], string> ToHex = ba => BitConverter.ToString(ba).Replace("-", "");
+
 // Finding every RSACryptoServiceProvider instance
 var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
-foreach (CandidateObject candidate in rsaProviderCandidates)
+foreach (CandidateObject candidateRsa in rsaProviderCandidates)
 {
-    RemoteObject rsaProv = remoteApp.GetRemoteObject(candidate);
+    RemoteObject rsaProv = remoteApp.GetRemoteObject(candidateRsa);
     dynamic dynamicRsaProv = rsaProv.Dynamify();
     // Calling remote `ExportParameters`.
     // First parameter (true) indicates we want the private key.
     dynamic parameters = dynamicRsaProv.ExportParameters(true);
-    Console.WriteLine("Modulus: " + parameters.Modulus);
-    Console.WriteLine("Exponent: " + parameters.Exponent);
-    Console.WriteLine("D: " + parameters.D);
-    Console.WriteLine("P: " + parameters.P);
-    Console.WriteLine("Q: " + parameters.Q);
-    Console.WriteLine("DP: " + parameters.DP);
-    Console.WriteLine("DQ: " + parameters.DQ);
-    Console.WriteLine("InverseQ: " + parameters.InverseQ);
+    Console.WriteLine((string) ("Modulus: " + ToHex(parameters.Modulus)));
+    Console.WriteLine((string) ("Exponent: " + ToHex(parameters.Exponent)));
+    Console.WriteLine((string) ("D: " + ToHex(parameters.D)));
+    Console.WriteLine((string) ("P: " + ToHex(parameters.P)));
+    Console.WriteLine((string) ("Q: " + ToHex(parameters.Q)));
+    Console.WriteLine((string) ("DP: " + ToHex(parameters.DP)));
+    Console.WriteLine((string) ("DQ: " + ToHex(parameters.DQ)));
+    Console.WriteLine((string) ("InverseQ: " + ToHex(parameters.InverseQ)));
 }
 ```
 
