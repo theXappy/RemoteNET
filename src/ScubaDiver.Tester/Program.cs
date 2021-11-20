@@ -73,9 +73,11 @@ namespace ScubaDiver.Tester
             List<RemoteObject> remoteObjects = new List<RemoteObject>();
             while (true)
             {
-                if (DoSingleMenu(remoteApp, remoteObjects)) return;
+                if (DoSingleMenu(remoteApp, remoteObjects)) 
+                    break;
             }
-
+            
+            remoteApp.Dispose();
         }
 
         private static bool DoSingleMenu(RemoteApp remoteApp, List<RemoteObject> remoteObjects)
