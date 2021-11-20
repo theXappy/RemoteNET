@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -14,10 +14,10 @@ using ScubaDiver.API.Dumps;
 
 namespace RemoteNET
 {
-    public class RemoteApp
+    public class RemoteApp : IDisposable
     {
-        private readonly Process _procWithDiver;
-        private readonly DiverCommunicator _communicator;
+        private Process _procWithDiver;
+        private DiverCommunicator _communicator;
 
         public RemoteActivator Activator { get; private set; }
 
@@ -149,6 +149,13 @@ namespace RemoteNET
             DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
 
             return new RemoteApp(target, com);
+        }
+
+        public void Dispose()
+        {
+            this.Communicator?.KillDiver();
+            this._communicator = null;
+            this._procWithDiver = null;
         }
 
     }
