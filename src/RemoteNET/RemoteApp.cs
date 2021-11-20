@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -89,52 +89,106 @@ namespace RemoteNET
 
             if (!alreadyInjected)
             {
-                // Dumping injector + bootstrap DLL to a temp dir
-                var tempDirPath = Path.Combine(Path.GetTempPath(), typeof(RemoteApp).Assembly.GetName().Name);
-                System.IO.DirectoryInfo tempDirInfo = new DirectoryInfo(tempDirPath);
-                if (tempDirInfo.Exists)
+                // Dumping injector + bootstrap DLL to a %localappdata%\RemoteNET
+                var remoteNetAppDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    typeof(RemoteApp).Assembly.GetName().Name);
+                DirectoryInfo remoteNetAppDataDirInfo = new DirectoryInfo(remoteNetAppDataDir);
+                if (!remoteNetAppDataDirInfo.Exists)
                 {
-                    tempDirInfo.Delete(true);
+                    remoteNetAppDataDirInfo.Create();
                 }
-                tempDirInfo.Create();
-
 
                 // Decide which injection toolkit to use x32 or x64
-                string injectorPath = Path.Combine(tempDirPath, nameof(Resources.Injector)+".exe");
-                string bootstrapPath = Path.Combine(tempDirPath, nameof(Resources.BootstrapDLL)+".dll");
+                string injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector)+".exe");
+                string bootstrapPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.BootstrapDLL)+".dll");
                 byte[] injectorResource = Resources.Injector;
                 byte[] bootstrapDllResource = Resources.BootstrapDLL;
                 if (target.Is64Bit())
                 {
-                    injectorPath = Path.Combine(tempDirPath, nameof(Resources.Injector_x64)+".exe");
-                    bootstrapPath = Path.Combine(tempDirPath, nameof(Resources.BootstrapDLL_x64)+".dll");
+                    injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector_x64)+".exe");
+                    bootstrapPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.BootstrapDLL_x64)+".dll");
                     injectorResource = Resources.Injector_x64;
                     bootstrapDllResource = Resources.BootstrapDLL_x64;
                 }
 
-                
-                // Extract toolkit to disk
-                File.WriteAllBytes(injectorPath, injectorResource);
-                File.WriteAllBytes(bootstrapPath, bootstrapDllResource);
+                // Check if injector or bootstrap resources differ from copies on disk
+                string injectorResourceHash = HashUtils.BufferSHA256(injectorResource);
+                string injectorFileHash = File.Exists(injectorPath) ? HashUtils.FileSHA256(injectorPath) : String.Empty;
+                if(injectorResourceHash != injectorFileHash)
+                {
+                    File.WriteAllBytes(injectorPath, injectorResource);
+                }
+                string bootstrapResourceHash = HashUtils.BufferSHA256(bootstrapDllResource);
+                string bootstrapFileHash = File.Exists(bootstrapPath) ? HashUtils.FileSHA256(bootstrapPath) : String.Empty;
+                if (bootstrapResourceHash != bootstrapFileHash)
+                {
+                    File.WriteAllBytes(bootstrapPath, bootstrapDllResource);
+                }
 
                 // Unzip scuba diver and dependencies into their own directory
-                var scubaDirInfo = tempDirInfo.CreateSubdirectory("Scuba");
+                var scubaDestDirInfo = new DirectoryInfo(
+                                                Path.Combine(
+                                                    remoteNetAppDataDir,
+                                                    "Scuba")
+                                                );
+                if(!scubaDestDirInfo.Exists)
+                {
+                    scubaDestDirInfo.Create();
+                }
+
+                // Temp dir to dump to before moving to app data (where it might have previously deployed files
+                // AND they might be in use by some application so they can't be overwritten)
+                Random rand = new Random();
+                var tempDir = Path.Combine(
+                    Path.GetTempPath(),
+                    rand.Next(100000).ToString());
+                DirectoryInfo tempDirInfo = new DirectoryInfo(tempDir);
+                if (tempDirInfo.Exists)
+                {
+                    tempDirInfo.Delete(recursive: true);
+                }
+                tempDirInfo.Create();
                 using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDiver))
                 {
                     ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
                     // This extracts the "Scuba" directory from the zip to *tempDir*
-                    diverZip.ExtractToDirectory(tempDirPath);
+                    diverZip.ExtractToDirectory(tempDir);
                 }
 
-                string scubaDiverDllPath = Directory.EnumerateFiles(scubaDirInfo.Name)
-                    .Single(scubaFile => scubaFile.EndsWith("ScubaDiver.dll"));
+                // Going over unzipped files and checking which of those we need to copy to our AppData directory
+                tempDirInfo = new DirectoryInfo(Path.Combine(tempDir,"Scuba"));
+                foreach (FileInfo fileInfo in tempDirInfo.GetFiles())
+                {
+                    string destPath = Path.Combine(scubaDestDirInfo.FullName, fileInfo.Name);
+                    if(File.Exists(destPath))
+                    {
+                        string dumpedFileHash = HashUtils.FileSHA256(fileInfo.FullName);
+                        string previousFileHash = HashUtils.FileSHA256(destPath);
+                        if(dumpedFileHash == previousFileHash)
+                        {
+                            // Skipping file because the previous version of it has the same hash
+                            continue;
+                        }
+                    }
+                    // Moving file to our AppData directory
+                    fileInfo.MoveTo(destPath);
+                }
+
+
+                // We are done with our temp directory
+                tempDirInfo.Delete(recursive: true);
+
+                string scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
+                    .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver.dll")).FullName;
 
                 var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id} {scubaDiverDllPath} {diverPort}");
-                startInfo.WorkingDirectory = tempDirPath;
+                startInfo.WorkingDirectory = remoteNetAppDataDir;
                 startInfo.UseShellExecute = false;
                 startInfo.RedirectStandardOutput = true;
                 var injectorProc = Process.Start(startInfo);
-                if (injectorProc != null && injectorProc.WaitForExit(5000))
+                // TODO: Currently I allow 500ms for the injector to fail (indicated by exiting)
+                if (injectorProc != null && injectorProc.WaitForExit(500))
                 {
                     // Injector finished early, there's probably an error.
                     var stdout = injectorProc.StandardOutput.ReadToEnd();
