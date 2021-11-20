@@ -19,6 +19,11 @@ namespace RemoteNET.Internal
 
         public RemoteObjectRef(ObjectDump remoteObjectInfo, TypeDump typeInfo, DiverCommunicator creatingCommunicator)
         {
+            if(typeInfo == null)
+            {
+                throw new ArgumentNullException(nameof(typeInfo));
+            }
+
             _remoteObjectInfo = remoteObjectInfo;
             _typeInfo = typeInfo;
             _creatingCommunicator = creatingCommunicator;

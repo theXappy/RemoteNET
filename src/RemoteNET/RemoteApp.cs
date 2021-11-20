@@ -33,7 +33,7 @@ namespace RemoteNET
         public IEnumerable<CandidateObject> QueryInstances(Type typeFilter) => QueryInstances(typeFilter.FullName);
         public IEnumerable<CandidateObject> QueryInstances(string typeFullNameFilter)
         {
-            return _communicator.DumpHeap(typeFullNameFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type));
+            return _communicator.DumpHeap(typeFullNameFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type, heapObj.HashCode));
         }
 
         public Type GetRemoteType(string typeFullName, string assembly = null)
@@ -44,14 +44,14 @@ namespace RemoteNET
             return rtf.Create(this, dumpedType);
         }
 
-        public RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address);
-        public RemoteObject GetRemoteObject(ulong remoteAddress)
+        public RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.HashCode);
+        public RemoteObject GetRemoteObject(ulong remoteAddress, int? hashCode = null)
         {
             ObjectDump od;
             TypeDump td;
             try
             {
-                od = _communicator.DumpObject(remoteAddress, true);
+                od = _communicator.DumpObject(remoteAddress, true, hashCode);
                 td = _communicator.DumpType(od.Type);
             }
             catch (Exception e)
@@ -172,6 +172,7 @@ namespace RemoteNET
                         }
                     }
                     // Moving file to our AppData directory
+                    File.Delete(destPath);
                     fileInfo.MoveTo(destPath);
                 }
 

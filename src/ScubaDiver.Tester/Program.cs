@@ -211,7 +211,7 @@ namespace ScubaDiver.Tester
                         Console.WriteLine($"Is sanity set to 777? Value: {sanity}");
                         break;
                     case 8:
-                        Func<byte[], string> ToHex = arr => string.Join("", arr.Select(b => b.ToString("X2")).ToArray());
+                        Func<byte[], string> ToHex = ba => BitConverter.ToString(ba).Replace("-", "");
 
                         // Finding every RSACryptoServiceProvider instance
                         var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
@@ -223,14 +223,14 @@ namespace ScubaDiver.Tester
                             // First parameter (true) indicates we want the private key.
                             Console.WriteLine(" * Key found:");
                             dynamic parameters = dynamicRsaProv.ExportParameters(true);
-                            Console.WriteLine((string) ("Modulus: " + ToHex(parameters.Modulus)));
-                            Console.WriteLine((string) ("Exponent: " + ToHex(parameters.Exponent)));
-                            Console.WriteLine((string) ("D: " + ToHex(parameters.D)));
-                            Console.WriteLine((string) ("P: " + ToHex(parameters.P)));
-                            Console.WriteLine((string) ("Q: " + ToHex(parameters.Q)));
-                            Console.WriteLine((string) ("DP: " + ToHex(parameters.DP)));
-                            Console.WriteLine((string) ("DQ: " + ToHex(parameters.DQ)));
-                            Console.WriteLine((string) ("InverseQ: " + ToHex(parameters.InverseQ)));
+                            Console.WriteLine("Modulus: " + ToHex(parameters.Modulus));
+                            Console.WriteLine("Exponent: " + ToHex(parameters.Exponent));
+                            Console.WriteLine("D: " + ToHex(parameters.D));
+                            Console.WriteLine("P: " + ToHex(parameters.P));
+                            Console.WriteLine("Q: " + ToHex(parameters.Q));
+                            Console.WriteLine("DP: " + ToHex(parameters.DP));
+                            Console.WriteLine("DQ: " + ToHex(parameters.DQ));
+                            Console.WriteLine("InverseQ: " + ToHex(parameters.InverseQ));
                         }
 
                         break;

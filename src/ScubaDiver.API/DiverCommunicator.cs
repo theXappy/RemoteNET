@@ -110,13 +110,19 @@ namespace ScubaDiver.API
             return typeDump;
         }
 
-        public ObjectDump DumpObject(ulong address, bool pinObject = false)
+        public ObjectDump DumpObject(ulong address, bool pinObject = false, int? hashcode = null)
         {
             Dictionary<string, string> queryParams = new()
             {
                 { "address", address.ToString() },
-                { "pinRequest", pinObject.ToString() }
+                { "pinRequest", pinObject.ToString() },
+                { "hashcode_fallback", "false" }
             };
+            if(hashcode.HasValue)
+            {
+                queryParams["hashcode"] = hashcode.Value.ToString();
+                queryParams["hashcode_fallback"] = "true";
+            }
             string body = SendRequest("object", queryParams);
             if (body.Contains("\"error\":"))
             {
