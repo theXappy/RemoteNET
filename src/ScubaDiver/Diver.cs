@@ -177,8 +177,8 @@ namespace ScubaDiver
             if (paramType.IsPrimitive)
             {
                 // Call 'Parse' static method of the relevant type
-                var parserMethod = paramType.GetMethodRecursive("Parse", new[] {typeof(string)});
-                object parsedParam = parserMethod.Invoke(null, new object[1] {param.EncodedObject});
+                var parserMethod = paramType.GetMethodRecursive("Parse", new[] { typeof(string) });
+                object parsedParam = parserMethod.Invoke(null, new object[1] { param.EncodedObject });
                 return (parsedParam);
             }
 
@@ -273,7 +273,7 @@ namespace ScubaDiver
                     catch (Exception)
                     {
                         return
-                            "{\"error\":\"Couldn't get handle to requested object. It could be because the Method Table or a GC collection happened.\"}";
+                            "{\"error\":\"Couldn't get handle to requested object. It could be because the Method Table mismatched or a GC collection happened.\"}";
                     }
                 }
             }
@@ -338,7 +338,7 @@ namespace ScubaDiver
                 else
                 {
                     // Pinning results
-                    PinnedObjectInfo poi =  PinObject(results);
+                    PinnedObjectInfo poi = PinObject(results);
                     ulong resultsAddress = poi.Address;
                     Type resultsType = results.GetType();
                     returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
@@ -460,7 +460,7 @@ namespace ScubaDiver
                 else
                 {
                     // Pinning results
-                    PinnedObjectInfo resultsPoi= PinObject(results);
+                    PinnedObjectInfo resultsPoi = PinObject(results);
                     ulong resultsAddress = resultsPoi.Address;
                     Type resultsType = results.GetType();
                     returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
@@ -479,7 +479,10 @@ namespace ScubaDiver
         private string MakeObjectResponse(HttpListenerRequest arg)
         {
             string objAddrStr = arg.QueryString.Get("address");
-            bool pinningRequested = arg.QueryString.Get("pinRequest") == "True";
+            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
+            bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
+            string hashCodeStr = arg.QueryString.Get("hashcode");
+            int userHashcode = 0;
             if (objAddrStr == null)
             {
                 return "{\"error\":\"Missing parameter 'address'\"}";
@@ -487,6 +490,13 @@ namespace ScubaDiver
             if (!ulong.TryParse(objAddrStr, out var objAddr))
             {
                 return "{\"error\":\"Parameter 'address' could not be parsed as ulong\"}";
+            }
+            if (hashCodeFallback)
+            {
+                if (!int.TryParse(hashCodeStr, out userHashcode))
+                {
+                    return "{\"error\":\"Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int\"}";
+                }
             }
             Console.WriteLine($"[Diver][Debug](MakeObjectResponse) objAddrStr={objAddr:X16}, pinningRequested={pinningRequested}");
 
@@ -504,25 +514,62 @@ namespace ScubaDiver
             else
             {
                 // Object not pinned, try get it the hard way
-                ClrObject clrObj = _runtime.Heap.GetObject(objAddr);
-                if (clrObj.Type == null)
+                ClrObject previousClrObj = _runtime.Heap.GetObject(objAddr);
+                if (previousClrObj.Type == null)
                 {
                     return "{\"error\":\"'address' points at an invalid address\"}";
                 }
 
                 // Make sure it's still in place
                 RefreshRuntime();
-                clrObj = _runtime.Heap.GetObject(objAddr);
+                ClrObject clrObj = _runtime.Heap.GetObject(objAddr);
                 if (clrObj.Type == null)
                 {
-                    return
-                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address.\"}";
+                    // Object moved! 
+                    // Let's try and save the day with some hashcode filtering (if user allowed us)
+                    if (hashCodeFallback)
+                    {
+                        Predicate<string> typeFilter = (string type) => type.Contains(previousClrObj.Type.Name);
+                        (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
+                        if (anyErrors)
+                        {
+                            return
+                                "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                                "Hash Code fallback was activated but dumping function failed so non hash codes were checked\"}";
+                        }
+                        var matches = objects.Where(heapObj => heapObj.HashCode == userHashcode).ToList();
+                        if (matches.Count == 0)
+                        {
+                            return
+                                "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                                "Hash Code fallback was activated but no objects with the same hash code were found\"}";
+                        }
+                        if (matches.Count > 1)
+                        {
+                            return
+                                "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                                "Hash Code fallback was activated but too many (>1) objects with the same hash code were found\"}";
+                        }
+
+                        // Single match! We are as lucky as it gets :)
+                        HeapDump.HeapObject heapObj = matches.Single();
+                        ulong mt = previousClrObj.Type.MethodTable;
+                        instance = _converter.ConvertFromIntPtr(heapObj.Address, mt);
+                    }
+                    else
+                    {
+                        return
+                            "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                            "Hash Code fallback was NOT activated\"}";
+                    }
                 }
+                else
+                {
+                    dumpedObjType = clrObj.Type.GetRealType();
 
-                dumpedObjType = clrObj.Type.GetRealType();
-
-                ulong mt = clrObj.Type.MethodTable;
-                instance = _converter.ConvertFromIntPtr(clrObj.Address,mt);
+                    ulong mt = clrObj.Type.MethodTable;
+                    instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
+                }
             }
 
             if (pinningRequested & !alreadyPinned)
@@ -545,7 +592,8 @@ namespace ScubaDiver
                 {
                     RetrivalAddress = retrievalAddr,
                     PinnedAddress = pinAddr,
-                    PrimitiveValue = PrimitivesEncoder.Encode(instance)
+                    PrimitiveValue = PrimitivesEncoder.Encode(instance),
+                    HashCode = instance.GetHashCode()
                 };
             }
             else
@@ -626,7 +674,8 @@ namespace ScubaDiver
                     PinnedAddress = pinAddr,
                     Type = dumpedObjType.ToString(),
                     Fields = fields,
-                    Properties = props
+                    Properties = props,
+                    HashCode = instance.GetHashCode()
                 };
             }
 
@@ -635,6 +684,11 @@ namespace ScubaDiver
 
         private bool UnpinObject(ulong objAddress)
         {
+            if (_pinnedObjects.TryGetValue(objAddress, out PinnedObjectInfo poi))
+            {
+                poi.UnfreezeEvent.Set();
+                poi.FreezeTask.Wait();
+            }
             bool removed = _pinnedObjects.Remove(objAddress);
             return removed;
         }
@@ -738,6 +792,13 @@ namespace ScubaDiver
             _runtime = null;
             _dt?.Dispose();
             _dt = null;
+
+            Console.WriteLine("[Diver] Unpinning objects");
+            foreach (ulong pinAddr in _pinnedObjects.Keys.ToList())
+            {
+                bool res = UnpinObject(pinAddr);
+                Console.WriteLine($"[Diver] Addr {pinAddr:X16} unpinning returned {res}");
+            }
 
             Console.WriteLine("[Diver] Dispatcher returned, Dive is complete.");
         }
@@ -862,24 +923,90 @@ namespace ScubaDiver
                 }
             }
 
-            List<HeapDump.HeapObject> objects = new();
-            foreach (ClrObject obj in _runtime.Heap.EnumerateObjects())
+            (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(matchesFilter);
+            if (anyErrors)
             {
-                string objType = obj.Type?.Name ?? "Unknown";
-                if (matchesFilter(objType))
-                {
-                    objects.Add(new()
-                    {
-                        Address = obj.Address,
-                        Type = objType
-                    });
-                }
+                return "{\"error\":\"All dumping trials failed because at least 1 " +
+                    "object moved between the snapshot and the heap enumeration\"}";
             }
 
             HeapDump hd = new() { Objects = objects };
 
             var resJson = JsonConvert.SerializeObject(hd);
             return resJson;
+        }
+
+        private (bool anyErrors, List<HeapDump.HeapObject> objects) GetHeapObjects(Predicate<string> filter)
+        {
+            List<HeapDump.HeapObject> objects = new();
+            bool anyErrors = false;
+            // Trying several times to dump all candidates
+            for (int i = 0; i < 3; i++)
+            {
+                // Clearing leftovers from last trial
+                objects.Clear();
+                anyErrors = false;
+
+                RefreshRuntime();
+                foreach (ClrObject clrObj in _runtime.Heap.EnumerateObjects())
+                {
+                    string objType = clrObj.Type?.Name ?? "Unknown";
+                    if (filter(objType))
+                    {
+                        ulong mt = clrObj.Type.MethodTable;
+                        int hashCode = 0;
+                        // TODO: Should I make hashcode dumping optional?
+                        // maybe make the type filter mandatory?
+                        // getting handles to every single object in the heap (in the worst case)
+                        // to dump it's hashcode sounds like it'll trigger a GC every single trial...
+                        object instance = null;
+                        try
+                        {
+                            instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
+                        }
+                        catch (Exception)
+                        {
+                            // Exiting heap enumeration and signaling that this trial has failed.
+                            anyErrors = true;
+                            break;
+                        }
+
+                        // We got the object in our hands so we haven't spotted a GC collection or anything else scary
+                        // now getting the hashcode which is itself a challange since 
+                        // objects might (very rudely) throw exceptions on this call.
+                        // I'm looking at you, System.Reflection.Emit.SignatureHelper
+                        //
+                        // We don't REALLY care if we don't get a has code. It just means those objects would
+                        // be a bit more hard to grab later.
+                        try
+                        {
+                            hashCode = instance.GetHashCode();
+                        }
+                        catch
+                        {
+                            // TODO: Maybe we need a boolean in HeapObject to indicate we couldn't get the hashcode...
+                            hashCode = 0;
+                        }
+
+                        objects.Add(new HeapDump.HeapObject()
+                        {
+                            Address = clrObj.Address,
+                            Type = objType,
+                            HashCode = hashCode
+                        });
+                    }
+                }
+                if (!anyErrors)
+                {
+                    // Success, dumped every instance there is to dump!
+                    break;
+                }
+            }
+            if (anyErrors)
+            {
+                objects.Clear();
+            }
+            return (anyErrors, objects);
         }
 
         private string MakeDomainsResponse(HttpListenerRequest req)
@@ -927,8 +1054,6 @@ namespace ScubaDiver
                 ClrType clrTypeInfo = module.GetTypeByName(name);
                 if (clrTypeInfo == null)
                 {
-                    Console.WriteLine(
-                        $"Mod Candidate for type resolution! {Path.GetFileNameWithoutExtension(module.Name)}");
                     var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
                     var typeNames = (from tuple in x
                                      let token = tuple.Token

@@ -16,5 +16,6 @@ namespace ScubaDiver.API.Dumps
         public string PrimitiveValue { get; set; }
         public List<MemberDump> Fields { get; set; }
         public List<MemberDump> Properties { get; set; }
+        public int HashCode { get; set; }
     }
 }
