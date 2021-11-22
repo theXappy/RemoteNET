@@ -42,7 +42,7 @@ int main(int argc, char** argv)
 
 	DWORD Pid = atoi(argv[1]);
 #ifdef _WIN64
-	strcat_s(DllName, "\\BootstrapDLL64.dll");
+	strcat_s(DllName, "\\BootstrapDLL_x64.dll");
 #else
 	strcat_s(DllName, "\\BootstrapDLL.dll");
 #endif
