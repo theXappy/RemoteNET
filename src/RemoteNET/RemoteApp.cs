@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using RemoteNET.Internal.Reflection;
@@ -97,6 +98,10 @@ namespace RemoteNET
             // To make the Diver's port predictable even when re-attaching we'll derive it from the PID:
             ushort diverPort = (ushort) target.Id;
 
+            // Determine if we are dealing with .NET Framework or .NET Core
+            string targetDotNetVer = target.GetSupportedTargetFramework();
+            bool isNetCore = targetDotNetVer != "net451";
+
             if (!alreadyInjected)
             {
                 // Dumping injector + bootstrap DLL to a %localappdata%\RemoteNET
@@ -140,7 +145,7 @@ namespace RemoteNET
                 var scubaDestDirInfo = new DirectoryInfo(
                                                 Path.Combine(
                                                     remoteNetAppDataDir,
-                                                    "Scuba")
+                                                    isNetCore ? "Scuba_NetCore" : "Scuba")
                                                 );
                 if(!scubaDestDirInfo.Exists)
                 {
@@ -159,7 +164,7 @@ namespace RemoteNET
                     tempDirInfo.Delete(recursive: true);
                 }
                 tempDirInfo.Create();
-                using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDiver))
+                using (var diverZipMemoryStream = new MemoryStream(isNetCore ? Resources.ScubaDiver_NetCore : Resources.ScubaDiver))
                 {
                     ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
                     // This extracts the "Scuba" directory from the zip to *tempDir*
@@ -167,7 +172,7 @@ namespace RemoteNET
                 }
 
                 // Going over unzipped files and checking which of those we need to copy to our AppData directory
-                tempDirInfo = new DirectoryInfo(Path.Combine(tempDir,"Scuba"));
+                tempDirInfo = new DirectoryInfo(Path.Combine(tempDir, isNetCore ? "Scuba_NetCore" : "Scuba"));
                 foreach (FileInfo fileInfo in tempDirInfo.GetFiles())
                 {
                     string destPath = Path.Combine(scubaDestDirInfo.FullName, fileInfo.Name);
@@ -190,10 +195,21 @@ namespace RemoteNET
                 // We are done with our temp directory
                 tempDirInfo.Delete(recursive: true);
 
-                string scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
+                string scubaDiverDllPath;
+                if (isNetCore)
+                {
+                    Console.WriteLine("[DEBUG] .NET Core target!");
+                    scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
+                       .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver_NetCore.dll")).FullName;
+                }
+                else
+                {
+                    scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
                     .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver.dll")).FullName;
+                }
+                
 
-                var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id} {scubaDiverDllPath} {diverPort}");
+                var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id} {scubaDiverDllPath} {diverPort} {targetDotNetVer}");
                 startInfo.WorkingDirectory = remoteNetAppDataDir;
                 startInfo.UseShellExecute = false;
                 startInfo.RedirectStandardOutput = true;
@@ -206,6 +222,11 @@ namespace RemoteNET
                     Console.WriteLine("Error with injector. Raw STDOUT:\n" + stdout);
                     return null;
                 }
+                // TODO: There's a bug I can't explain where the injector doesnt finish injecting
+                // if it's STDOUT isn't read.
+                // This is a hack, it should be solved in another way.
+                // CliWrap? Make injector not block on output writes?
+                Task.Run(() => { injectorProc.StandardOutput.ReadToEnd(); });
                 // TODO: Get results of injector
             }
 

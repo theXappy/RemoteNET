@@ -5,6 +5,12 @@ It's like [System.Runtime.Remoting](https://docs.microsoft.com/en-us/dotnet/api/
 
 Basically this library lets you mess with objects of any other .NET (framework) app without asking for permissions :)
 
+Tested versions:
+.NET 5/6,  
+.NET Core 3.0/3.1,  
+.NET Framework 4.5/4.6/4.7/4.8 (incl. subversions)
+
+
 ## Compilation
 1. Clone
 2. Open `RemoteNET.sln` file in VisualStudio 2019

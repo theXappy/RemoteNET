@@ -20,25 +20,40 @@ void DebugOut(wchar_t* fmt, ...)
 	fputws(dbg_out, stdout);
 }
 
+enum FrameworkType ParseFrameworkType(const std::wstring& framework)
+{
+	if (icase_cmp(framework, L"netcoreapp3.0")
+		|| icase_cmp(framework, L"netcoreapp3.1")
+		|| icase_cmp(framework, L"net5.0-windows")
+		|| icase_cmp(framework, L"net6.0-windows"))
+	{
+		return FrameworkType::NET_CORE;
+	}
 
-DllExport void LoadManagedProject(const wchar_t * bootstrapDllArg)
+	return FrameworkType::NET_FRAMEWORK;
+}
+
+
+DllExport void LoadManagedProject(const wchar_t* bootstrapDllArg)
 {
 	BOOL consoleAllocated;
 	HRESULT hr;
-	wchar_t argCopy[MAX_PATH];
-	wcscpy_s(argCopy, bootstrapDllArg);
-	argCopy[MAX_PATH - 1] = 0;
-	wchar_t* separator = wcsstr(argCopy, L"*");
-	if (separator == NULL)
+
+	const auto parts = split(bootstrapDllArg, L"*");
+
+	if (parts.size() < 3)
 	{
-		DebugOut(L"[Bootstrap] ERROR: Failed to find separator (*) in BootstrapDLL argument:");
-		DebugOut(L"%s\n", argCopy);
+		DebugOut(L"Not enough parameters.");
 		return;
 	}
-	// Splitting argument by replacing separator with null
-	*separator = NULL;
-	wchar_t* managedDllLocation = argCopy;
-	wchar_t* scubaDiverArg = separator + 1;
+
+	const auto& managedDllLocation = parts.at(0);
+	const auto& scubaDiverArg = parts.at(1);
+	const auto& framework = parts.at(2);
+
+	std::wcout << framework << std::endl;
+	std::wcout << managedDllLocation << std::endl;
+	std::wcout << scubaDiverArg << std::endl;
 
 	// All of this code is to spawn a console.
 	if (true) {
@@ -63,16 +78,33 @@ DllExport void LoadManagedProject(const wchar_t * bootstrapDllArg)
 		fflush(stdout);
 	}
 
-	// Secure a handle to the CLR v4.0
-	ICLRRuntimeHost* pClr = StartCLR(L"v4.0.30319");
+	ICLRRuntimeHost* pClr;
+	FrameworkType frameworkType = ParseFrameworkType(framework);
+
+	if (frameworkType == FrameworkType::NET_CORE)
+	{
+		// Secure a handle to the Core (3/5/6) CLR 
+		pClr = StartCLRCore();
+	}
+	else if (frameworkType == FrameworkType::NET_FRAMEWORK)
+	{
+		// Secure a handle to the CLR v4.0
+		pClr = StartCLR(L"v4.0.30319");
+	}
+	else
+	{
+		DebugOut(L"Invalid framework type\n");
+		return;
+	}
+
 	if (pClr != NULL)
 	{
 		DWORD result;
 		hr = pClr->ExecuteInDefaultAppDomain(
-			managedDllLocation,
+			managedDllLocation.c_str(),
 			L"ScubaDiver.Diver",
 			L"EntryPoint",
-			scubaDiverArg,
+			scubaDiverArg.c_str(),
 			&result);
 	}
 	else {
@@ -121,12 +153,9 @@ ICLRRuntimeHost* StartCLR(LPCWSTR dotNetVersion)
 					DebugOut(L"[Bootstrap] Got interface.\n");
 					// Start it. This is okay to call even if the CLR is already running
 					hr = pClrRuntimeHost->Start();
-					//       if (hr == S_OK)
-					//     {
 					DebugOut(L"[Bootstrap] Started the runtime!\n");
 					// Success!
 					return pClrRuntimeHost;
-					//   }
 				}
 			}
 		}
@@ -149,4 +178,47 @@ ICLRRuntimeHost* StartCLR(LPCWSTR dotNetVersion)
 	}
 
 	return NULL;
+}
+
+
+typedef HRESULT(STDAPICALLTYPE* FnGetNETCoreCLRRuntimeHost)(REFIID riid, IUnknown** pUnk);
+
+ICLRRuntimeHost* StartCLRCore()
+{
+	DebugOut(L"Getting handle for coreclr.dll...");
+	auto* const coreCLRModule = ::GetModuleHandle(L"coreclr.dll");
+
+	if (!coreCLRModule)
+	{
+		DebugOut(L"Could not get handle for coreclr.dll.");
+		return nullptr;
+	}
+
+	DebugOut(L"Got handle for coreclr.dll.");
+
+	DebugOut(L"Getting handle for GetCLRRuntimeHost...");
+
+	const auto pfnGetCLRRuntimeHost = reinterpret_cast<FnGetNETCoreCLRRuntimeHost>(::GetProcAddress(coreCLRModule, "GetCLRRuntimeHost"));
+	if (!pfnGetCLRRuntimeHost)
+	{
+		DebugOut(L"Could not get handle for GetCLRRuntimeHost.");
+		return nullptr;
+	}
+
+	DebugOut(L"Got handle for GetCLRRuntimeHost.");
+
+	DebugOut(L"Trying to get runtime host...");
+
+	ICLRRuntimeHost* clrRuntimeHost = nullptr;
+	const auto hr = pfnGetCLRRuntimeHost(IID_ICLRRuntimeHost, reinterpret_cast<IUnknown**>(&clrRuntimeHost));
+
+	if (FAILED(hr))
+	{
+		DebugOut(L"Could not get runtime host.");
+		return nullptr;
+	}
+
+	DebugOut(L"Got runtime host.");
+
+	return clrRuntimeHost;
 }

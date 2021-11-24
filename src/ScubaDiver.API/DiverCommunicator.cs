@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using Microsoft.Diagnostics.Runtime;
 using Newtonsoft.Json;
 using ScubaDiver.API.Dumps;
@@ -90,7 +91,7 @@ namespace ScubaDiver.API
         {
             Dictionary<string, string> queryParams = new()
             {
-                { "name", type }
+                { "name", HttpUtility.UrlEncode(type) }
             };
             if (assembly != null)
             {

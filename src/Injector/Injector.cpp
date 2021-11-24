@@ -36,8 +36,14 @@ int main(int argc, char** argv)
 
 	wchar_t ScubaDiverDllArg[MAX_PATH];
 	mbstowcs_s(&convertedChars, ScubaDiverDllArg, MAX_PATH, argv[3], _TRUNCATE);
-
 	wcscat_s(BootstrapDllArg, ScubaDiverDllArg);
+	wcscat_s(BootstrapDllArg, L"*");
+
+	wchar_t TargetFrameworkArg[MAX_PATH];
+	mbstowcs_s(&convertedChars, TargetFrameworkArg, MAX_PATH, argv[4], _TRUNCATE);
+	wcscat_s(BootstrapDllArg, TargetFrameworkArg);
+
+
 	printf("BootstrapDLL encoded argument: %ls\n", BootstrapDllArg);
 
 	DWORD Pid = atoi(argv[1]);
