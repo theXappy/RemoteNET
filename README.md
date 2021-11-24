@@ -80,7 +80,7 @@ RemoteObject passwordContainer = remoteApp.GetRemoteObject(candidates.Single());
 RemoteObject remoteSb1 = remoteApp.Activator.CreateInstance(typeof(StringBuilder));
 
 // Creating a remote StringBuilder with the (string,int) constructor
-RemoteObject remoteSb1 = remoteApp.Activator.CreateInstance(typeof(StringBuilder), "Hello", 100);
+RemoteObject remoteSb2 = remoteApp.Activator.CreateInstance(typeof(StringBuilder), "Hello", 100);
 ```
 Note how we used constructor arguments in the second `CreateInstance` call. Those could also be other `RemoteObject`s:
 ```C#
