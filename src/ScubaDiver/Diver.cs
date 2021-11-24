@@ -63,7 +63,7 @@ namespace ScubaDiver
             {
                 return "{\"error\":\"Missing parameter 'address'\"}";
             }
-            Console.WriteLine($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}");
+            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}");
 
             // Check if we have this objects in our pinned pool
             if (_pinnedObjects.ContainsKey(objAddr))
@@ -81,7 +81,7 @@ namespace ScubaDiver
 
         private string MakeCreateObjectResponse(HttpListenerRequest arg)
         {
-            Console.WriteLine("[Diver] Got /create_object request!");
+            Logger.Debug("[Diver] Got /create_object request!");
             string body = null;
             using (StreamReader sr = new StreamReader(arg.InputStream))
             {
@@ -111,13 +111,13 @@ namespace ScubaDiver
             List<object> paramsList = new List<object>();
             if (request.Parameters.Any())
             {
-                Console.WriteLine($"[Diver] Ctor'ing with parameters. Count: {request.Parameters.Count}");
+                Logger.Debug($"[Diver] Ctor'ing with parameters. Count: {request.Parameters.Count}");
                 paramsList = request.Parameters.Select(ParseParameterObject).ToList();
             }
             else
             {
                 // No parameters.
-                Console.WriteLine("[Diver] Ctor'ing without parameters");
+                Logger.Debug("[Diver] Ctor'ing without parameters");
             }
 
             object createdObject = null;
@@ -200,7 +200,7 @@ namespace ScubaDiver
 
         private string MakeInvokeResponse(HttpListenerRequest arg)
         {
-            Console.WriteLine("[Diver] Got /Invoke request!");
+            Logger.Debug("[Diver] Got /Invoke request!");
             string body = null;
             using (StreamReader sr = new StreamReader(arg.InputStream))
             {
@@ -286,16 +286,16 @@ namespace ScubaDiver
             List<object> paramsList = new List<object>();
             if (request.Parameters.Any())
             {
-                Console.WriteLine($"[Diver] Invoking with parameters. Count: {request.Parameters.Count}");
+                Logger.Debug($"[Diver] Invoking with parameters. Count: {request.Parameters.Count}");
                 paramsList = request.Parameters.Select(ParseParameterObject).ToList();
             }
             else
             {
                 // No parameters.
-                Console.WriteLine("[Diver] Invoking without parameters");
+                Logger.Debug("[Diver] Invoking without parameters");
             }
 
-            Console.WriteLine($"[Diver] Resolved target object type: {dumpedObjType.FullName}");
+            Logger.Debug($"[Diver] Resolved target object type: {dumpedObjType.FullName}");
             // Infer parameter types from received parameters.
             // Note that for 'null' arguments we don't know the type so we use a "Wild Card" type
             Type[] argumentTypes = paramsList.Select(p => p?.GetType() ?? new WildCardType()).ToArray();
@@ -305,10 +305,10 @@ namespace ScubaDiver
             if (method == null)
             {
                 Debugger.Launch();
-                Console.WriteLine($"[Diver] Failed to Resolved method :/");
+                Logger.Debug($"[Diver] Failed to Resolved method :/");
                 return "{\"error\":\"Couldn't find method in type.\"}";
             }
-            Console.WriteLine($"[Diver] Resolved method: {method.Name}, Containing Type: {method.DeclaringType}");
+            Logger.Debug($"[Diver] Resolved method: {method.Name}, Containing Type: {method.DeclaringType}");
 
             object results = null;
             try
@@ -356,7 +356,7 @@ namespace ScubaDiver
 
         private string MakeSetFieldResponse(HttpListenerRequest arg)
         {
-            Console.WriteLine("[Diver] Got /set_field request!");
+            Logger.Debug("[Diver] Got /set_field request!");
             string body = null;
             using (StreamReader sr = new StreamReader(arg.InputStream))
             {
@@ -429,10 +429,10 @@ namespace ScubaDiver
             if (fieldInfo == null)
             {
                 Debugger.Launch();
-                Console.WriteLine($"[Diver] Failed to Resolved field :/");
+                Logger.Debug($"[Diver] Failed to Resolved field :/");
                 return "{\"error\":\"Couldn't find field in type.\"}";
             }
-            Console.WriteLine($"[Diver] Resolved field: {fieldInfo.Name}, Containing Type: {fieldInfo.DeclaringType}");
+            Logger.Debug($"[Diver] Resolved field: {fieldInfo.Name}, Containing Type: {fieldInfo.DeclaringType}");
 
             object results = null;
             try
@@ -498,7 +498,7 @@ namespace ScubaDiver
                     return "{\"error\":\"Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int\"}";
                 }
             }
-            Console.WriteLine($"[Diver][Debug](MakeObjectResponse) objAddrStr={objAddr:X16}, pinningRequested={pinningRequested}");
+            Logger.Debug($"[Diver][Debug](MakeObjectResponse) objAddrStr={objAddr:X16}, pinningRequested={pinningRequested}");
 
             // Check if we have this objects in our pinned pool
             object instance = null;
@@ -782,25 +782,25 @@ namespace ScubaDiver
             string listeningUrl = $"http://127.0.0.1:{listenPort}/";
             listener.Prefixes.Add(listeningUrl);
             listener.Start();
-            Console.WriteLine($"[Diver] Listening on {listeningUrl}...");
+            Logger.Debug($"[Diver] Listening on {listeningUrl}...");
 
             Dispatcher(listener);
 
             listener.Close();
-            Console.WriteLine("[Diver] Closing ClrMD runtime and snapshot");
+            Logger.Debug("[Diver] Closing ClrMD runtime and snapshot");
             _runtime?.Dispose();
             _runtime = null;
             _dt?.Dispose();
             _dt = null;
 
-            Console.WriteLine("[Diver] Unpinning objects");
+            Logger.Debug("[Diver] Unpinning objects");
             foreach (ulong pinAddr in _pinnedObjects.Keys.ToList())
             {
                 bool res = UnpinObject(pinAddr);
-                Console.WriteLine($"[Diver] Addr {pinAddr:X16} unpinning returned {res}");
+                Logger.Debug($"[Diver] Addr {pinAddr:X16} unpinning returned {res}");
             }
 
-            Console.WriteLine("[Diver] Dispatcher returned, Dive is complete.");
+            Logger.Debug("[Diver] Dispatcher returned, Dive is complete.");
         }
 
         private void Dispatcher(HttpListener listener)
@@ -834,12 +834,12 @@ namespace ScubaDiver
                     break;
             }
 
-            Console.WriteLine("[Diver] HTTP Loop ended. Closing HTTP listener");
+            Logger.Debug("[Diver] HTTP Loop ended. Closing HTTP listener");
         }
 
         private string MakeDieResponse(HttpListenerRequest req)
         {
-            Console.WriteLine("[Diver] Die command received");
+            Logger.Debug("[Diver] Die command received");
             return "{\"status\":\"Goodbye\"}";
         }
 
@@ -1056,7 +1056,7 @@ namespace ScubaDiver
             if (!assembliesToSearch.Any())
             {
                 // No such assembly
-                Console.WriteLine($"[Diver] No such assembly \"{assembly}\"");
+                Logger.Debug($"[Diver] No such assembly \"{assembly}\"");
                 return null;
             }
 
@@ -1136,17 +1136,17 @@ namespace ScubaDiver
                 return JsonConvert.SerializeObject(recusiveTypeDump);
             }
 
-            Console.WriteLine($"[Diver] Failed to dump type {type} of {assembly}");
+            Logger.Debug($"[Diver] Failed to dump type {type} of {assembly}");
             return "{\"error\":\"Failed to find type in searched assemblies\"}";
         }
 
         public static Assembly AssembliesResolverFunc(object sender, ResolveEventArgs args)
         {
-            Console.WriteLine("[Diver][AssemblyResolver] In!");
-            Console.WriteLine($"[Diver][AssemblyResolver] Looking for: {args.Name}");
+            Logger.Debug("[Diver][AssemblyResolver] In!");
+            Logger.Debug($"[Diver][AssemblyResolver] Looking for: {args.Name}");
             string folderPath = Path.GetDirectoryName(typeof(Diver).Assembly.Location);
             string assemblyPath = Path.Combine(folderPath, new AssemblyName(args.Name).Name + ".dll");
-            Console.WriteLine($"[Diver][AssemblyResolver] Looking at: {assemblyPath}");
+            Logger.Debug($"[Diver][AssemblyResolver] Looking at: {assemblyPath}");
 
             if (!File.Exists(assemblyPath)) return null;
             Assembly assembly = Assembly.LoadFrom(assemblyPath);
@@ -1161,7 +1161,7 @@ namespace ScubaDiver
             // Diver needs some assemblies which might not be loaded in the target process
             // so starting off with registering an assembly resolver to the Diver's dll's directory
             AppDomain.CurrentDomain.AssemblyResolve += AssembliesResolverFunc;
-            Console.WriteLine("[Diver] Loaded + hooked assemblies resolver.");
+            Logger.Debug("[Diver] Loaded + hooked assemblies resolver.");
 
             try
             {
@@ -1169,12 +1169,13 @@ namespace ScubaDiver
                 ushort port = ushort.Parse(pwzArgument);
                 _instance.Dive(port);
 
-                // Diver killed
-                Console.WriteLine("[Diver] Diver finished gracefully, Entry point returning");
+                // Diver killed (politely)
+                Logger.Debug("[Diver] Diver finished gracefully, Entry point returning");
                 return 0;
             }
             catch (Exception e)
             {
+                Console.WriteLine("[Diver] ScubaDiver crashed.");
                 Console.WriteLine(e);
                 Console.WriteLine("[Diver] Exiting entry point in 60 secs...");
                 Thread.Sleep(TimeSpan.FromSeconds(60));
@@ -1183,7 +1184,7 @@ namespace ScubaDiver
             finally
             {
                 AppDomain.CurrentDomain.AssemblyResolve -= AssembliesResolverFunc;
-                Console.WriteLine("[Diver] unhooked assemblies resolver.");
+                Logger.Debug("[Diver] unhooked assemblies resolver.");
             }
         }
 

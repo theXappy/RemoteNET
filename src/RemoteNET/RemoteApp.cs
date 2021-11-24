@@ -198,7 +198,7 @@ namespace RemoteNET
                 string scubaDiverDllPath;
                 if (isNetCore)
                 {
-                    Console.WriteLine("[DEBUG] .NET Core target!");
+                    Logger.Debug("[DEBUG] .NET Core target!");
                     scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
                        .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver_NetCore.dll")).FullName;
                 }
@@ -219,7 +219,7 @@ namespace RemoteNET
                 {
                     // Injector finished early, there's probably an error.
                     var stdout = injectorProc.StandardOutput.ReadToEnd();
-                    Console.WriteLine("Error with injector. Raw STDOUT:\n" + stdout);
+                    Logger.Debug("Error with injector. Raw STDOUT:\n" + stdout);
                     return null;
                 }
                 // TODO: There's a bug I can't explain where the injector doesnt finish injecting

@@ -150,7 +150,7 @@ namespace RemoteNET.Internal
             object[] args,
             out object result)
         {
-            Console.WriteLine("[DynamicRemoteObject] TryInvokeMember called ~");
+            Logger.Debug("[DynamicRemoteObject] TryInvokeMember called ~");
             if (!_members.TryGetValue(binder.Name, out MemberType memberType))
                 throw new Exception($"No such member \"{binder.Name}\"");
 

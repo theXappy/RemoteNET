@@ -72,7 +72,7 @@ namespace RemoteNET
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"[WARN] Field `{fieldInfo}` could not be retrieved. Error: " + e);
+                    Logger.Debug($"[WARN] Field `{fieldInfo}` could not be retrieved. Error: " + e);
                     continue;
                 }
                 if (fieldDump.HasEncodedValue)
