@@ -10,6 +10,7 @@
 
 void DebugOut(wchar_t* fmt, ...)
 {
+#ifdef _DEBUG
 	va_list argp;
 	va_start(argp, fmt);
 	wchar_t dbg_out[4096];
@@ -18,6 +19,7 @@ void DebugOut(wchar_t* fmt, ...)
 	OutputDebugString(dbg_out);
 	// fputws is like `_putws` (which is like `puts` but for wchar_t) but doesnt append a new line
 	fputws(dbg_out, stdout);
+#endif
 }
 
 enum FrameworkType ParseFrameworkType(const std::wstring& framework)

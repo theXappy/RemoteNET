@@ -24,7 +24,6 @@ namespace ScubaDiver.Utils
         {
             if (myConverter == null)
             {
-                Console.WriteLine("[Diver] Dynamic Method init");
                 DynamicMethod method = new DynamicMethod("ConvertPtrToObjReference", typeof(T), new Type[] { typeof(IntPtr) }, typeof(IntPtr), true);
                 var gen = method.GetILGenerator();
                 // Load first argument 
@@ -34,7 +33,6 @@ namespace ScubaDiver.Utils
                 // IL Verification disabled
                 gen.Emit(OpCodes.Ret);
                 myConverter = (Void2ObjectConverter<T>)method.CreateDelegate(typeof(Void2ObjectConverter<T>));
-                Console.WriteLine("[Diver] init done");
             }
         }
 

@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Include="..\ScubaDiver\Diver.cs" Link="Diver.cs" />
+    <Compile Include="..\ScubaDiver\Logger.cs" Link="Logger.cs" />
     <Compile Include="..\ScubaDiver\Utils\Converter.cs" Link="Utils\Converter.cs" />
     <Compile Include="..\ScubaDiver\Utils\Pinnable.cs" Link="Utils\Pinnable.cs" />
     <Compile Include="..\ScubaDiver\Utils\PinnedObjectInfo.cs" Link="Utils\PinnedObjectInfo.cs" />
