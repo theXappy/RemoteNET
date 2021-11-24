@@ -27,7 +27,7 @@ namespace ScubaDiver
         // Runtime analysis and exploration fields
         private DataTarget _dt = null;
         private ClrRuntime _runtime = null;
-        private Converter<object> _converter = new();
+        private Converter<object> _converter = new Converter<object>();
 
         // HTTP Responses fields
         private Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
@@ -53,7 +53,7 @@ namespace ScubaDiver
                 {"/types", MakeTypesResponse},
                 {"/type", MakeTypeResponse},
             };
-            _pinnedObjects = new();
+            _pinnedObjects = new Dictionary<ulong, PinnedObjectInfo>();
         }
 
         private string MakeUnpinResponse(HttpListenerRequest arg)
@@ -83,7 +83,7 @@ namespace ScubaDiver
         {
             Console.WriteLine("[Diver] Got /create_object request!");
             string body = null;
-            using (StreamReader sr = new(arg.InputStream))
+            using (StreamReader sr = new StreamReader(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
@@ -108,7 +108,7 @@ namespace ScubaDiver
                 return "{\"error\":\"Failed to resolve type\"}";
             }
 
-            List<object> paramsList = new();
+            List<object> paramsList = new List<object>();
             if (request.Parameters.Any())
             {
                 Console.WriteLine($"[Diver] Ctor'ing with parameters. Count: {request.Parameters.Count}");
@@ -202,7 +202,7 @@ namespace ScubaDiver
         {
             Console.WriteLine("[Diver] Got /Invoke request!");
             string body = null;
-            using (StreamReader sr = new(arg.InputStream))
+            using (StreamReader sr = new StreamReader(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
@@ -283,7 +283,7 @@ namespace ScubaDiver
             // We have our target and it's type. No look for a matching overload for the
             // function to invoke.
             //
-            List<object> paramsList = new();
+            List<object> paramsList = new List<object>();
             if (request.Parameters.Any())
             {
                 Console.WriteLine($"[Diver] Invoking with parameters. Count: {request.Parameters.Count}");
@@ -324,7 +324,7 @@ namespace ScubaDiver
             if (method.ReturnType == typeof(void))
             {
                 // Not expecting results.
-                invocResults = new() { VoidReturnType = true };
+                invocResults = new InvocationResults() { VoidReturnType = true };
             }
             else
             {
@@ -345,7 +345,7 @@ namespace ScubaDiver
                 }
 
 
-                invocResults = new()
+                invocResults = new InvocationResults()
                 {
                     VoidReturnType = false,
                     ReturnedObjectOrAddress = returnValue
@@ -358,7 +358,7 @@ namespace ScubaDiver
         {
             Console.WriteLine("[Diver] Got /set_field request!");
             string body = null;
-            using (StreamReader sr = new(arg.InputStream))
+            using (StreamReader sr = new StreamReader(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
@@ -466,7 +466,7 @@ namespace ScubaDiver
                     returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
                 }
 
-                invocResults = new()
+                invocResults = new InvocationResults()
                 {
                     VoidReturnType = false,
                     ReturnedObjectOrAddress = returnValue
@@ -598,7 +598,7 @@ namespace ScubaDiver
             }
             else
             {
-                List<MemberDump> fields = new();
+                List<MemberDump> fields = new List<MemberDump>();
                 foreach (var fieldInfo in dumpedObjType.GetFields((BindingFlags)0xffff))
                 {
                     try
@@ -612,7 +612,7 @@ namespace ScubaDiver
                             encValue = PrimitivesEncoder.Encode(fieldValue);
                         }
 
-                        fields.Add(new()
+                        fields.Add(new MemberDump()
                         {
                             Name = fieldInfo.Name,
                             HasEncodedValue = hasEncValue,
@@ -621,7 +621,7 @@ namespace ScubaDiver
                     }
                     catch (Exception e)
                     {
-                        fields.Add(new()
+                        fields.Add(new MemberDump()
                         {
                             Name = fieldInfo.Name,
                             HasEncodedValue = false,
@@ -630,7 +630,7 @@ namespace ScubaDiver
                     }
                 }
 
-                List<MemberDump> props = new();
+                List<MemberDump> props = new List<MemberDump>();
                 foreach (var propInfo in dumpedObjType.GetProperties((BindingFlags)0xffff))
                 {
                     if (propInfo.GetMethod == null)
@@ -650,7 +650,7 @@ namespace ScubaDiver
                             encValue = PrimitivesEncoder.Encode(propValue);
                         }
 
-                        props.Add(new()
+                        props.Add(new MemberDump()
                         {
                             Name = propInfo.Name,
                             HasEncodedValue = hasEncValue,
@@ -659,7 +659,7 @@ namespace ScubaDiver
                     }
                     catch (Exception e)
                     {
-                        props.Add(new()
+                        props.Add(new MemberDump()
                         {
                             Name = propInfo.Name,
                             HasEncodedValue = false,
@@ -876,7 +876,7 @@ namespace ScubaDiver
                             { MethodTable = tuple.MethodTable, Token = token, TypeName = typeName };
 
 
-            TypesDump dump = new()
+            TypesDump dump = new TypesDump()
             {
                 AssemblyName = assembly,
                 Types = typeNames.ToList()
@@ -930,7 +930,7 @@ namespace ScubaDiver
                     "object moved between the snapshot and the heap enumeration\"}";
             }
 
-            HeapDump hd = new() { Objects = objects };
+            HeapDump hd = new HeapDump() { Objects = objects };
 
             var resJson = JsonConvert.SerializeObject(hd);
             return resJson;
@@ -938,7 +938,7 @@ namespace ScubaDiver
 
         private (bool anyErrors, List<HeapDump.HeapObject> objects) GetHeapObjects(Predicate<string> filter)
         {
-            List<HeapDump.HeapObject> objects = new();
+            List<HeapDump.HeapObject> objects = new List<HeapDump.HeapObject>();
             bool anyErrors = false;
             // Trying several times to dump all candidates
             for (int i = 0; i < 3; i++)
@@ -1012,17 +1012,17 @@ namespace ScubaDiver
         private string MakeDomainsResponse(HttpListenerRequest req)
         {
             // TODO: Allow moving between domains?
-            List<DomainsDump.AvailableDomain> available = new();
+            List<DomainsDump.AvailableDomain> available = new List<DomainsDump.AvailableDomain>();
             foreach (ClrAppDomain clrAppDomain in _runtime.AppDomains)
             {
-                available.Add(new()
+                available.Add(new DomainsDump.AvailableDomain()
                 {
                     Name = clrAppDomain.Name,
                     AvailableModules = clrAppDomain.Modules.Select(m => Path.GetFileNameWithoutExtension(m.Name)).ToList()
                 });
             }
 
-            DomainsDump dd = new()
+            DomainsDump dd = new DomainsDump()
             {
                 Current = AppDomain.CurrentDomain.FriendlyName,
                 AvailableDomains = available
@@ -1038,7 +1038,18 @@ namespace ScubaDiver
                 Debugger.Launch();
             }
 
-            Console.WriteLine($"[Diver] Trying to resolve type. [Assembly:{assembly}, Type:{name}]");
+            // TODO: With .NET Core divers thre seems to be some infinte loop when trying to resolve System.Int32 so
+            // this hack fixes it for now
+            if(name == "System.Int32")
+            {
+                return typeof(int);
+            }
+            if (name.StartsWith("System.Span`1[[System.Char,"))
+            {
+                return typeof(Span<Char>);
+            }
+
+
             IList<ClrModule> assembliesToSearch = _runtime.AppDomains.First().Modules;
             if (assembly != null)
                 assembliesToSearch = assembliesToSearch.Where(mod => Path.GetFileNameWithoutExtension(mod.Name) == assembly).ToList();
@@ -1089,7 +1100,6 @@ namespace ScubaDiver
             }
 
             string assembly = req.QueryString.Get("assembly");
-            Console.WriteLine($"[Diver] Type query for: [Assembly:{assembly}, Type:{type}]");
             Type resolvedType = ResolveType(type, assembly);
 
             TypeDump ParseType(Type typeObj)
@@ -1103,7 +1113,7 @@ namespace ScubaDiver
                 var props = typeObj.GetProperties((BindingFlags)0xffff).Select(pi => new TypeDump.TypeProperty(pi))
                     .ToList();
 
-                TypeDump td = new()
+                TypeDump td = new TypeDump()
                 {
                     Type = typeObj.FullName,
                     Assembly = typeObj.Assembly.GetName().Name,
@@ -1126,13 +1136,18 @@ namespace ScubaDiver
                 return JsonConvert.SerializeObject(recusiveTypeDump);
             }
 
+            Console.WriteLine($"[Diver] Failed to dump type {type} of {assembly}");
             return "{\"error\":\"Failed to find type in searched assemblies\"}";
         }
 
         public static Assembly AssembliesResolverFunc(object sender, ResolveEventArgs args)
         {
+            Console.WriteLine("[Diver][AssemblyResolver] In!");
+            Console.WriteLine($"[Diver][AssemblyResolver] Looking for: {args.Name}");
             string folderPath = Path.GetDirectoryName(typeof(Diver).Assembly.Location);
             string assemblyPath = Path.Combine(folderPath, new AssemblyName(args.Name).Name + ".dll");
+            Console.WriteLine($"[Diver][AssemblyResolver] Looking at: {assemblyPath}");
+
             if (!File.Exists(assemblyPath)) return null;
             Assembly assembly = Assembly.LoadFrom(assemblyPath);
             return assembly;

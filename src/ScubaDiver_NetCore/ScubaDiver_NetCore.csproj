@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <RootNamespace>ScubaDiver</RootNamespace>
+	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+	</PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ScubaDiver\Diver.cs" Link="Diver.cs" />
+    <Compile Include="..\ScubaDiver\Utils\Converter.cs" Link="Utils\Converter.cs" />
+    <Compile Include="..\ScubaDiver\Utils\Pinnable.cs" Link="Utils\Pinnable.cs" />
+    <Compile Include="..\ScubaDiver\Utils\PinnedObjectInfo.cs" Link="Utils\PinnedObjectInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Diagnostics.Runtime" Version="2.0.222201" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Utils\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="xcopy /Y /s &quot;$(TargetDir)&quot; &quot;$(SolutionDir)dist\$(ConfigurationName)\Scuba_NetCore\&quot;" />
+  </Target>
+
+</Project>

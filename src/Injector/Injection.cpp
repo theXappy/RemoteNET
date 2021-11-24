@@ -60,6 +60,7 @@ BOOL InjectAndRunThenUnload(DWORD ProcessId, const char * DllName, const std::st
 		cout << "Process found, but OpenProcess() failed: " << GetLastError() << endl;
 		return false;
 	}
+	cout << "[Injector] OpenProcess success" << endl;
 
 	// LoadLibraryA needs a string as its argument, but it needs to be in
 	// the remote Process' memory space.
@@ -70,18 +71,23 @@ BOOL InjectAndRunThenUnload(DWORD ProcessId, const char * DllName, const std::st
 		cout << "VirtualAllocEx Failed:" << GetLastError() << endl;
 		return false;
 	}
-	WriteProcessMemory(Proc, RemoteString, DllName, StrLength, NULL);
+	bool remoteSrtWriteSucc = WriteProcessMemory(Proc, RemoteString, DllName, StrLength, NULL);
+	cout << "[Injector] calling WriteProcessMemory with remote string: " << DllName << endl;
+
+	cout << "[Injector] WriteProcessMemory returned " << remoteSrtWriteSucc << endl;
 
 	// Start a remote thread on the targeted Process, using LoadLibraryA
 	// as our entry point to load a custom dll. (The A is for Ansi)
 	EnsureCloseHandle LoadThread = CreateRemoteThread(Proc, NULL, NULL,
 		(LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "LoadLibraryA"),
 		RemoteString, NULL, NULL);
+	cout << "[Injector] CreateRemoteThread returned valid? " << LoadThread.IsValid() << endl;
 	WaitForSingleObject(LoadThread, INFINITE);
 
 	// Get the handle of the now loaded module
 	DWORD hLibModule;
 	GetExitCodeThread(LoadThread, &hLibModule);
+	cout << "[Injector] GetExitCodeThread returned hLibModule: " << hLibModule << endl;
 
 	// Clean up the remote string
 	VirtualFreeEx(Proc, RemoteString, 0, MEM_RELEASE);
@@ -119,6 +125,7 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 		cout << endl;
 		return -1;
 	}
+	cout << "[Injector]  got module Snapshot for remote process " << endl;
 
 	// Get the HMODULE of the desired library
 	MODULEENTRY32W ModEntry = { sizeof(ModEntry) };
@@ -129,7 +136,9 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 		wstring ExePath(ModEntry.szExePath);
 		wstring ModuleTmp(ModuleName.begin(), ModuleName.end());
 		// For debug
-		//wcout << ExePath << endl;
+
+		cout << "[Injector]  Checking module: " << endl;
+		wcout << ExePath << endl;
 		Found = (ExePath == ModuleTmp);
 		if (Found)
 			break;
