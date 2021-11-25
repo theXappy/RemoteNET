@@ -151,14 +151,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="BootstrapDLL.h" />
-    <ClInclude Include="msgboxf.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
+    <ClInclude Include="..\BootstrapDLL\BootstrapDLL.h" />
+    <ClInclude Include="..\BootstrapDLL\msgboxf.h" />
+    <ClInclude Include="..\BootstrapDLL\stdafx.h" />
+    <ClInclude Include="..\BootstrapDLL\targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BootstrapDLL.cpp" />
-    <ClCompile Include="dllmain.cpp">
+    <ClCompile Include="..\BootstrapDLL\BootstrapDLL.cpp" />
+    <ClCompile Include="..\BootstrapDLL\dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
@@ -172,7 +172,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="..\BootstrapDLL\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
