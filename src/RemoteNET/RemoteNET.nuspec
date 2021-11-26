@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <!-- Identifier that must be unique within the hosting gallery -->
+        <id>RemoteNET</id>
+
+        <!-- Package version number that is used when resolving dependencies -->
+        <version>1.0.0</version>
+
+        <!-- Authors contain text that appears directly on the gallery -->
+        <authors>theXappy</authors>
+
+        <!-- 
+            Owners are typically nuget.org identities that allow gallery
+            users to easily find other packages by the same owners.  
+        -->
+        <owners>theXappy</owners>
+        
+         <!-- Project URL provides a link for the gallery -->
+        <projectUrl>https://github.com/theXappy/RemoteNET</projectUrl>
+
+         <!-- License information is displayed on the gallery -->
+        <license type="expression">MIT</license>
+        
+
+        <!-- Icon is used in Visual Studio's package manager UI -->
+        <icon>nuget_icon.png</icon>
+
+        <!-- 
+            If true, this value prompts the user to accept the license when
+            installing the package. 
+        -->
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+
+        <!-- 
+            The description can be used in package manager UI. Note that the
+            nuget.org gallery uses information you add in the portal. 
+        -->
+        <description>Examine, create and interact with remote objects in other .NET processes.</description>
+        <summary>Examine, create and interact with remote objects in other .NET processes.</summary>
+
+        <!-- Copyright information -->
+        <copyright>theXappy ©2021</copyright>
+
+        <!-- Tags appear in the gallery and can be used for tag searches -->
+        <tags>reverse-engineer forensics clrmd remoting low-level</tags>
+
+        <dependencies>
+          <group targetFramework=".NETStandard2.0">
+            <dependency id="Newtonsoft.Json" version="13.0.1" />
+            <dependency id="NETStandard.Library" version="2.0.3" />
+            <dependency id="Microsoft.Diagnostics.Runtime" version="2.0.222201" />
+            <dependency id="Microsoft.CSharp" version="4.7.0" />
+          </group>
+        </dependencies>
+
+    </metadata>
+
+    <!-- A readme.txt to display when the package is installed -->
+    <files>
+        <file src="nuget_icon.png" target="" />
+    </files>
+</package>
