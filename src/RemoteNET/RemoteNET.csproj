@@ -12,6 +12,7 @@
     <PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
   </PropertyGroup>
 
   <ItemGroup>
@@ -52,6 +53,10 @@
 
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
     <Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force&quot;" />
+  </Target>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="powershell &quot;Get-ChildItem -Path '$(ProjectDir)\Resources' -Exclude '*READ_ME*' | Set-Content -Value 'dummy'&quot;" />
   </Target>
 
 </Project>
