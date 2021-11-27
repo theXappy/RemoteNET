@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -221,9 +221,10 @@ namespace ScubaDiver.Tester
 
         private static void LocalDive()
         {
-            using Diver dive = new();
-            ushort port = (ushort)(new Random()).Next();
-            dive.Dive(port);
+            throw new NotImplementedException("Disbaled for now.");
+            //using Diver dive = new();
+            //ushort port = (ushort)(new Random()).Next();
+            //dive.Dive(port);
         }
     }
 }
