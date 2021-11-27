@@ -1136,9 +1136,14 @@ namespace ScubaDiver
                 return JsonConvert.SerializeObject(recusiveTypeDump);
             }
 
-            Logger.Debug($"[Diver] Failed to dump type {type} of {assembly}");
+            if (!_typesWeAlreadyFailedToDump.Contains(type))
+            {
+                Logger.Debug($"[Diver] Failed to dump type {type} of {assembly} (Reporting once per type)");
+                _typesWeAlreadyFailedToDump.Add(type);
+            }
             return "{\"error\":\"Failed to find type in searched assemblies\"}";
         }
+        HashSet<string> _typesWeAlreadyFailedToDump = new HashSet<string>();
 
         public static Assembly AssembliesResolverFunc(object sender, ResolveEventArgs args)
         {
