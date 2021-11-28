@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #pragma comment(lib, "mscoree.lib")
 
-#include "BootstrapDLL.h"
+#include "UnmanagedAdapter.h"
 #include <stdio.h>
 
 void DebugOut(wchar_t* fmt, ...)
@@ -36,12 +36,12 @@ enum FrameworkType ParseFrameworkType(const std::wstring& framework)
 }
 
 
-DllExport void LoadManagedProject(const wchar_t* bootstrapDllArg)
+DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 {
 	BOOL consoleAllocated;
 	HRESULT hr;
 
-	const auto parts = split(bootstrapDllArg, L"*");
+	const auto parts = split(adapterDllArg, L"*");
 
 	if (parts.size() < 3)
 	{
@@ -61,22 +61,22 @@ DllExport void LoadManagedProject(const wchar_t* bootstrapDllArg)
 	if (true) {
 		consoleAllocated = AllocConsole();
 		if (consoleAllocated) {
-			DebugOut(L"[Bootstrap] AllocConsole returned: %s\n", consoleAllocated ? "True" : "False");
+			DebugOut(L"[UnmanagedAdapter] AllocConsole returned: %s\n", consoleAllocated ? "True" : "False");
 			HANDLE stdHandle;
 			int hConsole;
 			FILE* fp;
 			stdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-			DebugOut(L"[Bootstrap] stdHandle = %d\n", stdHandle);
+			DebugOut(L"[UnmanagedAdapter] stdHandle = %d\n", stdHandle);
 			hConsole = _open_osfhandle((intptr_t)stdHandle, _O_TEXT);
-			DebugOut(L"[Bootstrap] hConsole = %d\n", hConsole);
+			DebugOut(L"[UnmanagedAdapter] hConsole = %d\n", hConsole);
 			fflush(stdout);
 			fp = _fdopen(hConsole, "w");
 			freopen_s(&fp, "CONOUT$", "w", stdout);
 			// End of cosole spawning
 		}
-		DebugOut(L"[Bootstrap] Can you see me? v2\n");
-		DebugOut(L"[Bootstrap] managedDllLocation = %ls\n", managedDllLocation);
-		DebugOut(L"[Bootstrap] scubaDiverArg = %ls\n", scubaDiverArg);
+		DebugOut(L"[UnmanagedAdapter] Can you see me? v2\n");
+		DebugOut(L"[UnmanagedAdapter] managedDllLocation = %ls\n", managedDllLocation);
+		DebugOut(L"[UnmanagedAdapter] scubaDiverArg = %ls\n", scubaDiverArg);
 		fflush(stdout);
 	}
 
@@ -110,7 +110,7 @@ DllExport void LoadManagedProject(const wchar_t* bootstrapDllArg)
 			&result);
 	}
 	else {
-		msgboxf("[Bootstrap] could not spawn CRL\n");
+		msgboxf("[UnmanagedAdapter] could not spawn CLR\n");
 	}
 
 	if (consoleAllocated) {
@@ -131,12 +131,10 @@ ICLRRuntimeHost* StartCLR(LPCWSTR dotNetVersion)
 
 	if (hr == S_OK)
 	{
-		DebugOut(L"[Bootstrap] Created CLR instance\n");
 		// Get the runtime information for the particular version of .NET
 		hr = pClrMetaHost->GetRuntime(dotNetVersion, IID_PPV_ARGS(&pClrRuntimeInfo));
 		if (hr == S_OK)
 		{
-			DebugOut(L"[Bootstrap] Got CLR runtime\n");
 			// Check if the specified runtime can be loaded into the process. This
 			// method will take into account other runtimes that may already be
 			// loaded into the process and set pbLoadable to TRUE if this runtime can
@@ -145,17 +143,14 @@ ICLRRuntimeHost* StartCLR(LPCWSTR dotNetVersion)
 			hr = pClrRuntimeInfo->IsLoadable(&fLoadable);
 			if ((hr == S_OK) && fLoadable)
 			{
-				DebugOut(L"[Bootstrap] Runtime is loadable!\n");
 				// Load the CLR into the current process and return a runtime interface
 				// pointer.
 				hr = pClrRuntimeInfo->GetInterface(CLSID_CLRRuntimeHost,
 					IID_PPV_ARGS(&pClrRuntimeHost));
 				if (hr == S_OK)
 				{
-					DebugOut(L"[Bootstrap] Got interface.\n");
 					// Start it. This is okay to call even if the CLR is already running
 					hr = pClrRuntimeHost->Start();
-					DebugOut(L"[Bootstrap] Started the runtime!\n");
 					// Success!
 					return pClrRuntimeHost;
 				}
@@ -187,40 +182,26 @@ typedef HRESULT(STDAPICALLTYPE* FnGetNETCoreCLRRuntimeHost)(REFIID riid, IUnknow
 
 ICLRRuntimeHost* StartCLRCore()
 {
-	DebugOut(L"Getting handle for coreclr.dll...");
 	auto* const coreCLRModule = ::GetModuleHandle(L"coreclr.dll");
 
 	if (!coreCLRModule)
 	{
-		DebugOut(L"Could not get handle for coreclr.dll.");
 		return nullptr;
 	}
-
-	DebugOut(L"Got handle for coreclr.dll.");
-
-	DebugOut(L"Getting handle for GetCLRRuntimeHost...");
 
 	const auto pfnGetCLRRuntimeHost = reinterpret_cast<FnGetNETCoreCLRRuntimeHost>(::GetProcAddress(coreCLRModule, "GetCLRRuntimeHost"));
 	if (!pfnGetCLRRuntimeHost)
 	{
-		DebugOut(L"Could not get handle for GetCLRRuntimeHost.");
 		return nullptr;
 	}
-
-	DebugOut(L"Got handle for GetCLRRuntimeHost.");
-
-	DebugOut(L"Trying to get runtime host...");
 
 	ICLRRuntimeHost* clrRuntimeHost = nullptr;
 	const auto hr = pfnGetCLRRuntimeHost(IID_ICLRRuntimeHost, reinterpret_cast<IUnknown**>(&clrRuntimeHost));
 
 	if (FAILED(hr))
 	{
-		DebugOut(L"Could not get runtime host.");
 		return nullptr;
 	}
-
-	DebugOut(L"Got runtime host.");
 
 	return clrRuntimeHost;
 }

@@ -88,7 +88,7 @@ namespace RemoteNET
             try
             {
                 alreadyInjected = target.Modules.AsEnumerable()
-                                        .Any(module => module.ModuleName.Contains("BootstrapDLL"));
+                                        .Any(module => module.ModuleName.Contains("UnmanagedAdapterDLL"));
             }
             catch
             {
@@ -104,7 +104,7 @@ namespace RemoteNET
 
             if (!alreadyInjected)
             {
-                // Dumping injector + bootstrap DLL to a %localappdata%\RemoteNET
+                // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
                 var remoteNetAppDataDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     typeof(RemoteApp).Assembly.GetName().Name);
@@ -116,15 +116,15 @@ namespace RemoteNET
 
                 // Decide which injection toolkit to use x32 or x64
                 string injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector)+".exe");
-                string bootstrapPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.BootstrapDLL)+".dll");
+                string adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL)+".dll");
                 byte[] injectorResource = Resources.Injector;
-                byte[] bootstrapDllResource = Resources.BootstrapDLL;
+                byte[] adapterResource = Resources.UnmanagedAdapterDLL;
                 if (target.Is64Bit())
                 {
                     injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector_x64)+".exe");
-                    bootstrapPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.BootstrapDLL_x64)+".dll");
+                    adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64)+".dll");
                     injectorResource = Resources.Injector_x64;
-                    bootstrapDllResource = Resources.BootstrapDLL_x64;
+                    adapterResource = Resources.UnmanagedAdapterDLL_x64;
                 }
 
                 // Check if injector or bootstrap resources differ from copies on disk
@@ -134,11 +134,11 @@ namespace RemoteNET
                 {
                     File.WriteAllBytes(injectorPath, injectorResource);
                 }
-                string bootstrapResourceHash = HashUtils.BufferSHA256(bootstrapDllResource);
-                string bootstrapFileHash = File.Exists(bootstrapPath) ? HashUtils.FileSHA256(bootstrapPath) : String.Empty;
-                if (bootstrapResourceHash != bootstrapFileHash)
+                string adapterResourceHash = HashUtils.BufferSHA256(adapterResource);
+                string adapterFileHash = File.Exists(adapterPath) ? HashUtils.FileSHA256(adapterPath) : String.Empty;
+                if (adapterResourceHash != adapterFileHash)
                 {
-                    File.WriteAllBytes(bootstrapPath, bootstrapDllResource);
+                    File.WriteAllBytes(adapterPath, adapterResource);
                 }
 
                 // Unzip scuba diver and dependencies into their own directory

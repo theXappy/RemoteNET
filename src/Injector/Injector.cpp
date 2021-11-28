@@ -24,37 +24,37 @@ int main(int argc, char** argv)
 	printf("x32 Version\n");
 #endif
 
-	// Bootstrapper
+	// Unmanaged Adapter
 	char DllName[MAX_PATH];
 	GetCurrentDirectoryA(MAX_PATH, DllName);
 
 	// Convert arguments to wchar_t[] and concat
-	wchar_t BootstrapDllArg[MAX_PATH];
+	wchar_t adapterDllArg[MAX_PATH];
 	size_t convertedChars = 0;
-	mbstowcs_s(&convertedChars, BootstrapDllArg, MAX_PATH, argv[2], _TRUNCATE);
-	wcscat_s(BootstrapDllArg, L"*");
+	mbstowcs_s(&convertedChars, adapterDllArg, MAX_PATH, argv[2], _TRUNCATE);
+	wcscat_s(adapterDllArg, L"*");
 
 	wchar_t ScubaDiverDllArg[MAX_PATH];
 	mbstowcs_s(&convertedChars, ScubaDiverDllArg, MAX_PATH, argv[3], _TRUNCATE);
-	wcscat_s(BootstrapDllArg, ScubaDiverDllArg);
-	wcscat_s(BootstrapDllArg, L"*");
+	wcscat_s(adapterDllArg, ScubaDiverDllArg);
+	wcscat_s(adapterDllArg, L"*");
 
 	wchar_t TargetFrameworkArg[MAX_PATH];
 	mbstowcs_s(&convertedChars, TargetFrameworkArg, MAX_PATH, argv[4], _TRUNCATE);
-	wcscat_s(BootstrapDllArg, TargetFrameworkArg);
+	wcscat_s(adapterDllArg, TargetFrameworkArg);
 
 
-	printf("BootstrapDLL encoded argument: %ls\n", BootstrapDllArg);
+	printf("UnmanagedAdapterDLL encoded argument: %ls\n", adapterDllArg);
 
 	DWORD Pid = atoi(argv[1]);
 #ifdef _WIN64
-	strcat_s(DllName, "\\BootstrapDLL_x64.dll");
+	strcat_s(DllName, "\\UnmanagedAdapterDLL_x64.dll");
 #else
-	strcat_s(DllName, "\\BootstrapDLL.dll");
+	strcat_s(DllName, "\\UnmanagedAdapterDLL.dll");
 #endif
 
-	printf("[.] Injecting BootstrapDLL into %d\n", Pid);
-	InjectAndRunThenUnload(Pid, DllName, "LoadManagedProject", BootstrapDllArg);
+	printf("[.] Injecting UnmanagedAdapterDLL into %d\n", Pid);
+	InjectAndRunThenUnload(Pid, DllName, "AdapterEntryPoint", adapterDllArg);
 
 	printf("[.] Done!");
 
