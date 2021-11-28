@@ -63,6 +63,11 @@ namespace RemoteNET.Internal.Reflection
                     remoteParams[i] =
                         ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetType().FullName);
                 }
+                else if (parameter is DynamicRemoteObject dro)
+                {
+                    RemoteObject originRemoteObject = dro.__ro;
+                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetType().FullName);
+                }
                 else
                 {
                     throw new Exception(
