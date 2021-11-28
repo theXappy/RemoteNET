@@ -68,7 +68,7 @@ namespace RemoteNET
                 MemberDump fieldDump = null;
                 try
                 {
-                    fieldDump = _ref.GetField(fieldInfo.Name);
+                    fieldDump = _ref.GetFieldDump(fieldInfo.Name);
                 }
                 catch (Exception e)
                 {
@@ -80,7 +80,7 @@ namespace RemoteNET
                     Func<object> getter = () =>
                     {
                         // Re-dumping field to get fresh value
-                         fieldDump = _ref.GetField(fieldInfo.Name, refresh: true);
+                         fieldDump = _ref.GetFieldDump(fieldInfo.Name, refresh: true);
                         object value = PrimitivesEncoder.Decode(fieldDump.EncodedValue, fieldInfo.TypeFullName);
                         return value;
                     };
@@ -97,6 +97,48 @@ namespace RemoteNET
                     // TODO: This is a non-primitive object so it's not encoded...
                     // Don't know what to do here yet.
                     // Skipping this field for now...
+                    Func<object> getter = () =>
+                    {
+                        // Re-dumping field to get fresh value
+                        InvocationResults res = _ref.GetField(fieldInfo.Name);
+
+                        if (!res.ReturnedObjectOrAddress.IsRemoteAddress)
+                        {
+                            throw new Exception($"Invoked {nameof(RemoteObjectRef)}.{nameof(RemoteObjectRef.GetField)} expecting " +
+                                                $"an object but the result was not a remote address");
+                        }
+
+                        var remoteObject = _app.GetRemoteObject(res.ReturnedObjectOrAddress.RemoteAddress);
+                        return remoteObject.Dynamify();
+                    };
+                    Action<object> setter = (newValue) =>
+                    {
+                        ObjectOrRemoteAddress remoteNewVal = null;
+                        if (newValue == null)
+                        {
+                            remoteNewVal = ObjectOrRemoteAddress.Null;
+                        }
+                        else if (newValue is RemoteObject remoteArg)
+                        {
+                            // Other remote object used as argument
+                            remoteNewVal = ObjectOrRemoteAddress.FromToken(remoteArg._ref.Token, remoteArg._ref.GetTypeDump().Type);
+                        }
+                        else if (newValue is DynamicRemoteObject droArg)
+                        {
+                            RemoteObject originRemoteObject = droArg.__ro;
+                            remoteNewVal = ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetType().FullName);
+                        }
+                        else
+                        {
+                            // Argument from our own memory. Wrap it in ObjectOrRemoteAddress
+                            // so it encodes it (as much as possible) for the diver to reconstruct (decode) on the other side
+                            var wrapped = ObjectOrRemoteAddress.FromObj(newValue);
+                            remoteNewVal = wrapped;
+                        }
+                        ObjectOrRemoteAddress reflectedValue = SetField(fieldDump.Name, remoteNewVal);
+                        // TODO: Return reflected field?
+                    };
+                    dro.AddField(fieldDump.Name, getter, setter);
                 }
             }
             // Adding properties
@@ -129,7 +171,6 @@ namespace RemoteNET
                             }
                             RemoteObject rObj = _app.GetRemoteObject(returnedValue.RemoteAddress);
                             return rObj.Dynamify();
-                            //throw new NotImplementedException("Can't get non-primitive properties yet");
                         }
                     });
                 }
