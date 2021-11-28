@@ -186,28 +186,33 @@ namespace RemoteNET
                 // Creating proxy method
                 Func<object[], object> proxy = (args) =>
                  {
-                     ObjectOrRemoteAddress[] encodedArgs = new ObjectOrRemoteAddress[args.Length];
+                     ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[args.Length];
                      for (int i = 0; i < args.Length; i++)
                      {
                          if (args[i] == null)
                          {
-                             encodedArgs[i] = ObjectOrRemoteAddress.Null;
+                             remoteParams[i] = ObjectOrRemoteAddress.Null;
                          }
                          else if (args[i] is RemoteObject remoteArg)
                          {
                              // Other remote object used as argument
-                             encodedArgs[i] = ObjectOrRemoteAddress.FromToken(remoteArg._ref.Token, remoteArg._ref.GetTypeDump().Type);
+                             remoteParams[i] = ObjectOrRemoteAddress.FromToken(remoteArg._ref.Token, remoteArg._ref.GetTypeDump().Type);
+                         }
+                         else if (args[i] is DynamicRemoteObject droArg)
+                         {
+                             RemoteObject originRemoteObject = droArg.__ro;
+                             remoteParams[i] = ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetType().FullName);
                          }
                          else
                          {
                              // Argument from our own memory. Wrap it in ObjectOrRemoteAddress
                              // so it encodes it (as much as possible) for the diver to reconstruct (decode) on the other side
                              var wrapped = ObjectOrRemoteAddress.FromObj(args[i]);
-                             encodedArgs[i] = wrapped;
+                             remoteParams[i] = wrapped;
                          }
                      }
 
-                     InvocationResults res = _ref.InvokeMethod(methodInfo.Name, encodedArgs);
+                     InvocationResults res = _ref.InvokeMethod(methodInfo.Name, remoteParams);
                      if (res.VoidReturnType)
                      {
                          // Nothing was returned
