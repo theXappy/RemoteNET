@@ -52,7 +52,7 @@
   </ItemGroup>
 
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force&quot;" />
+    <Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force&quot;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba_NetCore\' '$(ProjectDir)\Resources\ScubaDiver_NetCore.zip'  -Force&quot;" />
   </Target>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
