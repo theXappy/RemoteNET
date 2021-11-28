@@ -40,7 +40,7 @@ namespace RemoteNET.Internal
         /// </summary>
         /// <param name="name">Name of field to get the value of</param>
         /// <param name="refresh">Whether the value should be read again for this invocation or a cache version is good enough</param>
-        public MemberDump GetField(string name, bool refresh = false)
+        public MemberDump GetFieldDump(string name, bool refresh = false)
         {
             ThrowIfReleased();
             if (refresh)
@@ -98,6 +98,11 @@ namespace RemoteNET.Internal
         {
             ThrowIfReleased();
             return _creatingCommunicator.SetField(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, fieldName, newValue);
+        }
+        public InvocationResults GetField(string fieldName)
+        {
+            ThrowIfReleased();
+            return _creatingCommunicator.GetField(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, fieldName);
         }
 
         /// <summary>
