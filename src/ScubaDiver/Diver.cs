@@ -769,7 +769,7 @@ namespace ScubaDiver
             // This works like 'fork()', it cretes does NOT create a dump file and uses it as the target
             // Instead it creates a secondary processes which is a copy of the current one.
             // This subprocess inherits handles to DLLs in the current process so it might "lock"
-            // both bootstrapDLL.dll and ScubaDiver.dll
+            // both UnmanagedAdapterDLL.dll and ScubaDiver.dll
             _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
             _runtime = _dt.ClrVersions.Single().CreateRuntime();
         }
@@ -1160,7 +1160,7 @@ namespace ScubaDiver
 
         public static int EntryPoint(string pwzArgument)
         {
-            // Bootstrap needs to call a C# function with exactly this signature.
+            // UnmanagedAdapterDLL needs to call a C# function with exactly this signature.
             // So we use it to just create a diver, and run the Dive func (blocking)
 
             // Diver needs some assemblies which might not be loaded in the target process

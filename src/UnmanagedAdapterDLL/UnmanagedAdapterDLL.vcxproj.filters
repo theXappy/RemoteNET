@@ -21,7 +21,7 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BootstrapDLL.h">
+    <ClInclude Include="UnmanagedAdapter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="msgboxf.h">
@@ -35,7 +35,7 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BootstrapDLL.cpp">
+    <ClCompile Include="UnmanagedAdapterDLL.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -63,26 +63,6 @@ namespace RemoteNET.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
-        internal static byte[] BootstrapDLL {
-            get {
-                object obj = ResourceManager.GetObject("BootstrapDLL", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] BootstrapDLL_x64 {
-            get {
-                object obj = ResourceManager.GetObject("BootstrapDLL_x64", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
         internal static byte[] Injector {
             get {
                 object obj = ResourceManager.GetObject("Injector", resourceCulture);
@@ -116,6 +96,26 @@ namespace RemoteNET.Properties {
         internal static byte[] ScubaDiver_NetCore {
             get {
                 object obj = ResourceManager.GetObject("ScubaDiver_NetCore", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] UnmanagedAdapterDLL {
+            get {
+                object obj = ResourceManager.GetObject("UnmanagedAdapterDLL", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] UnmanagedAdapterDLL_x64 {
+            get {
+                object obj = ResourceManager.GetObject("UnmanagedAdapterDLL_x64", resourceCulture);
                 return ((byte[])(obj));
             }
         }

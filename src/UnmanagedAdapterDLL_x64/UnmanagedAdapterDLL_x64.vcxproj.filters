@@ -15,27 +15,27 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\BootstrapDLL\stdafx.h">
+    <ClInclude Include="..\UnmanagedAdapterDLL\stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\BootstrapDLL\targetver.h">
+    <ClInclude Include="..\UnmanagedAdapterDLL\targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\BootstrapDLL\BootstrapDLL.h">
+    <ClInclude Include="..\UnmanagedAdapterDLL\UnmanagedAdapterDLL.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\BootstrapDLL\msgboxf.h">
+    <ClInclude Include="..\UnmanagedAdapterDLL\msgboxf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\BootstrapDLL\dllmain.cpp">
+    <ClCompile Include="..\UnmanagedAdapterDLL\dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\BootstrapDLL\BootstrapDLL.cpp">
+    <ClCompile Include="..\UnmanagedAdapterDLL\UnmanagedAdapterDLL.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="..\UnmanagedAdapterDLL\stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
