@@ -194,5 +194,21 @@ namespace ScubaDiver.API
             InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
             return res;
         }
+
+        public InvocationResults GetField(ulong targetAddr, string targetTypeFullName, string fieldName)
+        {
+            FieldGetRequest invocReq = new FieldGetRequest()
+            {
+                ObjAddress = targetAddr,
+                TypeFullName = targetTypeFullName,
+                FieldName = fieldName,
+            };
+            var requestJsonBody = JsonConvert.SerializeObject(invocReq);
+
+            var resJson = SendRequest("get_field", null, requestJsonBody);
+
+            InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
+            return res;
+        }
     }
 }
