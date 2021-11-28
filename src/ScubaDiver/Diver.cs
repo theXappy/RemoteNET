@@ -46,6 +46,7 @@ namespace ScubaDiver
                 {"/domains", MakeDomainsResponse},
                 {"/heap", MakeHeapResponse},
                 {"/invoke", MakeInvokeResponse},
+                {"/get_field", MakeGetFieldResponse},
                 {"/set_field", MakeSetFieldResponse},
                 {"/create_object", MakeCreateObjectResponse},
                 {"/object", MakeObjectResponse},
@@ -352,6 +353,98 @@ namespace ScubaDiver
                 };
             }
             return JsonConvert.SerializeObject(invocResults);
+        }
+
+        private string MakeGetFieldResponse(HttpListenerRequest arg)
+        {
+            Logger.Debug("[Diver] Got /get_field request!");
+            string body = null;
+            using (StreamReader sr = new StreamReader(arg.InputStream))
+            {
+                body = sr.ReadToEnd();
+            }
+
+            if (string.IsNullOrEmpty(body))
+            {
+                return "{\"error\":\"Missing body\"}";
+            }
+
+            TextReader textReader = new StringReader(body);
+            JsonReader jr = new JsonTextReader(textReader);
+            JsonSerializer js = new JsonSerializer();
+            var request = js.Deserialize<FieldSetRequest>(jr);
+            if (request == null)
+            {
+                return "{\"error\":\"Failed to deserialize body\"}";
+            }
+
+            // Need to figure target instance and the target type.
+            // In case of a static call the target instance stays null.
+            object instance = null;
+            Type dumpedObjType;
+            if (request.ObjAddress == 0)
+            {
+                return "{\"error\":\"Can't get field of a null target\"}";
+            }
+
+            // Check if we have this objects in our pinned pool
+            if (_pinnedObjects.TryGetValue(request.ObjAddress, out PinnedObjectInfo poi))
+            {
+                // Found pinned object!
+                instance = poi.Object;
+                dumpedObjType = instance.GetType();
+            }
+            else
+            {
+                return "{\"error\":\"Can't get field of a unpinned objects\"}";
+            }
+
+            // Search the method with the matching signature
+            var fieldInfo = dumpedObjType.GetFieldRecursive(request.FieldName);
+            if (fieldInfo == null)
+            {
+                Debugger.Launch();
+                Logger.Debug($"[Diver] Failed to Resolved field :/");
+                return "{\"error\":\"Couldn't find field in type.\"}";
+            }
+            Logger.Debug($"[Diver] Resolved field: {fieldInfo.Name}, Containing Type: {fieldInfo.DeclaringType}");
+
+            object results = null;
+            try
+            {
+                results = fieldInfo.GetValue(instance);
+            }
+            catch (Exception e)
+            {
+                return $"{{\"error\":\"Invocation caused exception: {e}\"}}";
+            }
+
+
+            // Return the value we just set to the field to the caller...
+            InvocationResults invocResults;
+            {
+                ObjectOrRemoteAddress returnValue;
+                if (results.GetType().IsPrimitiveEtc())
+                {
+                    returnValue = ObjectOrRemoteAddress.FromObj(results);
+                }
+                else
+                {
+                    // Pinning results
+                    PinnedObjectInfo resultsPoi = PinObject(results);
+                    ulong resultsAddress = resultsPoi.Address;
+                    Type resultsType = results.GetType();
+                    returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
+                }
+
+                invocResults = new InvocationResults()
+                {
+                    VoidReturnType = false,
+                    ReturnedObjectOrAddress = returnValue
+                };
+            }
+            return JsonConvert.SerializeObject(invocResults);
+
         }
 
         private string MakeSetFieldResponse(HttpListenerRequest arg)
