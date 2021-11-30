@@ -157,7 +157,12 @@ namespace RemoteNET.Internal
             switch (memberType)
             {
                 case MemberType.Method:
-                    var overloads = _methods[binder.Name];
+                    List<MethodOverload> overloads = _methods[binder.Name];
+
+                    // Narrow down (hopefuly to one) overload with the same amount of types
+                    // TODO: We COULD possibly check the args types (local ones, RemoteObjects, DynamicObjects, ...) if we still have multiple results
+                    overloads = overloads.Where(overload => overload.ArgumentsTypes.Count == args.Length).ToList();
+
                     if (overloads.Count == 1)
                     {
                         // Easy case - a unique function name so we can just return it.
