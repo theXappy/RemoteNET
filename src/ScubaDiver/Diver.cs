@@ -185,8 +185,13 @@ namespace ScubaDiver
 
             if (paramType.IsEnum)
             {
-                object parsedParam = Enum.Parse(paramType, param.EncodedObject);
-                return (parsedParam);
+                // For encoded values, parse them using `Enum.Parse`
+                // for remote addresses - fall through to logic below this 'if' block
+                if (!param.IsRemoteAddress)
+                {
+                    object parsedParam = Enum.Parse(paramType, param.EncodedObject);
+                    return (parsedParam);
+                }
             }
 
             if (param.IsRemoteAddress && _pinnedObjects.TryGetValue(param.RemoteAddress, out PinnedObjectInfo poi))
