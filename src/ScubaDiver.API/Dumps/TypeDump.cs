@@ -82,6 +82,7 @@ namespace ScubaDiver.API.Dumps
             public string Visibility { get; set; }
             public string Name { get; set; }
             public string TypeFullName { get; set; }
+            public string Assembly { get; set; }
 
             public TypeField()
             {
@@ -92,6 +93,7 @@ namespace ScubaDiver.API.Dumps
                 Visibility = fi.IsPublic ? "Public" : "Private";
                 Name = fi.Name;
                 TypeFullName = fi.FieldType.FullName;
+                Assembly = fi.FieldType.Assembly.GetName().Name;
             }
 
         }

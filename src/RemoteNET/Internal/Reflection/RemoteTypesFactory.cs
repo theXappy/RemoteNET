@@ -150,6 +150,27 @@ namespace RemoteNET.Internal.Reflection
                 output.AddMethod(methodInfo);
             }
 
+
+            foreach (TypeDump.TypeField fieldDump in typeDump.Fields)
+            {
+                Type returnType;
+                try
+                {
+                    returnType = ResolveTypeWhileCreating(app, typeDump.Type, "field__resolving__logic",
+                    fieldDump.Assembly, fieldDump.TypeFullName);
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine($"[RemoteTypesFactory] failed to create field {fieldDump.Name} because it's type could be created.\n" +
+                                    "The throw exception was: " + e);
+                    continue;
+                }
+
+                RemoteFieldInfo fieldInfo = new RemoteFieldInfo(output, returnType, fieldDump.Name);
+                output.AddField(fieldInfo);
+            }
+
+
             // remove on-going creation indication
             _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
 

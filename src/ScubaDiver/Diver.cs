@@ -368,6 +368,7 @@ namespace ScubaDiver
         {
             Logger.Debug("[Diver] Got /get_field request!");
             string body = null;
+            object results = null;
             using (StreamReader sr = new StreamReader(arg.InputStream))
             {
                 body = sr.ReadToEnd();
@@ -389,43 +390,53 @@ namespace ScubaDiver
 
             // Need to figure target instance and the target type.
             // In case of a static call the target instance stays null.
-            object instance = null;
             Type dumpedObjType;
             if (request.ObjAddress == 0)
             {
-                return "{\"error\":\"Can't get field of a null target\"}";
-            }
+                // Null Target -- Getting a Static field
+                dumpedObjType = ResolveType(request.TypeFullName);
+                FieldInfo staticFieldInfo = dumpedObjType.GetField(request.FieldName);
+                if (!staticFieldInfo.IsStatic)
+                {
+                    return "{\"error\":\"Trying to get field with a null target bu the field was not a static one\"}";
+                }
 
-            // Check if we have this objects in our pinned pool
-            if (_pinnedObjects.TryGetValue(request.ObjAddress, out PinnedObjectInfo poi))
-            {
-                // Found pinned object!
-                instance = poi.Object;
-                dumpedObjType = instance.GetType();
+                results = staticFieldInfo.GetValue(null);
             }
             else
             {
-                return "{\"error\":\"Can't get field of a unpinned objects\"}";
-            }
+                object instance = null;
+                // Check if we have this objects in our pinned pool
+                if (_pinnedObjects.TryGetValue(request.ObjAddress, out PinnedObjectInfo poi))
+                {
+                    // Found pinned object!
+                    instance = poi.Object;
+                    dumpedObjType = instance.GetType();
+                }
+                else
+                {
+                    return "{\"error\":\"Can't get field of a unpinned objects\"}";
+                }
 
-            // Search the method with the matching signature
-            var fieldInfo = dumpedObjType.GetFieldRecursive(request.FieldName);
-            if (fieldInfo == null)
-            {
-                Debugger.Launch();
-                Logger.Debug($"[Diver] Failed to Resolved field :/");
-                return "{\"error\":\"Couldn't find field in type.\"}";
-            }
-            Logger.Debug($"[Diver] Resolved field: {fieldInfo.Name}, Containing Type: {fieldInfo.DeclaringType}");
+                // Search the method with the matching signature
+                var fieldInfo = dumpedObjType.GetFieldRecursive(request.FieldName);
+                if (fieldInfo == null)
+                {
+                    Debugger.Launch();
+                    Logger.Debug($"[Diver] Failed to Resolved field :/");
+                    return "{\"error\":\"Couldn't find field in type.\"}";
+                }
 
-            object results = null;
-            try
-            {
-                results = fieldInfo.GetValue(instance);
-            }
-            catch (Exception e)
-            {
-                return $"{{\"error\":\"Invocation caused exception: {e}\"}}";
+                Logger.Debug($"[Diver] Resolved field: {fieldInfo.Name}, Containing Type: {fieldInfo.DeclaringType}");
+
+                try
+                {
+                    results = fieldInfo.GetValue(instance);
+                }
+                catch (Exception e)
+                {
+                    return $"{{\"error\":\"Invocation caused exception: {e}\"}}";
+                }
             }
 
 
