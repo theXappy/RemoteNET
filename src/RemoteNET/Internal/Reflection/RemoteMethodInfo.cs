@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using ScubaDiver;
 using ScubaDiver.API;
+using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
 
 namespace RemoteNET.Internal.Reflection
@@ -87,7 +88,13 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                this.App.Communicator.InvokeStaticMethod(DeclaringType.FullName, this.Name, remoteParams);
+                InvocationResults invokeRes = this.App.Communicator.InvokeStaticMethod(DeclaringType.FullName, this.Name, remoteParams);
+                if (invokeRes.VoidReturnType)
+                {
+                    return new ValueTuple<bool, ObjectOrRemoteAddress>(false, null);
+                }
+                return (true, invokeRes.ReturnedObjectOrAddress);
+
             }
 
             // obj is NOT null. Make sure it's a RemoteObject.
