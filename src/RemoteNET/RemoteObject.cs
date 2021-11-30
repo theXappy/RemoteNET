@@ -299,5 +299,11 @@ namespace RemoteNET
         {
             return $"RemoteObject. Type: {_type?.FullName ?? "UNK"} Reference: [{_ref}]";
         }
+
+        public ObjectOrRemoteAddress GetField(string name)
+        {
+            var res = _ref.GetField(name);
+            return res.ReturnedObjectOrAddress;
+        }
     }
 }

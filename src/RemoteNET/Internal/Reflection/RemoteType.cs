@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 
 namespace RemoteNET.Internal.Reflection
 {
@@ -10,6 +11,7 @@ namespace RemoteNET.Internal.Reflection
     {
         public string RemoteAssemblyName { get; private set; }
         private List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
+        private List<RemoteFieldInfo> _fields = new List<RemoteFieldInfo>();
 
         public RemoteApp App { get; set; }
 
@@ -23,6 +25,11 @@ namespace RemoteNET.Internal.Reflection
         public void AddMethod(RemoteMethodInfo rmi)
         {
             _methods.Add(rmi);
+        }
+
+        public void AddField(RemoteFieldInfo fieldInfo)
+        {
+            _fields.Add(fieldInfo);
         }
 
         public override object[] GetCustomAttributes(bool inherit)
@@ -107,12 +114,12 @@ namespace RemoteNET.Internal.Reflection
 
         public override FieldInfo GetField(string name, BindingFlags bindingAttr)
         {
-            throw new NotImplementedException();
+            return _fields.ToArray().Single(field => field.Name == name);
         }
 
         public override FieldInfo[] GetFields(BindingFlags bindingAttr)
         {
-            throw new NotImplementedException();
+            return _fields.Cast<FieldInfo>().ToArray();
         }
 
         public override MemberInfo[] GetMembers(BindingFlags bindingAttr)
