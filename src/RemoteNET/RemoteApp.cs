@@ -50,6 +50,14 @@ namespace RemoteNET
             var dumpedType = _communicator.DumpType(typeFullName, assembly);
             return rtf.Create(this, dumpedType);
         }
+
+        public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
+        {
+            Type remoteType = GetRemoteType(typeFullName, assembly);
+            return new RemoteEnum(remoteType);
+        }
+
+
         /// <summary>
         /// Returns a handle to a remote type based on a given local type.
         /// </summary>
