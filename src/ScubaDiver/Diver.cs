@@ -314,11 +314,15 @@ namespace ScubaDiver
                 Logger.Debug($"[Diver] Failed to Resolved method :/");
                 return "{\"error\":\"Couldn't find method in type.\"}";
             }
-            Logger.Debug($"[Diver] Resolved method: {method.Name}, Containing Type: {method.DeclaringType}");
+
+            string argsSummary = string.Join(", ", argumentTypes.Select(arg => arg.Name));
+            Logger.Debug($"[Diver] Resolved method: {method.Name}({argsSummary}), Containing Type: {method.DeclaringType}");
 
             object results = null;
             try
             {
+                argsSummary = string.Join(", ", paramsList.Select(param=>param.ToString()));
+                Logger.Debug($"[Diver] Invoking {method.Name} with those args: {argsSummary}");
                 results = method.Invoke(instance, paramsList.ToArray());
             }
             catch (Exception e)
