@@ -94,9 +94,7 @@ namespace RemoteNET
                 }
                 else
                 {
-                    // TODO: This is a non-primitive object so it's not encoded...
-                    // Don't know what to do here yet.
-                    // Skipping this field for now...
+                    // Non primitive field
                     Func<object> getter = () =>
                     {
                         // Re-dumping field to get fresh value
