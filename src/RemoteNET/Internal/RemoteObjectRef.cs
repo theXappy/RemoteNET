@@ -105,6 +105,12 @@ namespace RemoteNET.Internal
             return _creatingCommunicator.GetField(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, fieldName);
         }
 
+        public void EventSubscribe(string eventName, Action<ObjectOrRemoteAddress[]> callback)
+        {
+            ThrowIfReleased();
+            _creatingCommunicator.EventSubscribe(_remoteObjectInfo.PinnedAddress, eventName, callback);
+        }
+
         /// <summary>
         /// Releases hold of the remote object in the remote process and the local proxy.
         /// </summary>

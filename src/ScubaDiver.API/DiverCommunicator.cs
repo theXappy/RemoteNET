@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -27,11 +28,15 @@ namespace ScubaDiver.API
         private string _hostname;
         private int _port;
 
+        private HttpListener _listener = null;
+
         public DiverCommunicator(string hostname, int port)
         {
             _hostname = hostname;
             _port = port;
         }
+        public DiverCommunicator(IPAddress ipa, int port) : this(ipa.ToString(), port) { }
+        public DiverCommunicator(IPEndPoint ipe) : this(ipe.Address, ipe.Port) { }
 
         private string SendRequest(string path, Dictionary<string, string> queryParams = null, string jsonBody = null)
         {
@@ -119,7 +124,7 @@ namespace ScubaDiver.API
                 { "pinRequest", pinObject.ToString() },
                 { "hashcode_fallback", "false" }
             };
-            if(hashcode.HasValue)
+            if (hashcode.HasValue)
             {
                 queryParams["hashcode"] = hashcode.Value.ToString();
                 queryParams["hashcode_fallback"] = "true";
@@ -210,5 +215,89 @@ namespace ScubaDiver.API
             InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
             return res;
         }
+
+        public void EventSubscribe(ulong targetAddr, string eventName, Action<ObjectOrRemoteAddress[]> callback)
+        {
+            Dictionary<string, string> queryParams;
+            string body;
+            if (this._listener == null)
+            {
+                Console.WriteLine("[Communicator] Event subscription seen but no local listener exists. Creating now.");
+                // Need to create HTTP listener and send the Diver it's info
+                int localHttpPort = this._port + 1;
+                string ip = "127.0.0.1";
+                _listener = new HttpListener();
+                string listeningUrl = $"http://{ip}:{localHttpPort}/";
+                _listener.Prefixes.Add(listeningUrl);
+                _listener.Start();
+                Task.Run(()=>Dispatcher(_listener));
+
+                queryParams = new();
+                queryParams["ip"] = ip;
+                queryParams["port"] = localHttpPort.ToString();
+                body = SendRequest("register_callbacks_ep", queryParams);
+                if (!body.Contains("\"status\":\"OK\""))
+                {
+                    throw new Exception("Local HTTP server created but informing the remote Diver resulted in an error. " +
+                        "Raw response: " + body);
+                }
+            }
+
+            queryParams = new() { };
+            queryParams["address"] = targetAddr.ToString();
+            queryParams["event"] = eventName;
+            body = SendRequest("heap", queryParams);
+            EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(body);
+
+            _eventHandlers[regRes.Token] = callback;
+        }
+
+        private Dictionary<int, Action<ObjectOrRemoteAddress[]>> _eventHandlers = new();
+
+        private void Dispatcher(HttpListener listener)
+        {
+            while (true)
+            {
+                var requestContext = listener.GetContext();
+                HttpListenerRequest request = requestContext.Request;
+
+                var response = requestContext.Response;
+                string body = null;
+                if (request.Url.AbsolutePath == "/invoke_callback")
+                {
+                    using (StreamReader sr = new StreamReader(request.InputStream))
+                    {
+                        body = sr.ReadToEnd();
+                    }
+                    CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
+                    if(_eventHandlers.TryGetValue(res.Token, out Action<ObjectOrRemoteAddress[]> callbackFunction))
+                    {
+                        callbackFunction(res.Parameters.ToArray());
+                        // TODO: Read action results and return them
+
+                        body = "{\"status\":\"OK\"}";
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[WARN] Diver tried to trigger a callback with unknown token value: {res.Token}");
+                        body = "{\"error\":\"Unknown Token\"}"; ;
+                    }
+                }
+                else
+                {
+                    body = "{\"error\":\"Unknown Command\"}";
+                }
+
+                byte[] buffer = System.Text.Encoding.UTF8.GetBytes(body);
+                // Get a response stream and write the response to it.
+                response.ContentLength64 = buffer.Length;
+                response.ContentType = "application/json";
+                System.IO.Stream output = response.OutputStream;
+                output.Write(buffer, 0, buffer.Length);
+                // You must close the output stream.
+                output.Close();
+            }
+        }
+
     }
 }

@@ -22,6 +22,19 @@ using Exception = System.Exception;
 
 namespace ScubaDiver
 {
+    public class RegisteredEventHandlerInfo
+    {
+        public Delegate RegisteredProxy { get; set; }
+        // Note that this object might be pinned or unpinned when this info object is created
+        // but by holding a reference to it within the class we don't care if it moves or
+        // not - we will always be able to safely access it
+        public object Target { get; set; }
+        public EventInfo EventInfo
+        {
+            get; set;
+        }
+    }
+
     public class Diver : IDisposable
     {
         // Runtime analysis and exploration fields
@@ -34,6 +47,11 @@ namespace ScubaDiver
 
         // Pinning objects fields
         private Dictionary<ulong, PinnedObjectInfo> _pinnedObjects;
+
+        // Callbacks Endpoint of the Controller process
+        IPEndPoint _callbacksEndpoint;
+        int _nextAvilableCallbackToken = 0;
+        private Dictionary<int, RegisteredEventHandlerInfo> _tokensToRegisteredEventHandlers;
 
         // Singleton
         private static Diver _instance;
@@ -53,8 +71,157 @@ namespace ScubaDiver
                 {"/unpin", MakeUnpinResponse},
                 {"/types", MakeTypesResponse},
                 {"/type", MakeTypeResponse},
+                {"/register_callbacks_ep", MakeRegisterCallbacksEndpointResponse},
+                {"/event_subscribe", MakeEventSubscribeResponse},
             };
             _pinnedObjects = new Dictionary<ulong, PinnedObjectInfo>();
+            _tokensToRegisteredEventHandlers = new Dictionary<int, RegisteredEventHandlerInfo>();
+        }
+
+        private string MakeEventSubscribeResponse(HttpListenerRequest arg)
+        {
+            if (_callbacksEndpoint == null)
+            {
+                return "{\"error\":\"Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!\"}";
+            }
+
+            string objAddrStr = arg.QueryString.Get("address");
+            if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
+            {
+                return "{\"error\":\"Missing parameter 'address'\"}";
+            }
+            Logger.Debug($"[Diver][Debug](RegisterEventHandler) objAddrStr={objAddr:X16}");
+
+            // Check if we have this objects in our pinned pool
+            PinnedObjectInfo poi;
+            if (!_pinnedObjects.TryGetValue(objAddr, out poi))
+            {
+                // Object not pinned, try get it the hard way
+                return "{\"error\":\"Object at given address wasn't pinned\"}";
+            }
+
+            object target = poi.Object;
+            Type resolvedType = target.GetType();
+
+            string eventName = arg.QueryString.Get("event");
+            if (eventName == null)
+            {
+                return "{\"error\":\"Missing parameter 'event'\"}";
+            }
+            // TODO: Does this need to be done recursivly?
+            EventInfo eventObj = resolvedType.GetEvent(eventName);
+            if (eventObj == null)
+            {
+                return "{\"error\":\"Failed to find event in type\"}";
+            }
+
+            // Let's make sure the event's delegate type has 2 args - (object, EventArgs or subclass)
+            Type eventDelegateType = eventObj.EventHandlerType;
+            MethodInfo invokeInfo = eventDelegateType.GetMethod("Invoke");
+            ParameterInfo[] paramInfos = invokeInfo.GetParameters();
+            if (paramInfos.Length != 2)
+            {
+                return "{\"error\":\"Currently only events with 2 parameters (object & EventArgs) can be subscribed to.\"}";
+            }
+            // Now I want to make sure the types of the parameters are subclasses of the expected ones.
+            // Every type is a subclass of object so I skip the first param
+            ParameterInfo secondParamInfo = paramInfos[1];
+            Type secondParamType = secondParamInfo.ParameterType;
+            if (!secondParamType.IsSubclassOf(typeof(EventArgs)))
+            {
+                return "{\"error\":\"Second parameter of the event's handler was not a subclass of EventArgs\"}";
+            }
+
+            // TODO: Make sure delegate's return type is void? (Who even uses non-void delegates?)
+
+            // We're all good regarding the signature!
+            // assign subscriber unique id
+            int token = _nextAvilableCallbackToken;
+            _nextAvilableCallbackToken++;
+
+            Action<object, EventArgs> handler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
+
+            Logger.Debug($"[Diver] Adding event handler to event {eventName}...");
+            eventObj.AddEventHandler(target, handler);
+            Logger.Debug($"[Diver] Added event handler to event {eventName}!");
+
+
+            // Save all the registeration info so it can be removed later upon request
+            _tokensToRegisteredEventHandlers[token] = new RegisteredEventHandlerInfo()
+            {
+                EventInfo = eventObj,
+                Target = target,
+                RegisteredProxy = handler
+            };
+
+            EventRegistrationResults erResults = new EventRegistrationResults() { Token = token };
+            return JsonConvert.SerializeObject(erResults);
+        }
+
+        private void InvokeControllerCallback(int token, params object[] parameters)
+        {
+            ReverseCommunicator reverseCommunicator = new ReverseCommunicator(_callbacksEndpoint);
+
+            bool[] pinnedJustForCallback = new bool[parameters.Length];
+            PinnedObjectInfo[] pinnedObjectInfos = new PinnedObjectInfo[parameters.Length]; 
+            ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                object parameter = parameters[i];
+                if (parameter.GetType().IsPrimitiveEtc())
+                {
+                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
+                }
+                else // Not primitive
+                {
+                    PinnedObjectInfo poi;
+                    if(!IsPinned(parameter, out poi))
+                    {
+                        // Pin and mark for unpinning later
+                        poi = PinObject(parameter);
+                        pinnedJustForCallback[i] = true;
+                    }
+                    pinnedObjectInfos[i] = poi;
+
+                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
+                }
+            }
+
+            // Call callback at controller
+            reverseCommunicator.InvokeCallback(token, remoteParams);
+
+            // Callback is over. Time to unpin parameters that were pinned just for this callback
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                if(pinnedJustForCallback[i])
+                {
+                    UnpinObject(pinnedObjectInfos[i].Address);
+                }
+            }
+        }
+
+        private string MakeRegisterCallbacksEndpointResponse(HttpListenerRequest arg)
+        {
+            // This API is used by the Diver's controller to set an 'End Point' (IP + Port) where
+            // it listens to callback requests (via HTTP)
+            // Callbacks are used for:
+            // 1. Invoking remote events (at Diver's side) callbacks (at controller side)
+            // 2. Invoking function hooks (FFU)
+            string ipAddrStr = arg.QueryString.Get("ip");
+            IPAddress ipa;
+            if (!IPAddress.TryParse(ipAddrStr, out ipa))
+            {
+                return "{\"error\":\"Parameter 'ip' couldn't be parsed to a valid IP Address\"}";
+            }
+            string portAddrStr = arg.QueryString.Get("port");
+            int port;
+            if (!int.TryParse(portAddrStr, out port))
+            {
+                return "{\"error\":\"Parameter 'port' couldn't be parsed to a valid IP Address\"}";
+            }
+            _callbacksEndpoint = new IPEndPoint(ipa, port);
+            Logger.Debug($"[Diver] Register Callback Endpoint complete. Endpoint: {_callbacksEndpoint}");
+            return "{\"status\":\"OK\"}";
         }
 
         private string MakeUnpinResponse(HttpListenerRequest arg)
@@ -321,7 +488,7 @@ namespace ScubaDiver
             object results = null;
             try
             {
-                argsSummary = string.Join(", ", paramsList.Select(param=>param.ToString()));
+                argsSummary = string.Join(", ", paramsList.Select(param => param.ToString()));
                 Logger.Debug($"[Diver] Invoking {method.Name} with those args: {argsSummary}");
                 results = method.Invoke(instance, paramsList.ToArray());
             }
@@ -795,6 +962,20 @@ namespace ScubaDiver
             return od;
         }
 
+        private bool IsPinned(object instance, out PinnedObjectInfo poi)
+        {
+            // TODO: There are more efficient ways to do this
+            foreach(PinnedObjectInfo currPoi in _pinnedObjects.Values)
+            {
+                if(currPoi.Object == instance)
+                {
+                    poi = currPoi;
+                    return true;
+                }
+            }
+            poi = null;
+            return false;
+        }
         private bool UnpinObject(ulong objAddress)
         {
             if (_pinnedObjects.TryGetValue(objAddress, out PinnedObjectInfo poi))
@@ -1153,7 +1334,7 @@ namespace ScubaDiver
 
             // TODO: With .NET Core divers thre seems to be some infinte loop when trying to resolve System.Int32 so
             // this hack fixes it for now
-            if(name == "System.Int32")
+            if (name == "System.Int32")
             {
                 return typeof(int);
             }
