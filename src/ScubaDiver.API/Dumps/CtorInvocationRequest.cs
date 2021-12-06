@@ -2,18 +2,14 @@
 
 namespace ScubaDiver.API.Dumps
 {
-
-    public class InvocationRequest
+    public class CtorInvocationRequest
     {
-        public ulong ObjAddress { get; set; }
-        public string MethodName { get; set; }
         public string TypeFullName { get; set; }
         public List<ObjectOrRemoteAddress> Parameters { get; set; }
 
-        public InvocationRequest()
+        public CtorInvocationRequest()
         {
             Parameters = new();
         }
     }
-    
 }
