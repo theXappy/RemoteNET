@@ -105,7 +105,7 @@ namespace RemoteNET.Internal
             return _creatingCommunicator.GetField(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, fieldName);
         }
 
-        public void EventSubscribe(string eventName, Action<ObjectOrRemoteAddress[]> callback)
+        public void EventSubscribe(string eventName, DiverCommunicator.LocalEventCallback callback)
         {
             ThrowIfReleased();
             _creatingCommunicator.EventSubscribe(_remoteObjectInfo.PinnedAddress, eventName, callback);

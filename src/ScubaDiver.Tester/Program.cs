@@ -3,13 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 using RemoteNET;
 using RemoteNET.Internal.Extensions;
+using ScubaDiver.API;
 
 namespace ScubaDiver.Tester
 {
@@ -89,7 +86,8 @@ namespace ScubaDiver.Tester
             Console.WriteLine("4. Print methods of Remote Object");
             Console.WriteLine("5. Invoke example static method (int.parse)");
             Console.WriteLine("6. Steal RSA keys");
-            Console.WriteLine("7. Exit");
+            Console.WriteLine("7. Subscribe to Event");
+            Console.WriteLine("8. Exit");
             string input = Console.ReadLine();
             ulong addr;
             uint index;
@@ -211,6 +209,36 @@ namespace ScubaDiver.Tester
                         }
                         break;
                     case 7:
+                        {
+                            Console.WriteLine("Enter local index of remote object:");
+                            if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
+                            {
+                                Console.WriteLine("Bad input.");
+                            }
+                            else
+                            {
+                                RemoteObject remoteObj = remoteObjects[(int)index];
+                                Console.WriteLine("Enter event name:");
+                                string eventName = Console.ReadLine().Trim();
+                                DiverCommunicator.LocalEventCallback func = (args) =>
+                                {
+                                    Console.WriteLine($"[!] Caught event {eventName} firing! Recieved {args.Length} args.");
+                                    foreach (ObjectOrRemoteAddress item in args)
+                                    {
+                                        RemoteObject ro = remoteApp.GetRemoteObject(item.RemoteAddress);
+                                        dynamic dro = ro.Dynamify();
+                                        Console.WriteLine($"  ARG: {dro.ToString()} ({dro.GetType().FullName})");
+                                        ro.Dispose();
+
+                                    }
+                                    return (false, null);
+                                };
+                                remoteObj.EventSubscribe(eventName, func);
+                                Console.WriteLine("Done registring. wait for invocations.");
+                            }
+                        }
+                        break;
+                    case 8:
                         // Exiting
                         return true;
                 }

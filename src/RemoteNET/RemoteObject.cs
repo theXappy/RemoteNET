@@ -305,5 +305,9 @@ namespace RemoteNET
             var res = _ref.GetField(name);
             return res.ReturnedObjectOrAddress;
         }
+        public void EventSubscribe(string eventName, DiverCommunicator.LocalEventCallback callback)
+        {
+            _ref.EventSubscribe(eventName, callback);
+        }
     }
 }

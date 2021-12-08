@@ -216,7 +216,7 @@ namespace ScubaDiver.API
             return res;
         }
 
-        public void EventSubscribe(ulong targetAddr, string eventName, Action<ObjectOrRemoteAddress[]> callback)
+        public void EventSubscribe(ulong targetAddr, string eventName, LocalEventCallback callback)
         {
             Dictionary<string, string> queryParams;
             string body;
@@ -246,13 +246,15 @@ namespace ScubaDiver.API
             queryParams = new() { };
             queryParams["address"] = targetAddr.ToString();
             queryParams["event"] = eventName;
-            body = SendRequest("heap", queryParams);
+            body = SendRequest("event_subscribe", queryParams);
             EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(body);
 
             _eventHandlers[regRes.Token] = callback;
         }
 
-        private Dictionary<int, Action<ObjectOrRemoteAddress[]>> _eventHandlers = new();
+        public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args);
+
+        private Dictionary<int, LocalEventCallback> _eventHandlers = new();
 
         private void Dispatcher(HttpListener listener)
         {
@@ -270,12 +272,21 @@ namespace ScubaDiver.API
                         body = sr.ReadToEnd();
                     }
                     CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
-                    if(_eventHandlers.TryGetValue(res.Token, out Action<ObjectOrRemoteAddress[]> callbackFunction))
+                    if(_eventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
                     {
-                        callbackFunction(res.Parameters.ToArray());
+                        (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray());
                         // TODO: Read action results and return them
 
-                        body = "{\"status\":\"OK\"}";
+                        InvocationResults ir = new InvocationResults()
+                        { 
+                            VoidReturnType = voidReturnType
+                        };
+                        if(!voidReturnType)
+                        {
+                            ir.ReturnedObjectOrAddress = callbackRes;
+                        }
+                        
+                        body = JsonConvert.SerializeObject(ir);
                     }
                     else
                     {
