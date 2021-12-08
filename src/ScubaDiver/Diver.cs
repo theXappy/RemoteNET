@@ -127,7 +127,7 @@ namespace ScubaDiver
             // Every type is a subclass of object so I skip the first param
             ParameterInfo secondParamInfo = paramInfos[1];
             Type secondParamType = secondParamInfo.ParameterType;
-            if (!secondParamType.IsSubclassOf(typeof(EventArgs)))
+            if (!secondParamType.IsAssignableFrom(typeof(EventArgs)))
             {
                 return "{\"error\":\"Second parameter of the event's handler was not a subclass of EventArgs\"}";
             }
@@ -139,7 +139,7 @@ namespace ScubaDiver
             int token = _nextAvilableCallbackToken;
             _nextAvilableCallbackToken++;
 
-            Action<object, EventArgs> handler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
+            EventHandler handler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
 
             Logger.Debug($"[Diver] Adding event handler to event {eventName}...");
             eventObj.AddEventHandler(target, handler);
@@ -183,7 +183,7 @@ namespace ScubaDiver
                     }
                     pinnedObjectInfos[i] = poi;
 
-                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
+                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(poi.Address, poi.GetType().FullName);
                 }
             }
 
@@ -1244,6 +1244,9 @@ namespace ScubaDiver
                 RefreshRuntime();
                 foreach (ClrObject clrObj in _runtime.Heap.EnumerateObjects())
                 {
+                    if (clrObj.IsFree)
+                        continue;
+
                     string objType = clrObj.Type?.Name ?? "Unknown";
                     if (filter(objType))
                     {
