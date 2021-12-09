@@ -11,7 +11,7 @@ namespace ScubaDiver.Utils
 
     internal static class Freezer
     {
-        public static PinnedObjectInfo Freeze(object target)
+        public static FrozenObjectInfo Freeze(object target)
         {
             ulong freezeAddr = 0;
             // Allows the freeze function to indicate freezing was done
@@ -25,7 +25,7 @@ namespace ScubaDiver.Utils
             freezeFeedback.WaitOne();
             freezeFeedback.Close();
 
-            return new PinnedObjectInfo(target, freezeAddr, unfreezeRequired, freezingTask);
+            return new FrozenObjectInfo(target, freezeAddr, unfreezeRequired, freezingTask);
         }
 
         /// <summary>
