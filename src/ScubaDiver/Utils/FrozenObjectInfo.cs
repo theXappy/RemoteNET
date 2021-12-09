@@ -12,7 +12,7 @@ namespace ScubaDiver.Utils
     /// Creating this object alone isn't enough to pin an object. It is only used to keep track of
     /// pinned objects' metadata.
     /// </summary>
-    public class PinnedObjectInfo
+    public class FrozenObjectInfo
     {
         /// <summary>
         /// Reference to the actually pinned object
@@ -34,7 +34,7 @@ namespace ScubaDiver.Utils
         /// </summary>
         public Task FreezeTask { get; private set; }
 
-        public PinnedObjectInfo(object o, ulong address, ManualResetEvent unfreezeEvent, Task freezeTask)
+        public FrozenObjectInfo(object o, ulong address, ManualResetEvent unfreezeEvent, Task freezeTask)
         {
             Object = o;
             Address = address;
