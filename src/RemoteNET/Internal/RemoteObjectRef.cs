@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using ScubaDiver;
 using ScubaDiver.API;
@@ -17,6 +18,7 @@ namespace RemoteNET.Internal
         public ulong Token => _remoteObjectInfo.PinnedAddress;
         public DiverCommunicator Communicator => _creatingCommunicator;
 
+        
         public RemoteObjectRef(ObjectDump remoteObjectInfo, TypeDump typeInfo, DiverCommunicator creatingCommunicator)
         {
             if(typeInfo == null)
@@ -105,10 +107,18 @@ namespace RemoteNET.Internal
             return _creatingCommunicator.GetField(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, fieldName);
         }
 
-        public void EventSubscribe(string eventName, DiverCommunicator.LocalEventCallback callback)
+        public void EventSubscribe(string eventName, DiverCommunicator.LocalEventCallback callbackProxy)
         {
             ThrowIfReleased();
-            _creatingCommunicator.EventSubscribe(_remoteObjectInfo.PinnedAddress, eventName, callback);
+
+            _creatingCommunicator.EventSubscribe(_remoteObjectInfo.PinnedAddress, eventName, callbackProxy);
+        }
+
+        public void EventUnsubscribe(string eventName, DiverCommunicator.LocalEventCallback callbackProxy)
+        {
+            ThrowIfReleased();
+
+            _creatingCommunicator.EventUnsubscribe(callbackProxy);
         }
 
         /// <summary>

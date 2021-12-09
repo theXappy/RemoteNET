@@ -71,6 +71,7 @@ namespace ScubaDiver.API
         {
             CallbackInvocationRequest invocReq = new CallbackInvocationRequest()
             {
+                Token = token,
                 Parameters = args.ToList()
             };
             var requestJsonBody = JsonConvert.SerializeObject(invocReq);

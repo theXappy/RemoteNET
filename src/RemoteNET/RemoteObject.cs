@@ -18,12 +18,15 @@ namespace RemoteNET
         private RemoteObjectRef _ref;
         private Type _type = null;
 
+        private Dictionary<Delegate, DiverCommunicator.LocalEventCallback> _eventCallbacksAndProxies;
+
         public ulong RemoteToken => _ref.Token;
 
         internal RemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
         {
             _app = remoteApp;
             _ref = reference;
+            _eventCallbacksAndProxies = new Dictionary<Delegate, DiverCommunicator.LocalEventCallback>();
         }
 
         /// <summary>
@@ -73,6 +76,17 @@ namespace RemoteNET
                 catch (Exception e)
                 {
                     Logger.Debug($"[WARN] Field `{fieldInfo}` could not be retrieved. Error: " + e);
+                    continue;
+                }
+
+                // Edge case: Events show up as fields
+                if (fieldInfo.TypeFullName == typeof(System.EventHandler).FullName)
+                {
+                    Type delegateType = _app.GetRemoteType(fieldInfo.TypeFullName);
+                    System.Reflection.ParameterInfo[] delegateParams = delegateType.GetMethod("Invoke").GetParameters();
+                    List<Type> paramTypes = delegateParams.Select(t=>t.ParameterType).ToList();
+
+                    dro.AddEvent(fieldInfo.Name, paramTypes);
                     continue;
                 }
                 if (fieldDump.HasEncodedValue)
@@ -272,6 +286,7 @@ namespace RemoteNET
                          }
                      }
                  };
+                // TODO: Does this even work if any of the arguments is a remote one
                 List<Type> argTypes = (from prmtr in methodInfo.Parameters
                                        let typeFullName = prmtr.Type
                                        let resolvedType = AppDomain.CurrentDomain.GetType(typeFullName)
@@ -289,12 +304,6 @@ namespace RemoteNET
             _ref = null;
         }
 
-        ~RemoteObject()
-        {
-            Dispose();
-
-        }
-
         public override string ToString()
         {
             return $"RemoteObject. Type: {_type?.FullName ?? "UNK"} Reference: [{_ref}]";
@@ -305,9 +314,50 @@ namespace RemoteNET
             var res = _ref.GetField(name);
             return res.ReturnedObjectOrAddress;
         }
-        public void EventSubscribe(string eventName, DiverCommunicator.LocalEventCallback callback)
+        public void EventSubscribe(string eventName, Delegate callback)
         {
-            _ref.EventSubscribe(eventName, callback);
+            // TODO: Add a check for amount of parameters and types (need to be dynamics)
+            // See implementation inside DynamicEventProxy
+
+
+            DiverCommunicator.LocalEventCallback callbackProxy = (ObjectOrRemoteAddress[] args) =>
+            {
+                DynamicRemoteObject[] droParameters = new DynamicRemoteObject[args.Length];
+                for (int i = 0; i < args.Length; i++)
+                {
+                    RemoteObject ro = _app.GetRemoteObject(args[i].RemoteAddress);
+                    DynamicRemoteObject dro = ro.Dynamify() as DynamicRemoteObject;
+
+                    // This is a crucial part: set the DynamicRemoteObject (and it's parent RemoteObject)
+                    // to now automaticlly dispose (which causes the remote parameters to be unpinned.)
+                    // We must do this in case on the parameters was already an object we hold as a RemoteObject
+                    // somewhere else in the program.
+                    // Note how we exit this function WITHOUT calling "Dispose" on the RemoteObject
+                    dro.DisableAutoDisposable();
+
+                    droParameters[i] = dro;
+                }
+
+                // Call the callback wutg tge proxied parameters (using DynamicRemoteObjects)
+                callback.DynamicInvoke(droParameters);
+
+                // TODO: Change this so the callback can actually return stuff?
+                return (true, null);
+            };
+
+            _eventCallbacksAndProxies[callback] = callbackProxy;
+
+            _ref.EventSubscribe(eventName, callbackProxy);
+        }
+        public void EventUnsubscribe(string eventName, Delegate callback)
+        {
+            DiverCommunicator.LocalEventCallback callbackProxy;
+            if (_eventCallbacksAndProxies.TryGetValue(callback, out callbackProxy))
+            {
+                _ref.EventUnsubscribe(eventName, callbackProxy);
+
+                _eventCallbacksAndProxies.Remove(callback);
+            }
         }
     }
 }
