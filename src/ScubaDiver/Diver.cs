@@ -73,11 +73,30 @@ namespace ScubaDiver
                 {"/type", MakeTypeResponse},
                 {"/register_callbacks_ep", MakeRegisterCallbacksEndpointResponse},
                 {"/event_subscribe", MakeEventSubscribeResponse},
+                {"/event_unsubscribe", MakeEventUnsubscribeResponse},
             };
             _pinnedObjects = new Dictionary<ulong, PinnedObjectInfo>();
             _tokensToRegisteredEventHandlers = new Dictionary<int, RegisteredEventHandlerInfo>();
         }
 
+        private string MakeEventUnsubscribeResponse(HttpListenerRequest arg)
+        {
+            string tokenStr = arg.QueryString.Get("token");
+            if (tokenStr == null || !int.TryParse(tokenStr, out int token))
+            {
+                return "{\"error\":\"Missing parameter 'address'\"}";
+            }
+            Logger.Debug($"[Diver][MakeEventUnsubscribeResponse] Called! Token: {token}");
+
+            if (_tokensToRegisteredEventHandlers.TryGetValue(token, out RegisteredEventHandlerInfo eventInfo))
+            {
+                eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
+                _tokensToRegisteredEventHandlers.Remove(token);
+                return "{\"status\":\"OK\"}";
+            }
+            return "{\"error\":\"Unknown token for event callback subscription\"}";
+
+        }
         private string MakeEventSubscribeResponse(HttpListenerRequest arg)
         {
             if (_callbacksEndpoint == null)
@@ -160,10 +179,11 @@ namespace ScubaDiver
 
         private void InvokeControllerCallback(int token, params object[] parameters)
         {
+            Logger.Debug($"[Diver][InvokeControllerCallback] Called~");
             ReverseCommunicator reverseCommunicator = new ReverseCommunicator(_callbacksEndpoint);
 
             bool[] pinnedJustForCallback = new bool[parameters.Length];
-            PinnedObjectInfo[] pinnedObjectInfos = new PinnedObjectInfo[parameters.Length]; 
+            PinnedObjectInfo[] pinnedObjectInfos = new PinnedObjectInfo[parameters.Length];
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
             {
@@ -175,7 +195,7 @@ namespace ScubaDiver
                 else // Not primitive
                 {
                     PinnedObjectInfo poi;
-                    if(!IsPinned(parameter, out poi))
+                    if (!IsPinned(parameter, out poi))
                     {
                         // Pin and mark for unpinning later
                         poi = PinObject(parameter);
@@ -193,7 +213,7 @@ namespace ScubaDiver
             // Callback is over. Time to unpin parameters that were pinned just for this callback
             for (int i = 0; i < parameters.Length; i++)
             {
-                if(pinnedJustForCallback[i])
+                if (pinnedJustForCallback[i])
                 {
                     UnpinObject(pinnedObjectInfos[i].Address);
                 }
@@ -965,9 +985,9 @@ namespace ScubaDiver
         private bool IsPinned(object instance, out PinnedObjectInfo poi)
         {
             // TODO: There are more efficient ways to do this
-            foreach(PinnedObjectInfo currPoi in _pinnedObjects.Values)
+            foreach (PinnedObjectInfo currPoi in _pinnedObjects.Values)
             {
-                if(currPoi.Object == instance)
+                if (currPoi.Object == instance)
                 {
                     poi = currPoi;
                     return true;
@@ -1075,7 +1095,16 @@ namespace ScubaDiver
                     break;
             }
 
-            Logger.Debug("[Diver] HTTP Loop ended. Closing HTTP listener");
+            Logger.Debug("[Diver] HTTP Loop ended. Cleaning up");
+
+            Logger.Debug("[Diver] Removing all event subscriptions");
+            foreach (int token in _tokensToRegisteredEventHandlers.Keys.ToList())
+            {
+                RegisteredEventHandlerInfo eventInfo = _tokensToRegisteredEventHandlers[token];
+                eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
+                _tokensToRegisteredEventHandlers.Remove(token);
+            }
+            Logger.Debug("[Diver] Removed all event subscriptions");
         }
 
         private string MakeDieResponse(HttpListenerRequest req)

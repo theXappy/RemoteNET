@@ -16,20 +16,61 @@ namespace RemoteNET.Internal
     /// 
     /// </summary>
     [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "}")]
-    class DynamicRemoteObject : DynamicObject
+    public class DynamicRemoteObject : DynamicObject
     {
         enum MemberType
         {
             Unknown,
             Field,
             Property,
-            Method
+            Method,
+            Event
         }
 
         private class MethodOverload
         {
             public List<Type> ArgumentsTypes { get; set; }
-            public Func<object[],object> Proxy { get; set; }
+            public Func<object[], object> Proxy { get; set; }
+        }
+
+        public class DynamicEventProxy
+        {
+            private RemoteObject _ro;
+            private string Name { get; set; }
+            private List<Type> ArgumentsTypes { get; set; }
+            
+            public DynamicEventProxy(RemoteObject ro, string name, List<Type> args)
+            {
+                this._ro = ro;
+                this.Name = name;
+                this.ArgumentsTypes = args;
+            }
+
+            public static DynamicEventProxy operator +(DynamicEventProxy c1, Delegate x)
+            {
+                System.Reflection.ParameterInfo[] parameters = x.Method.GetParameters();
+
+                if(parameters.Length != c1.ArgumentsTypes.Count)
+                {
+                    throw new Exception($"The '{c1.Name}' event expects {c1.ArgumentsTypes.Count} parameters, " +
+                        $"the callback that was being registered have {parameters.Length}");
+                }
+
+                if (parameters.Any(p => p.GetType().IsAssignableFrom(typeof(DynamicRemoteObject))))
+                {
+                    throw new Exception("A Remote event's local callback must have only 'dynamic' parameters");
+                }
+
+                c1._ro.EventSubscribe(c1.Name, x);
+
+                return c1;
+            }
+
+            public static DynamicEventProxy operator -(DynamicEventProxy c1, Delegate x)
+            {
+                c1._ro.EventUnsubscribe(c1.Name, x);
+                return c1;
+            }
         }
 
         private Dictionary<string, MemberType> _members = new Dictionary<string, MemberType>();
@@ -39,9 +80,17 @@ namespace RemoteNET.Internal
         private Dictionary<string, Action<object>> _propertiesSetters = new Dictionary<string, Action<object>>();
         private Dictionary<string, Func<object>> _propertiesGetters = new Dictionary<string, Func<object>>();
         private Dictionary<string, List<MethodOverload>> _methods = new Dictionary<string, List<MethodOverload>>();
+        private Dictionary<string, DynamicEventProxy> _events = new Dictionary<string, DynamicEventProxy>();
 
         public RemoteObject __ro;
         private string __typeFullName;
+
+        /// <summary>
+        /// By default, this class is going to dispose of it's creating RemoteObject.
+        /// If this field is set to true that disposal is disabled.
+        /// </summary>
+        bool _disableDisposal = false;
+
         public DynamicRemoteObject(RemoteObject ro)
         {
             __ro = ro;
@@ -93,7 +142,7 @@ namespace RemoteNET.Internal
         /// </summary>
         /// <param name="methodName">Method name</param>
         /// <param name="proxy">Function to invoke when the method is called by the <see cref="DynamicRemoteObject"/></param>
-        public void AddMethod(string methodName, List<Type> argTypes, Func<object[],object> proxy)
+        public void AddMethod(string methodName, List<Type> argTypes, Func<object[], object> proxy)
         {
             // Disallowing other members of this name except other methods
             // overloading is allowed.
@@ -105,8 +154,16 @@ namespace RemoteNET.Internal
             {
                 _methods[methodName] = new List<MethodOverload>();
             }
-            _methods[methodName].Add(new MethodOverload{ArgumentsTypes = argTypes, Proxy = proxy});
+            _methods[methodName].Add(new MethodOverload { ArgumentsTypes = argTypes, Proxy = proxy });
         }
+
+        public void AddEvent(string eventName, List<Type> argTypes)
+        {
+            // TODO: Make sure it's not defined twice
+            _members[eventName] = MemberType.Event;
+            _events[eventName] = new DynamicEventProxy(__ro, eventName ,argTypes);
+        }
+
 
         //
         // Dynamic Object API 
@@ -139,6 +196,9 @@ namespace RemoteNET.Internal
                     // Methods should go to "TryInvokeMember"
                     result = null;
                     return false;
+                case MemberType.Event:
+                    result = _events[binder.Name];
+                    break;
                 default:
                     throw new Exception($"No such member \"{binder.Name}\"");
             }
@@ -208,6 +268,25 @@ namespace RemoteNET.Internal
                     break;
                 case MemberType.Method:
                     throw new Exception("Can't modifying method members.");
+                case MemberType.Event:
+                    DynamicEventProxy eventProxy = _events[binder.Name];
+                    if(eventProxy == value)
+                    {
+                        // This "setting" of the event happens after regsistering an event handler because of how the "+=" operator works.
+                        // Since the "+" operator of DynamicEventProxy returns the same instance we can spot THIS EXACT scenario and allow it without raising errors.
+                        return true;
+                    }
+                    else
+                    {
+                        // This is an INVALID setting of the event "field". For example:
+                        // dynObject.SomeEvent = "123";
+                        //  - or even -
+                        // dynObject.SomeEvent = new EventHandler(new Action<object,EventArgs>((a,b)=>{}));
+
+                        // We are telling the user it's not not allowed just like normal .NET does not allow setting values to events.
+                        throw new Exception($"The event {binder.Name} can only appear on the left hand side of += or -=.");
+                    }
+                    break;
                 default:
                     throw new Exception($"No such member \"{binder.Name}\".");
             }
@@ -236,6 +315,19 @@ namespace RemoteNET.Internal
         public override bool Equals(object obj)
         {
             throw new NotImplementedException($"Can not call `Equals` on {nameof(DynamicRemoteObject)} instances");
+        }
+
+
+        public void DisableAutoDisposable()
+        {
+            _disableDisposal = true;
+        }
+
+        ~DynamicRemoteObject()
+        {
+            if (_disableDisposal) 
+                return;
+            __ro.Dispose();
         }
     }
 }

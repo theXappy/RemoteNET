@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using RemoteNET;
+using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using ScubaDiver.API;
 
@@ -25,7 +26,7 @@ namespace ScubaDiver.Tester
             {
                 Console.WriteLine("Enter process name (or substring)");
                 string procName = Console.ReadLine();
-                var candidateProcs = Process.GetProcesses().Where(proc => (proc.ProcessName+".exe").Contains(procName)).ToArray();
+                var candidateProcs = Process.GetProcesses().Where(proc => (proc.ProcessName + ".exe").Contains(procName)).ToArray();
                 if (candidateProcs.Length == 0)
                 {
                     Console.WriteLine("No processes found.");
@@ -70,10 +71,10 @@ namespace ScubaDiver.Tester
             List<RemoteObject> remoteObjects = new List<RemoteObject>();
             while (true)
             {
-                if (DoSingleMenu(remoteApp, remoteObjects)) 
+                if (DoSingleMenu(remoteApp, remoteObjects))
                     break;
             }
-            
+
             remoteApp.Dispose();
         }
 
@@ -218,23 +219,15 @@ namespace ScubaDiver.Tester
                             else
                             {
                                 RemoteObject remoteObj = remoteObjects[(int)index];
+                                dynamic dro = remoteObj.Dynamify();
+                                Action<dynamic,dynamic> callback = new Action<dynamic,dynamic>((dynamic arg1, dynamic arg2) => Console.WriteLine("INVOKED!!"));
+                                dro.SomeEvent += callback;
                                 Console.WriteLine("Enter event name:");
                                 string eventName = Console.ReadLine().Trim();
-                                DiverCommunicator.LocalEventCallback func = (args) =>
-                                {
-                                    Console.WriteLine($"[!] Caught event {eventName} firing! Recieved {args.Length} args.");
-                                    foreach (ObjectOrRemoteAddress item in args)
-                                    {
-                                        RemoteObject ro = remoteApp.GetRemoteObject(item.RemoteAddress);
-                                        dynamic dro = ro.Dynamify();
-                                        Console.WriteLine($"  ARG: {dro.ToString()} ({dro.GetType().FullName})");
-                                        ro.Dispose();
-
-                                    }
-                                    return (false, null);
-                                };
-                                remoteObj.EventSubscribe(eventName, func);
                                 Console.WriteLine("Done registring. wait for invocations.");
+                                Console.WriteLine("Press ENTER to unsubscribe.");
+                                Console.ReadLine();
+                                dro.SomeEvent -= callback;
                             }
                         }
                         break;

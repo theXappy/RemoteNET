@@ -218,6 +218,7 @@ namespace ScubaDiver.API
 
         public void EventSubscribe(ulong targetAddr, string eventName, LocalEventCallback callback)
         {
+            Console.WriteLine($"[Communicator]EventSubscribe target: {targetAddr}, event: {eventName}, callback: {callback}");
             Dictionary<string, string> queryParams;
             string body;
             if (this._listener == null)
@@ -249,12 +250,41 @@ namespace ScubaDiver.API
             body = SendRequest("event_subscribe", queryParams);
             EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(body);
 
-            _eventHandlers[regRes.Token] = callback;
+            _tokensToEventHandlers[regRes.Token] = callback;
+            _eventHandlersToToken[callback] = regRes.Token;
+        }
+        public void EventUnsubscribe(LocalEventCallback callback)
+        {
+            Console.WriteLine($"[Communicator]EventUnsubscribe callback: {callback}");
+            Dictionary<string, string> queryParams;
+            string body;
+
+            if (_eventHandlersToToken.TryGetValue(callback, out int token))
+            {
+
+                queryParams = new() { };
+                queryParams["token"] = token.ToString();
+                Console.WriteLine($"[Communicator]EventUnsubscribe Sending HTTP request to event_unsubscribe");
+                body = SendRequest("event_unsubscribe", queryParams);
+                Console.WriteLine($"[Communicator]EventUnsubscribe Got resp from event_unsubscribe. Response: {body}");
+                if(!body.Contains("{\"status\":\"OK\"}"))
+                {
+                    throw new Exception("Tried to unsubscribe from an event but the Diver's response was not 'OK'");
+                }
+
+                _tokensToEventHandlers.Remove(token);
+                _eventHandlersToToken.Remove(callback);
+            }
+            else
+            {
+                Console.WriteLine($"[Communicator]EventUnsubscribe TryGetValue failed :(((((((((((((((");
+            }
         }
 
         public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args);
 
-        private Dictionary<int, LocalEventCallback> _eventHandlers = new();
+        private Dictionary<int, LocalEventCallback> _tokensToEventHandlers = new();
+        private Dictionary<LocalEventCallback, int> _eventHandlersToToken = new();
 
         private void Dispatcher(HttpListener listener)
         {
@@ -272,7 +302,7 @@ namespace ScubaDiver.API
                         body = sr.ReadToEnd();
                     }
                     CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
-                    if(_eventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
+                    if(_tokensToEventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
                     {
                         (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray());
                         // TODO: Read action results and return them
