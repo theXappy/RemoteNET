@@ -995,62 +995,9 @@ namespace ScubaDiver
         /// <returns></returns>
         private PinnedObjectInfo PinObject(object instance)
         {
-            // Allows the freeze function to indicate freezing was done
-            ManualResetEvent freezeFeedback = new ManualResetEvent(false);
-            // Allows us to unfreeze later
-            ManualResetEvent unfreezeRequired = new ManualResetEvent(false);
-
-            ulong pinningAddress = 0;
-            var freezeTask = Task.Run(() => Freeze(instance, ref pinningAddress, freezeFeedback, unfreezeRequired));
-            // Waiting for freezing task to run
-            freezeFeedback.WaitOne();
-
-            // Object is pinned and it a good address
-            PinnedObjectInfo poi = new PinnedObjectInfo(instance, pinningAddress, unfreezeRequired, freezeTask);
-            _pinnedObjects[pinningAddress] = poi;
-            return poi;
-        }
-
-        /// <summary>
-        /// Freezes an object at it's current address
-        /// </summary>
-        /// <param name="o">Object to freeze</param>
-        /// <param name="freezeAddr">
-        /// Used to report back the freezed object's address. Only valid after <see cref="freezeFeedback"/> was set!
-        /// </param>
-        /// <param name="freezeFeedback">Event which the freezer will call once the object is frozen</param>
-        /// <param name="unfreezeRequested">Event the freezer waits on until unfreezing is requested by the caller</param>
-        public static unsafe void Freeze(object o, ref ulong freezeAddr, ManualResetEvent freezeFeedback, ManualResetEvent unfreezeRequested)
-        {
-            // TODO: This "costs" us a thread (probably from the thread pool) for every pinned object.
-            // Maybe this should be done in another class and support multiple objects per thread
-            // something like:
-            // fixed(byte* first ...)
-            // fixed(byte* second...)
-            // fixed(byte* third ...)
-            // {
-            // ...
-            // }
-            fixed (byte* ptr = &Unsafe.As<Pinnable>(o).Data)
-            {
-                // Our fixed pointer to the first field of the class lets
-                // us calculate the address to the object.
-                // We have:
-                //                 🠗
-                // [ Method Table ][ Field 1 ][ Field 2 ]...
-                //
-                // And we want: 
-                // 🠗
-                // [ Method Table ][ Field 1 ][ Field 2 ]...
-                //
-                // As far as I understand the Method Table is a pointer which means
-                // it's 4 bytes in x32 and 8 bytes in x64 (Hence using `IntPtr.Size`)
-                IntPtr iPtr = new IntPtr(ptr);
-                freezeAddr = ((ulong)iPtr.ToInt64()) - (ulong)IntPtr.Size;
-                freezeFeedback.Set();
-                unfreezeRequested.WaitOne();
-                GC.KeepAlive(iPtr);
-            }
+            PinnedObjectInfo fObj = Freezer.Freeze(instance);
+            _pinnedObjects[fObj.Address] = fObj;
+            return fObj;
         }
 
         void RefreshRuntime()
