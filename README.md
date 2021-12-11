@@ -134,6 +134,21 @@ foreach (CandidateObject candidateRsa in rsaProviderCandidates)
     Console.WriteLine("InverseQ: " + ToHex(parameters.InverseQ));
 }
 ```
+### ✳️ Remote Events
+You can also subscribe to/unsubscribe from remote events. The syntax is similar altough not exact:
+```C#
+CandidateObject cand = remoteApp.QueryInstances("System.IO.FileSystemWatcher").Single();
+RemoteObject remoteFileSysWatcher = remoteApp.GetRemoteObject(cand);
+dynamic dynFileSysWatcher = remoteFileSysWatcher.Dynamify();
+Action<dynamic, dynamic> callback = (dynamic o, dynamic e) => Console.WriteLine("Event Invoked!");
+dynFileSysWatcher.Changed += callback;
+/* ... Somewhere further ... */
+dynFileSysWatcher.Changed -= callback;
+```
+The limitations:  
+1. The parameters for the callback must be `dynamic`s
+2. The callback must define the exact number of parameters for that event
+3. Lambda expression are not allowed. The callback must be cast to an `Action<...>`.
 
 ## TODOs
 1. Generics/Arrays aren't completely supported
