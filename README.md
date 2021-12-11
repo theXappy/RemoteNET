@@ -66,26 +66,31 @@ Process target =  Process.GetProcessesByName("OtherDotNetAppName").Single();
 RemoteApp remoteApp = RemoteApp.Connect(target);
 ```
 
-### ✳️ Getting Remote Objects
-RemoteNET allows you to interact with existing objects and create new ones.  
-**To find existing objects** you'll need to search the remote heap.  
-Use `RemoteApp.QueryInstances` to find possible candidate for the desired object and `RemoteApp.GetRemoteObject` to get a handle of a candidate.  
+### ✳️ Getting Existing Remote Objects
+First and foremost RemoteNET allows you to find existing objects in the remote app.  
+To do so you'll need to search the remote heap.  
+Use `RemoteApp.QueryInstances()` to find possible candidate for the desired object and `RemoteApp.GetRemoteObject()` to get a handle of a candidate.  
 ```C#
 IEnumerable<CandidateObject> candidates = remoteApp.QueryInstances("MyApp.PasswordContainer");
 RemoteObject passwordContainer = remoteApp.GetRemoteObject(candidates.Single());
 ```
-**To create new objects** the `Activator`-lookalike can be used:
+
+### ✳️ Creating New Remote Objects
+Sometimes the existing objects in the remote app are not enough to do what you want.  
+For this reason you can also create new objects remotely.  
+Use the `Activator`-lookalike for that cause:
 ```C#
 // Creating a remote StringBuilder with default constructor
 RemoteObject remoteSb1 = remoteApp.Activator.CreateInstance(typeof(StringBuilder));
 
-// Creating a remote StringBuilder with the (string,int) constructor
+// Creating a remote StringBuilder with the "StringBuilder(string, int)" ctor
 RemoteObject remoteSb2 = remoteApp.Activator.CreateInstance(typeof(StringBuilder), "Hello", 100);
 ```
 Note how we used constructor arguments in the second `CreateInstance` call. Those could also be other `RemoteObject`s:
 ```C#
+// Constructing a bew StringBuilder
 RemoteObject remoteStringBuilder = remoteApp.Activator.CreateInstance(typeof(StringBuilder));
-// Constructing using the "StringWriter(StringBuilder sb)" ctor
+// Constructing a new StringWriter using the "StringWriter(StringBuilder sb)" ctor
 RemoteObject remoteStringWriter = remoteApp.Activator.CreateInstance(typeof(StringWriter), remoteStringBuilder);
 ```
 
@@ -93,6 +98,7 @@ RemoteObject remoteStringWriter = remoteApp.Activator.CreateInstance(typeof(Stri
 To allow a smooth coding expereince RemoteNET is utilizing a special dynamic object which any `RemoteObject` can turn into.  
 This object can be used to access field/properties just if they were field/properties of a local object:
 ```C#
+// Reading the 'Capacity' field of a newly created StringBuilder
 RemoteObject remoteStringBuilder = remoteApp.Activator.CreateInstance(typeof(StringBuilder));
 dynamic dynamicStringBuilder = remoteStringBuilder.Dynamify();
 Console.WriteLine("Remote StringBuilder's Capacity: " + dynamicStringBuilder.Capacity)
