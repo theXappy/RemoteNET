@@ -98,7 +98,7 @@ RemoteObject remoteStringWriter = remoteApp.Activator.CreateInstance(typeof(Stri
 To allow a smooth coding expereince RemoteNET is utilizing a special dynamic object which any `RemoteObject` can turn into.  
 This object can be used to access field/properties just if they were field/properties of a local object:
 ```C#
-// Reading the 'Capacity' field of a newly created StringBuilder
+// Reading the 'Capacity' property of a newly created StringBuilder
 RemoteObject remoteStringBuilder = remoteApp.Activator.CreateInstance(typeof(StringBuilder));
 dynamic dynamicStringBuilder = remoteStringBuilder.Dynamify();
 Console.WriteLine("Remote StringBuilder's Capacity: " + dynamicStringBuilder.Capacity)
