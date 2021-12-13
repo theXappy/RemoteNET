@@ -95,8 +95,21 @@ namespace ScubaDiver.API.Dumps
                 TypeFullName = fi.FieldType.FullName;
                 Assembly = fi.FieldType.Assembly.GetName().Name;
             }
-
         }
+        public class TypeEvent
+        {
+            public string Name { get; set; }
+            public string TypeFullName { get; set; }
+            public TypeEvent()
+            {
+            }
+            public TypeEvent(EventInfo ei)
+            {
+                this.Name = ei.Name;
+                this.TypeFullName = ei.EventHandlerType.FullName;
+            }
+        }
+
         public class TypeProperty
         {
             public string GetVisibility { get; set; }
@@ -131,6 +144,7 @@ namespace ScubaDiver.API.Dumps
 
         public List<TypeMethod> Methods { get; set; }
         public List<TypeField> Fields { get; set; }
+        public List<TypeEvent> Events { get; set; }
         public List<TypeProperty> Properties { get; set; }
     }
 }
