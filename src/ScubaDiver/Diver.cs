@@ -101,12 +101,10 @@ namespace ScubaDiver
         }
         private string MakeEventSubscribeResponse(HttpListenerRequest arg)
         {
-            Logger.Debug($"[Diver][Debug](RegisterEventHandler) Entered!");
             if (!HasCallbackEndpoint)
             {
                 return "{\"error\":\"Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!\"}";
             }
-            Logger.Debug($"[Diver][Debug](RegisterEventHandler) HasCallbackEndpoint == True");
 
             string objAddrStr = arg.QueryString.Get("address");
             if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
