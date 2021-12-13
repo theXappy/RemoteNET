@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
 namespace RemoteNET.Internal
@@ -38,7 +39,7 @@ namespace RemoteNET.Internal
             private RemoteObject _ro;
             private string Name { get; set; }
             private List<Type> ArgumentsTypes { get; set; }
-            
+
             public DynamicEventProxy(RemoteObject ro, string name, List<Type> args)
             {
                 this._ro = ro;
@@ -50,7 +51,7 @@ namespace RemoteNET.Internal
             {
                 System.Reflection.ParameterInfo[] parameters = x.Method.GetParameters();
 
-                if(parameters.Length != c1.ArgumentsTypes.Count)
+                if (parameters.Length != c1.ArgumentsTypes.Count)
                 {
                     throw new Exception($"The '{c1.Name}' event expects {c1.ArgumentsTypes.Count} parameters, " +
                         $"the callback that was being registered have {parameters.Length}");
@@ -161,13 +162,14 @@ namespace RemoteNET.Internal
         {
             // TODO: Make sure it's not defined twice
             _members[eventName] = MemberType.Event;
-            _events[eventName] = new DynamicEventProxy(__ro, eventName ,argTypes);
+            _events[eventName] = new DynamicEventProxy(__ro, eventName, argTypes);
         }
 
 
         //
         // Dynamic Object API 
         //
+
 
         public override bool TryGetMember(GetMemberBinder binder, out object result)
         {
@@ -270,7 +272,7 @@ namespace RemoteNET.Internal
                     throw new Exception("Can't modifying method members.");
                 case MemberType.Event:
                     DynamicEventProxy eventProxy = _events[binder.Name];
-                    if(eventProxy == value)
+                    if (eventProxy == value)
                     {
                         // This "setting" of the event happens after regsistering an event handler because of how the "+=" operator works.
                         // Since the "+" operator of DynamicEventProxy returns the same instance we can spot THIS EXACT scenario and allow it without raising errors.
@@ -293,7 +295,11 @@ namespace RemoteNET.Internal
             return true;
         }
 
-        static object GetDynamicMember(object obj, string memberName)
+        /// <summary>
+        /// Helper function to access the member 'memberName' of the object 'obj.
+        /// This is equivilent to explicitly compiling the expression 'obj.memberName'.
+        /// </summary>
+        public static object GetDynamicMember(object obj, string memberName)
         {
             var binder = Binder.GetMember(CSharpBinderFlags.None, memberName, obj.GetType(),
                 new[] { CSharpArgumentInfo.Create(CSharpArgumentInfoFlags.None, null) });
@@ -325,7 +331,7 @@ namespace RemoteNET.Internal
 
         ~DynamicRemoteObject()
         {
-            if (_disableDisposal) 
+            if (_disableDisposal)
                 return;
             __ro.Dispose();
         }
