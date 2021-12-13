@@ -53,8 +53,10 @@ namespace ScubaDiver
         int _nextAvilableCallbackToken = 0;
         private Dictionary<int, RegisteredEventHandlerInfo> _tokensToRegisteredEventHandlers;
 
-        // Singleton
-        private static Diver _instance;
+
+        HashSet<string> _typesWeAlreadyFailedToDump = new HashSet<string>();
+
+        public bool HasCallbackEndpoint => _callbacksEndpoint != null;
 
         public Diver()
         {
@@ -99,7 +101,7 @@ namespace ScubaDiver
         }
         private string MakeEventSubscribeResponse(HttpListenerRequest arg)
         {
-            if (_callbacksEndpoint == null)
+            if (HasCallbackEndpoint)
             {
                 return "{\"error\":\"Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!\"}";
             }
@@ -155,8 +157,7 @@ namespace ScubaDiver
 
             // We're all good regarding the signature!
             // assign subscriber unique id
-            int token = _nextAvilableCallbackToken;
-            _nextAvilableCallbackToken++;
+            int token = AssignCallbackToken();
 
             EventHandler handler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
 
@@ -177,7 +178,8 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(erResults);
         }
 
-        private void InvokeControllerCallback(int token, params object[] parameters)
+        public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvilableCallbackToken);
+        public void InvokeControllerCallback(int token, params object[] parameters)
         {
             Logger.Debug($"[Diver][InvokeControllerCallback] Called~");
             ReverseCommunicator reverseCommunicator = new ReverseCommunicator(_callbacksEndpoint);
@@ -982,7 +984,12 @@ namespace ScubaDiver
             return od;
         }
 
-        private bool IsPinned(object instance, out FrozenObjectInfo foi)
+        public bool TryGetPinnedObject(ulong objAddress, out FrozenObjectInfo foi)
+        {
+            return _pinnedObjects.TryGetValue(objAddress, out foi);
+        }
+
+        public bool IsPinned(object instance, out FrozenObjectInfo foi)
         {
             // TODO: There are more efficient ways to do this
             foreach (FrozenObjectInfo currFoi in _pinnedObjects.Values)
@@ -996,12 +1003,15 @@ namespace ScubaDiver
             foi = null;
             return false;
         }
-        private bool UnpinObject(ulong objAddress)
+        public bool UnpinObject(ulong objAddress)
         {
             if (_pinnedObjects.TryGetValue(objAddress, out FrozenObjectInfo poi))
             {
-                poi.UnfreezeEvent.Set();
-                poi.FreezeTask.Wait();
+                if (poi is FrozenObjectInfo foi)
+                {
+                    foi.UnfreezeEvent.Set();
+                    foi.FreezeTask.Wait();
+                }
             }
             bool removed = _pinnedObjects.Remove(objAddress);
             return removed;
@@ -1013,7 +1023,7 @@ namespace ScubaDiver
         /// <param name="instance">The object to pin</param>
         /// <param name="requiredPinningAddress">Current objects address if keeping it is crucial or null if it doesn't matter</param>
         /// <returns></returns>
-        private FrozenObjectInfo PinObject(object instance)
+        public FrozenObjectInfo PinObject(object instance)
         {
             FrozenObjectInfo fObj = Freezer.Freeze(instance);
             _pinnedObjects[fObj.Address] = fObj;
@@ -1427,60 +1437,14 @@ namespace ScubaDiver
             }
             return "{\"error\":\"Failed to find type in searched assemblies\"}";
         }
-        HashSet<string> _typesWeAlreadyFailedToDump = new HashSet<string>();
 
-        public static Assembly AssembliesResolverFunc(object sender, ResolveEventArgs args)
-        {
-            Logger.Debug("[Diver][AssemblyResolver] In!");
-            Logger.Debug($"[Diver][AssemblyResolver] Looking for: {args.Name}");
-            string folderPath = Path.GetDirectoryName(typeof(Diver).Assembly.Location);
-            string assemblyPath = Path.Combine(folderPath, new AssemblyName(args.Name).Name + ".dll");
-            Logger.Debug($"[Diver][AssemblyResolver] Looking at: {assemblyPath}");
 
-            if (!File.Exists(assemblyPath)) return null;
-            Assembly assembly = Assembly.LoadFrom(assemblyPath);
-            return assembly;
-        }
-
-        public static int EntryPoint(string pwzArgument)
-        {
-            // UnmanagedAdapterDLL needs to call a C# function with exactly this signature.
-            // So we use it to just create a diver, and run the Dive func (blocking)
-
-            // Diver needs some assemblies which might not be loaded in the target process
-            // so starting off with registering an assembly resolver to the Diver's dll's directory
-            AppDomain.CurrentDomain.AssemblyResolve += AssembliesResolverFunc;
-            Logger.Debug("[Diver] Loaded + hooked assemblies resolver.");
-
-            try
-            {
-                _instance = new Diver();
-                ushort port = ushort.Parse(pwzArgument);
-                _instance.Dive(port);
-
-                // Diver killed (politely)
-                Logger.Debug("[Diver] Diver finished gracefully, Entry point returning");
-                return 0;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("[Diver] ScubaDiver crashed.");
-                Console.WriteLine(e);
-                Console.WriteLine("[Diver] Exiting entry point in 60 secs...");
-                Thread.Sleep(TimeSpan.FromSeconds(60));
-                return 1;
-            }
-            finally
-            {
-                AppDomain.CurrentDomain.AssemblyResolve -= AssembliesResolverFunc;
-                Logger.Debug("[Diver] unhooked assemblies resolver.");
-            }
-        }
-
+        // IDisposable
         public void Dispose()
         {
             _runtime?.Dispose();
             _dt?.Dispose();
         }
+
     }
 }

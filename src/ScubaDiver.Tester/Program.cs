@@ -221,9 +221,13 @@ namespace ScubaDiver.Tester
                                 RemoteObject remoteObj = remoteObjects[(int)index];
                                 dynamic dro = remoteObj.Dynamify();
                                 Action<dynamic,dynamic> callback = new Action<dynamic,dynamic>((dynamic arg1, dynamic arg2) => Console.WriteLine("INVOKED!!"));
-                                dro.SomeEvent += callback;
+
                                 Console.WriteLine("Enter event name:");
                                 string eventName = Console.ReadLine().Trim();
+                                //dynamic eventObj = DynamicRemoteObject.GetDynamicMember(dro, eventName);
+                                //eventObj += callback;
+                                dro.SomeEvent += callback;
+
                                 Console.WriteLine("Done registring. wait for invocations.");
                                 Console.WriteLine("Press ENTER to unsubscribe.");
                                 Console.ReadLine();

@@ -19,7 +19,7 @@ namespace ScubaDiver.Utils
             // Allows us to unfreeze later
             ManualResetEvent unfreezeRequired = new ManualResetEvent(false);
 
-            Task freezingTask = Task.Run(() => FreezeInternal(target, ref freezeAddr, freezeFeedback, unfreezeRequired);
+            Task freezingTask = Task.Run(() => FreezeInternal(target, ref freezeAddr, freezeFeedback, unfreezeRequired));
 
             // Wait for freezing task to report back address
             freezeFeedback.WaitOne();

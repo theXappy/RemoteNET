@@ -13,16 +13,11 @@
     <Compile Include="..\ScubaDiver\Utils\Converter.cs" Link="Utils\Converter.cs" />
     <Compile Include="..\ScubaDiver\Utils\Freezer.cs" Link="Utils\Freezer.cs" />
     <Compile Include="..\ScubaDiver\Utils\Pinnable.cs" Link="Utils\Pinnable.cs" />
-    <Compile Include="..\ScubaDiver\Utils\PinnedObjectInfo.cs" Link="Utils\PinnedObjectInfo.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Diagnostics.Runtime" Version="2.0.222201" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Utils\" />
   </ItemGroup>
 
   <ItemGroup>
