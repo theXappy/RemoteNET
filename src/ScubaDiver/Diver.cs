@@ -982,84 +982,82 @@ namespace ScubaDiver
             Logger.Debug($"[Diver][Debug](MakeObjectResponse) objAddrStr={objAddr:X16}, pinningRequested={pinningRequested}");
 
             // Check if we have this objects in our pinned pool
-            object instance = null;
-            bool alreadyPinned = false;
-            Type dumpedObjType;
             if (_pinnedObjects.TryGetValue(objAddr, out FrozenObjectInfo foi))
             {
                 // Found pinned object!
-                instance = foi.Object;
-                dumpedObjType = instance.GetType();
-                alreadyPinned = true;
+                object pinnedInstance = foi.Object;
+                ObjectDump alreadyPinnedObjDump = ObjectDumpFactory.Create(pinnedInstance, objAddr, foi.Address);
+                return JsonConvert.SerializeObject(alreadyPinnedObjDump);
+            }
+
+            // Object not pinned, try get it the hard way
+            ClrObject previousClrObj = _runtime.Heap.GetObject(objAddr);
+            if (previousClrObj.Type == null)
+            {
+                return "{\"error\":\"'address' points at an invalid address\"}";
+            }
+
+            // Make sure it's still in place
+            RefreshRuntime();
+            ClrObject clrObj = _runtime.Heap.GetObject(objAddr);
+
+            //
+            // Figuring out the Method Table value and the actual Object's address
+            //
+            ulong methodTable;
+            ulong objAddress;
+            if (clrObj.Type != null)
+            {
+                methodTable = clrObj.Type.MethodTable;
+                objAddress = clrObj.Address;
             }
             else
             {
-                // Object not pinned, try get it the hard way
-                ClrObject previousClrObj = _runtime.Heap.GetObject(objAddr);
-                if (previousClrObj.Type == null)
+                // Object moved! 
+                // Let's try and save the day with some hashcode filtering (if user allowed us)
+                if (!hashCodeFallback)
                 {
-                    return "{\"error\":\"'address' points at an invalid address\"}";
+                    return
+                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                        "Hash Code fallback was NOT activated\"}";
                 }
 
-                // Make sure it's still in place
-                RefreshRuntime();
-                ClrObject clrObj = _runtime.Heap.GetObject(objAddr);
-                if (clrObj.Type == null)
+                Predicate<string> typeFilter = (string type) => type.Contains(previousClrObj.Type.Name);
+                (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
+                if (anyErrors)
                 {
-                    // Object moved! 
-                    // Let's try and save the day with some hashcode filtering (if user allowed us)
-                    if (hashCodeFallback)
-                    {
-                        Predicate<string> typeFilter = (string type) => type.Contains(previousClrObj.Type.Name);
-                        (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
-                        if (anyErrors)
-                        {
-                            return
-                                "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                                "Hash Code fallback was activated but dumping function failed so non hash codes were checked\"}";
-                        }
-                        var matches = objects.Where(heapObj => heapObj.HashCode == userHashcode).ToList();
-                        if (matches.Count == 0)
-                        {
-                            return
-                                "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                                "Hash Code fallback was activated but no objects with the same hash code were found\"}";
-                        }
-                        if (matches.Count > 1)
-                        {
-                            return
-                                "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                                "Hash Code fallback was activated but too many (>1) objects with the same hash code were found\"}";
-                        }
-
-                        // Single match! We are as lucky as it gets :)
-                        HeapDump.HeapObject heapObj = matches.Single();
-                        ulong mt = previousClrObj.Type.MethodTable;
-                        instance = _converter.ConvertFromIntPtr(heapObj.Address, mt);
-                    }
-                    else
-                    {
-                        return
-                            "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                            "Hash Code fallback was NOT activated\"}";
-                    }
+                    return
+                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                        "Hash Code fallback was activated but dumping function failed so non hash codes were checked\"}";
                 }
-                else
+                var matches = objects.Where(heapObj => heapObj.HashCode == userHashcode).ToList();
+                if (matches.Count != 1)
                 {
-                    dumpedObjType = clrObj.Type.GetRealType();
-
-                    ulong mt = clrObj.Type.MethodTable;
-                    instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
+                    return
+                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                        $"Hash Code fallback was activated but {((matches.Count > 1) ? "too many (>1)" : "no")} objects with the same hash code were found\"}}";
                 }
+
+                // Single match! We are as lucky as it gets :)
+                HeapDump.HeapObject heapObj = matches.Single();
+                methodTable = previousClrObj.Type.MethodTable;
+                objAddress = heapObj.Address;
             }
 
-            if (pinningRequested & !alreadyPinned)
+            //
+            // Actually convert the address back into an Object reference.
+            //
+            object instance = _converter.ConvertFromIntPtr(objAddress, methodTable);
+
+            // Pin the result object if requested
+            ulong pinnedAddress = 0;
+            if (pinningRequested)
             {
                 foi = PinObject(instance);
+                pinnedAddress = foi.Address;
             }
 
-            ulong pinAddr = foi?.Address ?? 0xeeffeeff;
-            ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinAddr);
+            ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinnedAddress);
             return JsonConvert.SerializeObject(od);
         }
         private string MakeDieResponse(HttpListenerRequest req)
@@ -1190,6 +1188,9 @@ namespace ScubaDiver
             string assembly = req.QueryString.Get("assembly");
             Type resolvedType = TypesResolver.Resolve(_runtime, type, assembly);
 
+            // 
+            // Defining a sub-function that parses a type and it's parents recursively
+            //
             TypeDump ParseType(Type typeObj)
             {
                 if (typeObj == null) return null;
