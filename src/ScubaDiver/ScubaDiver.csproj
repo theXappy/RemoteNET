@@ -40,12 +40,16 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Diver.cs" />
+    <Compile Include="DllEntry.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RegisteredEventHandlerInfo.cs" />
     <Compile Include="Utils\Converter.cs" />
     <Compile Include="Utils\Freezer.cs" />
+    <Compile Include="Utils\ObjectDumpFactory.cs" />
     <Compile Include="Utils\Pinnable.cs" />
     <Compile Include="Utils\FrozenObjectInfo.cs" />
+    <Compile Include="Utils\TypesResolver.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
