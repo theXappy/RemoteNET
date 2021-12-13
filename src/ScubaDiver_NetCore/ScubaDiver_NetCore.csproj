@@ -9,10 +9,15 @@
 
   <ItemGroup>
     <Compile Include="..\ScubaDiver\Diver.cs" Link="Diver.cs" />
+    <Compile Include="..\ScubaDiver\DllEntry.cs" Link="DllEntry.cs" />
     <Compile Include="..\ScubaDiver\Logger.cs" Link="Logger.cs" />
+    <Compile Include="..\ScubaDiver\RegisteredEventHandlerInfo.cs" Link="RegisteredEventHandlerInfo.cs" />
     <Compile Include="..\ScubaDiver\Utils\Converter.cs" Link="Utils\Converter.cs" />
     <Compile Include="..\ScubaDiver\Utils\Freezer.cs" Link="Utils\Freezer.cs" />
+    <Compile Include="..\ScubaDiver\Utils\FrozenObjectInfo.cs" Link="Utils\FrozenObjectInfo.cs" />
+    <Compile Include="..\ScubaDiver\Utils\ObjectDumpFactory.cs" Link="Utils\ObjectDumpFactory.cs" />
     <Compile Include="..\ScubaDiver\Utils\Pinnable.cs" Link="Utils\Pinnable.cs" />
+    <Compile Include="..\ScubaDiver\Utils\TypesResolver.cs" Link="Utils\TypesResolver.cs" />
   </ItemGroup>
 
   <ItemGroup>
