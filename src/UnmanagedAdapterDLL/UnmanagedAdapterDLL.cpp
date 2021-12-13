@@ -104,7 +104,7 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 		DWORD result;
 		hr = pClr->ExecuteInDefaultAppDomain(
 			managedDllLocation.c_str(),
-			L"ScubaDiver.Diver",
+			L"ScubaDiver.DllEntry",
 			L"EntryPoint",
 			scubaDiverArg.c_str(),
 			&result);
