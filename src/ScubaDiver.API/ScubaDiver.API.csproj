@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -18,5 +18,9 @@
     <PackageReference Include="Microsoft.Diagnostics.Runtime" Version="2.0.222201" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
+
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="echo +++++ Forcing re-build of ScubaDiver.API and hence RemoteNet +++++&#xD;&#xA;dotnet clean $(ProjectDir)\ScubaDiver.API.csproj" />
+  </Target>
 
 </Project>
