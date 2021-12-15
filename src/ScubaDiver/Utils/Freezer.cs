@@ -11,6 +11,15 @@ namespace ScubaDiver.Utils
 
     internal static class Freezer
     {
+        public static ulong GetAddress(object o)
+        {
+            FrozenObjectInfo foi = Freeze(o);
+            ulong address = foi.Address;
+            foi.UnfreezeEvent.Set();
+            foi.FreezeTask.Wait();
+            return address;
+        }
+
         public static FrozenObjectInfo Freeze(object target)
         {
             ulong freezeAddr = 0;
