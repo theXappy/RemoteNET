@@ -348,7 +348,8 @@ namespace RemoteNET
 
                 if (args.Length == 1)
                 {
-                    // We are expecting a single arg which is a array of objects and we need to flatten it.
+                    // We are expecting a single arg which is a REMOTE array of objects (object[]) and we need to flatten it
+                    // into several (Dynamic) Remote Objects in a LOCAL array of objects.
                     RemoteObject ro = this.GetRemoteObject(args[0].RemoteAddress);
                     dynamic dro = ro.Dynamify();
                     if ((ro.GetType() as Type).IsArray)
@@ -365,6 +366,8 @@ namespace RemoteNET
                         decodedParameters = new object[len];
                         for (int i = 0; i < len; i++)
                         {
+                            // Since this object isn't really a local array (just a proxy of a remote one) the index
+                            // acceess causes a 'GetItem' function call and retrival of the remote object at the position
                             dynamic item = dro[i];
                             decodedParameters[i] = item;
                         }
