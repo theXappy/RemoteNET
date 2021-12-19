@@ -32,13 +32,20 @@ namespace ScubaDiver.API.Extensions
         /// <param name="methodName">Method name</param>
         /// <param name="parameterTypes">Types of parameters in the function, in order.</param>
         /// <returns></returns>
-        public static MethodInfo GetMethodRecursive(this Type t, string methodName, Type[] parameterTypes)
+        public static MethodInfo GetMethodRecursive(this Type t, string methodName, Type[] parameterTypes = null)
         {
+            var methods = t.GetMethods((BindingFlags)0xffff).Where(m=>m.Name == methodName);
 
-            var method = t.GetMethods((BindingFlags)0xffff)
-                .SingleOrDefault(m => m.Name == methodName &&
-                                      m.GetParameters().Select(pi => pi.ParameterType)
+            MethodInfo method;
+            if (parameterTypes == null)
+            {
+                method = methods.SingleOrDefault();
+            }
+            else { 
+                method = methods.SingleOrDefault(m => m.GetParameters().Select(pi => pi.ParameterType)
                                           .SequenceEqual(parameterTypes, _wildCardTypesComparer));
+            }
+
             if (method != null)
             {
                 return method;
@@ -53,6 +60,10 @@ namespace ScubaDiver.API.Extensions
 
             // Check parent (until `object`)
             return t.BaseType.GetMethodRecursive(methodName, parameterTypes);
+        }
+        public static MethodInfo GetMethodRecursive(this Type t, string methodName)
+        {
+            return GetMethodRecursive(t, methodName, null);
         }
 
         /// <summary>

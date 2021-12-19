@@ -12,14 +12,16 @@ namespace RemoteNET.Internal.Reflection
         public string RemoteAssemblyName { get; private set; }
         private List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
         private List<RemoteFieldInfo> _fields = new List<RemoteFieldInfo>();
+        private bool _isArray;
 
         public RemoteApp App { get; set; }
 
-        public RemoteType(RemoteApp app, string fullName, string assemblyName)
+        public RemoteType(RemoteApp app, string fullName, string assemblyName, bool isArray)
         {
             App = app;
             this.FullName = fullName;
             this.RemoteAssemblyName = assemblyName;
+            this._isArray = isArray;
         }
 
         public void AddMethod(RemoteMethodInfo rmi)
@@ -102,9 +104,16 @@ namespace RemoteNET.Internal.Reflection
         protected override MethodInfo GetMethodImpl(string name, BindingFlags bindingAttr, Binder binder, CallingConventions callConvention,
             Type[] types, ParameterModifier[] modifiers)
         {
-            return _methods.Single(method =>
-                method.Name == name && 
-                method.GetParameters().Select(arg => arg.ParameterType).SequenceEqual(types));
+            var methodGroup = _methods.Where(method =>
+                method.Name == name);
+            if(types == null)
+            {
+                // Parameters unknown from caller. Hope we have only one method to return.
+                return methodGroup.Single();
+            }
+
+            // Need to filer also by types
+            return methodGroup.Single(method=> method.GetParameters().Select(arg => arg.ParameterType).SequenceEqual(types));
         }
 
         public override MethodInfo[] GetMethods(BindingFlags bindingAttr)
@@ -134,7 +143,7 @@ namespace RemoteNET.Internal.Reflection
 
         protected override bool IsArrayImpl()
         {
-            throw new NotImplementedException();
+            return _isArray;
         }
 
         protected override bool IsByRefImpl()

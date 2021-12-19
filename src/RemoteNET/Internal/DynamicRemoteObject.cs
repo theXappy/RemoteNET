@@ -1,5 +1,7 @@
 ﻿using Microsoft.CSharp.RuntimeBinder;
+using ScubaDiver.API.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
@@ -83,19 +85,26 @@ namespace RemoteNET.Internal
         private Dictionary<string, List<MethodOverload>> _methods = new Dictionary<string, List<MethodOverload>>();
         private Dictionary<string, DynamicEventProxy> _events = new Dictionary<string, DynamicEventProxy>();
 
+        public RemoteApp __ra;
         public RemoteObject __ro;
         private string __typeFullName;
 
-        /// <summary>
-        /// By default, this class is going to dispose of it's creating RemoteObject.
-        /// If this field is set to true that disposal is disabled.
-        /// </summary>
-        bool _disableDisposal = false;
 
-        public DynamicRemoteObject(RemoteObject ro)
+        public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
         {
+            var ST = new StackTrace();
+            __ra = ra;
             __ro = ro;
             __typeFullName = ro.GetType().FullName;
+        }
+
+
+        /// <summary>
+        /// Gets the type of the proxied remote object, in the remote app. (This does not reutrn `typeof(RemoteObject)`)
+        /// </summary>
+        public new Type GetType()
+        {
+            return __ro.GetType();
         }
 
         // Expansion API
@@ -174,7 +183,10 @@ namespace RemoteNET.Internal
         public override bool TryGetMember(GetMemberBinder binder, out object result)
         {
             if (!_members.TryGetValue(binder.Name, out MemberType memberType))
-                throw new Exception($"No such member \"{binder.Name}\"");
+            {
+                result = null;
+                return false;
+            }
 
             Func<object> getter;
 
@@ -192,7 +204,15 @@ namespace RemoteNET.Internal
                     {
                         throw new Exception($"Property \"{binder.Name}\" does not have a getter.");
                     }
-                    result = getter();
+                    try
+                    {
+                        result = getter();
+                    }
+                    catch(Exception ex)
+                    {
+                        Console.WriteLine($"Property \"{binder.Name}\"'s getter threw an exception which sucks. Ex: "+ex);
+                        throw;
+                    }
                     break;
                 case MemberType.Method:
                     // Methods should go to "TryInvokeMember"
@@ -212,14 +232,20 @@ namespace RemoteNET.Internal
             object[] args,
             out object result)
         {
+            string name = binder.Name;
+            return InvokeMethodMember(name, args, out result);
+        }
+
+        private bool InvokeMethodMember(string name, object[] args, out object result)
+        {
             Logger.Debug("[DynamicRemoteObject] TryInvokeMember called ~");
-            if (!_members.TryGetValue(binder.Name, out MemberType memberType))
-                throw new Exception($"No such member \"{binder.Name}\"");
+            if (!_members.TryGetValue(name, out MemberType memberType))
+                throw new Exception($"No such member \"{name}\"");
 
             switch (memberType)
             {
                 case MemberType.Method:
-                    List<MethodOverload> overloads = _methods[binder.Name];
+                    List<MethodOverload> overloads = _methods[name];
 
                     // Narrow down (hopefuly to one) overload with the same amount of types
                     // TODO: We COULD possibly check the args types (local ones, RemoteObjects, DynamicObjects, ...) if we still have multiple results
@@ -234,18 +260,18 @@ namespace RemoteNET.Internal
                     {
                         // Multiple overloads. This sucks because we need to... return some "Router" func...
                         throw new NotImplementedException($"Multiple overloads aren't supported at the moment. " +
-                                                          $"Method `{binder.Name}` had {overloads.Count} overloads registered.");
+                                                          $"Method `{name}` had {overloads.Count} overloads registered.");
                     }
                     break;
                 case MemberType.Field:
                 case MemberType.Property:
                 default:
-                    throw new Exception($"No such method \"{binder.Name}\"");
+                    throw new Exception($"No such method \"{name}\"");
             }
             return true;
         }
 
-
+        public bool HasMember(string name) => _members.ContainsKey(name);
         public override bool TrySetMember(SetMemberBinder binder, object value)
         {
             if (!_members.TryGetValue(binder.Name, out MemberType memberType))
@@ -288,7 +314,6 @@ namespace RemoteNET.Internal
                         // We are telling the user it's not not allowed just like normal .NET does not allow setting values to events.
                         throw new Exception($"The event {binder.Name} can only appear on the left hand side of += or -=.");
                     }
-                    break;
                 default:
                     throw new Exception($"No such member \"{binder.Name}\".");
             }
@@ -299,12 +324,47 @@ namespace RemoteNET.Internal
         /// Helper function to access the member 'memberName' of the object 'obj.
         /// This is equivilent to explicitly compiling the expression 'obj.memberName'.
         /// </summary>
-        public static object GetDynamicMember(object obj, string memberName)
+        public static bool TryGetDynamicMember(object obj, string memberName, out object output)
         {
             var binder = Binder.GetMember(CSharpBinderFlags.None, memberName, obj.GetType(),
                 new[] { CSharpArgumentInfo.Create(CSharpArgumentInfoFlags.None, null) });
             var callsite = CallSite<Func<CallSite, object, object>>.Create(binder);
-            return callsite.Target(callsite, obj);
+            //DynamicRemoteObject casted = obj as DynamicRemoteObject;
+            //Console.WriteLine(" @@@ Calling (casted.TryGetMember");
+            //return casted.TryGetMember((GetMemberBinder)binder, out output);
+            if (obj is DynamicRemoteObject dro)
+            {
+                if (dro._members.ContainsKey(memberName))
+                {
+                    Console.WriteLine("SHORTCUT~~");
+                    if (dro.TryGetMember(binder as GetMemberBinder, out output))
+                    {
+                        Console.WriteLine("SHORTCUT Nailed It!");
+                        return true;
+                    }
+                    Console.WriteLine("SHORTCUT MISSED...");
+                }
+                else
+                {
+                    Console.WriteLine("NO SHORTBUT Cause2");
+                }
+            }
+            else
+            {
+                Console.WriteLine("NO SHORTBUT Cause1");
+            }
+
+            // Fallback? Does it always just result in TryGetMember?
+            try
+            {
+                output = callsite.Target(callsite, obj);
+                return true;
+            }
+            catch
+            {
+                output = null;
+                return false;
+            }
         }
 
         public override string ToString()
@@ -323,17 +383,22 @@ namespace RemoteNET.Internal
             throw new NotImplementedException($"Can not call `Equals` on {nameof(DynamicRemoteObject)} instances");
         }
 
-
-        public void DisableAutoDisposable()
+        // TODO: key should be dynamic and even encoded as ObjectOrRemoteAddress later in the calls chain if required.
+        public dynamic this[int key]
         {
-            _disableDisposal = true;
-        }
-
-        ~DynamicRemoteObject()
-        {
-            if (_disableDisposal)
-                return;
-            __ro.Dispose();
+            get
+            {
+                ScubaDiver.API.ObjectOrRemoteAddress oora = __ro.GetItem(key);
+                if (oora.IsRemoteAddress)
+                {
+                    return this.__ra.GetRemoteObject(oora.RemoteAddress).Dynamify();
+                }
+                else
+                {
+                    return PrimitivesEncoder.Decode(oora.EncodedObject, oora.Type);
+                }
+            }
+            set => throw new NotImplementedException();
         }
     }
 }

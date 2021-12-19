@@ -67,14 +67,12 @@ namespace ScubaDiver.Utils
                 return typeObj;
             }
 
-            Console.WriteLine("[Diver][Info] Did not find type in dump, searching reflected assemblies");
             // Fallback - normal .NET reflection
             foreach (Assembly assm in AppDomain.CurrentDomain.GetAssemblies())
             {
                 Type t = assm.GetType(name, throwOnError: false);
                 if (t != null)
                 {
-                    Console.WriteLine("[Diver][Info] Found it! " + t);
                     return t;
                 }
             }

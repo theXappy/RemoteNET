@@ -13,7 +13,7 @@ namespace RemoteNET.Internal
     {
         public DynamicRemoteObject Create(RemoteApp rApp, RemoteObject remoteObj, TypeDump typeDump)
         {
-            DynamicRemoteObject dynRemoteObj = new DynamicRemoteObject(remoteObj);
+            DynamicRemoteObject dynRemoteObj = new DynamicRemoteObject(rApp, remoteObj);
 
             AddFields(rApp, remoteObj, typeDump, dynRemoteObj);
             AddEvents(rApp, remoteObj, typeDump, dynRemoteObj);
@@ -23,7 +23,7 @@ namespace RemoteNET.Internal
             return dynRemoteObj;
         }
 
-        private static void AddMethods(RemoteApp app, RemoteObject ro, TypeDump typeDump, DynamicRemoteObject dynRemoteObj)
+        private static void AddMethods(RemoteApp app, RemoteObject ro, TypeDump typeDump, DynamicRemoteObject dro)
         {
             // Adding methods
             // Gathering all methods from current type and all ancestor types
@@ -53,6 +53,36 @@ namespace RemoteNET.Internal
                     // TODO: Support generic methods. For now their parameters aren't cprrectly parse
                     // in the diver leaving us with missing types for them.
                     continue;
+                }
+
+                // Edge case: Sometimes we can only see the properties' "get_" and "set_" methos so we need to infere there's a property.
+                if (methodInfo.Name.StartsWith("get_") || methodInfo.Name.StartsWith("set_"))
+                {
+                    string propName = methodInfo.Name.Substring(methodInfo.Name.IndexOf('_') + 1);
+                    // Check if there's an explicit property with that name so we shouldn't worry about it.
+                    if (!typeDump.Properties.Any(typeProp => typeProp.Name == propName))
+                    {
+                        // There isn't a property. Time to make one up.
+                        var getMethod = allMethods.SingleOrDefault(typeMethod => typeMethod.Name == "get_" + propName);
+                        var setMethod = allMethods.SingleOrDefault(typeMethod => typeMethod.Name == "set_" + propName);
+                        // The full type name could be inffered from the result of the "get" method
+                        // or the argument of the "set" method.
+                        string typeFullName = null;
+                        if (getMethod != null)
+                        {
+                            typeFullName = getMethod.ReturnTypeFullName;
+                        }
+                        else
+                        {
+                            typeFullName = setMethod.Parameters.First().Type;
+                        }
+                        AddProperty(app, ro, dro, propName, typeFullName,
+                            getMethod != null,
+                            setMethod != null);
+                    }
+                    // NOTE: In any case, we follow throu with adding this method as a it is reported.
+                    // Just in case we are wrong and the remote object has some method like "get_some_things(...)"
+                    // which doesn't represents a property (just funny naming conventions).
                 }
 
                 // Creating proxy method
@@ -110,7 +140,7 @@ namespace RemoteNET.Internal
                                        let typeFullName = prmtr.Type
                                        let resolvedType = AppDomain.CurrentDomain.GetType(typeFullName)
                                        select resolvedType).ToList();
-                dynRemoteObj.AddMethod(methodInfo.Name, argTypes, proxy);
+                dro.AddMethod(methodInfo.Name, argTypes, proxy);
             }
         }
 
@@ -119,53 +149,67 @@ namespace RemoteNET.Internal
             // Adding properties
             foreach (TypeDump.TypeProperty propInfo in td.Properties)
             {
-                Action<object> setter = null;
-                Func<object> getter = null;
-                // Check if there's even a getter in the remote process
-                if (propInfo.GetVisibility != null)
-                {
-                    // There's a getter! (some visibility means it exists. If it's missing GetVisibility = null)
-                    // Creating proxy method
-                    getter = new Func<object>(() =>
-                    {
-                        // Non primitive property - getting remote object.
-                        (bool hasResults, ObjectOrRemoteAddress res) = ro.InvokeMethod("get_" + propInfo.Name, new ObjectOrRemoteAddress[0]);
-                        if (!hasResults)
-                        {
-                            throw new NotImplementedException("Trying to call getter of remote " +
-                                                              "property but either hasResults was false");
-                        }
-
-                        if (res.IsRemoteAddress)
-                        {
-                            RemoteObject rObj = rApp.GetRemoteObject(res.RemoteAddress);
-                            return rObj.Dynamify();
-                        }
-                        else
-                        {
-                            return PrimitivesEncoder.Decode(res.EncodedObject, propInfo.TypeFullName);
-                        }
-                    });
-                }
-                // Check if there's even a setter in the remote process
-                if (propInfo.SetVisibility != null)
-                {
-                    // There's a setter! (some visibility means it exists. If it's missing GetVisibility = null)
-                    // Creating proxy method
-                    setter = (newValue) =>
-                    {
-                        // Non primitive property - getting remote object.
-                        (bool hasResults, ObjectOrRemoteAddress returnedValue) = ro.InvokeMethod("set_" + propInfo.Name, new ObjectOrRemoteAddress[] { ObjectOrRemoteAddress.FromObj(newValue) });
-                        if (hasResults)
-                        {
-                            throw new NotImplementedException("Trying to call setter of remote " +
-                                                              "property but for some reason it returned some results...");
-                        }
-                    };
-                }
-
-                dro.AddProperty(propInfo.Name, getter, setter);
+                AddProperty(rApp, ro, dro, propInfo.Name, propInfo.TypeFullName,
+                    propInfo.GetVisibility != null,
+                    propInfo.SetVisibility != null);
             }
+        }
+
+        private static void AddProperty(RemoteApp rApp, RemoteObject ro, DynamicRemoteObject dro, string name, string typeFullName, bool hasGetVisability, bool hasSetVisability)
+        {
+            if (dro.HasMember(name))
+            {
+                // Property already defined, let's skip it.
+                Console.WriteLine("[AddProperty] PROPERTY {name} ALREADY DEFINED!");
+                return;
+            }
+
+            Action<object> setter = null;
+            Func<object> getter = null;
+            // Check if there's even a getter in the remote process
+            if (hasGetVisability)
+            {
+                // There's a getter! (some visibility means it exists. If it's missing GetVisibility = null)
+                // Creating proxy method
+                getter = new Func<object>(() =>
+                {
+                    // Non primitive property - getting remote object.
+                    (bool hasResults, ObjectOrRemoteAddress res) = ro.InvokeMethod("get_" + name, new ObjectOrRemoteAddress[0]);
+                    if (!hasResults)
+                    {
+                        throw new NotImplementedException("Trying to call getter of remote " +
+                                                          "property but either hasResults was false");
+                    }
+
+                    if (res.IsRemoteAddress)
+                    {
+                        RemoteObject rObj = rApp.GetRemoteObject(res.RemoteAddress);
+                        return rObj.Dynamify();
+                    }
+                    else
+                    {
+                        return PrimitivesEncoder.Decode(res.EncodedObject, typeFullName);
+                    }
+                });
+            }
+            // Check if there's even a setter in the remote process
+            if (hasSetVisability)
+            {
+                // There's a setter! (some visibility means it exists. If it's missing GetVisibility = null)
+                // Creating proxy method
+                setter = (newValue) =>
+                {
+                    // Non primitive property - getting remote object.
+                    (bool hasResults, ObjectOrRemoteAddress returnedValue) = ro.InvokeMethod("set_" + name, new ObjectOrRemoteAddress[] { ObjectOrRemoteAddress.FromObj(newValue) });
+                    if (hasResults)
+                    {
+                        throw new NotImplementedException("Trying to call setter of remote " +
+                                                          "property but for some reason it returned some results...");
+                    }
+                };
+            }
+
+            dro.AddProperty(name, getter, setter);
         }
 
         private static void AddFields(RemoteApp rApp, RemoteObject ro, TypeDump td, DynamicRemoteObject dro)

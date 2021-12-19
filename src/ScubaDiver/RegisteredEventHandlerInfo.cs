@@ -3,7 +3,12 @@ using System.Reflection;
 
 namespace ScubaDiver
 {
-    public class RegisteredEventHandlerInfo
+    public interface IProxyFunctionHolder
+    {
+        public Delegate RegisteredProxy { get;  }
+    }
+
+    public class RegisteredEventHandlerInfo : IProxyFunctionHolder
     {
         public Delegate RegisteredProxy { get; set; }
         // Note that this object might be pinned or unpinned when this info object is created
@@ -11,5 +16,12 @@ namespace ScubaDiver
         // not - we will always be able to safely access it
         public object Target { get; set; }
         public EventInfo EventInfo { get; set; }
+    }
+
+    public class RegisteredMethodHookInfo : IProxyFunctionHolder
+    {
+        public Delegate RegisteredProxy { get; set; }
+        public MethodInfo OriginalHookedMethod { get; set; }
+
     }
 }

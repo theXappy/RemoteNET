@@ -87,7 +87,7 @@ namespace RemoteNET.Internal.Reflection
                 return shortOutput;
             }
 
-            RemoteType output = new RemoteType(app, typeDump.Type, typeDump.Assembly);
+            RemoteType output = new RemoteType(app, typeDump.Type, typeDump.Assembly, typeDump.IsArray);
 
             // Temporarily indicate we are on-going creation
             _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.Type)] = output;

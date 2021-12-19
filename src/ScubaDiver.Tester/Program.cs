@@ -1,13 +1,17 @@
-using System;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Threading;
+using System.Threading.Tasks;
 using RemoteNET;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using ScubaDiver.API;
+using static RemoteNET.RemoteApp;
 
 namespace ScubaDiver.Tester
 {
@@ -88,7 +92,8 @@ namespace ScubaDiver.Tester
             Console.WriteLine("5. Invoke example static method (int.parse)");
             Console.WriteLine("6. Steal RSA keys");
             Console.WriteLine("7. Subscribe to Event");
-            Console.WriteLine("8. Exit");
+            Console.WriteLine("8. Hook Method");
+            Console.WriteLine("9. Exit");
             string input = Console.ReadLine();
             ulong addr;
             uint index;
@@ -220,7 +225,7 @@ namespace ScubaDiver.Tester
                             {
                                 RemoteObject remoteObj = remoteObjects[(int)index];
                                 dynamic dro = remoteObj.Dynamify();
-                                Action<dynamic,dynamic> callback = new Action<dynamic,dynamic>((dynamic arg1, dynamic arg2) => Console.WriteLine("INVOKED!!"));
+                                Action<dynamic, dynamic> callback = new Action<dynamic, dynamic>((dynamic arg1, dynamic arg2) => Console.WriteLine("INVOKED!!"));
 
                                 Console.WriteLine("Enter event name:");
                                 string eventName = Console.ReadLine().Trim();
@@ -236,6 +241,72 @@ namespace ScubaDiver.Tester
                         }
                         break;
                     case 8:
+                        {
+                            MethodInfo mi;
+                            Console.WriteLine("Full type name:");
+                            string type = Console.ReadLine();
+                            try
+                            {
+                                Type t = remoteApp.GetRemoteType(type);
+                                if (t == null)
+                                {
+                                    Console.WriteLine("Failed to find the type.");
+                                    break;
+                                }
+                                Console.WriteLine("Method name:");
+                                string method = Console.ReadLine();
+
+                                mi = t.GetMethod(method);
+                                if (mi == null)
+                                {
+                                    Console.WriteLine("Failed to find the method in the resolved type.");
+                                    break;
+                                }
+                            }
+                            catch (Exception)
+                            {
+                                Console.WriteLine("Something went wrong...");
+                                break;
+                            }
+
+                            BlockingCollection<string> pcCollection = new BlockingCollection<string>();
+                            Task printerTask = Task.Run(() =>
+                            {
+                                while(pcCollection.IsCompleted)
+                                {
+                                    string item;
+                                    if(pcCollection.TryTake(out item))
+                                    {
+                                        Console.WriteLine(item);
+                                    }
+                                    else
+                                    {
+                                        Thread.Sleep(100);
+                                    }
+                                }
+                            });
+
+                            HookAction callback = (dynamic instace, dynamic[] args) =>
+                            {
+                                foreach (dynamic d in args)
+                                {
+                                    Console.WriteLine($"ARG: {d.ToString()}");
+                                    if(d is string str)
+                                    {
+                                        pcCollection.Add(str);
+                                    }
+                                    else
+                                    {
+                                        pcCollection.Add("ERROR: NON STR ARGUMENT!!");
+                                    }
+                                }
+                            };
+
+                            remoteApp.HookMethod(mi, callback);
+
+                        }
+                        break;
+                    case 9:
                         // Exiting
                         return true;
                 }
