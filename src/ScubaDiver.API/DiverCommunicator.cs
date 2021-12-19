@@ -132,6 +132,11 @@ namespace ScubaDiver.API
             string body = SendRequest("object", queryParams);
             if (body.Contains("\"error\":"))
             {
+                if(body.Contains("'address' points at an invalid address") ||
+                    body.Contains("Method Table value mismatched"))
+                {
+                    throw new RemoteObjectMovedException(address, body);
+                }
                 throw new Exception("Diver failed to dump objet. Error: " + body);
             }
             ObjectDump objectDump = JsonConvert.DeserializeObject<ObjectDump>(body);
@@ -162,14 +167,41 @@ namespace ScubaDiver.API
 
             var resJson = SendRequest("invoke", null, requestJsonBody);
 
-            InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
+            InvocationResults res;
+            try
+            {
+                res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
+            }
+            catch
+            {
+                Console.WriteLine($"[Communicator] Error when deserializing object! res: {resJson}");
+                return null;
+            }
             return res;
+        }
+
+        public ObjectOrRemoteAddress GetItem(ulong token, int key)
+        {
+            Dictionary<string, string> queryParams = new()
+            {
+                { "address", token.ToString() },
+                { "pinRequest", "true" },
+                { "index", key.ToString() }
+            };
+            string body = SendRequest("get_item", queryParams);
+            if (body.Contains("\"error\":"))
+            {
+                throw new Exception("Diver failed to dump item of array object. Error: " + body);
+            }
+            InvocationResults invokeRes = JsonConvert.DeserializeObject<InvocationResults>(body);
+            return invokeRes.ReturnedObjectOrAddress;
+
         }
 
         public InvocationResults InvokeStaticMethod(string targetTypeFullName, string methodName,
             params ObjectOrRemoteAddress[] args) => InvokeMethod(0, targetTypeFullName, methodName, args);
 
-        public ObjectDump CreateObject(string typeFullName, ObjectOrRemoteAddress[] args)
+        public InvocationResults CreateObject(string typeFullName, ObjectOrRemoteAddress[] args)
         {
             var ctorInvocReq = new CtorInvocationRequest()
             {
@@ -179,7 +211,7 @@ namespace ScubaDiver.API
             var requestJsonBody = JsonConvert.SerializeObject(ctorInvocReq);
 
             var resJson = SendRequest("create_object", null, requestJsonBody);
-            ObjectDump res = JsonConvert.DeserializeObject<ObjectDump>(resJson, _withErrors);
+            InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
             return res;
         }
 
@@ -231,7 +263,7 @@ namespace ScubaDiver.API
                 string listeningUrl = $"http://{ip}:{localHttpPort}/";
                 _listener.Prefixes.Add(listeningUrl);
                 _listener.Start();
-                Task.Run(()=>Dispatcher(_listener));
+                Task.Run(() => Dispatcher(_listener));
 
                 queryParams = new();
                 queryParams["ip"] = ip;
@@ -267,7 +299,7 @@ namespace ScubaDiver.API
                 Console.WriteLine($"[Communicator]EventUnsubscribe Sending HTTP request to event_unsubscribe");
                 body = SendRequest("event_unsubscribe", queryParams);
                 Console.WriteLine($"[Communicator]EventUnsubscribe Got resp from event_unsubscribe. Response: {body}");
-                if(!body.Contains("{\"status\":\"OK\"}"))
+                if (!body.Contains("{\"status\":\"OK\"}"))
                 {
                     throw new Exception("Tried to unsubscribe from an event but the Diver's response was not 'OK'");
                 }
@@ -281,10 +313,85 @@ namespace ScubaDiver.API
             }
         }
 
+        public bool HookMethod(string type, string methodName, LocalHookCallback callback)
+        {
+            Dictionary<string, string> queryParams;
+            string body;
+            if (this._listener == null)
+            {
+                // Need to create HTTP listener and send the Diver it's info
+                int localHttpPort = this._port + 1;
+                string ip = "127.0.0.1";
+                _listener = new HttpListener();
+                string listeningUrl = $"http://{ip}:{localHttpPort}/";
+                _listener.Prefixes.Add(listeningUrl);
+                _listener.Start();
+                Task.Run(() => Dispatcher(_listener));
+
+                queryParams = new();
+                queryParams["ip"] = ip;
+                queryParams["port"] = localHttpPort.ToString();
+                body = SendRequest("register_callbacks_ep", queryParams);
+                if (!body.Contains("\"status\":\"OK\""))
+                {
+                    throw new Exception("Local HTTP server created but informing the remote Diver resulted in an error. " +
+                        "Raw response: " + body);
+                }
+            }
+
+            FunctionHookRequest req = new FunctionHookRequest()
+            {
+                TypeFullName = type,
+                MethodName = methodName,
+                HookPosition = "Pre", // TODO: Support others
+            };
+
+            var requestJsonBody = JsonConvert.SerializeObject(req);
+
+            var resJson = SendRequest("hook_method", null, requestJsonBody);
+            if (resJson.Contains("\"error\":"))
+            {
+                throw new Exception("Hook Method failed. Error from Diver: " + resJson);
+            }
+            EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(resJson);
+
+            _tokensToHookCallbacks[regRes.Token] = callback;
+            _hookCallbacksToTokens[callback] = regRes.Token;
+            // Getting back the token tells us the hook was registered successfully.
+            return true;
+        }
+        public void UnhookMethod(LocalHookCallback callback)
+        {
+            Dictionary<string, string> queryParams;
+            string body;
+
+            if (_hookCallbacksToTokens.TryGetValue(callback, out int token))
+            {
+                queryParams = new() { };
+                queryParams["token"] = token.ToString();
+                body = SendRequest("unhook_method", queryParams);
+                if (!body.Contains("{\"status\":\"OK\"}"))
+                {
+                    throw new Exception("Tried tounhook a method but the Diver's response was not 'OK'");
+                }
+
+                _tokensToHookCallbacks.Remove(token);
+                _hookCallbacksToTokens.Remove(callback);
+            }
+            else
+            {
+                Console.WriteLine($"[Communicator]UnhookMethod TryGetValue failed :(((((((((((((((");
+            }
+        }
+
+        public delegate void LocalHookCallback(ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args);
         public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args);
 
         private Dictionary<int, LocalEventCallback> _tokensToEventHandlers = new();
         private Dictionary<LocalEventCallback, int> _eventHandlersToToken = new();
+
+        private Dictionary<int, LocalHookCallback> _tokensToHookCallbacks = new();
+        private Dictionary<LocalHookCallback, int> _hookCallbacksToTokens = new();
 
         private void Dispatcher(HttpListener listener)
         {
@@ -302,20 +409,28 @@ namespace ScubaDiver.API
                         body = sr.ReadToEnd();
                     }
                     CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
-                    if(_tokensToEventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
+                    if (_tokensToEventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
                     {
                         (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray());
-                        // TODO: Read action results and return them
 
                         InvocationResults ir = new InvocationResults()
-                        { 
-                            VoidReturnType = voidReturnType
-                        };
-                        if(!voidReturnType)
                         {
-                            ir.ReturnedObjectOrAddress = callbackRes;
-                        }
-                        
+                            VoidReturnType = voidReturnType,
+                            ReturnedObjectOrAddress = voidReturnType ? null : callbackRes
+                        };
+
+                        body = JsonConvert.SerializeObject(ir);
+                    }
+                    else if (_tokensToHookCallbacks.TryGetValue(res.Token, out LocalHookCallback hook))
+                    {
+                        // Run hook. No results expected directly (it might alter variabels inside the hook)
+                        hook(res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
+
+                        InvocationResults ir = new InvocationResults()
+                        {
+                            VoidReturnType = true,
+                        };
+
                         body = JsonConvert.SerializeObject(ir);
                     }
                     else

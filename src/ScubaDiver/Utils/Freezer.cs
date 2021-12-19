@@ -28,11 +28,18 @@ namespace ScubaDiver.Utils
             // Allows us to unfreeze later
             ManualResetEvent unfreezeRequired = new ManualResetEvent(false);
 
-            Task freezingTask = Task.Run(() => FreezeInternal(target, ref freezeAddr, freezeFeedback, unfreezeRequired));
+
+            ThreadStart ts = (() => FreezeInternal(target, ref freezeAddr, freezeFeedback, unfreezeRequired));
+            Thread freezingThread = new Thread(ts);
+            freezingThread.Start();
 
             // Wait for freezing task to report back address
             freezeFeedback.WaitOne();
             freezeFeedback.Close();
+
+            freezingThread.Name = $"Freezer_of_{target.GetType().FullName}_at_0x{freezeAddr:X16}";
+            // TODO: This move to Threads from Tasks is quirky
+            Task freezingTask = Task.Run(() => freezingThread.Join());
 
             return new FrozenObjectInfo(target, freezeAddr, unfreezeRequired, freezingTask);
         }

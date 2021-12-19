@@ -1,19 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Reflection;
-using ScubaDiver;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
-using ScubaDiver.API.Extensions;
-using ScubaDiver.API.Utils;
 
 namespace RemoteNET
 {
-    public class RemoteObject : IDisposable
+    public class RemoteObject
     {
+        private static int NextIndex = 1;
+        public int Index;
+
         private RemoteApp _app;
         private RemoteObjectRef _ref;
         private Type _type = null;
@@ -24,6 +22,7 @@ namespace RemoteNET
 
         internal RemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
         {
+            Index = NextIndex++;
             _app = remoteApp;
             _ref = reference;
             _eventCallbacksAndProxies = new Dictionary<Delegate, DiverCommunicator.LocalEventCallback>();
@@ -71,7 +70,7 @@ namespace RemoteNET
         }
 
 
-        public void Dispose()
+        ~RemoteObject()
         {
             _ref?.RemoteRelease();
             _ref = null;
@@ -92,7 +91,6 @@ namespace RemoteNET
             // TODO: Add a check for amount of parameters and types (need to be dynamics)
             // See implementation inside DynamicEventProxy
 
-
             DiverCommunicator.LocalEventCallback callbackProxy = (ObjectOrRemoteAddress[] args) =>
             {
                 DynamicRemoteObject[] droParameters = new DynamicRemoteObject[args.Length];
@@ -100,13 +98,6 @@ namespace RemoteNET
                 {
                     RemoteObject ro = _app.GetRemoteObject(args[i].RemoteAddress);
                     DynamicRemoteObject dro = ro.Dynamify() as DynamicRemoteObject;
-
-                    // This is a crucial part: set the DynamicRemoteObject (and it's parent RemoteObject)
-                    // to now automaticlly dispose (which causes the remote parameters to be unpinned.)
-                    // We must do this in case on the parameters was already an object we hold as a RemoteObject
-                    // somewhere else in the program.
-                    // Note how we exit this function WITHOUT calling "Dispose" on the RemoteObject
-                    dro.DisableAutoDisposable();
 
                     droParameters[i] = dro;
                 }
@@ -131,6 +122,11 @@ namespace RemoteNET
 
                 _eventCallbacksAndProxies.Remove(callback);
             }
+        }
+
+        internal ObjectOrRemoteAddress GetItem(int key)
+        {
+            return  _ref.GetItem(key);
         }
     }
 }

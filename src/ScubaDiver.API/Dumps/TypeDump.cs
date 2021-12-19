@@ -140,6 +140,8 @@ namespace ScubaDiver.API.Dumps
         public string Type { get; set; }
         public string Assembly { get; set; }
 
+        public bool IsArray { get; set; }
+
         public TypeDump? ParentDump { get; set; }
 
         public List<TypeMethod> Methods { get; set; }

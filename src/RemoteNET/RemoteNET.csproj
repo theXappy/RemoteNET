@@ -1,62 +1,63 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <NoWin32Manifest>true</NoWin32Manifest>
-    <Company>theXappy</Company>
-    <Description>Examine, create and interact with remote objects in other .NET processes.</Description>
-    <Copyright>theXappy ©2021</Copyright>
-    <PackageProjectUrl>https://github.com/theXappy/RemoteNET</PackageProjectUrl>
-    <PackageIcon>nuget_icon.png</PackageIcon>
-    <RepositoryUrl>https://github.com/theXappy/RemoteNET</RepositoryUrl>
-    <PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <RunPostBuildEvent>Always</RunPostBuildEvent>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<NoWin32Manifest>true</NoWin32Manifest>
+		<Company>theXappy</Company>
+		<Description>Examine, create and interact with remote objects in other .NET processes.</Description>
+		<Copyright>theXappy ©2021</Copyright>
+		<PackageProjectUrl>https://github.com/theXappy/RemoteNET</PackageProjectUrl>
+		<PackageIcon>nuget_icon.png</PackageIcon>
+		<RepositoryUrl>https://github.com/theXappy/RemoteNET</RepositoryUrl>
+		<PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<RunPostBuildEvent>Always</RunPostBuildEvent>
+		<Version>$(VersionPrefix)</Version>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="Microsoft.CSharp">
-      <HintPath>..\..\..\..\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8\Microsoft.CSharp.dll</HintPath>
-    </Reference>
-  </ItemGroup>
+	<ItemGroup>
+		<Reference Include="Microsoft.CSharp">
+			<HintPath>..\..\..\..\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8\Microsoft.CSharp.dll</HintPath>
+		</Reference>
+	</ItemGroup>
 
-  <ItemGroup>
-    <Compile Update="Properties\Resources.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-  </ItemGroup>
+	<ItemGroup>
+		<Compile Update="Properties\Resources.Designer.cs">
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>Resources.resx</DependentUpon>
+		</Compile>
+	</ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Update="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Update="Properties\Resources.resx">
+			<Generator>ResXFileCodeGenerator</Generator>
+			<LastGenOutput>Resources.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+	</ItemGroup>
 
-  <ItemGroup>
-    <None Update="nuget_icon.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-  </ItemGroup>
+	<ItemGroup>
+		<None Update="nuget_icon.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
 
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force&quot;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba_NetCore\' '$(ProjectDir)\Resources\ScubaDiver_NetCore.zip'  -Force&quot;" />
-  </Target>
+	<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+		<Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba\' '$(ProjectDir)\Resources\ScubaDiver.zip'  -Force&quot;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\Scuba_NetCore\' '$(ProjectDir)\Resources\ScubaDiver_NetCore.zip'  -Force&quot;" />
+	</Target>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="powershell &quot;Get-ChildItem -Path '$(ProjectDir)\Resources' -Exclude '*READ_ME*' | Set-Content -Value 'dummy'&quot;" />
-  </Target>
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="powershell &quot;Get-ChildItem -Path '$(ProjectDir)\Resources' -Exclude '*READ_ME*' | Set-Content -Value 'dummy'&quot;" />
+	</Target>
 
 </Project>

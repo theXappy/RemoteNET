@@ -51,19 +51,11 @@ namespace RemoteNET
                 }
             }
 
-            ObjectDump od;
-            TypeDump td;
-            try
-            {
-                od = _communicator.CreateObject(t.FullName, remoteParams);
-                td = _communicator.DumpType(od.Type);
-            }
-            catch (Exception e)
-            {
-                throw new Exception("Could not dump remote object/type.", e);
-            }
+            // Create object + pin
+            InvocationResults invoRes = _communicator.CreateObject(t.FullName, remoteParams);
 
-            var remoteObject = new RemoteObject(new RemoteObjectRef(od, td, _communicator),_app);
+            // Get proxy object
+            var remoteObject = _app.GetRemoteObject(invoRes.ReturnedObjectOrAddress.RemoteAddress);
             return remoteObject;
         }
     }

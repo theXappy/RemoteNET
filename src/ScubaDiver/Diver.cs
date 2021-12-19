@@ -39,10 +39,11 @@ namespace ScubaDiver
         // Callbacks Endpoint of the Controller process
         IPEndPoint _callbacksEndpoint;
         int _nextAvilableCallbackToken = 0;
-        private Dictionary<int, RegisteredEventHandlerInfo> _tokensToRegisteredEventHandlers;
+        private Dictionary<int, IProxyFunctionHolder> _tokensToRegisteredEventHandlers;
 
-
+        // Collection for all types we failed to find
         HashSet<string> _typesWeAlreadyFailedToDump = new HashSet<string>();
+
 
         public bool HasCallbackEndpoint => _callbacksEndpoint != null;
 
@@ -64,9 +65,12 @@ namespace ScubaDiver
                 {"/register_callbacks_ep", MakeRegisterCallbacksEndpointResponse},
                 {"/event_subscribe", MakeEventSubscribeResponse},
                 {"/event_unsubscribe", MakeEventUnsubscribeResponse},
+                {"/hook_method", MakeHookMethodResponse},
+                {"/unhook_method", MakeUnhookMethodResponse},
+                {"/get_item", MakeArrayItemResponse},                
             };
             _pinnedObjects = new Dictionary<ulong, FrozenObjectInfo>();
-            _tokensToRegisteredEventHandlers = new Dictionary<int, RegisteredEventHandlerInfo>();
+            _tokensToRegisteredEventHandlers = new Dictionary<int, IProxyFunctionHolder>();
         }
 
         void RefreshRuntime()
@@ -148,9 +152,16 @@ namespace ScubaDiver
             Logger.Debug("[Diver] Removing all event subscriptions");
             foreach (int token in _tokensToRegisteredEventHandlers.Keys.ToList())
             {
-                RegisteredEventHandlerInfo eventInfo = _tokensToRegisteredEventHandlers[token];
-                eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
-                _tokensToRegisteredEventHandlers.Remove(token);
+                IProxyFunctionHolder proxyHolder = _tokensToRegisteredEventHandlers[token];
+                if (proxyHolder is RegisteredEventHandlerInfo rehi)
+                {
+                    rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
+                    _tokensToRegisteredEventHandlers.Remove(token);
+                }
+                else if (proxyHolder is RegisteredMethodHookInfo rmhi)
+                {
+                    ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
+                }
             }
             Logger.Debug("[Diver] Removed all event subscriptions");
         }
@@ -159,16 +170,17 @@ namespace ScubaDiver
         public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvilableCallbackToken);
         public void InvokeControllerCallback(int token, params object[] parameters)
         {
-            Logger.Debug($"[Diver][InvokeControllerCallback] Called~");
             ReverseCommunicator reverseCommunicator = new ReverseCommunicator(_callbacksEndpoint);
 
-            bool[] pinnedJustForCallback = new bool[parameters.Length];
-            FrozenObjectInfo[] pinnedObjectInfos = new FrozenObjectInfo[parameters.Length];
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
             {
                 object parameter = parameters[i];
-                if (parameter.GetType().IsPrimitiveEtc())
+                if(parameter == null)
+                {
+                    remoteParams[i] = ObjectOrRemoteAddress.Null;
+                }
+                else if (parameter.GetType().IsPrimitiveEtc())
                 {
                     remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
                 }
@@ -179,25 +191,14 @@ namespace ScubaDiver
                     {
                         // Pin and mark for unpinning later
                         foi = PinObject(parameter);
-                        pinnedJustForCallback[i] = true;
                     }
-                    pinnedObjectInfos[i] = foi;
 
-                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(foi.Address, foi.GetType().FullName);
+                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(foi.Address, foi.Object.GetType().FullName);
                 }
             }
 
             // Call callback at controller
             reverseCommunicator.InvokeCallback(token, remoteParams);
-
-            // Callback is over. Time to unpin parameters that were pinned just for this callback
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                if (pinnedJustForCallback[i])
-                {
-                    UnpinObject(pinnedObjectInfos[i].Address);
-                }
-            }
         }
         /// <summary>
         /// Tries to get a <see cref="FrozenObjectInfo"/> of a pinned object
@@ -255,7 +256,8 @@ namespace ScubaDiver
         public FrozenObjectInfo PinObject(object instance)
         {
             FrozenObjectInfo fObj = Freezer.Freeze(instance);
-            _pinnedObjects[fObj.Address] = fObj;
+            _pinnedObjects.Add(fObj.Address, fObj);
+
             return fObj;
         }
 
@@ -345,15 +347,121 @@ namespace ScubaDiver
             }
             Logger.Debug($"[Diver][MakeEventUnsubscribeResponse] Called! Token: {token}");
 
-            if (_tokensToRegisteredEventHandlers.TryGetValue(token, out RegisteredEventHandlerInfo eventInfo))
+            if (_tokensToRegisteredEventHandlers.TryGetValue(token, out IProxyFunctionHolder proxyHolder))
             {
-                eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
-                _tokensToRegisteredEventHandlers.Remove(token);
-                return "{\"status\":\"OK\"}";
+                if (proxyHolder is RegisteredEventHandlerInfo eventInfo)
+                {
+                    eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
+                    _tokensToRegisteredEventHandlers.Remove(token);
+                    return "{\"status\":\"OK\"}";
+                }
+                else
+                {
+                    return "{\"error\":\"A proxy holder object was found for the given token but it was not a RegisteredEventHandlerInfo object\"}";
+                }
             }
             return "{\"error\":\"Unknown token for event callback subscription\"}";
-
         }
+        private string MakeUnhookMethodResponse(HttpListenerRequest arg)
+        {
+            string tokenStr = arg.QueryString.Get("token");
+            if (tokenStr == null || !int.TryParse(tokenStr, out int token))
+            {
+                return "{\"error\":\"Missing parameter 'address'\"}";
+            }
+            Logger.Debug($"[Diver][MakeUnhookMethodResponse] Called! Token: {token}");
+
+            if (_tokensToRegisteredEventHandlers.TryGetValue(token, out IProxyFunctionHolder proxyHolder))
+            {
+                if (proxyHolder is RegisteredMethodHookInfo rmhi)
+                {
+                    ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
+                    return "{\"status\":\"OK\"}";
+                }
+                else
+                {
+                    return "{\"error\":\"A proxy holder object was found for the given token but it was not a RegisteredEventHandlerInfo object\"}";
+                }
+            }
+            return "{\"error\":\"Unknown token for event callback subscription\"}";
+        }
+        private string MakeHookMethodResponse(HttpListenerRequest arg)
+        {
+            Logger.Debug("[Diver] Got Hook Method request!");
+            if (!HasCallbackEndpoint)
+            {
+                return "{\"error\":\"Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!\"}";
+            }
+            string body = null;
+            using (StreamReader sr = new StreamReader(arg.InputStream))
+            {
+                body = sr.ReadToEnd();
+            }
+
+            if (string.IsNullOrEmpty(body))
+            {
+                return "{\"error\":\"Missing body\"}";
+            }
+
+            Logger.Debug("[Diver] Parsing Hook Method request body");
+
+            TextReader textReader = new StringReader(body);
+            JsonReader jr = new JsonTextReader(textReader);
+            JsonSerializer js = new JsonSerializer();
+            var request = js.Deserialize<FunctionHookRequest>(jr);
+            if (request == null)
+            {
+                return "{\"error\":\"Failed to deserialize body\"}";
+            }
+            Logger.Debug("[Diver] Parsing Hook Method request body -- Done!");
+
+            string typeFullName = request.TypeFullName;
+            string methodName =  request.MethodName;
+            string hookPosition = request.HookPosition;
+            if(hookPosition.ToUpper() != "PRE")
+            {
+                return "{\"error\":\"hook_position has an invalid or unsupported value\"}";
+            }
+            Logger.Debug("[Diver] Hook Method = It's pre");
+
+            Type resolvedType = TypesResolver.Resolve(_runtime, typeFullName);
+            if(resolvedType == null)
+            {
+                return "{\"error\":\"Failed to resolve type\"}";
+            }
+            Logger.Debug("[Diver] Hook Method - Resolved Type");
+
+            MethodInfo methodInfo = resolvedType.GetMethodRecursive(methodName);
+            if (methodInfo == null)
+            {
+                return "{\"error\":\"Failed to find method in type\"}";
+            }
+            Logger.Debug("[Diver] Hook Method - Resolved Method");
+
+            // We're all good regarding the signature!
+            // assign subscriber unique id
+            int token = AssignCallbackToken();
+            Logger.Debug($"[Diver] Hook Method - Assigned Token: {token}");
+
+            ScubaDiver.Hooking.HarmonyWrapper.HookCallback handler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
+
+            Logger.Debug($"[Diver] Hooking function {methodName}...");
+            ScubaDiver.Hooking.HarmonyWrapper.Instance.AddPrefix(methodInfo, handler);
+            Logger.Debug($"[Diver] Hooked func {methodName}!");
+
+
+            // Save all the registeration info so it can be removed later upon request
+            _tokensToRegisteredEventHandlers[token] = new RegisteredMethodHookInfo()
+            {
+                OriginalHookedMethod = methodInfo,
+                RegisteredProxy = handler
+            };
+
+            EventRegistrationResults erResults = new EventRegistrationResults() { Token = token };
+            return JsonConvert.SerializeObject(erResults);
+        }
+
+
         private string MakeEventSubscribeResponse(HttpListenerRequest arg)
         {
             if (!HasCallbackEndpoint)
@@ -370,7 +478,7 @@ namespace ScubaDiver
 
             // Check if we have this objects in our pinned pool
             FrozenObjectInfo foi;
-            if (!_pinnedObjects.TryGetValue(objAddr, out foi))
+            if (!TryGetPinnedObject(objAddr, out foi))
             {
                 // Object not pinned, try get it the hard way
                 return "{\"error\":\"Object at given address wasn't pinned\"}";
@@ -432,6 +540,7 @@ namespace ScubaDiver
             EventRegistrationResults erResults = new EventRegistrationResults() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
+
         private string MakeRegisterCallbacksEndpointResponse(HttpListenerRequest arg)
         {
             // This API is used by the Diver's controller to set an 'End Point' (IP + Port) where
@@ -462,10 +571,12 @@ namespace ScubaDiver
             {
                 return "{\"error\":\"Missing parameter 'address'\"}";
             }
-            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}");
+            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}\n" +
+                $"\tSOURCE : {(new System.Diagnostics.StackTrace()).GetFrame(1).GetMethod().Name}\n" +
+                $"\tSOURCE2: {(new System.Diagnostics.StackTrace()).GetFrame(2).GetMethod().Name}");
 
             // Check if we have this objects in our pinned pool
-            if (_pinnedObjects.ContainsKey(objAddr))
+            if (TryGetPinnedObject(objAddr, out _))
             {
                 // Found pinned object!
                 UnpinObject(objAddr);
@@ -537,23 +648,29 @@ namespace ScubaDiver
 
             // Need to return the results. If it's primitive we'll encode it
             // If it's non-primitive we pin it and send the address.
+            ObjectOrRemoteAddress res;
             ulong pinAddr;
             if (createdObject.GetType().IsPrimitiveEtc())
             {
                 // TODO: Something else?
                 pinAddr = 0xeeffeeff;
+                res = ObjectOrRemoteAddress.FromObj(createdObject);
             }
             else
             {
                 // Pinning results
                 var pinnedObj = PinObject(createdObject);
                 pinAddr = pinnedObj.Address;
+                res = ObjectOrRemoteAddress.FromToken(pinAddr, createdObject.GetType().FullName);
             }
 
 
-            ulong retrivalAddr = pinAddr; // New objects don't have a different address before pinning
-            ObjectDump od = ObjectDumpFactory.Create(createdObject, retrivalAddr, pinAddr);
-            return JsonConvert.SerializeObject(od);
+            InvocationResults invoRes = new InvocationResults()
+            {
+                ReturnedObjectOrAddress = res,
+                VoidReturnType = false
+            };
+            return JsonConvert.SerializeObject(invoRes);
 
         }
         private object ParseParameterObject(ObjectOrRemoteAddress param)
@@ -565,7 +682,7 @@ namespace ScubaDiver
                 case { IsRemoteAddress: false }:
                     return PrimitivesEncoder.Decode(param.EncodedObject, param.Type);
                 case { IsRemoteAddress: true }:
-                    if (_pinnedObjects.TryGetValue(param.RemoteAddress, out FrozenObjectInfo poi))
+                    if (TryGetPinnedObject(param.RemoteAddress, out FrozenObjectInfo poi))
                     {
                         return poi.Object;
                     }
@@ -618,7 +735,7 @@ namespace ScubaDiver
                 //
 
                 // Check if we have this objects in our pinned pool
-                if (_pinnedObjects.TryGetValue(request.ObjAddress, out FrozenObjectInfo poi))
+                if (TryGetPinnedObject(request.ObjAddress, out FrozenObjectInfo poi))
                 {
                     // Found pinned object!
                     instance = poi.Object;
@@ -778,7 +895,7 @@ namespace ScubaDiver
             {
                 object instance;
                 // Check if we have this objects in our pinned pool
-                if (_pinnedObjects.TryGetValue(request.ObjAddress, out FrozenObjectInfo poi))
+                if (TryGetPinnedObject(request.ObjAddress, out FrozenObjectInfo poi))
                 {
                     // Found pinned object!
                     instance = poi.Object;
@@ -870,7 +987,7 @@ namespace ScubaDiver
             }
 
             // Check if we have this objects in our pinned pool
-            if (_pinnedObjects.TryGetValue(request.ObjAddress, out FrozenObjectInfo poi))
+            if (TryGetPinnedObject(request.ObjAddress, out FrozenObjectInfo poi))
             {
                 // Found pinned object!
                 instance = poi.Object;
@@ -957,6 +1074,83 @@ namespace ScubaDiver
             }
             return JsonConvert.SerializeObject(invocResults);
         }
+        private string MakeArrayItemResponse(HttpListenerRequest arg)
+        {
+            string objAddrStr = arg.QueryString.Get("address");
+            string indexStr = arg.QueryString.Get("index");
+            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
+            if (!ulong.TryParse(objAddrStr, out var objAddr))
+            {
+                return "{\"error\":\"Parameter 'address' could not be parsed as ulong\"}";
+            }
+            if (!int.TryParse(indexStr, out var index))
+            {
+                return "{\"error\":\"Parameter 'index' could not be parsed as ulong\"}";
+            }
+
+            // Check if we have this objects in our pinned pool
+            FrozenObjectInfo arrayFoi;
+            if (!TryGetPinnedObject(objAddr, out arrayFoi))
+            {
+                // Object not pinned, try get it the hard way
+                return "{\"error\":\"Object at given address wasn't pinned\"}";
+            }
+
+            Array enumerable = (arrayFoi.Object as Array);
+            object[] asArray = enumerable?.Cast<object>().ToArray();
+            if(asArray == null)
+            {
+                return "{\"error\":\"Object at given address wasn't an array\"}";
+            }
+            if(index >= asArray.Length)
+            {
+                return "{\"error\":\"Index out of range\"}";
+            }
+
+            // Get the item
+            object item = asArray[index];
+
+            ObjectOrRemoteAddress res;
+            ulong pinAddr;
+            if (item.GetType().IsPrimitiveEtc())
+            {
+                // TODO: Something else?
+                res = ObjectOrRemoteAddress.FromObj(item);
+            }
+            else
+            { 
+                // Non-primitive results must be pinned before returning their remote address
+                // TODO: If a RemoteObject is not created for this object later and the item is not automaticlly unfreezed it might leak.
+                FrozenObjectInfo itemFoi;
+                if (IsPinned(item, out itemFoi))
+                {
+                    // Sanity: Make sure the pinned item is the same as the one we are looking for
+                    if (itemFoi.Object != item)
+                    {
+                        return $"{{\"error\":\"An object was pinned at that address but it's {nameof(FrozenObjectInfo)} " +
+                            $"object pointer at a different object\"}}";
+                    }
+                }
+                else
+                {
+                    // Item not pinned yet, let's do it.
+                    itemFoi = PinObject(item);
+                }
+
+                res = ObjectOrRemoteAddress.FromToken(itemFoi.Address, item.GetType().FullName);
+            }
+
+
+            InvocationResults invokeRes = new InvocationResults()
+            {
+                VoidReturnType = false,
+                ReturnedObjectOrAddress = res
+            };
+            
+           
+            return JsonConvert.SerializeObject(invokeRes);
+        }
+
         private string MakeObjectResponse(HttpListenerRequest arg)
         {
             string objAddrStr = arg.QueryString.Get("address");
@@ -979,10 +1173,9 @@ namespace ScubaDiver
                     return "{\"error\":\"Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int\"}";
                 }
             }
-            Logger.Debug($"[Diver][Debug](MakeObjectResponse) objAddrStr={objAddr:X16}, pinningRequested={pinningRequested}");
 
             // Check if we have this objects in our pinned pool
-            if (_pinnedObjects.TryGetValue(objAddr, out FrozenObjectInfo foi))
+            if (TryGetPinnedObject(objAddr, out FrozenObjectInfo foi))
             {
                 // Found pinned object!
                 object pinnedInstance = foi.Object;
@@ -991,13 +1184,7 @@ namespace ScubaDiver
             }
 
             // Object not pinned, try get it the hard way
-            ClrObject previousClrObj = _runtime.Heap.GetObject(objAddr);
-            if (previousClrObj.Type == null)
-            {
-                return "{\"error\":\"'address' points at an invalid address\"}";
-            }
-
-            // Make sure it's still in place
+            // Make sure it's still in place by refreshing the runtime
             RefreshRuntime();
             ClrObject clrObj = _runtime.Heap.GetObject(objAddr);
 
@@ -1005,11 +1192,11 @@ namespace ScubaDiver
             // Figuring out the Method Table value and the actual Object's address
             //
             ulong methodTable;
-            ulong objAddress;
+            ulong finalObjAddress;
             if (clrObj.Type != null)
             {
                 methodTable = clrObj.Type.MethodTable;
-                objAddress = clrObj.Address;
+                finalObjAddress = clrObj.Address;
             }
             else
             {
@@ -1022,7 +1209,7 @@ namespace ScubaDiver
                         "Hash Code fallback was NOT activated\"}";
                 }
 
-                Predicate<string> typeFilter = (string type) => type.Contains(previousClrObj.Type.Name);
+                Predicate<string> typeFilter = (string type) => type.Contains(clrObj.Type.Name);
                 (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
                 if (anyErrors)
                 {
@@ -1040,14 +1227,23 @@ namespace ScubaDiver
 
                 // Single match! We are as lucky as it gets :)
                 HeapDump.HeapObject heapObj = matches.Single();
-                methodTable = previousClrObj.Type.MethodTable;
-                objAddress = heapObj.Address;
+                methodTable = clrObj.Type.MethodTable;
+                ulong newObjAddress = heapObj.Address;
+                finalObjAddress = newObjAddress;
             }
 
             //
             // Actually convert the address back into an Object reference.
             //
-            object instance = _converter.ConvertFromIntPtr(objAddress, methodTable);
+            object instance;
+            try
+            {
+                instance = _converter.ConvertFromIntPtr(finalObjAddress, methodTable);
+            }
+            catch (ArgumentException)
+            {
+                return "{\"error\":\"Method Table value mismatched\"}";
+            }
 
             // Pin the result object if requested
             ulong pinnedAddress = 0;
@@ -1060,6 +1256,7 @@ namespace ScubaDiver
             ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinnedAddress);
             return JsonConvert.SerializeObject(od);
         }
+
         private string MakeDieResponse(HttpListenerRequest req)
         {
             Logger.Debug("[Diver] Die command received");
@@ -1180,7 +1377,7 @@ namespace ScubaDiver
         private string MakeTypeResponse(HttpListenerRequest req)
         {
             string type = req.QueryString.Get("name");
-            if (type == null)
+            if (string.IsNullOrEmpty(type))
             {
                 return "{\"error\":\"Missing parameter 'name'\"}";
             }
@@ -1213,7 +1410,8 @@ namespace ScubaDiver
                     Methods = methods,
                     Fields = fields,
                     Events = events,
-                    Properties = props
+                    Properties = props,
+                    IsArray = typeObj.IsArray,
                 };
                 if (typeObj != typeof(object))
                 {

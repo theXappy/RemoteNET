@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="..\ScubaDiver\Diver.cs" Link="Diver.cs" />
     <Compile Include="..\ScubaDiver\DllEntry.cs" Link="DllEntry.cs" />
+    <Compile Include="..\ScubaDiver\Hooking\HarmonyWrapper.cs" Link="Hooking\HarmonyWrapper.cs" />
     <Compile Include="..\ScubaDiver\Logger.cs" Link="Logger.cs" />
     <Compile Include="..\ScubaDiver\RegisteredEventHandlerInfo.cs" Link="RegisteredEventHandlerInfo.cs" />
     <Compile Include="..\ScubaDiver\Utils\Converter.cs" Link="Utils\Converter.cs" />
@@ -23,10 +24,15 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Diagnostics.Runtime" Version="2.0.222201" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Lib.Harmony" Version="2.1.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Hooking\" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

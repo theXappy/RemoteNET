@@ -37,5 +37,10 @@ namespace ScubaDiver.Utils
             UnfreezeEvent = unfreezeEvent;
             FreezeTask = freezeTask;
         }
+
+        public override string ToString()
+        {
+            return $"{nameof(FrozenObjectInfo)} : {{ Obj=[{this.Object}], HashCode={this.Object.GetHashCode()}, Address={this.Address:X16} }}";
+        }
     }
 }
