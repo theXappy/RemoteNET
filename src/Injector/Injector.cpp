@@ -13,8 +13,8 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-	if (argc < 4) {
-		printf("Usage: %s PID\nPID SCUBA_DIVER_PATH SCUBA_DIVER_ARG", argv[0]);
+	if (argc < 3) {
+		printf("Usage: %s PID ARG_FOR_INJECTED_DLL", argv[0]);
 		return 1;
 	}
 	printf("Starting...\n");
@@ -32,16 +32,6 @@ int main(int argc, char** argv)
 	wchar_t adapterDllArg[MAX_PATH];
 	size_t convertedChars = 0;
 	mbstowcs_s(&convertedChars, adapterDllArg, MAX_PATH, argv[2], _TRUNCATE);
-	wcscat_s(adapterDllArg, L"*");
-
-	wchar_t ScubaDiverDllArg[MAX_PATH];
-	mbstowcs_s(&convertedChars, ScubaDiverDllArg, MAX_PATH, argv[3], _TRUNCATE);
-	wcscat_s(adapterDllArg, ScubaDiverDllArg);
-	wcscat_s(adapterDllArg, L"*");
-
-	wchar_t TargetFrameworkArg[MAX_PATH];
-	mbstowcs_s(&convertedChars, TargetFrameworkArg, MAX_PATH, argv[4], _TRUNCATE);
-	wcscat_s(adapterDllArg, TargetFrameworkArg);
 
 
 	printf("UnmanagedAdapterDLL encoded argument: %ls\n", adapterDllArg);
