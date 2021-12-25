@@ -39,7 +39,7 @@ enum FrameworkType ParseFrameworkType(const std::wstring& framework)
 
 DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 {
-	BOOL consoleAllocated;
+	BOOL consoleAllocated = false;
 	HRESULT hr;
 
 	const auto parts = split(adapterDllArg, L"*");
@@ -56,31 +56,30 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 	const auto& scubaDiverArg = parts.at(3);
 	const auto& framework = parts.at(4);
 
-	std::wcout << framework << std::endl;
 
+#ifdef _DEBUG
 	// All of this code is to spawn a console.
-	if (true) {
-		consoleAllocated = AllocConsole();
-		if (consoleAllocated) {
-			DebugOut(L"[UnmanagedAdapter] AllocConsole returned: %s\n", consoleAllocated ? L"True" : L"False");
-			HANDLE stdHandle;
-			int hConsole;
-			FILE* fp;
-			stdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-			DebugOut(L"[UnmanagedAdapter] stdHandle = %d\n", stdHandle);
-			hConsole = _open_osfhandle((intptr_t)stdHandle, _O_TEXT);
-			DebugOut(L"[UnmanagedAdapter] hConsole = %d\n", hConsole);
-			fflush(stdout);
-			fp = _fdopen(hConsole, "w");
-			freopen_s(&fp, "CONOUT$", "w", stdout);
-			// End of cosole spawning
-		}
-		DebugOut(L"[UnmanagedAdapter] Can you see me? v2\n");
-		DebugOut(L"[UnmanagedAdapter] managedDllLocation = %s\n", managedDllLocation.c_str());
-		DebugOut(L"[UnmanagedAdapter] scubaDiverArg = %s\n", scubaDiverArg.c_str());
-
+	consoleAllocated = AllocConsole();
+	DebugOut(L"[UnmanagedAdapter] AllocConsole returned: %s\n", consoleAllocated ? L"True" : L"False");
+	if (consoleAllocated) {
+		HANDLE stdHandle;
+		int hConsole;
+		FILE* fp;
+		stdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+		DebugOut(L"[UnmanagedAdapter] stdHandle = %d\n", stdHandle);
+		hConsole = _open_osfhandle((intptr_t)stdHandle, _O_TEXT);
+		DebugOut(L"[UnmanagedAdapter] hConsole = %d\n", hConsole);
 		fflush(stdout);
+		fp = _fdopen(hConsole, "w");
+		freopen_s(&fp, "CONOUT$", "w", stdout);
+		// End of cosole spawning
 	}
+	DebugOut(L"[UnmanagedAdapter] Can you see me? v2\n");
+	DebugOut(L"[UnmanagedAdapter] managedDllLocation = %s\n", managedDllLocation.c_str());
+	DebugOut(L"[UnmanagedAdapter] scubaDiverArg = %s\n", scubaDiverArg.c_str());
+
+	fflush(stdout);
+#endif
 
 	ICLRRuntimeHost* pClr;
 	FrameworkType frameworkType = ParseFrameworkType(framework);
