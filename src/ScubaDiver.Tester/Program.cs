@@ -47,7 +47,7 @@ namespace ScubaDiver.Tester
                     Process curr = candidateProcs[i];
                     Console.WriteLine($"{i + 1}. {curr.ProcessName} " +
                                       $"(ID = {curr.Id}) " +
-                                      $"[Parent: {curr.GetParent().ProcessName} (ID = {curr.GetParent().Id})]");
+                                      $"[Parent: {curr.GetParent()?.ProcessName} (ID = {curr.GetParent()?.Id})]");
                 }
 
                 // Get the only process which doesn't have a parent with the same name.
@@ -56,7 +56,10 @@ namespace ScubaDiver.Tester
                 target = candidateProcs.Single(proc =>
                 {
                     var parentProc = proc.GetParent();
-                    Debug.WriteLine($"Procces {proc.ProcessName} (Id={proc.Id} is son of {parentProc.ProcessName} (Id={parentProc.Id})");
+                    // if we can't find the parent just go with this process. Hopefully it's the only one anyway
+                    if (parentProc == null)
+                        return true;
+                    Debug.WriteLine($"Procces {proc.ProcessName} (Id={proc.Id} is son of {parentProc .ProcessName} (Id={parentProc.Id})");
                     return parentProc.ProcessName != proc.ProcessName;
                 });
                 break;
@@ -64,7 +67,7 @@ namespace ScubaDiver.Tester
 
             Console.WriteLine($"Selected target: {target.ProcessName} " +
                               $"(ID = {target.Id}) " +
-                              $"[Parent: {target.GetParent().ProcessName} (ID = {target.GetParent().Id})]");
+                              $"[Parent: {target.GetParent()?.ProcessName} (ID = {target.GetParent()?.Id})]");
             RemoteApp remoteApp = RemoteApp.Connect(target);
             if (remoteApp == null)
             {
