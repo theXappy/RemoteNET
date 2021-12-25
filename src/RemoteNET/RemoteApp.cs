@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -85,7 +85,7 @@ namespace RemoteNET
 
         private Process _procWithDiver;
         private DiverCommunicator _communicator;
-        private Dictionary<HookAction, LocalHookCallback> _callbacksToProxies;
+        private Dictionary<MethodInfo, Dictionary<HookAction, LocalHookCallback>> _callbacksToProxies;
 
         private RemoteObjectsCollection _remoteObjects;
 
@@ -98,7 +98,7 @@ namespace RemoteNET
             _procWithDiver = procWithDiver;
             _communicator = communicator;
             Activator = new RemoteActivator(communicator, this);
-            _callbacksToProxies = new Dictionary<HookAction, LocalHookCallback>();
+            _callbacksToProxies = new Dictionary<MethodInfo, Dictionary<HookAction, LocalHookCallback>>();
             _remoteObjects = new RemoteObjectsCollection(this);
         }
 
@@ -396,9 +396,9 @@ namespace RemoteNET
                         {
                             len = (int)dro.Length;
                         }
-                        catch(Exception e)
+                        catch (Exception e)
                         {
-                            Console.WriteLine("EERROR ACCESSING ARRAY LEN: "+e);
+                            Console.WriteLine("EERROR ACCESSING ARRAY LEN: " + e);
                         }
                         decodedParameters = new object[len];
                         for (int i = 0; i < len; i++)
@@ -423,7 +423,11 @@ namespace RemoteNET
                 callback.DynamicInvoke(new object[2] { droInstance, decodedParameters });
             };
 
-            _callbacksToProxies[callback] = hookProxy;
+            if (!_callbacksToProxies.ContainsKey(methodToHook))
+            {
+                _callbacksToProxies[methodToHook] = new Dictionary<HookAction, LocalHookCallback>();
+            }
+            _callbacksToProxies[methodToHook][callback] = hookProxy;
 
             return _communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, hookProxy);
         }
