@@ -340,7 +340,29 @@ namespace RemoteNET
         //
 
         public delegate void HookAction(dynamic instance, dynamic[] args);
+        public bool UnhookMethod(MethodInfo methodToHook, HookAction callback)
+        {
+            if (!_callbacksToProxies.TryGetValue(methodToHook, out Dictionary<HookAction, LocalHookCallback> proxiesDict))
+            {
+                return false;
+            }
+
+            if (!proxiesDict.TryGetValue(callback, out LocalHookCallback hookProxy))
+            {
+                return false;
+            }
+
+            _communicator.UnhookMethod(hookProxy);
+            proxiesDict.Remove(callback);
+            if (proxiesDict.Count == 0)
+            {
+                // It was the last hook for this method, need to remove the inner dict
+                _callbacksToProxies.Remove(methodToHook);
+            }
+            return true;
+        }
         /// <returns>True on success, false otherwise</returns>
+
         public bool HookMethod(MethodInfo methodToHook, HookAction callback)
         {
             LocalHookCallback hookProxy = (ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args) =>
