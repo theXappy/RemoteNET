@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -169,6 +169,10 @@ namespace RemoteNET
                 if (adapterResourceHash != adapterFileHash)
                 {
                     File.WriteAllBytes(adapterPath, adapterResource);
+                    // Also set the copy's permissions so we can inject it into UWP apps
+                    FilePermissions.AddFileSecurity(adapterPath, "ALL APPLICATION PACKAGES",
+                        System.Security.AccessControl.FileSystemRights.ReadAndExecute,
+                        System.Security.AccessControl.AccessControlType.Allow);
                 }
 
                 // Unzip scuba diver and dependencies into their own directory
@@ -219,6 +223,10 @@ namespace RemoteNET
                     // Moving file to our AppData directory
                     File.Delete(destPath);
                     fileInfo.MoveTo(destPath);
+                    // Also set the copy's permissions so we can inject it into UWP apps
+                    FilePermissions.AddFileSecurity(destPath, "ALL APPLICATION PACKAGES",
+                                System.Security.AccessControl.FileSystemRights.ReadAndExecute,
+                                System.Security.AccessControl.AccessControlType.Allow);
                 }
 
 
