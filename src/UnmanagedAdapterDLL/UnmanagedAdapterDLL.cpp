@@ -3,6 +3,7 @@
 #include <metahost.h>
 #include <io.h>
 #include <fcntl.h>
+#include <corerror.h>
 #pragma comment(lib, "mscoree.lib")
 
 #include "UnmanagedAdapter.h"
@@ -43,25 +44,25 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 
 	const auto parts = split(adapterDllArg, L"*");
 
-	if (parts.size() < 3)
+	if (parts.size() < 5)
 	{
 		DebugOut(L"Not enough parameters.");
 		return;
 	}
 
 	const auto& managedDllLocation = parts.at(0);
-	const auto& scubaDiverArg = parts.at(1);
-	const auto& framework = parts.at(2);
+	const auto& managedDllClass = parts.at(1);
+	const auto& managedDllFunction = parts.at(2);
+	const auto& scubaDiverArg = parts.at(3);
+	const auto& framework = parts.at(4);
 
 	std::wcout << framework << std::endl;
-	std::wcout << managedDllLocation << std::endl;
-	std::wcout << scubaDiverArg << std::endl;
 
 	// All of this code is to spawn a console.
 	if (true) {
 		consoleAllocated = AllocConsole();
 		if (consoleAllocated) {
-			DebugOut(L"[UnmanagedAdapter] AllocConsole returned: %s\n", consoleAllocated ? "True" : "False");
+			DebugOut(L"[UnmanagedAdapter] AllocConsole returned: %s\n", consoleAllocated ? L"True" : L"False");
 			HANDLE stdHandle;
 			int hConsole;
 			FILE* fp;
@@ -75,8 +76,9 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 			// End of cosole spawning
 		}
 		DebugOut(L"[UnmanagedAdapter] Can you see me? v2\n");
-		DebugOut(L"[UnmanagedAdapter] managedDllLocation = %ls\n", managedDllLocation);
-		DebugOut(L"[UnmanagedAdapter] scubaDiverArg = %ls\n", scubaDiverArg);
+		DebugOut(L"[UnmanagedAdapter] managedDllLocation = %s\n", managedDllLocation.c_str());
+		DebugOut(L"[UnmanagedAdapter] scubaDiverArg = %s\n", scubaDiverArg.c_str());
+
 		fflush(stdout);
 	}
 
@@ -85,11 +87,13 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 
 	if (frameworkType == FrameworkType::NET_CORE)
 	{
+		DebugOut(L"[UnmanagedAdapter] Secure a handle to the Core (3/5/6) CLR \n");
 		// Secure a handle to the Core (3/5/6) CLR 
 		pClr = StartCLRCore();
 	}
 	else if (frameworkType == FrameworkType::NET_FRAMEWORK)
 	{
+		DebugOut(L"[UnmanagedAdapter] Secure a handle to the CLR v4.0 \n");
 		// Secure a handle to the CLR v4.0
 		pClr = StartCLR(L"v4.0.30319");
 	}
@@ -104,8 +108,8 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 		DWORD result;
 		hr = pClr->ExecuteInDefaultAppDomain(
 			managedDllLocation.c_str(),
-			L"ScubaDiver.DllEntry",
-			L"EntryPoint",
+			managedDllClass.c_str(),
+			managedDllFunction.c_str(),
 			scubaDiverArg.c_str(),
 			&result);
 	}
