@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using RemoteNET.Internal.Reflection;
+using RemoteNET.Internal.Utils;
 using RemoteNET.Properties;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
@@ -245,9 +246,15 @@ namespace RemoteNET
                     scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
                     .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver.dll")).FullName;
                 }
+                string adapterExecutionArg = string.Join("*", scubaDiverDllPath,
+                    "ScubaDiver.DllEntry",
+                    "EntryPoint",
+                    diverPort.ToString(),
+                    targetDotNetVer.ToString()
+                    );
 
 
-                var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id} {scubaDiverDllPath} {diverPort} {targetDotNetVer}");
+                var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id} {adapterExecutionArg}");
                 startInfo.WorkingDirectory = remoteNetAppDataDir;
                 startInfo.UseShellExecute = false;
                 startInfo.RedirectStandardOutput = true;
