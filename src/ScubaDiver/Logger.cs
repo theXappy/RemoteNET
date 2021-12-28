@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace ScubaDiver
@@ -11,6 +12,11 @@ namespace ScubaDiver
 #if DEBUG
             Console.WriteLine(s);
 #endif
+            if (Debugger.IsAttached)
+            {
+                System.Diagnostics.Debug.WriteLine(s);
+            }
+
         }
     }
 }
