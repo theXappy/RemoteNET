@@ -1,5 +1,5 @@
 ![icon](https://raw.githubusercontent.com/theXappy/RemoteNET/main/icon.png)
-# RemoteNET
+# RemoteNET [![NuGet][nuget-image]][nuget-link]
 This library lets you examine, create and interact with remote objects in other .NET processes.  
 It's like [System.Runtime.Remoting](https://docs.microsoft.com/en-us/dotnet/api/system.runtime.remoting?view=net-5.0) except the other app doesn't need to be compiled (or consent) to support it.
 
@@ -10,14 +10,12 @@ Basically this library lets you mess with objects of any other .NET app without 
 * .NET Core 3.0/3.1  
 * .NET Framework 4.5/4.6/4.7/4.8 (incl. subversions)
 
+## Including the library in your project
+There are 2 ways to get the library:
 
-## Compilation
-1. Clone
-2. Open `RemoteNET.sln` file in VisualStudio 2019
-3. Build Solution (`Ctrl+Shift+B`)
-
-You can then run the `ScubaDiver.Tester` project which is a CLI demonstrating some of `RemoteNET` abilities.  
-Alternativly, include `RemoteNET` in your project and use it yourself.
+1. Get it [from NuGet][nuget-link]\
+-or-
+2. Clone this repo, compile then reference `RemoteNET.dll` and `ScubaDiver.API.dll` in your project.
 
 ## Minimal Working Example
 To get the essence of how easy and usefull this library can be, see below a re-implementation of [denandz/KeeFarce](https://github.com/denandz/KeeFarce).  
@@ -161,7 +159,9 @@ The limitations:
 2. Static members
 3. Support injecting to self with local diver
 4. Document "Reflection API" (RemoteType, RemoteMethodInfo, ... )
-5. Support other .NET framework CLR versions (Before .NET 4.5). Currently supports v4.0.30319
+5. Support other .NET framework CLR versions (Before .NET 4). Currently supports v4.0.30319
+6. Document Harmony (prefix hooks)
+7. Support more Harmony features
 
 
 ## Thanks
@@ -173,3 +173,6 @@ Also multiple parts of this project are directly taken from KeeFarce (DLL Inject
 **Raymond Chen** for stating this project shouldn't be done in [this blog post from 2010](https://devblogs.microsoft.com/oldnewthing/20100812-00/?p=13163).  
 I really like this qoute from the post:
 >If you could obtain all instances of a type, the fundamental logic behind computer programming breaks down. It effectively becomes impossible to reason about code because anything could happen to your objects at any time.
+
+[nuget-image]: https://img.shields.io/nuget/v/RemoteNET
+[nuget-link]: https://www.nuget.org/packages/RemoteNET/
