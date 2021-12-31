@@ -160,7 +160,7 @@ namespace RemoteNET.Internal
             if (dro.HasMember(name))
             {
                 // Property already defined, let's skip it.
-                Console.WriteLine("[AddProperty] PROPERTY {name} ALREADY DEFINED!");
+                Logger.Debug("[AddProperty] PROPERTY {name} ALREADY DEFINED!");
                 return;
             }
 

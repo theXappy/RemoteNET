@@ -398,7 +398,7 @@ namespace RemoteNET
                         }
                         catch (Exception e)
                         {
-                            Console.WriteLine("EERROR ACCESSING ARRAY LEN: " + e);
+                            Logger.Debug("ERROR ACCESSING ARRAY LEN: " + e);
                         }
                         decodedParameters = new object[len];
                         for (int i = 0; i < len; i++)
