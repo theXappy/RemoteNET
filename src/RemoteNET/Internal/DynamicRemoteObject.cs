@@ -329,29 +329,15 @@ namespace RemoteNET.Internal
             var binder = Binder.GetMember(CSharpBinderFlags.None, memberName, obj.GetType(),
                 new[] { CSharpArgumentInfo.Create(CSharpArgumentInfoFlags.None, null) });
             var callsite = CallSite<Func<CallSite, object, object>>.Create(binder);
-            //DynamicRemoteObject casted = obj as DynamicRemoteObject;
-            //Console.WriteLine(" @@@ Calling (casted.TryGetMember");
-            //return casted.TryGetMember((GetMemberBinder)binder, out output);
             if (obj is DynamicRemoteObject dro)
             {
                 if (dro._members.ContainsKey(memberName))
                 {
-                    Console.WriteLine("SHORTCUT~~");
                     if (dro.TryGetMember(binder as GetMemberBinder, out output))
                     {
-                        Console.WriteLine("SHORTCUT Nailed It!");
                         return true;
                     }
-                    Console.WriteLine("SHORTCUT MISSED...");
                 }
-                else
-                {
-                    Console.WriteLine("NO SHORTBUT Cause2");
-                }
-            }
-            else
-            {
-                Console.WriteLine("NO SHORTBUT Cause1");
             }
 
             // Fallback? Does it always just result in TryGetMember?
