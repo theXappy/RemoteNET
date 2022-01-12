@@ -41,9 +41,18 @@ namespace ScubaDiver.API.Extensions
             {
                 method = methods.SingleOrDefault();
             }
-            else { 
-                method = methods.SingleOrDefault(m => m.GetParameters().Select(pi => pi.ParameterType)
-                                          .SequenceEqual(parameterTypes, _wildCardTypesComparer));
+            else {
+                MethodInfo[]? exactMatches = methods.Where(m => m.GetParameters().Select(pi => pi.ParameterType).SequenceEqual(parameterTypes)).ToArray();
+                if (exactMatches != null && exactMatches.Length == 1)
+                {
+                    method = exactMatches.First();
+                }
+                else
+                {
+                    // Do a less strict search
+                    method = methods.SingleOrDefault(m => m.GetParameters().Select(pi => pi.ParameterType)
+                                              .SequenceEqual(parameterTypes, _wildCardTypesComparer));
+                }
             }
 
             if (method != null)

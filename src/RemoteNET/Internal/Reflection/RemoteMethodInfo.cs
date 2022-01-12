@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using ScubaDiver;
 using ScubaDiver.API;
@@ -115,6 +116,12 @@ namespace RemoteNET.Internal.Reflection
         public override object[] GetCustomAttributes(Type attributeType, bool inherit)
         {
             throw new NotImplementedException();
+        }
+
+        public override string ToString()
+        {
+            string args = string.Join(", ", _paramInfos.Select(pi => pi.ParameterType.FullName));
+            return $"{this.ReturnType.FullName} {this.Name}({args})";
         }
     }
 }

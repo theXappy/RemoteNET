@@ -198,7 +198,9 @@ namespace ScubaDiver
             }
 
             // Call callback at controller
+            Logger.Debug("[InvokeControllerCallback] Before reverseCommunicator.InvokeCallback");
             reverseCommunicator.InvokeCallback(token, remoteParams);
+            Logger.Debug("[InvokeControllerCallback] After reverseCommunicator.InvokeCallback");
         }
         /// <summary>
         /// Tries to get a <see cref="FrozenObjectInfo"/> of a pinned object
@@ -418,7 +420,8 @@ namespace ScubaDiver
             string typeFullName = request.TypeFullName;
             string methodName =  request.MethodName;
             string hookPosition = request.HookPosition;
-            if(hookPosition.ToUpper() != "PRE")
+            HarmonyPatchPosition pos = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPosition);
+            if(!Enum.IsDefined(typeof(HarmonyPatchPosition), pos))
             {
                 return "{\"error\":\"hook_position has an invalid or unsupported value\"}";
             }
@@ -431,7 +434,12 @@ namespace ScubaDiver
             }
             Logger.Debug("[Diver] Hook Method - Resolved Type");
 
-            MethodInfo methodInfo = resolvedType.GetMethodRecursive(methodName);
+            Type[] paramTypes =
+                 request.ParametersTypeFullNames.Select(typeFullName => TypesResolver.Resolve(_runtime, typeFullName)).ToArray();
+            Console.WriteLine($"[Diver] Hooking - Calling GetMethodRecursive With these params COUNT={paramTypes.Length}");
+            Console.WriteLine($"[Diver] Hooking - Calling GetMethodRecursive With these param types: {(string.Join(",",paramTypes.Select(t=>t.FullName).ToArray()))}");
+            
+            MethodInfo methodInfo = resolvedType.GetMethodRecursive(methodName, paramTypes);
             if (methodInfo == null)
             {
                 return "{\"error\":\"Failed to find method in type\"}";
@@ -446,7 +454,15 @@ namespace ScubaDiver
             ScubaDiver.Hooking.HarmonyWrapper.HookCallback handler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
 
             Logger.Debug($"[Diver] Hooking function {methodName}...");
-            ScubaDiver.Hooking.HarmonyWrapper.Instance.AddPrefix(methodInfo, handler);
+            try
+            {
+                ScubaDiver.Hooking.HarmonyWrapper.Instance.AddHook(methodInfo, pos, handler);
+            }
+            catch(Exception ex)
+            {
+                Logger.Debug($"[Diver] Failed to hook func {methodName}. Exception: {ex}");
+                return "{\"error\":\"Failed insert the hook for the function. HarmonyWrapper.AddHook failed.\"}";
+            }
             Logger.Debug($"[Diver] Hooked func {methodName}!");
 
 

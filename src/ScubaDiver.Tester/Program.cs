@@ -257,9 +257,29 @@ namespace ScubaDiver.Tester
                                     break;
                                 }
                                 Console.WriteLine("Method name:");
-                                string method = Console.ReadLine();
+                                string methodName = Console.ReadLine();
 
-                                mi = t.GetMethod(method);
+                                var methods = t.GetMethods((BindingFlags)0xffff).Where(mInfo=>mInfo.Name == methodName).ToArray();
+                                if(methodName.Length < 0 )
+                                {
+                                    throw new Exception("No such function");
+                                }
+                                else if (methods.Length > 1)
+                                {
+                                    Console.WriteLine("More than one overload found:");
+                                    for (int i = 0; i < methods.Length; i++)
+                                    {
+                                        string paramsList = string.Join(",", methods[i].GetParameters().Select(prm => prm.ParameterType.FullName+ " " + prm.Name));
+                                        Console.WriteLine($"{i + 1}. {methods[i].ReturnType.Name} {methodName}({paramsList})");
+                                    }
+                                    Console.WriteLine("Which overload?");
+                                    int res = int.Parse(Console.ReadLine())-1;
+                                    mi = methods[res];
+                                }
+                                else
+                                {
+                                    mi = methods.Single();
+                                }
                                 if (mi == null)
                                 {
                                     Console.WriteLine("Failed to find the method in the resolved type.");
@@ -305,8 +325,27 @@ namespace ScubaDiver.Tester
                                 }
                             };
 
-                            remoteApp.HookMethod(mi, callback);
-
+                            Console.WriteLine("Which position to hook?");
+                            Console.WriteLine("1. Prefix");
+                            Console.WriteLine("2. Postfix");
+                            Console.WriteLine("3. Finalizer");
+                            if (!int.TryParse(Console.ReadLine(), out int selection) || (selection < 1 || selection > 4))
+                            {
+                                Console.WriteLine("Bad input.");
+                                break;
+                            }
+                            switch(selection)
+                            {
+                                case 1:
+                                    remoteApp.Harmony.Patch(mi, prefix: callback);
+                                    break;
+                                case 2:
+                                    remoteApp.Harmony.Patch(mi, postfix: callback);
+                                    break;
+                                case 3:
+                                    remoteApp.Harmony.Patch(mi, finalizer: callback);
+                                    break;
+                            }
                         }
                         break;
                     case 9:

@@ -15,6 +15,7 @@ using ScubaDiver.API.Dumps;
 
 namespace ScubaDiver.API
 {
+
     /// <summary>
     /// Communicates with a diver in a remote process
     /// </summary>
@@ -313,7 +314,7 @@ namespace ScubaDiver.API
             }
         }
 
-        public bool HookMethod(string type, string methodName, LocalHookCallback callback)
+        public bool HookMethod(string type, string methodName, HarmonyPatchPosition pos, LocalHookCallback callback, List<string> parametersTypeFullNames = null)
         {
             Dictionary<string, string> queryParams;
             string body;
@@ -343,7 +344,8 @@ namespace ScubaDiver.API
             {
                 TypeFullName = type,
                 MethodName = methodName,
-                HookPosition = "Pre", // TODO: Support others
+                HookPosition = pos.ToString(),
+                ParametersTypeFullNames = parametersTypeFullNames
             };
 
             var requestJsonBody = JsonConvert.SerializeObject(req);
@@ -355,6 +357,7 @@ namespace ScubaDiver.API
             }
             EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(resJson);
 
+            Console.WriteLine($"[Hook] Received back token: {regRes.Token} from raw json: {resJson}");
             _tokensToHookCallbacks[regRes.Token] = callback;
             _hookCallbacksToTokens[callback] = regRes.Token;
             // Getting back the token tells us the hook was registered successfully.
@@ -384,7 +387,6 @@ namespace ScubaDiver.API
             }
         }
 
-        public delegate void LocalHookCallback(ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args);
         public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args);
 
         private Dictionary<int, LocalEventCallback> _tokensToEventHandlers = new();

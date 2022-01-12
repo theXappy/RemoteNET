@@ -85,11 +85,11 @@ namespace RemoteNET
 
         private Process _procWithDiver;
         private DiverCommunicator _communicator;
-        private Dictionary<MethodInfo, Dictionary<HookAction, LocalHookCallback>> _callbacksToProxies;
 
         private RemoteObjectsCollection _remoteObjects;
 
         public RemoteActivator Activator { get; private set; }
+        public RemoteHarmony Harmony{ get; private set; }
 
         public DiverCommunicator Communicator => _communicator;
 
@@ -98,7 +98,7 @@ namespace RemoteNET
             _procWithDiver = procWithDiver;
             _communicator = communicator;
             Activator = new RemoteActivator(communicator, this);
-            _callbacksToProxies = new Dictionary<MethodInfo, Dictionary<HookAction, LocalHookCallback>>();
+            Harmony = new RemoteHarmony(this);
             _remoteObjects = new RemoteObjectsCollection(this);
         }
 
@@ -333,103 +333,6 @@ namespace RemoteNET
         public RemoteObject GetRemoteObject(ulong remoteAddress, int? hashCode = null)
         {
             return _remoteObjects.GetRemoteObject(remoteAddress, hashCode);
-        }
-
-        //
-        // Hooking
-        //
-
-        public delegate void HookAction(dynamic instance, dynamic[] args);
-        public bool UnhookMethod(MethodInfo methodToHook, HookAction callback)
-        {
-            if (!_callbacksToProxies.TryGetValue(methodToHook, out Dictionary<HookAction, LocalHookCallback> proxiesDict))
-            {
-                return false;
-            }
-
-            if (!proxiesDict.TryGetValue(callback, out LocalHookCallback hookProxy))
-            {
-                return false;
-            }
-
-            _communicator.UnhookMethod(hookProxy);
-            proxiesDict.Remove(callback);
-            if (proxiesDict.Count == 0)
-            {
-                // It was the last hook for this method, need to remove the inner dict
-                _callbacksToProxies.Remove(methodToHook);
-            }
-            return true;
-        }
-        /// <returns>True on success, false otherwise</returns>
-
-        public bool HookMethod(MethodInfo methodToHook, HookAction callback)
-        {
-            LocalHookCallback hookProxy = (ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args) =>
-            {
-                // Converting instance to DRO
-                DynamicRemoteObject droInstance;
-                if (instance.IsNull)
-                {
-                    droInstance = null;
-                }
-                else
-                {
-                    RemoteObject roInstance = GetRemoteObject(instance.RemoteAddress);
-                    droInstance = roInstance.Dynamify();
-                }
-
-
-                // Converting args to DROs/raw primitive types
-                object[] decodedParameters;
-
-                if (args.Length == 1)
-                {
-                    // We are expecting a single arg which is a REMOTE array of objects (object[]) and we need to flatten it
-                    // into several (Dynamic) Remote Objects in a LOCAL array of objects.
-                    RemoteObject ro = this.GetRemoteObject(args[0].RemoteAddress);
-                    dynamic dro = ro.Dynamify();
-                    if ((ro.GetType() as Type).IsArray)
-                    {
-                        int len = 0;
-                        try
-                        {
-                            len = (int)dro.Length;
-                        }
-                        catch (Exception e)
-                        {
-                            Logger.Debug("ERROR ACCESSING ARRAY LEN: " + e);
-                        }
-                        decodedParameters = new object[len];
-                        for (int i = 0; i < len; i++)
-                        {
-                            // Since this object isn't really a local array (just a proxy of a remote one) the index
-                            // acceess causes a 'GetItem' function call and retrival of the remote object at the position
-                            dynamic item = dro[i];
-                            decodedParameters[i] = item;
-                        }
-                    }
-                    else
-                    {
-                        throw new NotImplementedException("Unexpected arguments forwarded to callback from the diver -- single arg but not an array.");
-                    }
-                }
-                else
-                {
-                    throw new NotImplementedException("Unexpected arguments forwarded to callback from the diver.");
-                }
-
-                // Call the callback with the proxied parameters (using DynamicRemoteObjects)
-                callback.DynamicInvoke(new object[2] { droInstance, decodedParameters });
-            };
-
-            if (!_callbacksToProxies.ContainsKey(methodToHook))
-            {
-                _callbacksToProxies[methodToHook] = new Dictionary<HookAction, LocalHookCallback>();
-            }
-            _callbacksToProxies[methodToHook][callback] = hookProxy;
-
-            return _communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, hookProxy);
         }
 
         //
