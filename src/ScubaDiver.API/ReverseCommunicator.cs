@@ -78,6 +78,11 @@ namespace ScubaDiver.API
 
             var resJson = SendRequest("invoke_callback", null, requestJsonBody);
 
+            if(resJson.Contains("\"error\":"))
+            {
+                return null;
+            }
+
             InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
             return res;
         }

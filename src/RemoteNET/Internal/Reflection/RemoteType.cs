@@ -112,8 +112,19 @@ namespace RemoteNET.Internal.Reflection
                 return methodGroup.Single();
             }
 
+            bool overloadsComparer(RemoteMethodInfo method)
+            {
+                var parameters = method.GetParameters();
+                // Compare Full Names mainly because the RemoteMethodInfo contains RemoteParameterInfos and we might be 
+                // comparing with local parameters (like System.String)
+                bool matchingExpectingTypes = parameters
+                    .Select(arg => arg.ParameterType.FullName)
+                    .SequenceEqual(types.Select(type=>type.FullName));
+                return matchingExpectingTypes;
+            }
+
             // Need to filer also by types
-            return methodGroup.Single(method=> method.GetParameters().Select(arg => arg.ParameterType).SequenceEqual(types));
+            return methodGroup.Single(overloadsComparer);
         }
 
         public override MethodInfo[] GetMethods(BindingFlags bindingAttr)
