@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -26,6 +27,7 @@ namespace ScubaDiver
     public class Diver : IDisposable
     {
         // Runtime analysis and exploration fields
+        private object _debugObjectsLock = new object();
         private DataTarget _dt = null;
         private ClrRuntime _runtime = null;
         private Converter<object> _converter = new Converter<object>();
@@ -34,16 +36,14 @@ namespace ScubaDiver
         private Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
 
         // Pinning objects fields
-        private Dictionary<ulong, FrozenObjectInfo> _pinnedObjects;
+        private ConcurrentDictionary<ulong, FrozenObjectInfo> _pinnedObjects;
 
         // Callbacks Endpoint of the Controller process
         IPEndPoint _callbacksEndpoint;
         int _nextAvilableCallbackToken = 0;
-        private Dictionary<int, IProxyFunctionHolder> _tokensToRegisteredEventHandlers;
+        private ConcurrentDictionary<int, IProxyFunctionHolder> _tokensToRegisteredEventHandlers;
 
-        // Collection for all types we failed to find
-        HashSet<string> _typesWeAlreadyFailedToDump = new HashSet<string>();
-
+        private ManualResetEvent _stayAlive = new ManualResetEvent(true);
 
         public bool HasCallbackEndpoint => _callbacksEndpoint != null;
 
@@ -67,25 +67,28 @@ namespace ScubaDiver
                 {"/event_unsubscribe", MakeEventUnsubscribeResponse},
                 {"/hook_method", MakeHookMethodResponse},
                 {"/unhook_method", MakeUnhookMethodResponse},
-                {"/get_item", MakeArrayItemResponse},                
+                {"/get_item", MakeArrayItemResponse},
             };
-            _pinnedObjects = new Dictionary<ulong, FrozenObjectInfo>();
-            _tokensToRegisteredEventHandlers = new Dictionary<int, IProxyFunctionHolder>();
+            _pinnedObjects = new ConcurrentDictionary<ulong, FrozenObjectInfo>();
+            _tokensToRegisteredEventHandlers = new ConcurrentDictionary<int, IProxyFunctionHolder>();
         }
 
         void RefreshRuntime()
         {
-            _runtime?.Dispose();
-            _runtime = null;
-            _dt?.Dispose();
-            _dt = null;
+            lock (_debugObjectsLock)
+            {
+                _runtime?.Dispose();
+                _runtime = null;
+                _dt?.Dispose();
+                _dt = null;
 
-            // This works like 'fork()', it cretes does NOT create a dump file and uses it as the target
-            // Instead it creates a secondary processes which is a copy of the current one.
-            // This subprocess inherits handles to DLLs in the current process so it might "lock"
-            // both UnmanagedAdapterDLL.dll and ScubaDiver.dll
-            _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
-            _runtime = _dt.ClrVersions.Single().CreateRuntime();
+                // This works like 'fork()', it cretes does NOT create a dump file and uses it as the target
+                // Instead it creates a secondary processes which is a copy of the current one.
+                // This subprocess inherits handles to DLLs in the current process so it might "lock"
+                // both UnmanagedAdapterDLL.dll and ScubaDiver.dll
+                _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
+                _runtime = _dt.ClrVersions.Single().CreateRuntime();
+            }
         }
 
         public void Dive(ushort listenPort)
@@ -102,10 +105,13 @@ namespace ScubaDiver
 
             listener.Close();
             Logger.Debug("[Diver] Closing ClrMD runtime and snapshot");
-            _runtime?.Dispose();
-            _runtime = null;
-            _dt?.Dispose();
-            _dt = null;
+            lock (_debugObjectsLock)
+            {
+                _runtime?.Dispose();
+                _runtime = null;
+                _dt?.Dispose();
+                _dt = null;
+            }
 
             Logger.Debug("[Diver] Unpinning objects");
             foreach (ulong pinAddr in _pinnedObjects.Keys.ToList())
@@ -116,35 +122,43 @@ namespace ScubaDiver
 
             Logger.Debug("[Diver] Dispatcher returned, Dive is complete.");
         }
+
+        private void HandleDispatchedRequest(HttpListenerContext requestContext)
+        {
+            HttpListenerRequest request = requestContext.Request;
+
+            var response = requestContext.Response;
+            string body;
+            if (_responseBodyCreators.TryGetValue(request.Url.AbsolutePath, out var respBodyGenerator))
+            {
+                body = respBodyGenerator(request);
+            }
+            else
+            {
+                body = "{\"error\":\"Unknown Command\"}";
+            }
+
+            byte[] buffer = System.Text.Encoding.UTF8.GetBytes(body);
+            // Get a response stream and write the response to it.
+            response.ContentLength64 = buffer.Length;
+            response.ContentType = "application/json";
+            System.IO.Stream output = response.OutputStream;
+            output.Write(buffer, 0, buffer.Length);
+            // You must close the output stream.
+            output.Close();
+        }
+
         private void Dispatcher(HttpListener listener)
         {
-            while (true)
+            while (_stayAlive.WaitOne())
             {
-                var requestContext = listener.GetContext();
-                HttpListenerRequest request = requestContext.Request;
-
-                var response = requestContext.Response;
-                string body;
-                if (_responseBodyCreators.TryGetValue(request.Url.AbsolutePath, out var respBodyGenerator))
+                HttpListenerContext requestContext = listener.GetContext();
+                Task.Run(() =>
                 {
-                    body = respBodyGenerator(request);
-                }
-                else
-                {
-                    body = "{\"error\":\"Unknown Command\"}";
-                }
-
-                byte[] buffer = System.Text.Encoding.UTF8.GetBytes(body);
-                // Get a response stream and write the response to it.
-                response.ContentLength64 = buffer.Length;
-                response.ContentType = "application/json";
-                System.IO.Stream output = response.OutputStream;
-                output.Write(buffer, 0, buffer.Length);
-                // You must close the output stream.
-                output.Close();
-
-                if (request.RawUrl == "/die")
-                    break;
+                    Console.WriteLine($"[Diver][TASK ID {Thread.CurrentThread.ManagedThreadId}] New Dispatched Request STARTED");
+                    HandleDispatchedRequest(requestContext);
+                    Console.WriteLine($"[Diver][TASK ID {Thread.CurrentThread.ManagedThreadId}] New Dispatched Request FINISHED");
+                });
             }
 
             Logger.Debug("[Diver] HTTP Loop ended. Cleaning up");
@@ -156,7 +170,7 @@ namespace ScubaDiver
                 if (proxyHolder is RegisteredEventHandlerInfo rehi)
                 {
                     rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
-                    _tokensToRegisteredEventHandlers.Remove(token);
+                    _tokensToRegisteredEventHandlers.TryRemove(token, out _);
                 }
                 else if (proxyHolder is RegisteredMethodHookInfo rmhi)
                 {
@@ -176,7 +190,7 @@ namespace ScubaDiver
             for (int i = 0; i < parameters.Length; i++)
             {
                 object parameter = parameters[i];
-                if(parameter == null)
+                if (parameter == null)
                 {
                     remoteParams[i] = ObjectOrRemoteAddress.Null;
                 }
@@ -238,16 +252,16 @@ namespace ScubaDiver
         /// <returns>True if it was pinned, false if not.</returns>
         public bool UnpinObject(ulong objAddress)
         {
-            if (_pinnedObjects.TryGetValue(objAddress, out FrozenObjectInfo poi))
+            if (_pinnedObjects.TryRemove(objAddress, out FrozenObjectInfo poi))
             {
                 if (poi is FrozenObjectInfo foi)
                 {
                     foi.UnfreezeEvent.Set();
                     foi.FreezeTask.Wait();
                 }
+                return true;
             }
-            bool removed = _pinnedObjects.Remove(objAddress);
-            return removed;
+            return false;
         }
         /// <summary>
         /// Pins an object, possibly at a specific address.
@@ -258,7 +272,7 @@ namespace ScubaDiver
         public FrozenObjectInfo PinObject(object instance)
         {
             FrozenObjectInfo fObj = Freezer.Freeze(instance);
-            _pinnedObjects.Add(fObj.Address, fObj);
+            _pinnedObjects.TryAdd(fObj.Address, fObj);
 
             return fObj;
         }
@@ -275,55 +289,58 @@ namespace ScubaDiver
                 anyErrors = false;
 
                 RefreshRuntime();
-                foreach (ClrObject clrObj in _runtime.Heap.EnumerateObjects())
+                lock (_debugObjectsLock)
                 {
-                    if (clrObj.IsFree)
-                        continue;
-
-                    string objType = clrObj.Type?.Name ?? "Unknown";
-                    if (filter(objType))
+                    foreach (ClrObject clrObj in _runtime.Heap.EnumerateObjects())
                     {
-                        ulong mt = clrObj.Type.MethodTable;
-                        int hashCode = 0;
-                        // TODO: Should I make hashcode dumping optional?
-                        // maybe make the type filter mandatory?
-                        // getting handles to every single object in the heap (in the worst case)
-                        // to dump it's hashcode sounds like it'll trigger a GC every single trial...
-                        object instance = null;
-                        try
-                        {
-                            instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
-                        }
-                        catch (Exception)
-                        {
-                            // Exiting heap enumeration and signaling that this trial has failed.
-                            anyErrors = true;
-                            break;
-                        }
+                        if (clrObj.IsFree)
+                            continue;
 
-                        // We got the object in our hands so we haven't spotted a GC collection or anything else scary
-                        // now getting the hashcode which is itself a challange since 
-                        // objects might (very rudely) throw exceptions on this call.
-                        // I'm looking at you, System.Reflection.Emit.SignatureHelper
-                        //
-                        // We don't REALLY care if we don't get a has code. It just means those objects would
-                        // be a bit more hard to grab later.
-                        try
+                        string objType = clrObj.Type?.Name ?? "Unknown";
+                        if (filter(objType))
                         {
-                            hashCode = instance.GetHashCode();
-                        }
-                        catch
-                        {
-                            // TODO: Maybe we need a boolean in HeapObject to indicate we couldn't get the hashcode...
-                            hashCode = 0;
-                        }
+                            ulong mt = clrObj.Type.MethodTable;
+                            int hashCode = 0;
+                            // TODO: Should I make hashcode dumping optional?
+                            // maybe make the type filter mandatory?
+                            // getting handles to every single object in the heap (in the worst case)
+                            // to dump it's hashcode sounds like it'll trigger a GC every single trial...
+                            object instance = null;
+                            try
+                            {
+                                instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
+                            }
+                            catch (Exception)
+                            {
+                                // Exiting heap enumeration and signaling that this trial has failed.
+                                anyErrors = true;
+                                break;
+                            }
 
-                        objects.Add(new HeapDump.HeapObject()
-                        {
-                            Address = clrObj.Address,
-                            Type = objType,
-                            HashCode = hashCode
-                        });
+                            // We got the object in our hands so we haven't spotted a GC collection or anything else scary
+                            // now getting the hashcode which is itself a challange since 
+                            // objects might (very rudely) throw exceptions on this call.
+                            // I'm looking at you, System.Reflection.Emit.SignatureHelper
+                            //
+                            // We don't REALLY care if we don't get a has code. It just means those objects would
+                            // be a bit more hard to grab later.
+                            try
+                            {
+                                hashCode = instance.GetHashCode();
+                            }
+                            catch
+                            {
+                                // TODO: Maybe we need a boolean in HeapObject to indicate we couldn't get the hashcode...
+                                hashCode = 0;
+                            }
+
+                            objects.Add(new HeapDump.HeapObject()
+                            {
+                                Address = clrObj.Address,
+                                Type = objType,
+                                HashCode = hashCode
+                            });
+                        }
                     }
                 }
                 if (!anyErrors)
@@ -354,7 +371,7 @@ namespace ScubaDiver
                 if (proxyHolder is RegisteredEventHandlerInfo eventInfo)
                 {
                     eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
-                    _tokensToRegisteredEventHandlers.Remove(token);
+                    _tokensToRegisteredEventHandlers.TryRemove(token, out _);
                     return "{\"status\":\"OK\"}";
                 }
                 else
@@ -418,27 +435,34 @@ namespace ScubaDiver
             Logger.Debug("[Diver] Parsing Hook Method request body -- Done!");
 
             string typeFullName = request.TypeFullName;
-            string methodName =  request.MethodName;
+            string methodName = request.MethodName;
             string hookPosition = request.HookPosition;
             HarmonyPatchPosition pos = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPosition);
-            if(!Enum.IsDefined(typeof(HarmonyPatchPosition), pos))
+            if (!Enum.IsDefined(typeof(HarmonyPatchPosition), pos))
             {
                 return "{\"error\":\"hook_position has an invalid or unsupported value\"}";
             }
             Logger.Debug("[Diver] Hook Method = It's pre");
 
-            Type resolvedType = TypesResolver.Resolve(_runtime, typeFullName);
-            if(resolvedType == null)
+            Type resolvedType = null;
+            lock (_debugObjectsLock)
+            {
+                resolvedType = TypesResolver.Resolve(_runtime, typeFullName);
+            }
+            if (resolvedType == null)
             {
                 return "{\"error\":\"Failed to resolve type\"}";
             }
             Logger.Debug("[Diver] Hook Method - Resolved Type");
 
-            Type[] paramTypes =
-                 request.ParametersTypeFullNames.Select(typeFullName => TypesResolver.Resolve(_runtime, typeFullName)).ToArray();
+            Type[] paramTypes = null;
+            lock (_debugObjectsLock)
+            {
+                paramTypes = request.ParametersTypeFullNames.Select(typeFullName => TypesResolver.Resolve(_runtime, typeFullName)).ToArray();
+            }
             Console.WriteLine($"[Diver] Hooking - Calling GetMethodRecursive With these params COUNT={paramTypes.Length}");
-            Console.WriteLine($"[Diver] Hooking - Calling GetMethodRecursive With these param types: {(string.Join(",",paramTypes.Select(t=>t.FullName).ToArray()))}");
-            
+            Console.WriteLine($"[Diver] Hooking - Calling GetMethodRecursive With these param types: {(string.Join(",", paramTypes.Select(t => t.FullName).ToArray()))}");
+
             MethodInfo methodInfo = resolvedType.GetMethodRecursive(methodName, paramTypes);
             if (methodInfo == null)
             {
@@ -458,7 +482,7 @@ namespace ScubaDiver
             {
                 ScubaDiver.Hooking.HarmonyWrapper.Instance.AddHook(methodInfo, pos, handler);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Debug($"[Diver] Failed to hook func {methodName}. Exception: {ex}");
                 return "{\"error\":\"Failed insert the hook for the function. HarmonyWrapper.AddHook failed.\"}";
@@ -627,7 +651,12 @@ namespace ScubaDiver
                 return "{\"error\":\"Failed to deserialize body\"}";
             }
 
-            Type t = TypesResolver.Resolve(_runtime, request.TypeFullName);
+
+            Type t = null;
+            lock (_debugObjectsLock)
+            {
+                t = TypesResolver.Resolve(_runtime, request.TypeFullName);
+            }
             if (t == null)
             {
                 return "{\"error\":\"Failed to resolve type\"}";
@@ -742,7 +771,10 @@ namespace ScubaDiver
                 // Null target - static call
                 //
 
-                dumpedObjType = TypesResolver.Resolve(_runtime, request.TypeFullName);
+                lock (_debugObjectsLock)
+                {
+                    dumpedObjType = TypesResolver.Resolve(_runtime, request.TypeFullName);
+                }
             }
             else
             {
@@ -760,7 +792,11 @@ namespace ScubaDiver
                 else
                 {
                     // Object not pinned, try get it the hard way
-                    ClrObject clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                    ClrObject clrObj;
+                    lock (_debugObjectsLock)
+                    {
+                        clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                    }
                     if (clrObj.Type == null)
                     {
                         return "{\"error\":\"'address' points at an invalid address\"}";
@@ -768,7 +804,10 @@ namespace ScubaDiver
 
                     // Make sure it's still in place
                     RefreshRuntime();
-                    clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                    lock (_debugObjectsLock)
+                    {
+                        clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                    }
                     if (clrObj.Type == null)
                     {
                         return
@@ -898,7 +937,10 @@ namespace ScubaDiver
             if (request.ObjAddress == 0)
             {
                 // Null Target -- Getting a Static field
-                dumpedObjType = TypesResolver.Resolve(_runtime, request.TypeFullName);
+                lock (_debugObjectsLock)
+                {
+                    dumpedObjType = TypesResolver.Resolve(_runtime, request.TypeFullName);
+                }
                 FieldInfo staticFieldInfo = dumpedObjType.GetField(request.FieldName);
                 if (!staticFieldInfo.IsStatic)
                 {
@@ -1012,7 +1054,11 @@ namespace ScubaDiver
             else
             {
                 // Object not pinned, try get it the hard way
-                ClrObject clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                ClrObject clrObj = default(ClrObject);
+                lock (_debugObjectsLock)
+                {
+                    clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                }
                 if (clrObj.Type == null)
                 {
                     return "{\"error\":\"'address' points at an invalid address\"}";
@@ -1020,7 +1066,10 @@ namespace ScubaDiver
 
                 // Make sure it's still in place
                 RefreshRuntime();
-                clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                lock (_debugObjectsLock)
+                {
+                    clrObj = _runtime.Heap.GetObject(request.ObjAddress);
+                }
                 if (clrObj.Type == null)
                 {
                     return
@@ -1114,11 +1163,11 @@ namespace ScubaDiver
 
             Array enumerable = (arrayFoi.Object as Array);
             object[] asArray = enumerable?.Cast<object>().ToArray();
-            if(asArray == null)
+            if (asArray == null)
             {
                 return "{\"error\":\"Object at given address wasn't an array\"}";
             }
-            if(index >= asArray.Length)
+            if (index >= asArray.Length)
             {
                 return "{\"error\":\"Index out of range\"}";
             }
@@ -1134,7 +1183,7 @@ namespace ScubaDiver
                 res = ObjectOrRemoteAddress.FromObj(item);
             }
             else
-            { 
+            {
                 // Non-primitive results must be pinned before returning their remote address
                 // TODO: If a RemoteObject is not created for this object later and the item is not automaticlly unfreezed it might leak.
                 FrozenObjectInfo itemFoi;
@@ -1162,8 +1211,8 @@ namespace ScubaDiver
                 VoidReturnType = false,
                 ReturnedObjectOrAddress = res
             };
-            
-           
+
+
             return JsonConvert.SerializeObject(invokeRes);
         }
 
@@ -1202,7 +1251,11 @@ namespace ScubaDiver
             // Object not pinned, try get it the hard way
             // Make sure it's still in place by refreshing the runtime
             RefreshRuntime();
-            ClrObject clrObj = _runtime.Heap.GetObject(objAddr);
+            ClrObject clrObj =default(ClrObject);
+            lock (_debugObjectsLock)
+            {
+                _runtime.Heap.GetObject(objAddr);
+            }
 
             //
             // Figuring out the Method Table value and the actual Object's address
@@ -1276,6 +1329,7 @@ namespace ScubaDiver
         private string MakeDieResponse(HttpListenerRequest req)
         {
             Logger.Debug("[Diver] Die command received");
+            _stayAlive.Reset();
             return "{\"status\":\"Goodbye\"}";
         }
         private string MakeTypesResponse(HttpListenerRequest req)
@@ -1283,7 +1337,11 @@ namespace ScubaDiver
             string assembly = req.QueryString.Get("assembly");
 
             // Try exact match assembly 
-            var allAssembliesInApp = _runtime.AppDomains.SelectMany(appDom => appDom.Modules);
+            IEnumerable<ClrModule> allAssembliesInApp = null;
+            lock (_debugObjectsLock)
+            {
+                allAssembliesInApp = _runtime.AppDomains.SelectMany(appDom => appDom.Modules);
+            }
             List<ClrModule> matchingAssemblies = allAssembliesInApp.Where(module => Path.GetFileNameWithoutExtension(module.Name) == assembly).ToList();
             if (matchingAssemblies.Count == 0)
             {
@@ -1373,13 +1431,16 @@ namespace ScubaDiver
         {
             // TODO: Allow moving between domains?
             List<DomainsDump.AvailableDomain> available = new List<DomainsDump.AvailableDomain>();
-            foreach (ClrAppDomain clrAppDomain in _runtime.AppDomains)
+            lock (_debugObjectsLock)
             {
-                available.Add(new DomainsDump.AvailableDomain()
+                foreach (ClrAppDomain clrAppDomain in _runtime.AppDomains)
                 {
-                    Name = clrAppDomain.Name,
-                    AvailableModules = clrAppDomain.Modules.Select(m => Path.GetFileNameWithoutExtension(m.Name)).ToList()
-                });
+                    available.Add(new DomainsDump.AvailableDomain()
+                    {
+                        Name = clrAppDomain.Name,
+                        AvailableModules = clrAppDomain.Modules.Select(m => Path.GetFileNameWithoutExtension(m.Name)).ToList()
+                    });
+                }
             }
 
             DomainsDump dd = new DomainsDump()
@@ -1399,7 +1460,11 @@ namespace ScubaDiver
             }
 
             string assembly = req.QueryString.Get("assembly");
-            Type resolvedType = TypesResolver.Resolve(_runtime, type, assembly);
+            Type resolvedType = null;
+            lock (_debugObjectsLock)
+            {
+                resolvedType = TypesResolver.Resolve(_runtime, type, assembly);
+            }
 
             // 
             // Defining a sub-function that parses a type and it's parents recursively
@@ -1444,11 +1509,6 @@ namespace ScubaDiver
                 return JsonConvert.SerializeObject(recusiveTypeDump);
             }
 
-            if (!_typesWeAlreadyFailedToDump.Contains(type))
-            {
-                Logger.Debug($"[Diver] Failed to dump type {type} of {assembly} (Reporting once per type)");
-                _typesWeAlreadyFailedToDump.Add(type);
-            }
             return "{\"error\":\"Failed to find type in searched assemblies\"}";
         }
 
@@ -1456,8 +1516,11 @@ namespace ScubaDiver
         // IDisposable
         public void Dispose()
         {
-            _runtime?.Dispose();
-            _dt?.Dispose();
+            lock (_debugObjectsLock)
+            {
+                _runtime?.Dispose();
+                _dt?.Dispose();
+            }
         }
 
     }
