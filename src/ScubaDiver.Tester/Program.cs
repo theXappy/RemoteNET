@@ -248,6 +248,7 @@ namespace ScubaDiver.Tester
                             MethodInfo mi;
                             Console.WriteLine("Full type name:");
                             string type = Console.ReadLine();
+                            string methodName = String.Empty;
                             try
                             {
                                 Type t = remoteApp.GetRemoteType(type);
@@ -257,7 +258,7 @@ namespace ScubaDiver.Tester
                                     break;
                                 }
                                 Console.WriteLine("Method name:");
-                                string methodName = Console.ReadLine();
+                                methodName = Console.ReadLine();
 
                                 var methods = t.GetMethods((BindingFlags)0xffff).Where(mInfo=>mInfo.Name == methodName).ToArray();
                                 if(methodName.Length < 0 )
@@ -311,6 +312,7 @@ namespace ScubaDiver.Tester
 
                             HookAction callback = (dynamic instace, dynamic[] args) =>
                             {
+                                Console.WriteLine($"$$$ Hooked Function {type}.{methodName} called! $$$");
                                 foreach (dynamic d in args)
                                 {
                                     Console.WriteLine($"ARG: {d.ToString()}");
