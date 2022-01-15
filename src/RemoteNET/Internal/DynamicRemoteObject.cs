@@ -1,4 +1,5 @@
 ﻿using Microsoft.CSharp.RuntimeBinder;
+using RemoteNET.Internal.ProxiedReflection;
 using ScubaDiver.API.Utils;
 using System;
 using System.Collections;
@@ -11,6 +12,7 @@ using System.Runtime.CompilerServices;
 
 namespace RemoteNET.Internal
 {
+
     /// <summary>
     /// A proxy of a remote object.
     /// Usages of this class should be strictly as a `dynamic` variable.
@@ -21,82 +23,18 @@ namespace RemoteNET.Internal
     [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "}")]
     public class DynamicRemoteObject : DynamicObject
     {
-        enum MemberType
-        {
-            Unknown,
-            Field,
-            Property,
-            Method,
-            Event
-        }
 
-        private class ProxiedMethodOverload
-        {
-            public List<Type> ArgumentsTypes { get; set; }
-            public Func<object[], object> Proxy { get; set; }
-        }
-
-        /// <summary>
-        /// Info of proxied field or property
-        /// </summary>
-        private class ProxiedValueMemberInfo
-        {
-            public string FullTypeName { get; set; }
-            public Action<object> Setter { get; set; }
-            public Func<object> Getter { get; set; }
-        }
-
-        public class DynamicEventProxy
-        {
-            private RemoteObject _ro;
-            private string Name { get; set; }
-            private List<Type> ArgumentsTypes { get; set; }
-
-            public DynamicEventProxy(RemoteObject ro, string name, List<Type> args)
-            {
-                this._ro = ro;
-                this.Name = name;
-                this.ArgumentsTypes = args;
-            }
-
-            public static DynamicEventProxy operator +(DynamicEventProxy c1, Delegate x)
-            {
-                System.Reflection.ParameterInfo[] parameters = x.Method.GetParameters();
-
-                if (parameters.Length != c1.ArgumentsTypes.Count)
-                {
-                    throw new Exception($"The '{c1.Name}' event expects {c1.ArgumentsTypes.Count} parameters, " +
-                        $"the callback that was being registered have {parameters.Length}");
-                }
-
-                if (parameters.Any(p => p.GetType().IsAssignableFrom(typeof(DynamicRemoteObject))))
-                {
-                    throw new Exception("A Remote event's local callback must have only 'dynamic' parameters");
-                }
-
-                c1._ro.EventSubscribe(c1.Name, x);
-
-                return c1;
-            }
-
-            public static DynamicEventProxy operator -(DynamicEventProxy c1, Delegate x)
-            {
-                c1._ro.EventUnsubscribe(c1.Name, x);
-                return c1;
-            }
-        }
-
-        private Dictionary<string, MemberType> _members = new Dictionary<string, MemberType>();
+        private Dictionary<string, ProxiedMemberType> _members = new Dictionary<string, ProxiedMemberType>();
         private Dictionary<string, ProxiedValueMemberInfo> _fields = new Dictionary<string, ProxiedValueMemberInfo>();
         private Dictionary<string, ProxiedValueMemberInfo> _properties = new Dictionary<string, ProxiedValueMemberInfo>();
-        private Dictionary<string, List<ProxiedMethodOverload>> _methods = new Dictionary<string, List<ProxiedMethodOverload>>();
-        private Dictionary<string, DynamicEventProxy> _events = new Dictionary<string, DynamicEventProxy>();
+        private Dictionary<string, ProxiedMethodGroup> _methods = new Dictionary<string, ProxiedMethodGroup>();
+        private Dictionary<string, ProxiedEventInfo> _events = new Dictionary<string, ProxiedEventInfo>();
 
         public RemoteApp __ra;
         public RemoteObject __ro;
         private string __typeFullName;
 
-
+ 
         public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
         {
             __ra = ra;
@@ -125,8 +63,8 @@ namespace RemoteNET.Internal
             if (getter == null && setter == null)
                 throw new Exception("A property must be set with at least a setter/getter.");
 
-            _members[propName] = MemberType.Field;
-            ProxiedValueMemberInfo proxyInfo = new ProxiedValueMemberInfo()
+            _members[propName] = ProxiedMemberType.Field;
+            ProxiedValueMemberInfo proxyInfo = new ProxiedValueMemberInfo(ProxiedMemberType.Field)
             {
                 FullTypeName = fullTypeName
             };
@@ -152,8 +90,8 @@ namespace RemoteNET.Internal
             if (getter == null && setter == null)
                 throw new Exception("A property must be set with at least a setter/getter.");
 
-            _members[propName] = MemberType.Property;
-            ProxiedValueMemberInfo proxyInfo = new ProxiedValueMemberInfo()
+            _members[propName] = ProxiedMemberType.Property;
+            ProxiedValueMemberInfo proxyInfo = new ProxiedValueMemberInfo(ProxiedMemberType.Property)
             {
                 FullTypeName = fullTypeName
             };
@@ -174,13 +112,13 @@ namespace RemoteNET.Internal
         {
             // Disallowing other members of this name except other methods
             // overloading is allowed.
-            if (_members.TryGetValue(methodName, out MemberType memType) && memType != MemberType.Method)
+            if (_members.TryGetValue(methodName, out ProxiedMemberType memType) && memType != ProxiedMemberType.Method)
                 throw new Exception($"A member with the name \"{methodName}\" already exists");
 
-            _members[methodName] = MemberType.Method;
+            _members[methodName] = ProxiedMemberType.Method;
             if (!_methods.ContainsKey(methodName))
             {
-                _methods[methodName] = new List<ProxiedMethodOverload>();
+                _methods[methodName] = new ProxiedMethodGroup();
             }
             _methods[methodName].Add(new ProxiedMethodOverload { ArgumentsTypes = argTypes, Proxy = proxy });
         }
@@ -188,10 +126,34 @@ namespace RemoteNET.Internal
         public void AddEvent(string eventName, List<Type> argTypes)
         {
             // TODO: Make sure it's not defined twice
-            _members[eventName] = MemberType.Event;
-            _events[eventName] = new DynamicEventProxy(__ro, eventName, argTypes);
+            _members[eventName] = ProxiedMemberType.Event;
+            _events[eventName] = new ProxiedEventInfo(__ro, eventName, argTypes);
         }
 
+        public IReadOnlyDictionary<string, IProxiedMember> GetDynamicallyAddedMembers()
+        {
+            Dictionary<string, IProxiedMember> output = new Dictionary<string, IProxiedMember>();
+            foreach(KeyValuePair<string, ProxiedMemberType> memberAndType in _members)
+            {
+                string memberName = memberAndType.Key;
+                switch (memberAndType.Value)
+                {
+                    case ProxiedMemberType.Field:
+                        output[memberName] = _fields[memberName];
+                        break;
+                    case ProxiedMemberType.Property:
+                        output[memberName] = _properties[memberName];
+                        break;
+                    case ProxiedMemberType.Method:
+                        output[memberName] = _methods[memberName];
+                        break;
+                    case ProxiedMemberType.Event:
+                        output[memberName] = _events[memberName];
+                        break;
+                }
+            }
+            return output;
+        }
 
         //
         // Dynamic Object API 
@@ -200,7 +162,7 @@ namespace RemoteNET.Internal
 
         public override bool TryGetMember(GetMemberBinder binder, out object result)
         {
-            if (!_members.TryGetValue(binder.Name, out MemberType memberType))
+            if (!_members.TryGetValue(binder.Name, out ProxiedMemberType memberType))
             {
                 result = null;
                 return false;
@@ -211,8 +173,8 @@ namespace RemoteNET.Internal
 
             switch (memberType)
             {
-                case MemberType.Field:
-                case MemberType.Property:
+                case ProxiedMemberType.Field:
+                case ProxiedMemberType.Property:
                     if (!_fields.TryGetValue(binder.Name, out proxiedInfo))
                     {
                         throw new Exception($"Field or Property \"{binder.Name}\" does not have a getter.");
@@ -227,11 +189,11 @@ namespace RemoteNET.Internal
                         throw;
                     }
                     break;
-                case MemberType.Method:
+                case ProxiedMemberType.Method:
                     // Methods should go to "TryInvokeMember"
                     result = null;
                     return false;
-                case MemberType.Event:
+                case ProxiedMemberType.Event:
                     result = _events[binder.Name];
                     break;
                 default:
@@ -252,12 +214,12 @@ namespace RemoteNET.Internal
         private bool InvokeMethodMember(string name, object[] args, out object result)
         {
             Logger.Debug("[DynamicRemoteObject] TryInvokeMember called ~");
-            if (!_members.TryGetValue(name, out MemberType memberType))
+            if (!_members.TryGetValue(name, out ProxiedMemberType memberType))
                 throw new Exception($"No such member \"{name}\"");
 
             switch (memberType)
             {
-                case MemberType.Method:
+                case ProxiedMemberType.Method:
                     List<ProxiedMethodOverload> overloads = _methods[name];
 
                     // Narrow down (hopefuly to one) overload with the same amount of types
@@ -276,8 +238,8 @@ namespace RemoteNET.Internal
                                                           $"Method `{name}` had {overloads.Count} overloads registered.");
                     }
                     break;
-                case MemberType.Field:
-                case MemberType.Property:
+                case ProxiedMemberType.Field:
+                case ProxiedMemberType.Property:
                 default:
                     throw new Exception($"No such method \"{name}\"");
             }
@@ -287,7 +249,7 @@ namespace RemoteNET.Internal
         public bool HasMember(string name) => _members.ContainsKey(name);
         public override bool TrySetMember(SetMemberBinder binder, object value)
         {
-            if (!_members.TryGetValue(binder.Name, out MemberType memberType))
+            if (!_members.TryGetValue(binder.Name, out ProxiedMemberType memberType))
                 throw new Exception($"No such member \"{binder.Name}\"");
 
             // In case we are resolving a field or property
@@ -295,8 +257,8 @@ namespace RemoteNET.Internal
 
             switch (memberType)
             {
-                case MemberType.Field:
-                case MemberType.Property:
+                case ProxiedMemberType.Field:
+                case ProxiedMemberType.Property:
                     if (!_fields.TryGetValue(binder.Name, out proxiedInfo))
                     {
                         throw new Exception($"Field or Property \"{binder.Name}\" does not have a setter.");
@@ -311,10 +273,10 @@ namespace RemoteNET.Internal
                         throw;
                     }
                     break;
-                case MemberType.Method:
+                case ProxiedMemberType.Method:
                     throw new Exception("Can't modifying method members.");
-                case MemberType.Event:
-                    DynamicEventProxy eventProxy = _events[binder.Name];
+                case ProxiedMemberType.Event:
+                    ProxiedEventInfo eventProxy = _events[binder.Name];
                     if (eventProxy == value)
                     {
                         // This "setting" of the event happens after regsistering an event handler because of how the "+=" operator works.
