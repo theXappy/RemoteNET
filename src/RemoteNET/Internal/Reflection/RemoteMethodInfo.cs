@@ -6,6 +6,7 @@ using ScubaDiver;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
+using ScubaDiver.API.Utils;
 
 namespace RemoteNET.Internal.Reflection
 {
@@ -79,6 +80,8 @@ namespace RemoteNET.Internal.Reflection
                 }
             }
 
+            bool hasResults;
+            ObjectOrRemoteAddress oora;
             if (obj == null)
             {
                 if (this.App == null)
@@ -92,20 +95,41 @@ namespace RemoteNET.Internal.Reflection
                 InvocationResults invokeRes = this.App.Communicator.InvokeStaticMethod(DeclaringType.FullName, this.Name, remoteParams);
                 if (invokeRes.VoidReturnType)
                 {
-                    return new ValueTuple<bool, ObjectOrRemoteAddress>(false, null);
+                    hasResults = false;
+                    oora = null;
                 }
-                return (true, invokeRes.ReturnedObjectOrAddress);
-
+                else
+                {
+                    hasResults = true;
+                    oora = invokeRes.ReturnedObjectOrAddress;
+                }
             }
-
-            // obj is NOT null. Make sure it's a RemoteObject.
-            if (!(obj is RemoteObject ro))
+            else
             {
-                throw new NotImplementedException(
-                    $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(RemoteObject)} targets at the moment.");
+                // obj is NOT null. Make sure it's a RemoteObject.
+                if (!(obj is RemoteObject ro))
+                {
+                    throw new NotImplementedException(
+                        $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(RemoteObject)} targets at the moment.");
+                }
+                (hasResults, oora) = ro.InvokeMethod(this.Name, remoteParams);
             }
 
-            return ro.InvokeMethod(this.Name, remoteParams);
+            if (!hasResults)
+                return null;
+
+            // Non-void function.
+            if (oora.IsNull)
+                return null;
+            if(!oora.IsRemoteAddress)
+            {
+                return PrimitivesEncoder.Decode(oora);
+            }
+            else
+            {
+                RemoteObject ro = App.GetRemoteObject(oora.RemoteAddress);
+                return ro.Dynamify();
+            }
         }
 
         public override MethodInfo GetBaseDefinition()
