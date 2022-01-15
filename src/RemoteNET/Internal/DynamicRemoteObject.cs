@@ -99,7 +99,6 @@ namespace RemoteNET.Internal
 
         public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
         {
-            var ST = new StackTrace();
             __ra = ra;
             __ro = ro;
             __typeFullName = ro.GetType().FullName;
