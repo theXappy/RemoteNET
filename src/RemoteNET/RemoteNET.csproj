@@ -16,6 +16,7 @@
 		<Version>$(VersionPrefix)</Version>
 		<AssemblyVersion>1.0.1.4</AssemblyVersion>
 		<FileVersion>1.0.1.4</FileVersion>
+		<LangVersion>8</LangVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
