@@ -209,7 +209,7 @@ namespace RemoteNET.Internal
                 };
             }
 
-            dro.AddProperty(name, getter, setter);
+            dro.AddProperty(name, typeFullName, getter, setter);
         }
 
         private static void AddFields(RemoteApp rApp, RemoteObject ro, TypeDump td, DynamicRemoteObject dro)
@@ -264,7 +264,7 @@ namespace RemoteNET.Internal
                     }
                     ro.SetField(fieldInfo.Name, remoteNewVal);
                 };
-                dro.AddField(fieldInfo.Name, getter, setter);
+                dro.AddField(fieldInfo.Name, fieldInfo.TypeFullName, getter, setter);
             }
         }
 
