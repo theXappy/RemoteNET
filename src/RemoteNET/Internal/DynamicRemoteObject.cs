@@ -30,10 +30,20 @@ namespace RemoteNET.Internal
             Event
         }
 
-        private class MethodOverload
+        private class ProxiedMethodOverload
         {
             public List<Type> ArgumentsTypes { get; set; }
             public Func<object[], object> Proxy { get; set; }
+        }
+
+        /// <summary>
+        /// Info of proxied field or property
+        /// </summary>
+        private class ProxiedValueMemberInfo
+        {
+            public string FullTypeName { get; set; }
+            public Action<object> Setter { get; set; }
+            public Func<object> Getter { get; set; }
         }
 
         public class DynamicEventProxy
@@ -77,12 +87,9 @@ namespace RemoteNET.Internal
         }
 
         private Dictionary<string, MemberType> _members = new Dictionary<string, MemberType>();
-
-        private Dictionary<string, Action<object>> _fieldsSetters = new Dictionary<string, Action<object>>();
-        private Dictionary<string, Func<object>> _fieldsGetters = new Dictionary<string, Func<object>>();
-        private Dictionary<string, Action<object>> _propertiesSetters = new Dictionary<string, Action<object>>();
-        private Dictionary<string, Func<object>> _propertiesGetters = new Dictionary<string, Func<object>>();
-        private Dictionary<string, List<MethodOverload>> _methods = new Dictionary<string, List<MethodOverload>>();
+        private Dictionary<string, ProxiedValueMemberInfo> _fields = new Dictionary<string, ProxiedValueMemberInfo>();
+        private Dictionary<string, ProxiedValueMemberInfo> _properties = new Dictionary<string, ProxiedValueMemberInfo>();
+        private Dictionary<string, List<ProxiedMethodOverload>> _methods = new Dictionary<string, List<ProxiedMethodOverload>>();
         private Dictionary<string, DynamicEventProxy> _events = new Dictionary<string, DynamicEventProxy>();
 
         public RemoteApp __ra;
@@ -111,7 +118,7 @@ namespace RemoteNET.Internal
         /// <summary>
         /// Define a new field for the remote object
         /// </summary>
-        public void AddField(string propName, Func<object> getter, Action<object> setter)
+        public void AddField(string propName, string fullTypeName, Func<object> getter, Action<object> setter)
         {
             if (_members.ContainsKey(propName))
                 throw new Exception($"A member with the name \"{propName}\" already exists");
@@ -120,10 +127,16 @@ namespace RemoteNET.Internal
                 throw new Exception("A property must be set with at least a setter/getter.");
 
             _members[propName] = MemberType.Field;
+            ProxiedValueMemberInfo proxyInfo = new ProxiedValueMemberInfo()
+            {
+                FullTypeName = fullTypeName
+            };
             if (getter != null)
-                _fieldsGetters[propName] = getter;
+                proxyInfo.Getter = getter;
             if (setter != null)
-                _fieldsSetters[propName] = setter;
+                proxyInfo.Setter = setter;  
+
+            _fields.Add(propName, proxyInfo);
         }
 
         /// <summary>
@@ -132,7 +145,7 @@ namespace RemoteNET.Internal
         /// <param name="propName">Name of the property</param>
         /// <param name="getter">Getter function. Can be null if getting is not available</param>
         /// <param name="setter">Setter function. Can be null if setting is not available</param>
-        public void AddProperty(string propName, Func<object> getter, Action<object> setter)
+        public void AddProperty(string propName, string fullTypeName, Func<object> getter, Action<object> setter)
         {
             if (_members.ContainsKey(propName))
                 throw new Exception($"A member with the name \"{propName}\" already exists");
@@ -141,10 +154,16 @@ namespace RemoteNET.Internal
                 throw new Exception("A property must be set with at least a setter/getter.");
 
             _members[propName] = MemberType.Property;
+            ProxiedValueMemberInfo proxyInfo = new ProxiedValueMemberInfo()
+            {
+                FullTypeName = fullTypeName
+            };
             if (getter != null)
-                _propertiesGetters[propName] = getter;
+                proxyInfo.Getter = getter;
             if (setter != null)
-                _propertiesSetters[propName] = setter;
+                proxyInfo.Setter = setter;
+
+            _fields.Add(propName, proxyInfo);
         }
 
         /// <summary>
@@ -162,9 +181,9 @@ namespace RemoteNET.Internal
             _members[methodName] = MemberType.Method;
             if (!_methods.ContainsKey(methodName))
             {
-                _methods[methodName] = new List<MethodOverload>();
+                _methods[methodName] = new List<ProxiedMethodOverload>();
             }
-            _methods[methodName].Add(new MethodOverload { ArgumentsTypes = argTypes, Proxy = proxy });
+            _methods[methodName].Add(new ProxiedMethodOverload { ArgumentsTypes = argTypes, Proxy = proxy });
         }
 
         public void AddEvent(string eventName, List<Type> argTypes)
@@ -188,29 +207,24 @@ namespace RemoteNET.Internal
                 return false;
             }
 
-            Func<object> getter;
+            // In case we are resolving a field or property
+            ProxiedValueMemberInfo proxiedInfo;
 
             switch (memberType)
             {
                 case MemberType.Field:
-                    if (!_fieldsGetters.TryGetValue(binder.Name, out getter))
-                    {
-                        throw new Exception($"Field \"{binder.Name}\" does not have a getter.");
-                    }
-                    result = getter();
-                    break;
                 case MemberType.Property:
-                    if (!_propertiesGetters.TryGetValue(binder.Name, out getter))
+                    if (!_fields.TryGetValue(binder.Name, out proxiedInfo))
                     {
-                        throw new Exception($"Property \"{binder.Name}\" does not have a getter.");
+                        throw new Exception($"Field or Property \"{binder.Name}\" does not have a getter.");
                     }
                     try
                     {
-                        result = getter();
+                        result = proxiedInfo.Getter();
                     }
                     catch(Exception ex)
                     {
-                        Console.WriteLine($"Property \"{binder.Name}\"'s getter threw an exception which sucks. Ex: "+ex);
+                        Console.WriteLine($"Field or Property \"{binder.Name}\"'s getter threw an exception which sucks. Ex: "+ex);
                         throw;
                     }
                     break;
@@ -245,7 +259,7 @@ namespace RemoteNET.Internal
             switch (memberType)
             {
                 case MemberType.Method:
-                    List<MethodOverload> overloads = _methods[name];
+                    List<ProxiedMethodOverload> overloads = _methods[name];
 
                     // Narrow down (hopefuly to one) overload with the same amount of types
                     // TODO: We COULD possibly check the args types (local ones, RemoteObjects, DynamicObjects, ...) if we still have multiple results
@@ -277,22 +291,26 @@ namespace RemoteNET.Internal
             if (!_members.TryGetValue(binder.Name, out MemberType memberType))
                 throw new Exception($"No such member \"{binder.Name}\"");
 
-            Action<object> setter;
+            // In case we are resolving a field or property
+            ProxiedValueMemberInfo proxiedInfo;
+
             switch (memberType)
             {
                 case MemberType.Field:
-                    if (!_fieldsSetters.TryGetValue(binder.Name, out setter))
-                    {
-                        throw new Exception($"Field \"{binder.Name}\" does not have a setter.");
-                    }
-                    setter(value);
-                    break;
                 case MemberType.Property:
-                    if (!_propertiesSetters.TryGetValue(binder.Name, out setter))
+                    if (!_fields.TryGetValue(binder.Name, out proxiedInfo))
                     {
-                        throw new Exception($"Property \"{binder.Name}\" does not have a setter.");
+                        throw new Exception($"Field or Property \"{binder.Name}\" does not have a setter.");
                     }
-                    setter(value);
+                    try
+                    {
+                        proxiedInfo.Setter(value);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Field or Property \"{binder.Name}\"'s setter threw an exception which sucks. Ex: " + ex);
+                        throw;
+                    }
                     break;
                 case MemberType.Method:
                     throw new Exception("Can't modifying method members.");
