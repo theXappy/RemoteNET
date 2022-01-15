@@ -59,6 +59,12 @@ namespace ScubaDiver.API.Utils
         }
 
 
+        public static object Decode(ObjectOrRemoteAddress oora)
+        {
+            if (oora.IsRemoteAddress)
+                throw new ArgumentException("Can not decode ObjectOrRemoteAddress object which represents a remote address.");
+            return Decode(oora.EncodedObject, oora.Type);
+        }
         public static object Decode(string toDecode, Type resultType)
         {
             // Easiest case - strings are encoded to themselves
