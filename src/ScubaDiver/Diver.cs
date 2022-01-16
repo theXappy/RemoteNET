@@ -337,6 +337,7 @@ namespace ScubaDiver
                             objects.Add(new HeapDump.HeapObject()
                             {
                                 Address = clrObj.Address,
+                                MethodTable = clrObj.Type.MethodTable,
                                 Type = objType,
                                 HashCode = hashCode
                             });
@@ -1249,12 +1250,21 @@ namespace ScubaDiver
             }
 
             // Object not pinned, try get it the hard way
+            // Make sure we had such an object in the last dumped runtime (this will help us later if the object moves
+            // since we'll know what type we are looking for)
+            // Make sure it's still in place
+            ClrObject lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
+            if (lastKnownClrObj == null)
+            {
+                return "{\"error\":\"No object in this address. Try finding it's address again and dumping again.\"}";
+            }
+
             // Make sure it's still in place by refreshing the runtime
             RefreshRuntime();
             ClrObject clrObj =default(ClrObject);
             lock (_debugObjectsLock)
             {
-                _runtime.Heap.GetObject(objAddr);
+                clrObj = _runtime.Heap.GetObject(objAddr);
             }
 
             //
@@ -1278,7 +1288,7 @@ namespace ScubaDiver
                         "Hash Code fallback was NOT activated\"}";
                 }
 
-                Predicate<string> typeFilter = (string type) => type.Contains(clrObj.Type.Name);
+                Predicate<string> typeFilter = (string type) => type.Contains(lastKnownClrObj.Type.Name);
                 (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
                 if (anyErrors)
                 {
@@ -1296,9 +1306,9 @@ namespace ScubaDiver
 
                 // Single match! We are as lucky as it gets :)
                 HeapDump.HeapObject heapObj = matches.Single();
-                methodTable = clrObj.Type.MethodTable;
                 ulong newObjAddress = heapObj.Address;
                 finalObjAddress = newObjAddress;
+                methodTable = heapObj.MethodTable;
             }
 
             //
