@@ -100,7 +100,7 @@ namespace RemoteNET.Internal
             if (setter != null)
                 proxyInfo.Setter = setter;
 
-            _fields.Add(propName, proxyInfo);
+            _properties.Add(propName, proxyInfo);
         }
 
         /// <summary>
@@ -174,10 +174,9 @@ namespace RemoteNET.Internal
             switch (memberType)
             {
                 case ProxiedMemberType.Field:
-                case ProxiedMemberType.Property:
                     if (!_fields.TryGetValue(binder.Name, out proxiedInfo))
                     {
-                        throw new Exception($"Field or Property \"{binder.Name}\" does not have a getter.");
+                        throw new Exception($"Field \"{binder.Name}\" does not have a getter.");
                     }
                     try
                     {
@@ -185,7 +184,22 @@ namespace RemoteNET.Internal
                     }
                     catch(Exception ex)
                     {
-                        Console.WriteLine($"Field or Property \"{binder.Name}\"'s getter threw an exception which sucks. Ex: "+ex);
+                        Console.WriteLine($"Field \"{binder.Name}\"'s getter threw an exception which sucks. Ex: "+ex);
+                        throw;
+                    }
+                    break;
+                case ProxiedMemberType.Property:
+                    if (!_properties.TryGetValue(binder.Name, out proxiedInfo))
+                    {
+                        throw new Exception($"Property \"{binder.Name}\" does not have a getter.");
+                    }
+                    try
+                    {
+                        result = proxiedInfo.Getter();
+                    }
+                    catch(Exception ex)
+                    {
+                        Console.WriteLine($"Property \"{binder.Name}\"'s getter threw an exception which sucks. Ex: "+ex);
                         throw;
                     }
                     break;
