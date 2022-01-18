@@ -108,7 +108,7 @@ namespace RemoteNET.Internal
         /// </summary>
         /// <param name="methodName">Method name</param>
         /// <param name="proxy">Function to invoke when the method is called by the <see cref="DynamicRemoteObject"/></param>
-        public void AddMethod(string methodName, List<Type> argTypes, Func<object[], object> proxy)
+        public void AddMethod(string methodName, List<Tuple<Type,string>> parameters, Type retType, Func<object[], object> proxy)
         {
             // Disallowing other members of this name except other methods
             // overloading is allowed.
@@ -120,7 +120,7 @@ namespace RemoteNET.Internal
             {
                 _methods[methodName] = new ProxiedMethodGroup();
             }
-            _methods[methodName].Add(new ProxiedMethodOverload { ArgumentsTypes = argTypes, Proxy = proxy });
+            _methods[methodName].Add(new ProxiedMethodOverload { ReturnType = retType, Parameters = parameters, Proxy = proxy });
         }
 
         public void AddEvent(string eventName, List<Type> argTypes)
@@ -238,7 +238,7 @@ namespace RemoteNET.Internal
 
                     // Narrow down (hopefuly to one) overload with the same amount of types
                     // TODO: We COULD possibly check the args types (local ones, RemoteObjects, DynamicObjects, ...) if we still have multiple results
-                    overloads = overloads.Where(overload => overload.ArgumentsTypes.Count == args.Length).ToList();
+                    overloads = overloads.Where(overload => overload.Parameters.Count == args.Length).ToList();
 
                     if (overloads.Count == 1)
                     {

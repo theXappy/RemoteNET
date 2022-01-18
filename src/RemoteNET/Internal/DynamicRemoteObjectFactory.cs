@@ -1,4 +1,5 @@
-﻿using ScubaDiver.API;
+﻿using RemoteNET.Internal.Reflection;
+using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
 using ScubaDiver.API.Utils;
@@ -11,8 +12,11 @@ namespace RemoteNET.Internal
 {
     public class DynamicRemoteObjectFactory
     {
+        private RemoteApp _app;
+
         public DynamicRemoteObject Create(RemoteApp rApp, RemoteObject remoteObj, TypeDump typeDump)
         {
+            _app = rApp;
             DynamicRemoteObject dynRemoteObj = new DynamicRemoteObject(rApp, remoteObj);
 
             AddFields(rApp, remoteObj, typeDump, dynRemoteObj);
@@ -23,7 +27,12 @@ namespace RemoteNET.Internal
             return dynRemoteObj;
         }
 
-        private static void AddMethods(RemoteApp app, RemoteObject ro, TypeDump typeDump, DynamicRemoteObject dro)
+        private Type GetDependentType(string fullTypeName)
+        {
+            return _app.GetRemoteType(fullTypeName);
+        }
+
+        private void AddMethods(RemoteApp app, RemoteObject ro, TypeDump typeDump, DynamicRemoteObject dro)
         {
             // Adding methods
             // Gathering all methods from current type and all ancestor types
@@ -136,15 +145,16 @@ namespace RemoteNET.Internal
                     }
                 };
                 // TODO: Does this even work if any of the arguments is a remote one
-                List<Type> argTypes = (from prmtr in methodInfo.Parameters
+                List<Tuple<Type,string>> argTypes = (from prmtr in methodInfo.Parameters
                                        let typeFullName = prmtr.Type
-                                       let resolvedType = AppDomain.CurrentDomain.GetType(typeFullName)
-                                       select resolvedType).ToList();
-                dro.AddMethod(methodInfo.Name, argTypes, proxy);
+                                       let resolvedType = GetDependentType(typeFullName)
+                                       select new Tuple<Type,string>(resolvedType,prmtr.Name)).ToList();
+                Type retType = GetDependentType(methodInfo.ReturnTypeFullName);
+                dro.AddMethod(methodInfo.Name, argTypes, retType, proxy);
             }
         }
 
-        private static void AddProperties(RemoteApp rApp, RemoteObject ro, TypeDump td, DynamicRemoteObject dro)
+        private void AddProperties(RemoteApp rApp, RemoteObject ro, TypeDump td, DynamicRemoteObject dro)
         {
             // Adding properties
             foreach (TypeDump.TypeProperty propInfo in td.Properties)
@@ -155,7 +165,7 @@ namespace RemoteNET.Internal
             }
         }
 
-        private static void AddProperty(RemoteApp rApp, RemoteObject ro, DynamicRemoteObject dro, string name, string typeFullName, bool hasGetVisability, bool hasSetVisability)
+        private void AddProperty(RemoteApp rApp, RemoteObject ro, DynamicRemoteObject dro, string name, string typeFullName, bool hasGetVisability, bool hasSetVisability)
         {
             if (dro.HasMember(name))
             {
@@ -212,7 +222,7 @@ namespace RemoteNET.Internal
             dro.AddProperty(name, typeFullName, getter, setter);
         }
 
-        private static void AddFields(RemoteApp rApp, RemoteObject ro, TypeDump td, DynamicRemoteObject dro)
+        private void AddFields(RemoteApp rApp, RemoteObject ro, TypeDump td, DynamicRemoteObject dro)
         {
             foreach (TypeDump.TypeField fieldInfo in td.Fields)
             {
@@ -269,7 +279,7 @@ namespace RemoteNET.Internal
         }
 
 
-        private static void AddEvents(RemoteApp rApp, RemoteObject ro, TypeDump td, DynamicRemoteObject dro)
+        private void AddEvents(RemoteApp rApp, RemoteObject ro, TypeDump td, DynamicRemoteObject dro)
         {
             foreach (TypeDump.TypeEvent eventInfo in td.Events)
             {

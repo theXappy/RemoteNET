@@ -5,7 +5,8 @@ namespace RemoteNET.Internal
 {
     public class ProxiedMethodOverload
     {
-        public List<Type> ArgumentsTypes { get; set; }
+        public Type ReturnType { get; set; }
+        public List<Tuple<Type,string>> Parameters { get; set; }
         public Func<object[], object> Proxy { get; set; }
     }
 }
