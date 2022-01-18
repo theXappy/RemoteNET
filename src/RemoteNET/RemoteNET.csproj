@@ -14,8 +14,8 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
 		<Version>$(VersionPrefix)</Version>
-		<AssemblyVersion>1.0.1.4</AssemblyVersion>
-		<FileVersion>1.0.1.4</FileVersion>
+		<AssemblyVersion>1.0.1.5</AssemblyVersion>
+		<FileVersion>1.0.1.5</FileVersion>
 		<LangVersion>8</LangVersion>
 	</PropertyGroup>
 
