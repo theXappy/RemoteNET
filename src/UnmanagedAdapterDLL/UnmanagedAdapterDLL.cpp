@@ -40,7 +40,8 @@ bool ShouldOpenDebugConosle() {
 #if _DEBUG
 	return true
 #else
-	return getenv("REMOTE_NET_MAGIC_DEBUG") != NULL;
+	GetEnvironmentVariable(L"REMOTE_NET_MAGIC_DEBUG", NULL, 0);
+	return GetLastError() != ERROR_ENVVAR_NOT_FOUND;
 #endif
 }
 
