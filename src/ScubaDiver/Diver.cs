@@ -1485,9 +1485,7 @@ namespace ScubaDiver
 
                 var methods = typeObj.GetMethods((BindingFlags)0xffff).Select(mi => new TypeDump.TypeMethod(mi))
                     .ToList();
-                var fields = typeObj.GetFields((BindingFlags)0xffff)
-                    .Where(fi => fi.FieldType.FullName == typeof(System.EventHandler).FullName)
-                    .Select(fi => new TypeDump.TypeField(fi))
+                var fields = typeObj.GetFields((BindingFlags)0xffff).Select(fi => new TypeDump.TypeField(fi))
                     .ToList();
                 var events = typeObj.GetEvents((BindingFlags)0xffff).Select(ei => new TypeDump.TypeEvent(ei))
                     .ToList();
