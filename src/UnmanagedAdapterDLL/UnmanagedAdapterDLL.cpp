@@ -38,7 +38,7 @@ enum FrameworkType ParseFrameworkType(const std::wstring& framework)
 
 bool ShouldOpenDebugConosle() {
 #if _DEBUG
-	return true
+	return true;
 #else
 	GetEnvironmentVariable(L"REMOTE_NET_MAGIC_DEBUG", NULL, 0);
 	return GetLastError() != ERROR_ENVVAR_NOT_FOUND;
