@@ -85,7 +85,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\UnmanagedAdapterDLL\UnmanagedAdapterDLL.h" />
+    <ClInclude Include="..\UnmanagedAdapterDLL\UnmanagedAdapter.h" />
     <ClInclude Include="..\UnmanagedAdapterDLL\msgboxf.h" />
     <ClInclude Include="..\UnmanagedAdapterDLL\stdafx.h" />
     <ClInclude Include="..\UnmanagedAdapterDLL\targetver.h" />
