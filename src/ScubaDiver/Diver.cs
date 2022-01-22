@@ -82,9 +82,11 @@ namespace ScubaDiver
                 _dt?.Dispose();
                 _dt = null;
 
-                // This works like 'fork()', it cretes does NOT create a dump file and uses it as the target
-                // Instead it creates a secondary processes which is a copy of the current one.
-                // This subprocess inherits handles to DLLs in the current process so it might "lock"
+                // This works like 'fork()', it does NOT create a dump file and uses it as the target
+                // Instead it creates a secondary process which is a copy of the current one, but without any running threads.
+                // Then our process attaches to the other one and reads its memory.
+                //
+                // NOTE: This subprocess inherits handles to DLLs in the current process so it might "lock"
                 // both UnmanagedAdapterDLL.dll and ScubaDiver.dll
                 _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
                 _runtime = _dt.ClrVersions.Single().CreateRuntime();
