@@ -1,4 +1,4 @@
-using Microsoft.CSharp.RuntimeBinder;
+﻿using Microsoft.CSharp.RuntimeBinder;
 using RemoteNET.Internal.ProxiedReflection;
 using ScubaDiver.API.Utils;
 using System;
@@ -55,15 +55,15 @@ namespace RemoteNET.Internal
         /// <summary>
         /// Define a new field for the remote object
         /// </summary>
-        public void AddField(string propName, string fullTypeName, Func<object> getter, Action<object> setter)
+        public void AddField(string field, string fullTypeName, Func<object> getter, Action<object> setter)
         {
-            if (_members.ContainsKey(propName))
-                throw new Exception($"A member with the name \"{propName}\" already exists");
+            if (_members.ContainsKey(field))
+                throw new Exception($"A member with the name \"{field}\" already exists");
 
             if (getter == null && setter == null)
                 throw new Exception("A property must be set with at least a setter/getter.");
 
-            _members[propName] = ProxiedMemberType.Field;
+            _members[field] = ProxiedMemberType.Field;
             ProxiedValueMemberInfo proxyInfo = new ProxiedValueMemberInfo(ProxiedMemberType.Field)
             {
                 FullTypeName = fullTypeName
@@ -73,7 +73,7 @@ namespace RemoteNET.Internal
             if (setter != null)
                 proxyInfo.Setter = setter;  
 
-            _fields.Add(propName, proxyInfo);
+            _fields.Add(field, proxyInfo);
         }
 
         /// <summary>
