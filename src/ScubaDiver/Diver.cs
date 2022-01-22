@@ -284,8 +284,9 @@ namespace ScubaDiver
             List<HeapDump.HeapObject> objects = new List<HeapDump.HeapObject>();
             bool anyErrors = false;
             // Trying several times to dump all candidates
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 10; i++)
             {
+                Logger.Debug($"Trying to dump heap objects. Try #{i + 1}");
                 // Clearing leftovers from last trial
                 objects.Clear();
                 anyErrors = false;
@@ -354,6 +355,7 @@ namespace ScubaDiver
             }
             if (anyErrors)
             {
+                Logger.Debug($"Failt to dump heap objects. Aborting.");
                 objects.Clear();
             }
             return (anyErrors, objects);
