@@ -100,11 +100,16 @@ namespace ScubaDiver
             HttpListener listener = new HttpListener();
             string listeningUrl = $"http://127.0.0.1:{listenPort}/";
             listener.Prefixes.Add(listeningUrl);
+            // Set timeout
+            var manager = listener.TimeoutManager;
+            manager.IdleConnection = TimeSpan.FromSeconds(5);
             listener.Start();
             Logger.Debug($"[Diver] Listening on {listeningUrl}...");
 
             Dispatcher(listener);
 
+            Logger.Debug("[Diver] Closing listener");
+            listener.Stop();
             listener.Close();
             Logger.Debug("[Diver] Closing ClrMD runtime and snapshot");
             lock (_debugObjectsLock)
@@ -152,15 +157,61 @@ namespace ScubaDiver
 
         private void Dispatcher(HttpListener listener)
         {
-            while (_stayAlive.WaitOne())
+            // Using a timeout we can make sure not to block if the
+            // 'stayAlive' state changes to "reset" (which means we should die)
+            while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))
             {
-                HttpListenerContext requestContext = listener.GetContext();
-                Task.Run(() =>
+                void ListenerCallback(IAsyncResult result)
                 {
-                    Console.WriteLine($"[Diver][TASK ID {Thread.CurrentThread.ManagedThreadId}] New Dispatched Request STARTED");
-                    HandleDispatchedRequest(requestContext);
-                    Console.WriteLine($"[Diver][TASK ID {Thread.CurrentThread.ManagedThreadId}] New Dispatched Request FINISHED");
-                });
+                    HttpListener listener = (HttpListener)result.AsyncState;
+                    HttpListenerContext context;
+                    try
+                    {
+                        context = listener.EndGetContext(result);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        Logger.Debug("[Diver][ListenerCallback] Listener is disposed. Exiting.");
+                        return;
+                    }
+
+                    try
+                    {
+                        HandleDispatchedRequest(context);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("[Diver] Task faulted! Exception:");
+                        Console.WriteLine(e);
+                    }
+                }
+                IAsyncResult asyncOperation = listener.BeginGetContext(ListenerCallback, listener);
+
+                while(true)
+                {
+                    if(asyncOperation.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(100)))
+                    {
+                        // Async operation started! We can mov on to next request
+                        break;
+                    }
+                    else
+                    {
+                        // Async event still awaiting new HTTP requests... It's a good time to check
+                        // if we were signaled to die
+                        if(!_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))
+                        {
+                            // Time to die.
+                            // Leaving the inner loop will get us to the outter loop where _stayAlive is checked (again)
+                            // and then it that loop will stop as well.
+                            break;
+                        }
+                        else
+                        {
+                            // No singal of die command. We can continue waiting
+                            continue;
+                        }
+                    }
+                }
             }
 
             Logger.Debug("[Diver] HTTP Loop ended. Cleaning up");
