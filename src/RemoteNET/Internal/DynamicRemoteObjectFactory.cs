@@ -1,4 +1,4 @@
-﻿using RemoteNET.Internal.Reflection;
+using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
@@ -189,6 +189,11 @@ namespace RemoteNET.Internal
                     {
                         throw new NotImplementedException("Trying to call getter of remote " +
                                                           "property but either hasResults was false");
+                    }
+
+                    if(res.IsNull)
+                    {
+                        return null;
                     }
 
                     if (res.IsRemoteAddress)
