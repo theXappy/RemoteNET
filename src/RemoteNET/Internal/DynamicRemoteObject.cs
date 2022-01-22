@@ -1,4 +1,4 @@
-﻿using Microsoft.CSharp.RuntimeBinder;
+using Microsoft.CSharp.RuntimeBinder;
 using RemoteNET.Internal.ProxiedReflection;
 using ScubaDiver.API.Utils;
 using System;
@@ -348,7 +348,7 @@ namespace RemoteNET.Internal
 
         public override string ToString()
         {
-            return _methods[nameof(ToString)].Single().Proxy(new object[0]) as string;
+            return _methods[nameof(ToString)].Single(mi=>mi.Parameters.Count == 0).Proxy(new object[0]) as string;
         }
 
         public override int GetHashCode()
