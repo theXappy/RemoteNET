@@ -922,8 +922,9 @@ namespace ScubaDiver
             try
             {
                 argsSummary = string.Join(", ", paramsList.Select(param => param.ToString()));
-                Logger.Debug($"[Diver] Invoking {method.Name} with those args: {argsSummary}");
+                Logger.Debug($"[Diver] Invoking {method.Name} with those args (Count: {paramsList.Count}): `{argsSummary}`");
                 results = method.Invoke(instance, paramsList.ToArray());
+                Console.WriteLine("[Diver] invoked function finished!");
             }
             catch (Exception e)
             {
