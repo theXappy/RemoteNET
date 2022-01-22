@@ -939,28 +939,40 @@ namespace ScubaDiver
             }
             else
             {
-                // Need to return the results. If it's primitive we'll encode it
-                // If it's non-primitive we pin it and send the address.
-                ObjectOrRemoteAddress returnValue;
-                if (results.GetType().IsPrimitiveEtc())
+                if (results == null)
                 {
-                    returnValue = ObjectOrRemoteAddress.FromObj(results);
+                    // Got back a null...
+                    invocResults = new InvocationResults()
+                    {
+                        VoidReturnType = false,
+                        ReturnedObjectOrAddress = ObjectOrRemoteAddress.Null
+                    };
                 }
                 else
                 {
-                    // Pinning results
-                    FrozenObjectInfo foi = PinObject(results);
-                    ulong resultsAddress = foi.Address;
-                    Type resultsType = results.GetType();
-                    returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
+                    // Need to return the results. If it's primitive we'll encode it
+                    // If it's non-primitive we pin it and send the address.
+                    ObjectOrRemoteAddress returnValue;
+                    if (results.GetType().IsPrimitiveEtc())
+                    {
+                        returnValue = ObjectOrRemoteAddress.FromObj(results);
+                    }
+                    else
+                    {
+                        // Pinning results
+                        FrozenObjectInfo foi = PinObject(results);
+                        ulong resultsAddress = foi.Address;
+                        Type resultsType = results.GetType();
+                        returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
+                    }
+
+
+                    invocResults = new InvocationResults()
+                    {
+                        VoidReturnType = false,
+                        ReturnedObjectOrAddress = returnValue
+                    };
                 }
-
-
-                invocResults = new InvocationResults()
-                {
-                    VoidReturnType = false,
-                    ReturnedObjectOrAddress = returnValue
-                };
             }
             return JsonConvert.SerializeObject(invocResults);
         }
@@ -1317,7 +1329,7 @@ namespace ScubaDiver
 
             // Make sure it's still in place by refreshing the runtime
             RefreshRuntime();
-            ClrObject clrObj =default(ClrObject);
+            ClrObject clrObj = default(ClrObject);
             lock (_debugObjectsLock)
             {
                 clrObj = _runtime.Heap.GetObject(objAddr);
