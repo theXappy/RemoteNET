@@ -1,4 +1,4 @@
-using RemoteNET.Internal.Reflection;
+﻿using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
@@ -170,7 +170,7 @@ namespace RemoteNET.Internal
             if (dro.HasMember(name))
             {
                 // Property already defined, let's skip it.
-                Logger.Debug("[AddProperty] PROPERTY {name} ALREADY DEFINED!");
+                Logger.Debug($"[AddProperty] PROPERTY {name} ALREADY DEFINED!");
                 return;
             }
 
