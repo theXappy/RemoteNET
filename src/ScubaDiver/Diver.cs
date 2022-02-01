@@ -311,9 +311,7 @@ namespace ScubaDiver
             }
 
             // Call callback at controller
-            Logger.Debug("[InvokeControllerCallback] Before reverseCommunicator.InvokeCallback");
             reverseCommunicator.InvokeCallback(token, remoteParams);
-            Logger.Debug("[InvokeControllerCallback] After reverseCommunicator.InvokeCallback");
         }
         /// <summary>
         /// Tries to get a <see cref="FrozenObjectInfo"/> of a pinned object
@@ -713,9 +711,7 @@ namespace ScubaDiver
             {
                 return "{\"error\":\"Missing parameter 'address'\"}";
             }
-            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}\n" +
-                $"\tSOURCE : {(new System.Diagnostics.StackTrace()).GetFrame(1).GetMethod().Name}\n" +
-                $"\tSOURCE2: {(new System.Diagnostics.StackTrace()).GetFrame(2).GetMethod().Name}");
+            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}\n");
 
             // Check if we have this objects in our pinned pool
             if (TryGetPinnedObject(objAddr, out _))

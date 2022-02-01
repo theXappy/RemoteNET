@@ -28,8 +28,6 @@ namespace ScubaDiver.API.Utils
             {
                 object[] objectsEnumerable = enumerable.Cast<object>().ToArray();
                 Type elementsType = toEncode.GetType().GetElementType();
-                Console.WriteLine($"[PrimEncoder] Element Type: {elementsType.Name}");
-                Console.WriteLine($"[PrimEncoder] elementsType.IsPrimitiveEtc: {elementsType.IsPrimitiveEtc()}");
                 if (!elementsType.IsPrimitiveEtc())
                 {
                     // TODO: Support arrays of RemoteObjects/DynamicRemoteObject
