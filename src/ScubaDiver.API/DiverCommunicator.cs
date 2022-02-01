@@ -29,6 +29,8 @@ namespace ScubaDiver.API
         private string _hostname;
         private int _port;
 
+        private int? _process_id = null;
+
         private HttpListener _listener = null;
 
         public DiverCommunicator(string hostname, int port)
@@ -72,6 +74,11 @@ namespace ScubaDiver.API
 
         public bool KillDiver()
         {
+            if(_process_id.HasValue)
+            {
+                UnregisterClient(_process_id.Value);
+            }
+
             string body = SendRequest("die");
             return body?.Contains("Goodbye") ?? false;
         }
@@ -179,6 +186,52 @@ namespace ScubaDiver.API
                 return null;
             }
             return res;
+        }
+
+        public bool RegisterClient(int? process_id = null)
+        {
+            _process_id = process_id ?? Process.GetCurrentProcess().Id;
+
+            try
+            {
+                string body = SendRequest("register_client", new Dictionary<string, string> { { "process_id", _process_id.Value.ToString()} });
+                return body.Contains("{\"status\":\"OK'\"}");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        public bool UnregisterClient(int? process_id = null)
+        {
+            _process_id = process_id ?? Process.GetCurrentProcess().Id;
+
+            try
+            {
+                string body = SendRequest("unregister_client", new Dictionary<string, string> { { "process_id", _process_id.Value.ToString()} });
+                return body.Contains("{\"status\":\"OK'\"}");
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                _process_id = null;
+            }
+        }
+
+        public bool CheckAliveness()
+        {
+            try
+            {
+                string body = SendRequest("ping");
+                return body.Contains("pong");
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public ObjectOrRemoteAddress GetItem(ulong token, int key)
