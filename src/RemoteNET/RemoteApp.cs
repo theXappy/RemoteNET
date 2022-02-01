@@ -89,7 +89,7 @@ namespace RemoteNET
         private RemoteObjectsCollection _remoteObjects;
 
         public RemoteActivator Activator { get; private set; }
-        public RemoteHarmony Harmony{ get; private set; }
+        public RemoteHarmony Harmony { get; private set; }
 
         public DiverCommunicator Communicator => _communicator;
 
@@ -115,16 +115,10 @@ namespace RemoteNET
         {
             // TODO: If target is our own process run a local Diver without DLL injections
 
-            bool alreadyInjected = false;
-            try
-            {
-                alreadyInjected = target.Modules.AsEnumerable()
-                                        .Any(module => module.ModuleName.Contains("UnmanagedAdapterDLL"));
-            }
-            catch
-            {
-                // Sometimes this happens because x32 vs x64 process interaction is not supported
-            }
+
+            //
+            // First Try: Blindly check the HTTP endpoint
+            //
 
             // To make the Diver's port predictable even when re-attaching we'll derive it from the PID:
             ushort diverPort = (ushort)target.Id;
@@ -133,119 +127,38 @@ namespace RemoteNET
             string targetDotNetVer = target.GetSupportedTargetFramework();
             bool isNetCore = targetDotNetVer != "net451";
 
-            if (!alreadyInjected)
+            // TODO: Make it configurable
+            string diverAddr = "127.0.0.1";
+            DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
+
+            bool isAlive = com.CheckAliveness();
+
+            if (!isAlive)
             {
-                // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
-                var remoteNetAppDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    typeof(RemoteApp).Assembly.GetName().Name);
-                DirectoryInfo remoteNetAppDataDirInfo = new DirectoryInfo(remoteNetAppDataDir);
-                if (!remoteNetAppDataDirInfo.Exists)
-                {
-                    remoteNetAppDataDirInfo.Create();
-                }
+                //
+                // Second Try: Inject DLL, assuming not injected yet
+                //
 
-                // Decide which injection toolkit to use x32 or x64
-                string injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector) + ".exe");
-                string adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL) + ".dll");
-                byte[] injectorResource = Resources.Injector;
-                byte[] adapterResource = Resources.UnmanagedAdapterDLL;
-                if (target.Is64Bit())
+                bool adapterModuleAlreadyInjected = false;
+                try
                 {
-                    injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector_x64) + ".exe");
-                    adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64) + ".dll");
-                    injectorResource = Resources.Injector_x64;
-                    adapterResource = Resources.UnmanagedAdapterDLL_x64;
+                    adapterModuleAlreadyInjected = target.Modules.AsEnumerable()
+                                            .Any(module => module.ModuleName.Contains("UnmanagedAdapterDLL"));
                 }
-
-                // Check if injector or bootstrap resources differ from copies on disk
-                string injectorResourceHash = HashUtils.BufferSHA256(injectorResource);
-                string injectorFileHash = File.Exists(injectorPath) ? HashUtils.FileSHA256(injectorPath) : String.Empty;
-                if (injectorResourceHash != injectorFileHash)
+                catch
                 {
-                    File.WriteAllBytes(injectorPath, injectorResource);
+                    // Sometimes this happens because x32 vs x64 process interaction is not supported
                 }
-                string adapterResourceHash = HashUtils.BufferSHA256(adapterResource);
-                string adapterFileHash = File.Exists(adapterPath) ? HashUtils.FileSHA256(adapterPath) : String.Empty;
-                if (adapterResourceHash != adapterFileHash)
+                if (adapterModuleAlreadyInjected)
                 {
-                    File.WriteAllBytes(adapterPath, adapterResource);
-                    // Also set the copy's permissions so we can inject it into UWP apps
-                    FilePermissions.AddFileSecurity(adapterPath, "ALL APPLICATION PACKAGES",
-                        System.Security.AccessControl.FileSystemRights.ReadAndExecute,
-                        System.Security.AccessControl.AccessControlType.Allow);
-                }
-
-                // Unzip scuba diver and dependencies into their own directory
-                var scubaDestDirInfo = new DirectoryInfo(
-                                                Path.Combine(
-                                                    remoteNetAppDataDir,
-                                                    isNetCore ? "Scuba_NetCore" : "Scuba")
-                                                );
-                if (!scubaDestDirInfo.Exists)
-                {
-                    scubaDestDirInfo.Create();
-                }
-
-                // Temp dir to dump to before moving to app data (where it might have previously deployed files
-                // AND they might be in use by some application so they can't be overwritten)
-                Random rand = new Random();
-                var tempDir = Path.Combine(
-                    Path.GetTempPath(),
-                    rand.Next(100000).ToString());
-                DirectoryInfo tempDirInfo = new DirectoryInfo(tempDir);
-                if (tempDirInfo.Exists)
-                {
-                    tempDirInfo.Delete(recursive: true);
-                }
-                tempDirInfo.Create();
-                using (var diverZipMemoryStream = new MemoryStream(isNetCore ? Resources.ScubaDiver_NetCore : Resources.ScubaDiver))
-                {
-                    ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
-                    // This extracts the "Scuba" directory from the zip to *tempDir*
-                    diverZip.ExtractToDirectory(tempDir);
-                }
-
-                // Going over unzipped files and checking which of those we need to copy to our AppData directory
-                tempDirInfo = new DirectoryInfo(Path.Combine(tempDir, isNetCore ? "Scuba_NetCore" : "Scuba"));
-                foreach (FileInfo fileInfo in tempDirInfo.GetFiles())
-                {
-                    string destPath = Path.Combine(scubaDestDirInfo.FullName, fileInfo.Name);
-                    if (File.Exists(destPath))
-                    {
-                        string dumpedFileHash = HashUtils.FileSHA256(fileInfo.FullName);
-                        string previousFileHash = HashUtils.FileSHA256(destPath);
-                        if (dumpedFileHash == previousFileHash)
-                        {
-                            // Skipping file because the previous version of it has the same hash
-                            continue;
-                        }
-                    }
-                    // Moving file to our AppData directory
-                    File.Delete(destPath);
-                    fileInfo.MoveTo(destPath);
-                    // Also set the copy's permissions so we can inject it into UWP apps
-                    FilePermissions.AddFileSecurity(destPath, "ALL APPLICATION PACKAGES",
-                                System.Security.AccessControl.FileSystemRights.ReadAndExecute,
-                                System.Security.AccessControl.AccessControlType.Allow);
+                    throw new Exception("Failed to connect to remote app. It seems like the diver had already been injected but it is not responding to HTTP requests.\n" +
+                        "It's suggested to restart the target app and retry.");
                 }
 
 
-                // We are done with our temp directory
-                tempDirInfo.Delete(recursive: true);
-
-                string scubaDiverDllPath;
-                if (isNetCore)
-                {
-                    Logger.Debug("[DEBUG] .NET Core target!");
-                    scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
-                       .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver_NetCore.dll")).FullName;
-                }
-                else
-                {
-                    scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
-                    .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver.dll")).FullName;
-                }
+                // Not injected yet, Injecting adapter now (which should load the Diver)
+                string remoteNetAppDataDir, injectorPath, scubaDiverDllPath;
+                GetInjectionToolkit(target, isNetCore, out remoteNetAppDataDir, out injectorPath, out scubaDiverDllPath);
                 string adapterExecutionArg = string.Join("*", scubaDiverDllPath,
                     "ScubaDiver.DllEntry",
                     "EntryPoint",
@@ -265,26 +178,155 @@ namespace RemoteNET
                     // Injector finished early, there's probably an error.
                     var stdout = injectorProc.StandardOutput.ReadToEnd();
                     Logger.Debug("Error with injector. Raw STDOUT:\n" + stdout);
-                    return null;
+                    isAlive = false;
                 }
-                // TODO: There's a bug I can't explain where the injector doesnt finish injecting
-                // if it's STDOUT isn't read.
-                // This is a hack, it should be solved in another way.
-                // CliWrap? Make injector not block on output writes?
-                ThreadStart ts = () => { injectorProc.StandardOutput.ReadToEnd(); };
-                var readerThread = new Thread(ts)
+                else
                 {
-                    Name = "Injector_STD_Out_Reader"
-                };
-                readerThread.Start();
-                // TODO: Get results of injector
+                    // TODO: There's a bug I can't explain where the injector doesnt finish injecting
+                    // if it's STDOUT isn't read.
+                    // This is a hack, it should be solved in another way.
+                    // CliWrap? Make injector not block on output writes?
+                    ThreadStart ts = () => { injectorProc.StandardOutput.ReadToEnd(); };
+                    var readerThread = new Thread(ts)
+                    {
+                        Name = "Injector_STD_Out_Reader"
+                    };
+                    readerThread.Start();
+                    // TODO: Get results of injector
+                    isAlive = true;
+                }
             }
 
-            // TODO: Make it configurable
-            string diverAddr = "127.0.0.1";
-            DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
+            if (isAlive)
+            {
+                bool registered = com.RegisterClient();
+                if (registered)
+                {
+                    return new RemoteApp(target, com);
+                }
+            }
+            return null;
+        }
 
-            return new RemoteApp(target, com);
+        /// <summary>
+        /// Returns paths to 
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="isNetCore"></param>
+        /// <param name="remoteNetAppDataDir"></param>
+        /// <param name="injectorPath"></param>
+        /// <param name="scubaDiverDllPath"></param>
+        private static void GetInjectionToolkit(Process target, bool isNetCore, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath)
+        {
+            // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
+            remoteNetAppDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                typeof(RemoteApp).Assembly.GetName().Name);
+            DirectoryInfo remoteNetAppDataDirInfo = new DirectoryInfo(remoteNetAppDataDir);
+            if (!remoteNetAppDataDirInfo.Exists)
+            {
+                remoteNetAppDataDirInfo.Create();
+            }
+
+            // Decide which injection toolkit to use x32 or x64
+            injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector) + ".exe");
+            string adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL) + ".dll");
+            byte[] injectorResource = Resources.Injector;
+            byte[] adapterResource = Resources.UnmanagedAdapterDLL;
+            if (target.Is64Bit())
+            {
+                injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector_x64) + ".exe");
+                adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64) + ".dll");
+                injectorResource = Resources.Injector_x64;
+                adapterResource = Resources.UnmanagedAdapterDLL_x64;
+            }
+
+            // Check if injector or bootstrap resources differ from copies on disk
+            string injectorResourceHash = HashUtils.BufferSHA256(injectorResource);
+            string injectorFileHash = File.Exists(injectorPath) ? HashUtils.FileSHA256(injectorPath) : String.Empty;
+            if (injectorResourceHash != injectorFileHash)
+            {
+                File.WriteAllBytes(injectorPath, injectorResource);
+            }
+            string adapterResourceHash = HashUtils.BufferSHA256(adapterResource);
+            string adapterFileHash = File.Exists(adapterPath) ? HashUtils.FileSHA256(adapterPath) : String.Empty;
+            if (adapterResourceHash != adapterFileHash)
+            {
+                File.WriteAllBytes(adapterPath, adapterResource);
+                // Also set the copy's permissions so we can inject it into UWP apps
+                FilePermissions.AddFileSecurity(adapterPath, "ALL APPLICATION PACKAGES",
+                    System.Security.AccessControl.FileSystemRights.ReadAndExecute,
+                    System.Security.AccessControl.AccessControlType.Allow);
+            }
+
+            // Unzip scuba diver and dependencies into their own directory
+            var scubaDestDirInfo = new DirectoryInfo(
+                                            Path.Combine(
+                                                remoteNetAppDataDir,
+                                                isNetCore ? "Scuba_NetCore" : "Scuba")
+                                            );
+            if (!scubaDestDirInfo.Exists)
+            {
+                scubaDestDirInfo.Create();
+            }
+
+            // Temp dir to dump to before moving to app data (where it might have previously deployed files
+            // AND they might be in use by some application so they can't be overwritten)
+            Random rand = new Random();
+            var tempDir = Path.Combine(
+                Path.GetTempPath(),
+                rand.Next(100000).ToString());
+            DirectoryInfo tempDirInfo = new DirectoryInfo(tempDir);
+            if (tempDirInfo.Exists)
+            {
+                tempDirInfo.Delete(recursive: true);
+            }
+            tempDirInfo.Create();
+            using (var diverZipMemoryStream = new MemoryStream(isNetCore ? Resources.ScubaDiver_NetCore : Resources.ScubaDiver))
+            {
+                ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
+                // This extracts the "Scuba" directory from the zip to *tempDir*
+                diverZip.ExtractToDirectory(tempDir);
+            }
+
+            // Going over unzipped files and checking which of those we need to copy to our AppData directory
+            tempDirInfo = new DirectoryInfo(Path.Combine(tempDir, isNetCore ? "Scuba_NetCore" : "Scuba"));
+            foreach (FileInfo fileInfo in tempDirInfo.GetFiles())
+            {
+                string destPath = Path.Combine(scubaDestDirInfo.FullName, fileInfo.Name);
+                if (File.Exists(destPath))
+                {
+                    string dumpedFileHash = HashUtils.FileSHA256(fileInfo.FullName);
+                    string previousFileHash = HashUtils.FileSHA256(destPath);
+                    if (dumpedFileHash == previousFileHash)
+                    {
+                        // Skipping file because the previous version of it has the same hash
+                        continue;
+                    }
+                }
+                // Moving file to our AppData directory
+                File.Delete(destPath);
+                fileInfo.MoveTo(destPath);
+                // Also set the copy's permissions so we can inject it into UWP apps
+                FilePermissions.AddFileSecurity(destPath, "ALL APPLICATION PACKAGES",
+                            System.Security.AccessControl.FileSystemRights.ReadAndExecute,
+                            System.Security.AccessControl.AccessControlType.Allow);
+            }
+
+
+            // We are done with our temp directory
+            tempDirInfo.Delete(recursive: true);
+            if (isNetCore)
+            {
+                Logger.Debug("[DEBUG] .NET Core target!");
+                scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
+                   .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver_NetCore.dll")).FullName;
+            }
+            else
+            {
+                scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
+                .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver.dll")).FullName;
+            }
         }
 
         //
@@ -338,12 +380,11 @@ namespace RemoteNET
         //
         // IDisposable
         //
-
         public void Dispose()
         {
-            this.Communicator?.KillDiver();
-            this._communicator = null;
-            this._procWithDiver = null;
+            Communicator?.KillDiver();
+            _communicator = null;
+            _procWithDiver = null;
         }
 
     }
