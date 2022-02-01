@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -7,11 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using System.Runtime;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Diagnostics.Runtime;
 using Newtonsoft.Json;
 using ScubaDiver.API;
@@ -32,6 +27,10 @@ namespace ScubaDiver
         private ClrRuntime _runtime = null;
         private Converter<object> _converter = new Converter<object>();
 
+        // Clients Tracking
+        public object _registeredPidsLock = new object();
+        public List<int> _registeredPids = new List<int>();
+
         // HTTP Responses fields
         private Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
 
@@ -51,7 +50,10 @@ namespace ScubaDiver
         {
             _responseBodyCreators = new Dictionary<string, Func<HttpListenerRequest, string>>()
             {
+                {"/ping", MakePingResponse},
                 {"/die", MakeDieResponse},
+                {"/register_client", MakeRegisterClientResponse},
+                {"/unregister_client", MakeUnregisterClientResponse},
                 {"/domains", MakeDomainsResponse},
                 {"/heap", MakeHeapResponse},
                 {"/invoke", MakeInvokeResponse},
@@ -71,6 +73,50 @@ namespace ScubaDiver
             };
             _pinnedObjects = new ConcurrentDictionary<ulong, FrozenObjectInfo>();
             _tokensToRegisteredEventHandlers = new ConcurrentDictionary<int, IProxyFunctionHolder>();
+        }
+
+        private string MakePingResponse(HttpListenerRequest arg)
+        {
+            return "{\"status\":\"pong\"}";
+        }
+
+        private string MakeUnregisterClientResponse(HttpListenerRequest arg)
+        {
+            string pidString = arg.QueryString.Get("process_id");
+            if (pidString == null || !int.TryParse(pidString, out int pid))
+            {
+                return "{\"error\":\"Missing parameter 'process_id'\"}";
+            }
+            bool removed;
+            int remaining;
+            lock (_registeredPidsLock) {
+                removed = _registeredPids.Remove(pid);
+                remaining = _registeredPids.Count;
+            }
+            Logger.Debug("[Diver] Client unregistered. ID = " + pid);
+
+            UnregisterClientResponse ucResponse = new UnregisterClientResponse()
+            {
+                WasRemvoed = removed,
+                OtherClientsAmount = remaining
+            };
+
+            return JsonConvert.SerializeObject(ucResponse);
+        }
+
+        private string MakeRegisterClientResponse(HttpListenerRequest arg)
+        {
+            string pidString = arg.QueryString.Get("process_id");
+            if (pidString == null || !int.TryParse(pidString, out int pid))
+            {
+                return "{\"error\":\"Missing parameter 'process_id'\"}";
+            }
+            lock (_registeredPidsLock)
+            {
+                _registeredPids.Add(pid);
+            }
+            Logger.Debug("[Diver] New client registered. ID = " + pid);
+            return "{\"status\":\"OK'\"}";
         }
 
         void RefreshRuntime()
@@ -1407,6 +1453,17 @@ namespace ScubaDiver
         private string MakeDieResponse(HttpListenerRequest req)
         {
             Logger.Debug("[Diver] Die command received");
+            bool forceKill = req.QueryString.Get("force").ToUpper() == "TRUE";
+            lock (_registeredPidsLock)
+            {
+                if (_registeredPids.Count > 0 && !forceKill)
+                {
+                    Logger.Debug("[Diver] Die command failed - More clients exist.");
+                    return "{\"status\":\"Error more clients remaining. You can use the force=true argument to ignore this check.\"}";
+                }
+            }
+
+            Logger.Debug("[Diver] Die command accepted.");
             _stayAlive.Reset();
             return "{\"status\":\"Goodbye\"}";
         }
