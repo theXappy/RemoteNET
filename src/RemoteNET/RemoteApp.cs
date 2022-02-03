@@ -13,6 +13,7 @@ using RemoteNET.Internal.Extensions;
 using RemoteNET.Internal.Reflection;
 using RemoteNET.Internal.Utils;
 using RemoteNET.Properties;
+using RemoteNET.Utils;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 using static ScubaDiver.API.DiverCommunicator;
@@ -105,6 +106,8 @@ namespace RemoteNET
         //
         // Init
         // 
+
+        public static RemoteApp Connect(string target)  => Connect(ProcessHelper.GetSingleRoot(target));
 
         /// <summary>
         /// Creates a new provider.
