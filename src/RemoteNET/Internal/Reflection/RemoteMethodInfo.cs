@@ -57,7 +57,7 @@ namespace RemoteNET.Internal.Reflection
             for (int i = 0; i < parameters.Length; i++)
             {
                 object parameter = parameters[i];
-                if (parameter.GetType().IsPrimitiveEtc())
+                if (parameter.GetType().IsPrimitiveEtc() || parameter.GetType().IsPrimitiveEtcArray())
                 {
                     remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
                 }
