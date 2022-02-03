@@ -100,6 +100,17 @@ namespace ScubaDiver.API.Extensions
             return t.BaseType.GetFieldRecursive(fieldName);
         }
 
+        public static bool IsPrimitiveEtcArray(this Type realType)
+        {
+            if (!realType.IsArray)
+            {
+                return false;
+            }
+
+            Type elementsType = realType.GetElementType();
+            return elementsType.IsPrimitiveEtc();
+        }
+
         public static bool IsPrimitiveEtc(this Type realType)
         {
             return realType.IsPrimitive || realType == typeof(string) || realType == typeof(decimal) ||
