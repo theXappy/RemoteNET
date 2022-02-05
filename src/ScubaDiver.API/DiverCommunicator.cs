@@ -112,15 +112,12 @@ namespace ScubaDiver.API
             }
 
             string body = SendRequest("type", queryParams);
+            if(body.StartsWith("{\"error\":"))
+            {
+                throw new Exception("Diver had some issues dumping this type for us. Reported error: " + body);
+            }
             TypeDump typeDump;
-            try
-            {
-                typeDump = JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
-            }
-            catch
-            {
-                typeDump = null;
-            }
+            typeDump = JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
             return typeDump;
         }
 
