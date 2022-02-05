@@ -1,4 +1,4 @@
-using Microsoft.Diagnostics.Runtime;
+﻿using Microsoft.Diagnostics.Runtime;
 using ScubaDiver.API.Extensions;
 using System;
 using System.Collections.Generic;
@@ -30,41 +30,42 @@ namespace ScubaDiver.Utils
             }
 
 
-            IList<ClrModule> assembliesToSearch = _runtime.AppDomains.First().Modules;
-            if (assembly != null)
-                assembliesToSearch = assembliesToSearch.Where(mod => Path.GetFileNameWithoutExtension(mod.Name) == assembly).ToList();
-            if (!assembliesToSearch.Any())
+            try
             {
-                // No such assembly
-                Logger.Debug($"[Diver] No such assembly \"{assembly}\"");
-                return null;
-            }
+                IList<ClrModule> assembliesToSearch = _runtime.AppDomains.First().Modules;
+                if (assembly != null)
+                    assembliesToSearch = assembliesToSearch.Where(mod => Path.GetFileNameWithoutExtension(mod.Name) == assembly).ToList();
 
-            foreach (ClrModule module in assembliesToSearch)
-            {
-                ClrType clrTypeInfo = module.GetTypeByName(name);
-                if (clrTypeInfo == null)
+                foreach (ClrModule module in assembliesToSearch)
                 {
-                    var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
-                    var typeNames = (from tuple in x
-                                     let token = tuple.Token
-                                     let resolvedType = module.ResolveToken(token) ?? null
-                                     where resolvedType?.Name == name
-                                     select new { MethodTable = tuple.MethodTable, Token = token, ClrType = resolvedType }).ToList();
-                    if (typeNames.Any())
+                    ClrType clrTypeInfo = module.GetTypeByName(name);
+                    if (clrTypeInfo == null)
                     {
-                        clrTypeInfo = typeNames.First().ClrType;
+                        var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
+                        var typeNames = (from tuple in x
+                                         let token = tuple.Token
+                                         let resolvedType = module.ResolveToken(token) ?? null
+                                         where resolvedType?.Name == name
+                                         select new { MethodTable = tuple.MethodTable, Token = token, ClrType = resolvedType }).ToList();
+                        if (typeNames.Any())
+                        {
+                            clrTypeInfo = typeNames.First().ClrType;
+                        }
                     }
-                }
 
-                if (clrTypeInfo == null)
-                {
-                    continue;
-                }
+                    if (clrTypeInfo == null)
+                    {
+                        continue;
+                    }
 
-                // Found it
-                Type typeObj = clrTypeInfo.GetRealType();
-                return typeObj;
+                    // Found it
+                    Type typeObj = clrTypeInfo.GetRealType();
+                    return typeObj;
+                }
+            }
+            catch 
+            { 
+                // Using ClrMD Failed but we have a fallback
             }
 
             // Fallback - normal .NET reflection
