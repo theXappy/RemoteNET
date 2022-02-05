@@ -1,4 +1,4 @@
-﻿using Microsoft.Diagnostics.Runtime;
+using Microsoft.Diagnostics.Runtime;
 using ScubaDiver.API.Extensions;
 using System;
 using System.Collections.Generic;
@@ -75,6 +75,24 @@ namespace ScubaDiver.Utils
                 {
                     return t;
                 }
+            }
+
+            // Special case for List<T>
+            if (name.StartsWith("System.Collections.Generic.List`1"))
+            {
+                string innerType = name.Substring("System.Collections.Generic.List`1".Length).Trim('[').Trim(']');
+                try
+                {
+                    Type inner = TypesResolver.Resolve(_runtime, innerType);
+                    if (inner != null)
+                    {
+                        var listType = typeof(List<>);
+                        var constructedListType = listType.MakeGenericType(inner);
+                        if(constructedListType.FullName == name)
+                            return constructedListType;
+                    }
+                }
+                catch { }
             }
 
             return null;
