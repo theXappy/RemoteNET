@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -1273,13 +1274,16 @@ namespace ScubaDiver
                 return "{\"error\":\"Object at given address wasn't pinned\"}";
             }
 
-            Array enumerable = (arrayFoi.Object as Array);
-            object[] asArray = enumerable?.Cast<object>().ToArray();
+            IList asList = (arrayFoi.Object as IList);
+            object[] asArray = asList?.Cast<object>().ToArray();
             if (asArray == null)
             {
-                return "{\"error\":\"Object at given address wasn't an array\"}";
+                return "{\"error\":\"Object at given address wasn't an IList\"}";
             }
-            if (index >= asArray.Length)
+            int length = asArray.Length;
+
+
+            if (index >= length)
             {
                 return "{\"error\":\"Index out of range\"}";
             }
