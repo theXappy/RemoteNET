@@ -42,7 +42,8 @@ namespace ScubaDiver
         // Callbacks Endpoint of the Controller process
         IPEndPoint _callbacksEndpoint;
         int _nextAvilableCallbackToken = 0;
-        private ConcurrentDictionary<int, IProxyFunctionHolder> _tokensToRegisteredEventHandlers;
+        private ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
+        private ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
 
         private ManualResetEvent _stayAlive = new ManualResetEvent(true);
 
@@ -74,7 +75,8 @@ namespace ScubaDiver
                 {"/get_item", MakeArrayItemResponse},
             };
             _pinnedObjects = new ConcurrentDictionary<ulong, FrozenObjectInfo>();
-            _tokensToRegisteredEventHandlers = new ConcurrentDictionary<int, IProxyFunctionHolder>();
+            _remoteEventHandler = new ConcurrentDictionary<int, RegisteredEventHandlerInfo>();
+            _remoteHooks = new ConcurrentDictionary<int, RegisteredMethodHookInfo>();
         }
 
         private string MakePingResponse(HttpListenerRequest arg)
@@ -91,7 +93,8 @@ namespace ScubaDiver
             }
             bool removed;
             int remaining;
-            lock (_registeredPidsLock) {
+            lock (_registeredPidsLock)
+            {
                 removed = _registeredPids.Remove(pid);
                 remaining = _registeredPids.Count;
             }
@@ -235,9 +238,9 @@ namespace ScubaDiver
                 }
                 IAsyncResult asyncOperation = listener.BeginGetContext(ListenerCallback, listener);
 
-                while(true)
+                while (true)
                 {
-                    if(asyncOperation.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(100)))
+                    if (asyncOperation.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(100)))
                     {
                         // Async operation started! We can mov on to next request
                         break;
@@ -246,7 +249,7 @@ namespace ScubaDiver
                     {
                         // Async event still awaiting new HTTP requests... It's a good time to check
                         // if we were signaled to die
-                        if(!_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))
+                        if (!_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))
                         {
                             // Time to die.
                             // Leaving the inner loop will get us to the outter loop where _stayAlive is checked (again)
@@ -264,21 +267,18 @@ namespace ScubaDiver
 
             Logger.Debug("[Diver] HTTP Loop ended. Cleaning up");
 
-            Logger.Debug("[Diver] Removing all event subscriptions");
-            foreach (int token in _tokensToRegisteredEventHandlers.Keys.ToList())
+            Logger.Debug("[Diver] Removing all event subscriptions & hooks");
+            foreach (RegisteredEventHandlerInfo rehi in _remoteEventHandler.Values)
             {
-                IProxyFunctionHolder proxyHolder = _tokensToRegisteredEventHandlers[token];
-                if (proxyHolder is RegisteredEventHandlerInfo rehi)
-                {
-                    rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
-                    _tokensToRegisteredEventHandlers.TryRemove(token, out _);
-                }
-                else if (proxyHolder is RegisteredMethodHookInfo rmhi)
-                {
-                    ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
-                }
+                rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
             }
-            Logger.Debug("[Diver] Removed all event subscriptions");
+            foreach (RegisteredMethodHookInfo rmhi in _remoteHooks.Values)
+            {
+                ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
+            }
+            _remoteEventHandler.Clear();
+            _remoteHooks.Clear();
+            Logger.Debug("[Diver] Removed all event subscriptions & hooks");
         }
 
 
@@ -468,18 +468,11 @@ namespace ScubaDiver
             }
             Logger.Debug($"[Diver][MakeEventUnsubscribeResponse] Called! Token: {token}");
 
-            if (_tokensToRegisteredEventHandlers.TryGetValue(token, out IProxyFunctionHolder proxyHolder))
+            if (_remoteEventHandler.TryGetValue(token, out RegisteredEventHandlerInfo eventInfo))
             {
-                if (proxyHolder is RegisteredEventHandlerInfo eventInfo)
-                {
-                    eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
-                    _tokensToRegisteredEventHandlers.TryRemove(token, out _);
-                    return "{\"status\":\"OK\"}";
-                }
-                else
-                {
-                    return "{\"error\":\"A proxy holder object was found for the given token but it was not a RegisteredEventHandlerInfo object\"}";
-                }
+                eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
+                _remoteEventHandler.TryRemove(token, out _);
+                return "{\"status\":\"OK\"}";
             }
             return "{\"error\":\"Unknown token for event callback subscription\"}";
         }
@@ -492,17 +485,10 @@ namespace ScubaDiver
             }
             Logger.Debug($"[Diver][MakeUnhookMethodResponse] Called! Token: {token}");
 
-            if (_tokensToRegisteredEventHandlers.TryGetValue(token, out IProxyFunctionHolder proxyHolder))
+            if (_remoteHooks.TryGetValue(token, out RegisteredMethodHookInfo rmhi))
             {
-                if (proxyHolder is RegisteredMethodHookInfo rmhi)
-                {
-                    ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
-                    return "{\"status\":\"OK\"}";
-                }
-                else
-                {
-                    return "{\"error\":\"A proxy holder object was found for the given token but it was not a RegisteredEventHandlerInfo object\"}";
-                }
+                ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
+                return "{\"status\":\"OK\"}";
             }
             return "{\"error\":\"Unknown token for event callback subscription\"}";
         }
@@ -577,12 +563,12 @@ namespace ScubaDiver
             int token = AssignCallbackToken();
             Logger.Debug($"[Diver] Hook Method - Assigned Token: {token}");
 
-            ScubaDiver.Hooking.HarmonyWrapper.HookCallback handler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
+            Hooking.HarmonyWrapper.HookCallback patchCallback = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
 
             Logger.Debug($"[Diver] Hooking function {methodName}...");
             try
             {
-                ScubaDiver.Hooking.HarmonyWrapper.Instance.AddHook(methodInfo, pos, handler);
+                ScubaDiver.Hooking.HarmonyWrapper.Instance.AddHook(methodInfo, pos, patchCallback);
             }
             catch (Exception ex)
             {
@@ -593,10 +579,10 @@ namespace ScubaDiver
 
 
             // Save all the registeration info so it can be removed later upon request
-            _tokensToRegisteredEventHandlers[token] = new RegisteredMethodHookInfo()
+            _remoteHooks[token] = new RegisteredMethodHookInfo()
             {
                 OriginalHookedMethod = methodInfo,
-                RegisteredProxy = handler
+                RegisteredProxy = patchCallback
             };
 
             EventRegistrationResults erResults = new EventRegistrationResults() { Token = token };
@@ -664,19 +650,19 @@ namespace ScubaDiver
             // assign subscriber unique id
             int token = AssignCallbackToken();
 
-            EventHandler handler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
+            EventHandler eventHandler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
 
             Logger.Debug($"[Diver] Adding event handler to event {eventName}...");
-            eventObj.AddEventHandler(target, handler);
+            eventObj.AddEventHandler(target, eventHandler);
             Logger.Debug($"[Diver] Added event handler to event {eventName}!");
 
 
             // Save all the registeration info so it can be removed later upon request
-            _tokensToRegisteredEventHandlers[token] = new RegisteredEventHandlerInfo()
+            _remoteEventHandler[token] = new RegisteredEventHandlerInfo()
             {
                 EventInfo = eventObj,
                 Target = target,
-                RegisteredProxy = handler
+                RegisteredProxy = eventHandler
             };
 
             EventRegistrationResults erResults = new EventRegistrationResults() { Token = token };

@@ -13,6 +13,7 @@
     <Compile Include="..\ScubaDiver\Hooking\HarmonyWrapper.cs" Link="Hooking\HarmonyWrapper.cs" />
     <Compile Include="..\ScubaDiver\Logger.cs" Link="Logger.cs" />
     <Compile Include="..\ScubaDiver\RegisteredEventHandlerInfo.cs" Link="RegisteredEventHandlerInfo.cs" />
+    <Compile Include="..\ScubaDiver\RegisteredMethodHookInfo.cs" Link="RegisteredMethodHookInfo.cs" />
     <Compile Include="..\ScubaDiver\Utils\Converter.cs" Link="Utils\Converter.cs" />
     <Compile Include="..\ScubaDiver\Utils\Freezer.cs" Link="Utils\Freezer.cs" />
     <Compile Include="..\ScubaDiver\Utils\FrozenObjectInfo.cs" Link="Utils\FrozenObjectInfo.cs" />
