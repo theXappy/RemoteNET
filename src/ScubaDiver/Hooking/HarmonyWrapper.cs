@@ -12,7 +12,7 @@ namespace ScubaDiver.Hooking
     {
         public static HarmonyWrapper Instance => new HarmonyWrapper();
 
-        private HarmonyLib.Harmony _harmony;
+        private Harmony _harmony;
         /// <summary>
         /// Maps 'target function parameters count' to right hook function (UnifiedHook_NUMBER)
         /// </summary>
@@ -35,7 +35,7 @@ namespace ScubaDiver.Hooking
                 MethodInfo spHook = AccessTools.Method(this.GetType(), $"UnifiedHook_{i}");
                 if (spHook == null)
                 {
-                    // No more hooks available. We finished with (i-1) entries.
+                    // No more hooks available. We finished with i entries, the last valid entry had (i-1) parameters.
                     break;
                 }
                 _psHooks[i] = spHook;
@@ -46,16 +46,20 @@ namespace ScubaDiver.Hooking
 
         public void AddHook(MethodInfo target, HarmonyPatchPosition pos, HookCallback patch)
         {
+            //
+            // Save a side the patch callback to invoke when the target is called
+            //
             string uniqueId = target.DeclaringType.FullName + ":" + target.Name;
             _actualHooks[uniqueId] = patch;
 
+            //
+            // Actual hook for the method is the generic "SinglePrefixHook" (through one if its proxies 'UnifiedHook_X')
+            // the "SinglePrefixHook" will search for the above saved callback and invoke it itself.
+            //
             int paramsCount = target.GetParameters().Length;
-            MethodInfo spHook = _psHooks[paramsCount];
+            MethodInfo myPrefixHook = _psHooks[paramsCount];
             // Document the `single prefix hook` used so we can remove later
-            _singlePrefixHooks[uniqueId] = spHook;
-
-            string prefixHookName = $"UnifiedHook_{paramsCount}";
-            var myPrefixHook = this.GetType().GetMethod(prefixHookName, (BindingFlags)0xfffffff);
+            _singlePrefixHooks[uniqueId] = myPrefixHook;
 
             HarmonyMethod prefix = null;
             HarmonyMethod postfix = null;
@@ -97,7 +101,7 @@ namespace ScubaDiver.Hooking
         private static void SinglePrefixHook(MethodBase __originalMethod, object __instance, params object[] args)
         {
             string uniqueId = __originalMethod.DeclaringType.FullName + ":" + __originalMethod.Name;
-            if (_actualHooks.TryGetValue(uniqueId, out var funcHook))
+            if (_actualHooks.TryGetValue(uniqueId, out HookCallback funcHook))
             {
                 funcHook(__instance, args);
             }
