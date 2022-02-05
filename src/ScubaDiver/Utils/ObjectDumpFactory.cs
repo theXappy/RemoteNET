@@ -42,7 +42,7 @@ namespace ScubaDiver.Utils
                         PinnedAddress = pinAddr,
                         PrimitiveValue = PrimitivesEncoder.Encode(instance),
                         SubObjectsCount = enumerable.Length,
-                        Type = dumpedObjType.ToString(),
+                        Type = dumpedObjType.FullName,
                         HashCode = instance.GetHashCode()
                     };
                     return od;
@@ -58,7 +58,7 @@ namespace ScubaDiver.Utils
                         PinnedAddress = pinAddr,
                         PrimitiveValue = "==UNUSED==",
                         SubObjectsCount = enumerable.Length,
-                        Type = dumpedObjType.ToString(),
+                        Type = dumpedObjType.FullName,
                         HashCode = instance.GetHashCode()
                     };
 
@@ -74,7 +74,7 @@ namespace ScubaDiver.Utils
                     ObjectType = ObjectType.NonPrimitive,
                     RetrivalAddress = retrievalAddr,
                     PinnedAddress = pinAddr,
-                    Type = dumpedObjType.ToString(),
+                    Type = dumpedObjType.FullName,
                     HashCode = instance.GetHashCode()
                 };
             }
@@ -83,17 +83,21 @@ namespace ScubaDiver.Utils
 
 
             List<MemberDump> fields = new List<MemberDump>();
-            foreach (var fieldInfo in dumpedObjType.GetFields((BindingFlags)0xffff))
+            var eventNames = dumpedObjType.GetEvents((BindingFlags)0xffff).Select(eventInfo => eventInfo.Name);
+            foreach (var fieldInfo in dumpedObjType.GetFields((BindingFlags)0xffff).Where(fieldInfo => !eventNames.Contains(fieldInfo.Name)))
             {
                 try
                 {
                     var fieldValue = fieldInfo.GetValue(instance);
                     bool hasEncValue = false;
                     string encValue = null;
-                    if (fieldValue.GetType().IsPrimitiveEtc() || fieldValue is IEnumerable)
+                    if (fieldValue != null)
                     {
-                        hasEncValue = true;
-                        encValue = PrimitivesEncoder.Encode(fieldValue);
+                        if (fieldValue.GetType().IsPrimitiveEtc() || fieldValue.GetType().IsPrimitiveEtcArray())
+                        {
+                            hasEncValue = true;
+                            encValue = PrimitivesEncoder.Encode(fieldValue);
+                        }
                     }
 
                     fields.Add(new MemberDump()
