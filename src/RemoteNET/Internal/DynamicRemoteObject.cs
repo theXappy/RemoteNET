@@ -272,10 +272,9 @@ namespace RemoteNET.Internal
             switch (memberType)
             {
                 case ProxiedMemberType.Field:
-                case ProxiedMemberType.Property:
                     if (!_fields.TryGetValue(binder.Name, out proxiedInfo))
                     {
-                        throw new Exception($"Field or Property \"{binder.Name}\" does not have a setter.");
+                        throw new Exception($"Field \"{binder.Name}\" does not have a setter.");
                     }
                     try
                     {
@@ -283,7 +282,22 @@ namespace RemoteNET.Internal
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Field or Property \"{binder.Name}\"'s setter threw an exception which sucks. Ex: " + ex);
+                        Console.WriteLine($"Field \"{binder.Name}\"'s setter threw an exception which sucks. Ex: " + ex);
+                        throw;
+                    }
+                    break;
+                case ProxiedMemberType.Property:
+                    if (!_properties.TryGetValue(binder.Name, out proxiedInfo))
+                    {
+                        throw new Exception($"Property \"{binder.Name}\" does not have a setter.");
+                    }
+                    try
+                    {
+                        proxiedInfo.Setter(value);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Property \"{binder.Name}\"'s setter threw an exception which sucks. Ex: " + ex);
                         throw;
                     }
                     break;
