@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -1582,15 +1583,16 @@ namespace ScubaDiver
 
             return JsonConvert.SerializeObject(dd);
         }
-        private string MakeTypeResponse(HttpListenerRequest req)
+        private string MakeTypeResponse(HttpListenerRequest req) => MakeTypeResponse(req.QueryString);
+        public string MakeTypeResponse(NameValueCollection queryString)
         {
-            string type = req.QueryString.Get("name");
+            string type = queryString.Get("name");
             if (string.IsNullOrEmpty(type))
             {
                 return "{\"error\":\"Missing parameter 'name'\"}";
             }
 
-            string assembly = req.QueryString.Get("assembly");
+            string assembly = queryString.Get("assembly");
             Type resolvedType = null;
             lock (_debugObjectsLock)
             {
