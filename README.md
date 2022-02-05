@@ -155,13 +155,11 @@ The limitations:
 3. Lambda expression are not allowed. The callback must be cast to an `Action<...>`.
 
 ## TODOs
-1. Generics/Arrays aren't completely supported
-2. Static members
-3. Support injecting to self with local diver
-4. Document "Reflection API" (RemoteType, RemoteMethodInfo, ... )
-5. Support other .NET framework CLR versions (Before .NET 4). Currently supports v4.0.30319
-6. Document Harmony (prefix hooks)
-7. Support more Harmony features
+1. Static members
+2. Document "Reflection API" (RemoteType, RemoteMethodInfo, ... )
+3. Support other .NET framework CLR versions (Before .NET 4). Currently supports v4.0.30319
+4. Document Harmony (prefix/postfix/finalizer hooks)
+5. Support more Harmony features
 
 
 ## Thanks
