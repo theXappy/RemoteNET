@@ -27,8 +27,13 @@ namespace RemoteNET.Internal
             return dynRemoteObj;
         }
 
-        private Type GetDependentType(string fullTypeName)
+        private Type GetDependentType(string fullTypeName, string assembly = null)
         {
+            if (assembly != null) {
+                Type possibleResults = TypesResolver.Instance.Resolve(assembly, fullTypeName);
+                if (possibleResults != null)
+                    return possibleResults;
+            }
             return _app.GetRemoteType(fullTypeName);
         }
 
@@ -147,9 +152,10 @@ namespace RemoteNET.Internal
                 // TODO: Does this even work if any of the arguments is a remote one
                 List<Tuple<Type,string>> argTypes = (from prmtr in methodInfo.Parameters
                                        let typeFullName = prmtr.Type
-                                       let resolvedType = GetDependentType(typeFullName)
+                                       let assm = prmtr.Assembly
+                                       let resolvedType = GetDependentType(typeFullName, assm)
                                        select new Tuple<Type,string>(resolvedType,prmtr.Name)).ToList();
-                Type retType = GetDependentType(methodInfo.ReturnTypeFullName);
+                Type retType = GetDependentType(methodInfo.ReturnTypeFullName, methodInfo.ReturnTypeAssembly);
                 dro.AddMethod(methodInfo.Name, argTypes, retType, proxy);
             }
         }
@@ -234,7 +240,7 @@ namespace RemoteNET.Internal
                 // Edge case: Events show up as fields
                 if (fieldInfo.TypeFullName == typeof(System.EventHandler).FullName)
                 {
-                    Type delegateType = rApp.GetRemoteType(fieldInfo.TypeFullName);
+                    Type delegateType = GetDependentType(fieldInfo.TypeFullName, fieldInfo.Assembly);
                     System.Reflection.ParameterInfo[] delegateParams = delegateType.GetMethod("Invoke").GetParameters();
                     List<Type> paramTypes = delegateParams.Select(t => t.ParameterType).ToList();
 
@@ -289,7 +295,7 @@ namespace RemoteNET.Internal
             foreach (TypeDump.TypeEvent eventInfo in td.Events)
             {
                 // Edge case: Events show up as fields
-                Type delegateType = rApp.GetRemoteType(eventInfo.TypeFullName);
+                Type delegateType = GetDependentType(eventInfo.TypeFullName);
                 System.Reflection.ParameterInfo[] delegateParams = delegateType.GetMethod("Invoke").GetParameters();
                 List<Type> paramTypes = delegateParams.Select(t => t.ParameterType).ToList();
 
