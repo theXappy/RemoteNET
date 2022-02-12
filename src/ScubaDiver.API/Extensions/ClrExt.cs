@@ -43,11 +43,11 @@ namespace ScubaDiver.API.Extensions
             if (domain == null) domain = AppDomain.CurrentDomain;
 
             var fullTypeName = type.Name;
-            var assemblyNamePrefix = Path.GetFileNameWithoutExtension(type.Module.AssemblyName);
+            var assemblyNamePrefix = Path.GetFileNameWithoutExtension(type.Module.AssemblyName).ToUpperInvariant();
             foreach (var assembly in domain.GetAssemblies())
             {
                 string assmName = assembly.GetName().Name;
-                if (assmName.StartsWith(assemblyNamePrefix) || assmName == "mscorlib" && assemblyNamePrefix.StartsWith("System"))
+                if (assmName.ToUpperInvariant().StartsWith(assemblyNamePrefix) || assmName == "mscorlib" && assemblyNamePrefix.StartsWith("System"))
                 {
                     Type match = assembly.GetType(fullTypeName);
                     if (match != null)
