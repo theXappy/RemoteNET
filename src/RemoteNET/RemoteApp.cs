@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -16,6 +16,7 @@ using RemoteNET.Properties;
 using RemoteNET.Utils;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
+using static RemoteNET.Utils.ProcessHelper;
 using static ScubaDiver.API.DiverCommunicator;
 
 namespace RemoteNET
@@ -107,7 +108,18 @@ namespace RemoteNET
         // Init
         // 
 
-        public static RemoteApp Connect(string target)  => Connect(ProcessHelper.GetSingleRoot(target));
+        public static RemoteApp Connect(string target)
+        {
+            try
+            {
+                return Connect(ProcessHelper.GetSingleRoot(target));
+            }
+            catch (TooManyProcessesException tooManyProcsEx)
+            {
+                throw new TooManyProcessesException($"{tooManyProcsEx.Message}\n" +
+                    $"You can also get the right System.Diagnostics.Process object yourself and use the {nameof(Connect)}({nameof(Process)} target) overload of this function.", tooManyProcsEx.Matches);
+            }
+        }
 
         /// <summary>
         /// Creates a new provider.
@@ -216,14 +228,6 @@ namespace RemoteNET
             return null;
         }
 
-        /// <summary>
-        /// Returns paths to 
-        /// </summary>
-        /// <param name="target"></param>
-        /// <param name="isNetCore"></param>
-        /// <param name="remoteNetAppDataDir"></param>
-        /// <param name="injectorPath"></param>
-        /// <param name="scubaDiverDllPath"></param>
         private static void GetInjectionToolkit(Process target, bool isNetCore, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath)
         {
             // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
