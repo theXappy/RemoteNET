@@ -96,7 +96,8 @@ namespace ScubaDiver.Tester
             Console.WriteLine("6. Steal RSA keys");
             Console.WriteLine("7. Subscribe to Event");
             Console.WriteLine("8. Hook Method");
-            Console.WriteLine("9. Exit");
+            Console.WriteLine("9. Get Remote Object");
+            Console.WriteLine("10. Exit");
             string input = Console.ReadLine();
             ulong addr;
             uint index;
@@ -351,6 +352,32 @@ namespace ScubaDiver.Tester
                         }
                         break;
                     case 9:
+                        {
+                            try
+                            {
+                                Console.WriteLine("Enter full type name to get");
+                                string typeName = Console.ReadLine().Trim();
+                                if (string.IsNullOrWhiteSpace(typeName))
+                                {
+                                    // Assuming user wants all types
+                                    typeName = null;
+                                }
+
+                                var res = remoteApp.GetRemoteType(typeName);
+                                Console.WriteLine("Results:");
+                                Console.WriteLine(res);
+                                Console.WriteLine("Props:");
+                                foreach (var a in res.GetProperties())
+                                {
+                                    Console.WriteLine(a);
+                                    Console.WriteLine("Getter: " + a.GetGetMethod());
+                                    Console.WriteLine("Setter: " + a.GetSetMethod());
+                                }
+                            }
+                            catch { }
+                        }
+                        break;
+                    case 10:
                         // Exiting
                         return true;
                 }

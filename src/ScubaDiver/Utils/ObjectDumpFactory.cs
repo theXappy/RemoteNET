@@ -93,11 +93,7 @@ namespace ScubaDiver.Utils
                     string encValue = null;
                     if (fieldValue != null)
                     {
-                        if (fieldValue.GetType().IsPrimitiveEtc() || fieldValue.GetType().IsPrimitiveEtcArray())
-                        {
-                            hasEncValue = true;
-                            encValue = PrimitivesEncoder.Encode(fieldValue);
-                        }
+                        hasEncValue = PrimitivesEncoder.TryEncode(fieldValue, out encValue);
                     }
 
                     fields.Add(new MemberDump()

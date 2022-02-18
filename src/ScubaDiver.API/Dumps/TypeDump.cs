@@ -47,14 +47,23 @@ namespace ScubaDiver.API.Dumps
             {
             }
 
-            public TypeMethod(MethodInfo mi)
+            public TypeMethod(MethodBase methodBase)
             {
-                Visibility = mi.IsPublic ? "Public" : "Private";
-                ContainsGenericParameters = mi.ContainsGenericParameters;
-                Name = mi.Name;
-                ReturnTypeFullName = mi.ReturnType.FullName;
-                ReturnTypeAssembly = mi.ReturnType.Assembly.GetName().Name;
-                Parameters = mi.GetParameters().Select(pi => new MethodParameter(pi)).ToList();
+                Visibility = methodBase.IsPublic ? "Public" : "Private";
+                ContainsGenericParameters = methodBase.ContainsGenericParameters;
+                Name = methodBase.Name;
+                Parameters = methodBase.GetParameters().Select(paramInfo => new MethodParameter(paramInfo)).ToList();
+                if(methodBase is MethodInfo methodInfo)
+                {
+                    ReturnTypeFullName = methodInfo.ReturnType.FullName;
+                    ReturnTypeAssembly = methodInfo.ReturnType.Assembly.GetName().Name;
+                }
+                else
+                {
+                    ReturnTypeFullName = "System.Void";
+                    ReturnTypeAssembly = "mscorlib";
+
+                }
             }
 
             public bool SignaturesEqual(TypeMethod other)
@@ -116,6 +125,7 @@ namespace ScubaDiver.API.Dumps
             public string SetVisibility { get; set; }
             public string Name { get; set; }
             public string TypeFullName { get; set; }
+            public string Assembly { get; set; }
 
             public TypeProperty()
             {
@@ -134,6 +144,7 @@ namespace ScubaDiver.API.Dumps
 
                 Name = pi.Name;
                 TypeFullName = pi.PropertyType.FullName;
+                Assembly = pi.PropertyType.Assembly.GetName().Name;
             }
         }
 
@@ -145,6 +156,7 @@ namespace ScubaDiver.API.Dumps
         public TypeDump? ParentDump { get; set; }
 
         public List<TypeMethod> Methods { get; set; }
+        public List<TypeMethod> Constructors { get; set; }
         public List<TypeField> Fields { get; set; }
         public List<TypeEvent> Events { get; set; }
         public List<TypeProperty> Properties { get; set; }
