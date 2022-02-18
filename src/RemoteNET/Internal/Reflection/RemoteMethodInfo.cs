@@ -2,7 +2,6 @@
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using ScubaDiver;
 
 namespace RemoteNET.Internal.Reflection
 {

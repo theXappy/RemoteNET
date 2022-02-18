@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using ScubaDiver;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 
