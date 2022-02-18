@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using ScubaDiver;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 

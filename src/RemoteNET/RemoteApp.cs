@@ -4,10 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Tasks;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using RemoteNET.Internal.Reflection;
@@ -16,8 +13,6 @@ using RemoteNET.Properties;
 using RemoteNET.Utils;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
-using static RemoteNET.Utils.ProcessHelper;
-using static ScubaDiver.API.DiverCommunicator;
 
 namespace RemoteNET
 {

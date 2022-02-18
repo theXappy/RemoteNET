@@ -2,7 +2,6 @@
 using ScubaDiver.API.Utils;
 using ScubaDiver.API.Extensions;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
