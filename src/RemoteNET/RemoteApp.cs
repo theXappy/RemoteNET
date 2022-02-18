@@ -126,10 +126,6 @@ namespace RemoteNET
             // To make the Diver's port predictable even when re-attaching we'll derive it from the PID:
             ushort diverPort = (ushort)target.Id;
 
-            // Determine if we are dealing with .NET Framework or .NET Core
-            string targetDotNetVer = target.GetSupportedTargetFramework();
-            bool isNetCore = targetDotNetVer != "net451";
-
             // TODO: Make it configurable
             string diverAddr = "127.0.0.1";
             DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
@@ -142,6 +138,13 @@ namespace RemoteNET
                 // Second Try: Inject DLL, assuming not injected yet
                 //
 
+
+                // Determine if we are dealing with .NET Framework or .NET Core
+                string targetDotNetVer = target.GetSupportedTargetFramework();
+                bool isNetCore = targetDotNetVer != "net451";
+
+                // Check for defective diver - Check if the 'unmanged adapter' is already loaded in the target
+                // If it's true, and we know the HTTP endpoint is close, then the processes has a defective diver and can't be helped.
                 bool adapterModuleAlreadyInjected = false;
                 try
                 {
@@ -161,6 +164,7 @@ namespace RemoteNET
 
                 // Not injected yet, Injecting adapter now (which should load the Diver)
                 string remoteNetAppDataDir, injectorPath, scubaDiverDllPath;
+                // Get different injection kit (for .NET framework or .NET core & x86 or x64)
                 GetInjectionToolkit(target, isNetCore, out remoteNetAppDataDir, out injectorPath, out scubaDiverDllPath);
                 string adapterExecutionArg = string.Join("*", scubaDiverDllPath,
                     "ScubaDiver.DllEntry",
@@ -202,6 +206,7 @@ namespace RemoteNET
 
             if (isAlive)
             {
+                // Now register our program as a "client" of the diver
                 bool registered = com.RegisterClient();
                 if (registered)
                 {
