@@ -5,7 +5,7 @@ namespace RemoteNET.Internal.Reflection
 {
     public class DynamicRemoteEnum : DynamicObject
     {
-        private RemoteEnum _remoteEnum;
+        private readonly RemoteEnum _remoteEnum;
         public RemoteApp App => _remoteEnum.App;
 
         public DynamicRemoteEnum(RemoteEnum remoteEnum)

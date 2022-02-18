@@ -24,28 +24,28 @@ namespace ScubaDiver
     public class Diver : IDisposable
     {
         // Runtime analysis and exploration fields
-        private object _debugObjectsLock = new object();
+        private readonly object _debugObjectsLock = new object();
         private DataTarget _dt = null;
         private ClrRuntime _runtime = null;
-        private Converter<object> _converter = new Converter<object>();
+        private readonly Converter<object> _converter = new Converter<object>();
 
         // Clients Tracking
         public object _registeredPidsLock = new object();
         public List<int> _registeredPids = new List<int>();
 
         // HTTP Responses fields
-        private Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
+        private readonly Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
 
         // Pinning objects fields
-        private ConcurrentDictionary<ulong, FrozenObjectInfo> _pinnedObjects;
+        private readonly ConcurrentDictionary<ulong, FrozenObjectInfo> _pinnedObjects;
 
         // Callbacks Endpoint of the Controller process
         IPEndPoint _callbacksEndpoint;
         int _nextAvilableCallbackToken = 0;
-        private ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
-        private ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
+        private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
+        private readonly ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
 
-        private ManualResetEvent _stayAlive = new ManualResetEvent(true);
+        private readonly ManualResetEvent _stayAlive = new ManualResetEvent(true);
 
         public bool HasCallbackEndpoint => _callbacksEndpoint != null;
 

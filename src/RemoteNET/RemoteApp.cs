@@ -21,8 +21,8 @@ namespace RemoteNET
         internal class RemoteObjectsCollection
         {
             // The WeakReferences are to RemoteObject
-            private Dictionary<ulong, WeakReference<RemoteObject>> _pinnedAddressesToRemoteObjects;
-            private RemoteApp _app;
+            private readonly Dictionary<ulong, WeakReference<RemoteObject>> _pinnedAddressesToRemoteObjects;
+            private readonly RemoteApp _app;
 
             public RemoteObjectsCollection(RemoteApp app)
             {
@@ -83,7 +83,7 @@ namespace RemoteNET
         private Process _procWithDiver;
         private DiverCommunicator _communicator;
 
-        private RemoteObjectsCollection _remoteObjects;
+        private readonly RemoteObjectsCollection _remoteObjects;
 
         public RemoteActivator Activator { get; private set; }
         public RemoteHarmony Harmony { get; private set; }

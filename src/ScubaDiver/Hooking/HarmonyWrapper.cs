@@ -12,19 +12,19 @@ namespace ScubaDiver.Hooking
     {
         public static HarmonyWrapper Instance => new HarmonyWrapper();
 
-        private Harmony _harmony;
+        private readonly Harmony _harmony;
         /// <summary>
         /// Maps 'target function parameters count' to right hook function (UnifiedHook_NUMBER)
         /// </summary>
-        private Dictionary<int, MethodInfo> _psHooks;
+        private readonly Dictionary<int, MethodInfo> _psHooks;
         /// <summary>
         /// Maps methods and the prefix hooks that were used to hook them. (Important for unpatching)
         /// </summary>
-        private Dictionary<string, MethodInfo> _singlePrefixHooks = new Dictionary<string, MethodInfo>();
+        private readonly Dictionary<string, MethodInfo> _singlePrefixHooks = new Dictionary<string, MethodInfo>();
         /// <summary>
         /// Thsis dict is static because <see cref="SinglePrefixHook"/> must be a static function (Harmony limitations)
         /// </summary>
-        private static ConcurrentDictionary<string, HookCallback> _actualHooks = new ConcurrentDictionary<string, HookCallback>();
+        private static readonly ConcurrentDictionary<string, HookCallback> _actualHooks = new ConcurrentDictionary<string, HookCallback>();
 
         private HarmonyWrapper()
         {

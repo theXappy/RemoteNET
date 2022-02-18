@@ -11,9 +11,9 @@ namespace RemoteNET
 
     public class RemoteHarmony
     {
-        private RemoteApp _app;
+        private readonly RemoteApp _app;
 
-        private Dictionary<MethodBase, MethodHooks> _callbacksToProxies;
+        private readonly Dictionary<MethodBase, MethodHooks> _callbacksToProxies;
 
         /// <summary>
         /// A LocalHookCallback in a specific patching position
