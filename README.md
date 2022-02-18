@@ -59,9 +59,9 @@ This section documents most parts of the library's API which you'll likely need.
 ### ✳️ Setup
 To start playing with a remote process you need to create a `RemoteApp` object like so:
 ```C#
-Process target =  Process.GetProcessesByName("OtherDotNetAppName").Single();
-RemoteApp remoteApp = RemoteApp.Connect(target);
+RemoteApp remoteApp = RemoteApp.Connect("OtherDotNetAppName");
 ```
+If you have multiple processes with such name you can use the overload `Connect(System.Diagnostics.Process p)`;
 
 ### ✳️ Getting Existing Remote Objects
 First and foremost RemoteNET allows you to find existing objects in the remote app.  
