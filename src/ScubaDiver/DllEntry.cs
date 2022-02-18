@@ -29,7 +29,7 @@ namespace ScubaDiver
 
             try
             {
-                Diver _instance = new Diver();
+                Diver _instance = new();
                 ushort port = ushort.Parse(pwzArgument);
                 _instance.Dive(port);
 

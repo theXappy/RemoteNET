@@ -41,7 +41,7 @@ namespace ScubaDiver.Tester
                 break;
             }
 
-            List<RemoteObject> remoteObjects = new List<RemoteObject>();
+            List<RemoteObject> remoteObjects = new();
             while (true)
             {
                 if (DoSingleMenu(remoteApp, remoteObjects))
@@ -195,7 +195,7 @@ namespace ScubaDiver.Tester
                             {
                                 RemoteObject remoteObj = remoteObjects[(int)index];
                                 dynamic dro = remoteObj.Dynamify();
-                                Action<dynamic, dynamic> callback = new Action<dynamic, dynamic>((dynamic arg1, dynamic arg2) => Console.WriteLine("INVOKED!!"));
+                                Action<dynamic, dynamic> callback = new((dynamic arg1, dynamic arg2) => Console.WriteLine("INVOKED!!"));
 
                                 Console.WriteLine("Enter event name:");
                                 string eventName = Console.ReadLine().Trim();
@@ -260,7 +260,7 @@ namespace ScubaDiver.Tester
                                 break;
                             }
 
-                            BlockingCollection<string> pcCollection = new BlockingCollection<string>();
+                            BlockingCollection<string> pcCollection = new();
                             Task printerTask = Task.Run(() =>
                             {
                                 while(pcCollection.IsCompleted)

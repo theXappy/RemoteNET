@@ -21,13 +21,13 @@ namespace ScubaDiver.Utils
         {
             ulong freezeAddr = 0;
             // Allows the freeze function to indicate freezing was done
-            ManualResetEvent freezeFeedback = new ManualResetEvent(false);
+            ManualResetEvent freezeFeedback = new(false);
             // Allows us to unfreeze later
-            ManualResetEvent unfreezeRequired = new ManualResetEvent(false);
+            ManualResetEvent unfreezeRequired = new(false);
 
 
             ThreadStart ts = (() => FreezeInternal(target, ref freezeAddr, freezeFeedback, unfreezeRequired));
-            Thread freezingThread = new Thread(ts);
+            Thread freezingThread = new(ts);
             freezingThread.Start();
 
             // Wait for freezing task to report back address
@@ -75,7 +75,7 @@ namespace ScubaDiver.Utils
                 //
                 // As far as I understand the Method Table is a pointer which means
                 // it's 4 bytes in x32 and 8 bytes in x64 (Hence using `IntPtr.Size`)
-                IntPtr iPtr = new IntPtr(ptr);
+                IntPtr iPtr = new(ptr);
                 freezeAddr = ((ulong)iPtr.ToInt64()) - (ulong)IntPtr.Size;
                 freezeFeedback.Set();
                 unfreezeRequested.WaitOne();
