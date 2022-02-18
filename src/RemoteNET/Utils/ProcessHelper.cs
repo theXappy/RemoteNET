@@ -37,15 +37,46 @@ namespace RemoteNET.Utils
 
             // Harder case - multiple matches. Let's hope it's a single tree
             // Get the only process which doesn't have a parent with the same name.
-            var target = candidateProcs.SingleOrDefault(proc =>
+            var possibleRoots = candidateProcs.Where(proc =>
             {
-                var parentProc = proc.GetParent();
+                Process parentProc;
+                try
+                {
+                    parentProc = proc.GetParent();
+                }
+                catch (Exception ex)
+                {
+                    parentProc = null;
+                }
                 // if we can't find the parent just go with this process. Hopefully it's the only one anyway
                 if (parentProc == null)
                     return true;
                 return parentProc.ProcessName != proc.ProcessName;
-            });
-            return target;
+            }).ToList();
+
+            if (possibleRoots.Count == 1)
+            {
+                // Single root! Just what we hoped to find.
+                return possibleRoots.Single();
+            }
+            else
+            {
+                // Multiple roots... this is an issue we can't resolve and have to report back.
+                string procsList = null;
+                try
+                {
+                    procsList = string.Join("\n", candidateProcs.Select(proc => $"\t({proc.Id}) {proc.ProcessName}").ToArray());
+                }
+                catch
+                {
+                    procsList = "** FAILED TO GENERATE PROCESS LIST **";
+                }
+                throw new TooManyProcessesException($"Too many processes contains '{procName}' in their name.\n" +
+                    $"Those were NOT found to be a single 'tree' of processes with a single parent (root) process.\n" +
+                    $"The processes that were found:\n" +
+                    $"{procsList}" +
+                    $"You should narrow it down with a more exclusive substring", candidateProcs.ToArray());
+            }
         }
     }
 }
