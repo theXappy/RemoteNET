@@ -25,54 +25,25 @@ namespace ScubaDiver.Tester
 
         private static void RemoteDive()
         {
-            Process target;
+            RemoteApp remoteApp = null;
             while (true)
             {
                 Console.WriteLine("Enter process name (or substring)");
                 string procName = Console.ReadLine();
-                var candidateProcs = Process.GetProcesses().Where(proc => (proc.ProcessName + ".exe").Contains(procName)).ToArray();
-                if (candidateProcs.Length == 0)
+                try
                 {
-                    Console.WriteLine("No processes found.");
-                    continue;
+                    remoteApp = RemoteApp.Connect(procName);
+                    if (remoteApp == null)
+                    {
+                        Console.WriteLine("Something went wrong, try again.");
+                        continue;
+                    }
                 }
-                if (candidateProcs.Length == 1)
+                catch (Exception ex)
                 {
-                    target = candidateProcs.Single();
-                    break;
+                    Console.WriteLine("ERROR: "+ex);
                 }
-                Console.WriteLine("There were too many results:");
-                for (int i = 0; i < candidateProcs.Length; i++)
-                {
-                    Process curr = candidateProcs[i];
-                    Console.WriteLine($"{i + 1}. {curr.ProcessName} " +
-                                      $"(ID = {curr.Id}) " +
-                                      $"[Parent: {curr.GetParent()?.ProcessName} (ID = {curr.GetParent()?.Id})]");
-                }
-
-                // Get the only process which doesn't have a parent with the same name.
-                Console.WriteLine("Assuming all process are in the same process tree.\n" +
-                                  "Getting root (First with different parent process name).");
-                target = candidateProcs.Single(proc =>
-                {
-                    var parentProc = proc.GetParent();
-                    // if we can't find the parent just go with this process. Hopefully it's the only one anyway
-                    if (parentProc == null)
-                        return true;
-                    Debug.WriteLine($"Procces {proc.ProcessName} (Id={proc.Id} is son of {parentProc .ProcessName} (Id={parentProc.Id})");
-                    return parentProc.ProcessName != proc.ProcessName;
-                });
                 break;
-            }
-
-            Console.WriteLine($"Selected target: {target.ProcessName} " +
-                              $"(ID = {target.Id}) " +
-                              $"[Parent: {target.GetParent()?.ProcessName} (ID = {target.GetParent()?.Id})]");
-            RemoteApp remoteApp = RemoteApp.Connect(target);
-            if (remoteApp == null)
-            {
-                Console.WriteLine("Something went wrong and we couldn't connect to the remote process... Aborting.");
-                return;
             }
 
             List<RemoteObject> remoteObjects = new List<RemoteObject>();
