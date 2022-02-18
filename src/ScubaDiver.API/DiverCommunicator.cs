@@ -42,7 +42,7 @@ namespace ScubaDiver.API
         {
             queryParams ??= new();
 
-            HttpClient c = new HttpClient();
+            HttpClient c = new();
             string query = "";
             bool firstParam = true;
             foreach (KeyValuePair<string, string> kvp in queryParams)
@@ -158,7 +158,7 @@ namespace ScubaDiver.API
         public InvocationResults InvokeMethod(ulong targetAddr, string targetTypeFullName, string methodName,
             params ObjectOrRemoteAddress[] args)
         {
-            InvocationRequest invocReq = new InvocationRequest()
+            InvocationRequest invocReq = new()
             {
                 ObjAddress = targetAddr,
                 TypeFullName = targetTypeFullName,
@@ -265,7 +265,7 @@ namespace ScubaDiver.API
 
         public InvocationResults SetField(ulong targetAddr, string targetTypeFullName, string fieldName, ObjectOrRemoteAddress newValue)
         {
-            FieldSetRequest invocReq = new FieldSetRequest()
+            FieldSetRequest invocReq = new()
             {
                 ObjAddress = targetAddr,
                 TypeFullName = targetTypeFullName,
@@ -282,7 +282,7 @@ namespace ScubaDiver.API
 
         public InvocationResults GetField(ulong targetAddr, string targetTypeFullName, string fieldName)
         {
-            FieldGetRequest invocReq = new FieldGetRequest()
+            FieldGetRequest invocReq = new()
             {
                 ObjAddress = targetAddr,
                 TypeFullName = targetTypeFullName,
@@ -387,7 +387,7 @@ namespace ScubaDiver.API
                 }
             }
 
-            FunctionHookRequest req = new FunctionHookRequest()
+            FunctionHookRequest req = new()
             {
                 TypeFullName = type,
                 MethodName = methodName,
@@ -453,7 +453,7 @@ namespace ScubaDiver.API
                 string body = null;
                 if (request.Url.AbsolutePath == "/invoke_callback")
                 {
-                    using (StreamReader sr = new StreamReader(request.InputStream))
+                    using (StreamReader sr = new(request.InputStream))
                     {
                         body = sr.ReadToEnd();
                     }
@@ -462,7 +462,7 @@ namespace ScubaDiver.API
                     {
                         (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray());
 
-                        InvocationResults ir = new InvocationResults()
+                        InvocationResults ir = new()
                         {
                             VoidReturnType = voidReturnType,
                             ReturnedObjectOrAddress = voidReturnType ? null : callbackRes
@@ -475,7 +475,7 @@ namespace ScubaDiver.API
                         // Run hook. No results expected directly (it might alter variabels inside the hook)
                         hook(res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
 
-                        InvocationResults ir = new InvocationResults()
+                        InvocationResults ir = new()
                         {
                             VoidReturnType = true,
                         };

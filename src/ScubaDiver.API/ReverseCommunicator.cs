@@ -32,7 +32,7 @@ namespace ScubaDiver.API
         {
             queryParams ??= new();
 
-            HttpClient c = new HttpClient();
+            HttpClient c = new();
             string query = "";
             bool firstParam = true;
             foreach (KeyValuePair<string, string> kvp in queryParams)
@@ -62,7 +62,7 @@ namespace ScubaDiver.API
         public InvocationResults InvokeCallback(int token,
             params ObjectOrRemoteAddress[] args)
         {
-            CallbackInvocationRequest invocReq = new CallbackInvocationRequest()
+            CallbackInvocationRequest invocReq = new()
             {
                 Token = token,
                 Parameters = args.ToList()

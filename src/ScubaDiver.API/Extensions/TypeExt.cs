@@ -22,7 +22,7 @@ namespace ScubaDiver.API.Extensions
             }
         }
 
-        private static readonly WildCardEnabledTypesComparer _wildCardTypesComparer = new WildCardEnabledTypesComparer();
+        private static readonly WildCardEnabledTypesComparer _wildCardTypesComparer = new();
 
         /// <summary>
         /// Searches a type for a specific method. If not found searches its ancestors.

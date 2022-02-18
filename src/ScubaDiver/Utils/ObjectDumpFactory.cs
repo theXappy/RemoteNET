@@ -81,7 +81,7 @@ namespace ScubaDiver.Utils
 
 
 
-            List<MemberDump> fields = new List<MemberDump>();
+            List<MemberDump> fields = new();
             var eventNames = dumpedObjType.GetEvents((BindingFlags)0xffff).Select(eventInfo => eventInfo.Name);
             foreach (var fieldInfo in dumpedObjType.GetFields((BindingFlags)0xffff).Where(fieldInfo => !eventNames.Contains(fieldInfo.Name)))
             {
@@ -113,7 +113,7 @@ namespace ScubaDiver.Utils
                 }
             }
 
-            List<MemberDump> props = new List<MemberDump>();
+            List<MemberDump> props = new();
             foreach (var propInfo in dumpedObjType.GetProperties((BindingFlags)0xffff))
             {
                 if (propInfo.GetMethod == null)

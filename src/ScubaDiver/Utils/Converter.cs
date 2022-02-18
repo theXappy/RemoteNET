@@ -24,7 +24,7 @@ namespace ScubaDiver.Utils
         {
             if (myConverter == null)
             {
-                DynamicMethod method = new DynamicMethod("ConvertPtrToObjReference", typeof(T), new Type[] { typeof(IntPtr) }, typeof(IntPtr), true);
+                DynamicMethod method = new("ConvertPtrToObjReference", typeof(T), new Type[] { typeof(IntPtr) }, typeof(IntPtr), true);
                 var gen = method.GetILGenerator();
                 // Load first argument 
                 gen.Emit(OpCodes.Ldarg_0);

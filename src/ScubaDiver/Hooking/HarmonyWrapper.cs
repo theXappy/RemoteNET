@@ -10,7 +10,7 @@ namespace ScubaDiver.Hooking
 
     public class HarmonyWrapper
     {
-        public static HarmonyWrapper Instance => new HarmonyWrapper();
+        public static HarmonyWrapper Instance => new();
 
         private readonly Harmony _harmony;
         /// <summary>
@@ -20,11 +20,11 @@ namespace ScubaDiver.Hooking
         /// <summary>
         /// Maps methods and the prefix hooks that were used to hook them. (Important for unpatching)
         /// </summary>
-        private readonly Dictionary<string, MethodInfo> _singlePrefixHooks = new Dictionary<string, MethodInfo>();
+        private readonly Dictionary<string, MethodInfo> _singlePrefixHooks = new();
         /// <summary>
         /// Thsis dict is static because <see cref="SinglePrefixHook"/> must be a static function (Harmony limitations)
         /// </summary>
-        private static readonly ConcurrentDictionary<string, HookCallback> _actualHooks = new ConcurrentDictionary<string, HookCallback>();
+        private static readonly ConcurrentDictionary<string, HookCallback> _actualHooks = new();
 
         private HarmonyWrapper()
         {

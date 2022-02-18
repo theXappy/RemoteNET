@@ -24,14 +24,14 @@ namespace ScubaDiver
     public class Diver : IDisposable
     {
         // Runtime analysis and exploration fields
-        private readonly object _debugObjectsLock = new object();
+        private readonly object _debugObjectsLock = new();
         private DataTarget _dt = null;
         private ClrRuntime _runtime = null;
-        private readonly Converter<object> _converter = new Converter<object>();
+        private readonly Converter<object> _converter = new();
 
         // Clients Tracking
-        public object _registeredPidsLock = new object();
-        public List<int> _registeredPids = new List<int>();
+        public object _registeredPidsLock = new();
+        public List<int> _registeredPids = new();
 
         // HTTP Responses fields
         private readonly Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
@@ -45,7 +45,7 @@ namespace ScubaDiver
         private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
         private readonly ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
 
-        private readonly ManualResetEvent _stayAlive = new ManualResetEvent(true);
+        private readonly ManualResetEvent _stayAlive = new(true);
 
         public bool HasCallbackEndpoint => _callbacksEndpoint != null;
 
@@ -100,7 +100,7 @@ namespace ScubaDiver
             }
             Logger.Debug("[Diver] Client unregistered. ID = " + pid);
 
-            UnregisterClientResponse ucResponse = new UnregisterClientResponse()
+            UnregisterClientResponse ucResponse = new()
             {
                 WasRemvoed = removed,
                 OtherClientsAmount = remaining
@@ -148,7 +148,7 @@ namespace ScubaDiver
         {
             // Start session
             RefreshRuntime();
-            HttpListener listener = new HttpListener();
+            HttpListener listener = new();
             string listeningUrl = $"http://127.0.0.1:{listenPort}/";
             listener.Prefixes.Add(listeningUrl);
             // Set timeout
@@ -285,7 +285,7 @@ namespace ScubaDiver
         public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvilableCallbackToken);
         public void InvokeControllerCallback(int token, params object[] parameters)
         {
-            ReverseCommunicator reverseCommunicator = new ReverseCommunicator(_callbacksEndpoint);
+            ReverseCommunicator reverseCommunicator = new(_callbacksEndpoint);
 
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
@@ -378,7 +378,7 @@ namespace ScubaDiver
 
         private (bool anyErrors, List<HeapDump.HeapObject> objects) GetHeapObjects(Predicate<string> filter)
         {
-            List<HeapDump.HeapObject> objects = new List<HeapDump.HeapObject>();
+            List<HeapDump.HeapObject> objects = new();
             bool anyErrors = false;
             // Trying several times to dump all candidates
             for (int i = 0; i < 10; i++)
@@ -500,7 +500,7 @@ namespace ScubaDiver
                 return "{\"error\":\"Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!\"}";
             }
             string body = null;
-            using (StreamReader sr = new StreamReader(arg.InputStream))
+            using (StreamReader sr = new(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
@@ -514,7 +514,7 @@ namespace ScubaDiver
 
             TextReader textReader = new StringReader(body);
             JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new JsonSerializer();
+            JsonSerializer js = new();
             var request = js.Deserialize<FunctionHookRequest>(jr);
             if (request == null)
             {
@@ -585,7 +585,7 @@ namespace ScubaDiver
                 RegisteredProxy = patchCallback
             };
 
-            EventRegistrationResults erResults = new EventRegistrationResults() { Token = token };
+            EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
 
@@ -665,7 +665,7 @@ namespace ScubaDiver
                 RegisteredProxy = eventHandler
             };
 
-            EventRegistrationResults erResults = new EventRegistrationResults() { Token = token };
+            EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
 
@@ -718,7 +718,7 @@ namespace ScubaDiver
         {
             Logger.Debug("[Diver] Got /create_object request!");
             string body = null;
-            using (StreamReader sr = new StreamReader(arg.InputStream))
+            using (StreamReader sr = new(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
@@ -730,7 +730,7 @@ namespace ScubaDiver
 
             TextReader textReader = new StringReader(body);
             JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new JsonSerializer();
+            JsonSerializer js = new();
             var request = js.Deserialize<CtorInvocationRequest>(jr);
             if (request == null)
             {
@@ -748,7 +748,7 @@ namespace ScubaDiver
                 return "{\"error\":\"Failed to resolve type\"}";
             }
 
-            List<object> paramsList = new List<object>();
+            List<object> paramsList = new();
             if (request.Parameters.Any())
             {
                 Logger.Debug($"[Diver] Ctor'ing with parameters. Count: {request.Parameters.Count}");
@@ -796,7 +796,7 @@ namespace ScubaDiver
             }
 
 
-            InvocationResults invoRes = new InvocationResults()
+            InvocationResults invoRes = new()
             {
                 ReturnedObjectOrAddress = res,
                 VoidReturnType = false
@@ -828,7 +828,7 @@ namespace ScubaDiver
         {
             Logger.Debug("[Diver] Got /Invoke request!");
             string body = null;
-            using (StreamReader sr = new StreamReader(arg.InputStream))
+            using (StreamReader sr = new(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
@@ -840,7 +840,7 @@ namespace ScubaDiver
 
             TextReader textReader = new StringReader(body);
             JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new JsonSerializer();
+            JsonSerializer js = new();
             var request = js.Deserialize<InvocationRequest>(jr);
             if (request == null)
             {
@@ -919,7 +919,7 @@ namespace ScubaDiver
             // We have our target and it's type. No look for a matching overload for the
             // function to invoke.
             //
-            List<object> paramsList = new List<object>();
+            List<object> paramsList = new();
             if (request.Parameters.Any())
             {
                 Logger.Debug($"[Diver] Invoking with parameters. Count: {request.Parameters.Count}");
@@ -1011,7 +1011,7 @@ namespace ScubaDiver
             Logger.Debug("[Diver] Got /get_field request!");
             string body = null;
             object results = null;
-            using (StreamReader sr = new StreamReader(arg.InputStream))
+            using (StreamReader sr = new(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
@@ -1023,7 +1023,7 @@ namespace ScubaDiver
 
             TextReader textReader = new StringReader(body);
             JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new JsonSerializer();
+            JsonSerializer js = new();
             FieldSetRequest request = js.Deserialize<FieldSetRequest>(jr);
             if (request == null)
             {
@@ -1115,7 +1115,7 @@ namespace ScubaDiver
         {
             Logger.Debug("[Diver] Got /set_field request!");
             string body = null;
-            using (StreamReader sr = new StreamReader(arg.InputStream))
+            using (StreamReader sr = new(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
@@ -1127,7 +1127,7 @@ namespace ScubaDiver
 
             TextReader textReader = new StringReader(body);
             JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new JsonSerializer();
+            JsonSerializer js = new();
             var request = js.Deserialize<FieldSetRequest>(jr);
             if (request == null)
             {
@@ -1308,7 +1308,7 @@ namespace ScubaDiver
             }
 
 
-            InvocationResults invokeRes = new InvocationResults()
+            InvocationResults invokeRes = new()
             {
                 VoidReturnType = false,
                 ReturnedObjectOrAddress = res
@@ -1491,7 +1491,7 @@ namespace ScubaDiver
                             { MethodTable = tuple.MethodTable, Token = token, TypeName = typeName };
 
 
-            TypesDump dump = new TypesDump()
+            TypesDump dump = new()
             {
                 AssemblyName = assembly,
                 Types = typeNames.ToList()
@@ -1544,7 +1544,7 @@ namespace ScubaDiver
                     "object moved between the snapshot and the heap enumeration\"}";
             }
 
-            HeapDump hd = new HeapDump() { Objects = objects };
+            HeapDump hd = new() { Objects = objects };
 
             var resJson = JsonConvert.SerializeObject(hd);
             return resJson;
@@ -1552,7 +1552,7 @@ namespace ScubaDiver
         private string MakeDomainsResponse(HttpListenerRequest req)
         {
             // TODO: Allow moving between domains?
-            List<DomainsDump.AvailableDomain> available = new List<DomainsDump.AvailableDomain>();
+            List<DomainsDump.AvailableDomain> available = new();
             lock (_debugObjectsLock)
             {
                 foreach (ClrAppDomain clrAppDomain in _runtime.AppDomains)
@@ -1565,7 +1565,7 @@ namespace ScubaDiver
                 }
             }
 
-            DomainsDump dd = new DomainsDump()
+            DomainsDump dd = new()
             {
                 Current = AppDomain.CurrentDomain.FriendlyName,
                 AvailableDomains = available
@@ -1607,7 +1607,7 @@ namespace ScubaDiver
                 var props = typeObj.GetProperties((BindingFlags)0xffff).Select(pi => new TypeDump.TypeProperty(pi))
                     .ToList();
 
-                TypeDump td = new TypeDump()
+                TypeDump td = new()
                 {
                     Type = typeObj.FullName,
                     Assembly = typeObj.Assembly.GetName().Name,
