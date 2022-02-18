@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Linq;
 using RemoteNET.Internal;
+using RemoteNET.Internal.Reflection;
 using ScubaDiver;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
@@ -24,32 +26,7 @@ namespace RemoteNET
 
         public RemoteObject CreateInstance(Type t, params object[] parameters)
         {
-            ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                object parameter = parameters[i];
-                if (parameter.GetType().IsPrimitiveEtc() || parameter.GetType().IsEnum)
-                {
-                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
-                }
-                else if (parameter is RemoteObject remoteArg)
-                {
-                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetType().FullName);
-                }
-                else if (parameter is DynamicRemoteObject dro)
-                {
-                    RemoteObject originRemoteObject = dro.__ro;
-                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetType().FullName);
-                }
-                else
-                {
-                    throw new Exception($"{nameof(RemoteActivator)}.{nameof(CreateInstance)} only works with primitive (int, " +
-                                        $"double, string,...) or remote (in {nameof(RemoteObject)}) parameters. " +
-                                        $"The parameter at index {i} was of unsupported type {parameters.GetType()}. \n" +
-                                        $"If you are trying to pass a local object to a remote c'tor you need to construct " +
-                                        $"that object in the remote application instead.");
-                }
-            }
+            ObjectOrRemoteAddress[] remoteParams = parameters.Select(RemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
 
             // Create object + pin
             InvocationResults invoRes = _communicator.CreateObject(t.FullName, remoteParams);

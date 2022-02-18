@@ -24,36 +24,66 @@ namespace ScubaDiver.API.Utils
                 return toEncode.ToString();
             }
 
-            if (toEncode is Array enumerable)
+            if (!(toEncode is Array enumerable))
             {
-                object[] objectsEnumerable = enumerable.Cast<object>().ToArray();
-                Type elementsType = toEncode.GetType().GetElementType();
-                if (!elementsType.IsPrimitiveEtc())
-                {
-                    // TODO: Support arrays of RemoteObjects/DynamicRemoteObject
-                    throw new Exception("At least one element in the array is not primitive");
-                }
-
-                // Otherwise - this is an array of primitives.
-                string output = string.Empty;
-                foreach (object o in objectsEnumerable)
-                {
-                    string currObjectValue = Encode(o);
-                    // Escape commas
-                    currObjectValue = currObjectValue.Replace(",", "\\,");
-                    if (output != string.Empty)
-                    {
-                        output += ",";
-                    }
-
-                    output += $"\"{currObjectValue}\"";
-                }
-
-                return output;
+                throw new ArgumentException(
+                    $"Object to encode was not a primitive or an array. TypeFullName: {toEncode.GetType()}");
             }
 
-            throw new ArgumentException(
-                $"Object to encode was not a primitive or an array. TypeFullName: {toEncode.GetType()}");
+            object[] objectsEnumerable = enumerable.Cast<object>().ToArray();
+            Type elementsType = toEncode.GetType().GetElementType();
+            if (!elementsType.IsPrimitiveEtc())
+            {
+                // TODO: Support arrays of RemoteObjects/DynamicRemoteObject
+                throw new Exception("At least one element in the array is not primitive");
+            }
+
+            // Otherwise - this is an array of primitives.
+            string output = string.Empty;
+            foreach (object o in objectsEnumerable)
+            {
+                string currObjectValue = Encode(o);
+                // Escape commas
+                currObjectValue = currObjectValue.Replace(",", "\\,");
+                if (output != string.Empty)
+                {
+                    output += ",";
+                }
+
+                output += $"\"{currObjectValue}\"";
+            }
+
+            return output;
+        }
+
+        public static bool TryEncode(object toEncode, out string res)
+        {
+            res = default(string);
+            if (!(toEncode.GetType().IsPrimitiveEtc() || toEncode.GetType().IsEnum))
+            {
+                if (toEncode is Array enumerable)
+                {
+                    Type elementsType = toEncode.GetType().GetElementType();
+                    if (!elementsType.IsPrimitiveEtc())
+                    {
+                        // Array of non-primitives --> not primitive
+                        return true;
+                    }
+                    else
+                    {
+                        // It's a primitives array, All go exit if clauses and encode
+                    }
+                }
+                else
+                {
+                    // Not primitive ETC nor array --> not primitive
+                    return false;
+                }
+            }
+
+            // All good, can encode with no exceptions:
+            res = Encode(toEncode);
+            return true;
         }
 
 

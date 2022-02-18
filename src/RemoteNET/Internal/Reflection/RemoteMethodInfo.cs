@@ -3,10 +3,6 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using ScubaDiver;
-using ScubaDiver.API;
-using ScubaDiver.API.Dumps;
-using ScubaDiver.API.Extensions;
-using ScubaDiver.API.Utils;
 
 namespace RemoteNET.Internal.Reflection
 {
@@ -51,85 +47,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
-            // invokeAttr, binder and culture currently ignored
-
-            ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                object parameter = parameters[i];
-                if (parameter.GetType().IsPrimitiveEtc() || parameter.GetType().IsPrimitiveEtcArray())
-                {
-                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
-                }
-                else if (parameter is RemoteObject remoteArg)
-                {
-                    remoteParams[i] =
-                        ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetType().FullName);
-                }
-                else if (parameter is DynamicRemoteObject dro)
-                {
-                    RemoteObject originRemoteObject = dro.__ro;
-                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetType().FullName);
-                }
-                else
-                {
-                    throw new Exception(
-                        $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only works with primitive (int, " +
-                        $"double, string,...) or remote (in {nameof(RemoteObject)}) parameters. " +
-                        $"The parameter at index {i} was of unsupported type {parameters.GetType()}");
-                }
-            }
-
-            bool hasResults;
-            ObjectOrRemoteAddress oora;
-            if (obj == null)
-            {
-                if (this.App == null)
-                {
-                    throw new InvalidOperationException($"Trying to invoke a static call (null target object) " +
-                                                        $"on a {nameof(RemoteMethodInfo)} but it's associated " +
-                                                        $"Declaring Type ({this.DeclaringType}) does not have a RemoteApp associated. " +
-                                                        $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
-                }
-
-                InvocationResults invokeRes = this.App.Communicator.InvokeStaticMethod(DeclaringType.FullName, this.Name, remoteParams);
-                if (invokeRes.VoidReturnType)
-                {
-                    hasResults = false;
-                    oora = null;
-                }
-                else
-                {
-                    hasResults = true;
-                    oora = invokeRes.ReturnedObjectOrAddress;
-                }
-            }
-            else
-            {
-                // obj is NOT null. Make sure it's a RemoteObject.
-                if (!(obj is RemoteObject ro))
-                {
-                    throw new NotImplementedException(
-                        $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(RemoteObject)} targets at the moment.");
-                }
-                (hasResults, oora) = ro.InvokeMethod(this.Name, remoteParams);
-            }
-
-            if (!hasResults)
-                return null;
-
-            // Non-void function.
-            if (oora.IsNull)
-                return null;
-            if(!oora.IsRemoteAddress)
-            {
-                return PrimitivesEncoder.Decode(oora);
-            }
-            else
-            {
-                RemoteObject ro = App.GetRemoteObject(oora.RemoteAddress);
-                return ro.Dynamify();
-            }
+            return RemoteFunctionsInvokeHelper.Invoke(this.App, DeclaringType, Name, obj, parameters);
         }
 
         public override MethodInfo GetBaseDefinition()

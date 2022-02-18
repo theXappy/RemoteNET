@@ -10,8 +10,10 @@ namespace RemoteNET.Internal.Reflection
     public class RemoteType : Type
     {
         public string RemoteAssemblyName { get; private set; }
+        private List<RemoteConstructorInfo> _ctors = new List<RemoteConstructorInfo>();
         private List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
         private List<RemoteFieldInfo> _fields = new List<RemoteFieldInfo>();
+        private List<RemotePropertyInfo> _properties = new List<RemotePropertyInfo>();
         private bool _isArray;
 
         public RemoteApp App { get; set; }
@@ -24,6 +26,11 @@ namespace RemoteNET.Internal.Reflection
             this._isArray = isArray;
         }
 
+        public void AddConstructor(RemoteConstructorInfo rci)
+        {
+            _ctors.Add(rci);
+        }
+
         public void AddMethod(RemoteMethodInfo rmi)
         {
             _methods.Add(rmi);
@@ -32,6 +39,10 @@ namespace RemoteNET.Internal.Reflection
         public void AddField(RemoteFieldInfo fieldInfo)
         {
             _fields.Add(fieldInfo);
+        }
+        public void AddProperty(RemotePropertyInfo fieldInfo)
+        {
+            _properties.Add(fieldInfo);
         }
 
         public override object[] GetCustomAttributes(bool inherit)
@@ -44,10 +55,7 @@ namespace RemoteNET.Internal.Reflection
             throw new NotImplementedException();
         }
 
-        public override ConstructorInfo[] GetConstructors(BindingFlags bindingAttr)
-        {
-            throw new NotImplementedException();
-        }
+        public override ConstructorInfo[] GetConstructors(BindingFlags bindingAttr) => _ctors.Cast<ConstructorInfo>().ToArray();
 
         public override Type GetInterface(string name, bool ignoreCase)
         {
@@ -95,11 +103,7 @@ namespace RemoteNET.Internal.Reflection
             throw new NotImplementedException();
         }
 
-        public override PropertyInfo[] GetProperties(BindingFlags bindingAttr)
-        {
-            throw new NotImplementedException();
-        }
-
+        public override PropertyInfo[] GetProperties(BindingFlags bindingAttr) => _properties.Cast<PropertyInfo>().ToArray();
 
         protected override MethodInfo GetMethodImpl(string name, BindingFlags bindingAttr, Binder binder, CallingConventions callConvention,
             Type[] types, ParameterModifier[] modifiers)

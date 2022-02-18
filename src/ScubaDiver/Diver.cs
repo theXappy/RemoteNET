@@ -1596,6 +1596,8 @@ namespace ScubaDiver
             {
                 if (typeObj == null) return null;
 
+                var ctors = typeObj.GetConstructors((BindingFlags)0xffff).Select(ci => new TypeDump.TypeMethod(ci))
+                    .ToList();
                 var methods = typeObj.GetMethods((BindingFlags)0xffff).Select(mi => new TypeDump.TypeMethod(mi))
                     .ToList();
                 var fields = typeObj.GetFields((BindingFlags)0xffff).Select(fi => new TypeDump.TypeField(fi))
@@ -1610,6 +1612,7 @@ namespace ScubaDiver
                     Type = typeObj.FullName,
                     Assembly = typeObj.Assembly.GetName().Name,
                     Methods = methods,
+                    Constructors = ctors,
                     Fields = fields,
                     Events = events,
                     Properties = props,
