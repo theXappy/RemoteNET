@@ -43,7 +43,7 @@
         <copyright>theXappy ©2021</copyright>
 
         <!-- Tags appear in the gallery and can be used for tag searches -->
-        <tags>reverse-engineer forensics clrmd remoting low-level</tags>
+        <tags>reverse-engineer forensics clrmd remoting low-level instrumentation</tags>
 
         <dependencies>
           <group targetFramework="netstandard2.0">
