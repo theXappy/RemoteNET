@@ -1,4 +1,4 @@
-﻿using Microsoft.Diagnostics.Runtime;
+using Microsoft.Diagnostics.Runtime;
 using ScubaDiver.API.Extensions;
 using System;
 using System.Collections.Generic;
@@ -43,10 +43,10 @@ namespace ScubaDiver.Utils
                     {
                         var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
                         var typeNames = (from tuple in x
-                                         let token = tuple.Token
-                                         let resolvedType = module.ResolveToken(token) ?? null
-                                         where resolvedType?.Name == name
-                                         select new { MethodTable = tuple.MethodTable, Token = token, ClrType = resolvedType }).ToList();
+                                         let Token = tuple.Token
+                                         let ClrType = module.ResolveToken(Token) ?? null
+                                         where ClrType?.Name == name
+                                         select new { tuple.MethodTable, Token, ClrType }).ToList();
                         if (typeNames.Any())
                         {
                             clrTypeInfo = typeNames.First().ClrType;
