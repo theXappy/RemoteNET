@@ -65,7 +65,6 @@ namespace ScubaDiver.Tester
             Console.WriteLine("9. Get Remote Object");
             Console.WriteLine("10. Exit");
             string input = Console.ReadLine();
-            ulong addr;
             uint index;
             if (int.TryParse(input, out int userChoice))
             {
@@ -94,7 +93,7 @@ namespace ScubaDiver.Tester
                             // Getting object
                             Console.WriteLine("Enter address (decimal):");
                             input = Console.ReadLine();
-                            if (ulong.TryParse(input, out addr))
+                            if (ulong.TryParse(input, out ulong addr))
                             {
                                 try
                                 {
@@ -265,8 +264,7 @@ namespace ScubaDiver.Tester
                             {
                                 while(pcCollection.IsCompleted)
                                 {
-                                    string item;
-                                    if(pcCollection.TryTake(out item))
+                                    if (pcCollection.TryTake(out string item))
                                     {
                                         Console.WriteLine(item);
                                     }

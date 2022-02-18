@@ -52,8 +52,7 @@ namespace RemoteNET
             public RemoteObject GetRemoteObject(ulong address, int? hashcode = null)
             {
                 RemoteObject ro;
-                WeakReference<RemoteObject> wr;
-                if (_pinnedAddressesToRemoteObjects.TryGetValue(address, out wr))
+                if (_pinnedAddressesToRemoteObjects.TryGetValue(address, out WeakReference<RemoteObject> wr))
                 {
                     bool gotTarget = wr.TryGetTarget(out ro);
                     if (gotTarget)
@@ -170,9 +169,8 @@ namespace RemoteNET
 
 
                 // Not injected yet, Injecting adapter now (which should load the Diver)
-                string remoteNetAppDataDir, injectorPath, scubaDiverDllPath;
                 // Get different injection kit (for .NET framework or .NET core & x86 or x64)
-                GetInjectionToolkit(target, isNetCore, out remoteNetAppDataDir, out injectorPath, out scubaDiverDllPath);
+                GetInjectionToolkit(target, isNetCore, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath);
                 string adapterExecutionArg = string.Join("*", scubaDiverDllPath,
                     "ScubaDiver.DllEntry",
                     "EntryPoint",
