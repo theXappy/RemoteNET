@@ -22,8 +22,7 @@ To get the essence of how easy and usefull this library can be, see below a re-i
 This example interacts with an open KeePass process and makes it export all credentials to a CSV file.  
 ```C#
 // Gain foothold within the target process
-Process keePassProc =  Process.GetProcessesByName("KeePass").Single();
-RemoteApp remoteApp = RemoteApp.Connect(keePassProc);
+RemoteApp remoteApp = RemoteApp.Connect("KeePass.exe");
 RemoteActivator rActivator = remoteApp.Activator;
 
 // Get a remote DocumentManagerEx object
