@@ -115,8 +115,7 @@ namespace RemoteNET
         }
         public void EventUnsubscribe(string eventName, Delegate callback)
         {
-            DiverCommunicator.LocalEventCallback callbackProxy;
-            if (_eventCallbacksAndProxies.TryGetValue(callback, out callbackProxy))
+            if (_eventCallbacksAndProxies.TryGetValue(callback, out DiverCommunicator.LocalEventCallback callbackProxy))
             {
                 _ref.EventUnsubscribe(eventName, callbackProxy);
 

@@ -301,8 +301,7 @@ namespace ScubaDiver
                 }
                 else // Not primitive
                 {
-                    FrozenObjectInfo foi;
-                    if (!IsPinned(parameter, out foi))
+                    if (!IsPinned(parameter, out FrozenObjectInfo foi))
                     {
                         // Pin and mark for unpinning later
                         foi = PinObject(parameter);
@@ -605,8 +604,7 @@ namespace ScubaDiver
             Logger.Debug($"[Diver][Debug](RegisterEventHandler) objAddrStr={objAddr:X16}");
 
             // Check if we have this objects in our pinned pool
-            FrozenObjectInfo foi;
-            if (!TryGetPinnedObject(objAddr, out foi))
+            if (!TryGetPinnedObject(objAddr, out FrozenObjectInfo foi))
             {
                 // Object not pinned, try get it the hard way
                 return "{\"error\":\"Object at given address wasn't pinned\"}";
@@ -677,14 +675,12 @@ namespace ScubaDiver
             // 1. Invoking remote events (at Diver's side) callbacks (at controller side)
             // 2. Invoking function hooks (FFU)
             string ipAddrStr = arg.QueryString.Get("ip");
-            IPAddress ipa;
-            if (!IPAddress.TryParse(ipAddrStr, out ipa))
+            if (!IPAddress.TryParse(ipAddrStr, out IPAddress ipa))
             {
                 return "{\"error\":\"Parameter 'ip' couldn't be parsed to a valid IP Address\"}";
             }
             string portAddrStr = arg.QueryString.Get("port");
-            int port;
-            if (!int.TryParse(portAddrStr, out port))
+            if (!int.TryParse(portAddrStr, out int port))
             {
                 return "{\"error\":\"Parameter 'port' couldn't be parsed to a valid IP Address\"}";
             }
@@ -1253,8 +1249,7 @@ namespace ScubaDiver
             }
 
             // Check if we have this objects in our pinned pool
-            FrozenObjectInfo arrayFoi;
-            if (!TryGetPinnedObject(objAddr, out arrayFoi))
+            if (!TryGetPinnedObject(objAddr, out FrozenObjectInfo arrayFoi))
             {
                 // Object not pinned, try get it the hard way
                 return "{\"error\":\"Object at given address wasn't pinned\"}";
@@ -1288,8 +1283,7 @@ namespace ScubaDiver
             {
                 // Non-primitive results must be pinned before returning their remote address
                 // TODO: If a RemoteObject is not created for this object later and the item is not automaticlly unfreezed it might leak.
-                FrozenObjectInfo itemFoi;
-                if (IsPinned(item, out itemFoi))
+                if (IsPinned(item, out FrozenObjectInfo itemFoi))
                 {
                     // Sanity: Make sure the pinned item is the same as the one we are looking for
                     if (itemFoi.Object != item)

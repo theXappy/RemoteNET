@@ -15,8 +15,7 @@ namespace RemoteNET.Internal.Extensions
                 return false;
             // if this method is not available in your version of .NET, use GetNativeSystemInfo via P/Invoke instead
 
-            bool isWow64;
-            if (!IsWow64Process(process.Handle, out isWow64))
+            if (!IsWow64Process(process.Handle, out bool isWow64))
                 throw new Win32Exception();
             return !isWow64;
         }

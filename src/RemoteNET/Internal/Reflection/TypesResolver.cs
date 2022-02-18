@@ -25,9 +25,8 @@ namespace RemoteNET.Internal.Reflection
 
         public Type Resolve(string assemblyName, string typeFullName)
         {
-            Type resolvedType = null;
             // Start by searching cache
-            if (_cache.TryGetValue(new Tuple<string, string>(assemblyName, typeFullName), out resolvedType))
+            if (_cache.TryGetValue(new Tuple<string, string>(assemblyName, typeFullName), out Type resolvedType))
             {
                 return resolvedType;
             }
