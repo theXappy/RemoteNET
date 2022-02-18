@@ -12,13 +12,13 @@ namespace ScubaDiver.API
     /// </summary>
     public class ReverseCommunicator
     {
-        JsonSerializerSettings _withErrors = new()
+        readonly JsonSerializerSettings _withErrors = new()
         {
             MissingMemberHandling = MissingMemberHandling.Error
         };
 
-        private string _hostname;
-        private int _port;
+        private readonly string _hostname;
+        private readonly int _port;
 
         public ReverseCommunicator(string hostname, int port)
         {

@@ -12,11 +12,11 @@ namespace RemoteNET
         private static int NextIndex = 1;
         public int Index;
 
-        private RemoteApp _app;
+        private readonly RemoteApp _app;
         private RemoteObjectRef _ref;
         private Type _type = null;
 
-        private Dictionary<Delegate, DiverCommunicator.LocalEventCallback> _eventCallbacksAndProxies;
+        private readonly Dictionary<Delegate, DiverCommunicator.LocalEventCallback> _eventCallbacksAndProxies;
 
         public ulong RemoteToken => _ref.Token;
 

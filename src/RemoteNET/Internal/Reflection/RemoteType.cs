@@ -9,11 +9,11 @@ namespace RemoteNET.Internal.Reflection
     public class RemoteType : Type
     {
         public string RemoteAssemblyName { get; private set; }
-        private List<RemoteConstructorInfo> _ctors = new List<RemoteConstructorInfo>();
-        private List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
-        private List<RemoteFieldInfo> _fields = new List<RemoteFieldInfo>();
-        private List<RemotePropertyInfo> _properties = new List<RemotePropertyInfo>();
-        private bool _isArray;
+        private readonly List<RemoteConstructorInfo> _ctors = new List<RemoteConstructorInfo>();
+        private readonly List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
+        private readonly List<RemoteFieldInfo> _fields = new List<RemoteFieldInfo>();
+        private readonly List<RemotePropertyInfo> _properties = new List<RemotePropertyInfo>();
+        private readonly bool _isArray;
 
         public RemoteApp App { get; set; }
 

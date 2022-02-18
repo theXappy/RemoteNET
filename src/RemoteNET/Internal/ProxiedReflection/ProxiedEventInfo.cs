@@ -9,7 +9,7 @@ namespace RemoteNET.Internal
     {
         public ProxiedMemberType Type => ProxiedMemberType.Event;
 
-        private RemoteObject _ro;
+        private readonly RemoteObject _ro;
         private string Name { get; set; }
         private List<Type> ArgumentsTypes { get; set; }
 

@@ -10,7 +10,7 @@ namespace RemoteNET.Internal.Reflection
 {
     public class RemoteTypesFactory
     {
-        private TypesResolver _resolver;
+        private readonly TypesResolver _resolver;
         private DiverCommunicator _communicator;
 
         public RemoteTypesFactory(TypesResolver resolver)
@@ -31,7 +31,7 @@ namespace RemoteNET.Internal.Reflection
         /// it's important since <see cref="Create"/> might recursively call itself and
         /// types might depend on one another (circular references)
         /// </summary>
-        private Dictionary<Tuple<string, string>, Type> _onGoingCreations =
+        private readonly Dictionary<Tuple<string, string>, Type> _onGoingCreations =
             new Dictionary<Tuple<string, string>, Type>();
 
 

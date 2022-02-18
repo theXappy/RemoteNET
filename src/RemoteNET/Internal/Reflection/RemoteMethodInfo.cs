@@ -15,7 +15,7 @@ namespace RemoteNET.Internal.Reflection
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
         public override MethodAttributes Attributes => throw new NotImplementedException();
 
-        private ParameterInfo[] _paramInfos;
+        private readonly ParameterInfo[] _paramInfos;
 
         private RemoteApp App => (DeclaringType as RemoteType)?.App;
 

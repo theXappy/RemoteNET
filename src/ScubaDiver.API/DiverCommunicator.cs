@@ -18,13 +18,13 @@ namespace ScubaDiver.API
     /// </summary>
     public class DiverCommunicator
     {
-        JsonSerializerSettings _withErrors = new()
+        readonly JsonSerializerSettings _withErrors = new()
         {
             MissingMemberHandling = MissingMemberHandling.Error
         };
 
-        private string _hostname;
-        private int _port;
+        private readonly string _hostname;
+        private readonly int _port;
 
         private int? _process_id = null;
 
@@ -436,11 +436,11 @@ namespace ScubaDiver.API
 
         public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args);
 
-        private Dictionary<int, LocalEventCallback> _tokensToEventHandlers = new();
-        private Dictionary<LocalEventCallback, int> _eventHandlersToToken = new();
+        private readonly Dictionary<int, LocalEventCallback> _tokensToEventHandlers = new();
+        private readonly Dictionary<LocalEventCallback, int> _eventHandlersToToken = new();
 
-        private Dictionary<int, LocalHookCallback> _tokensToHookCallbacks = new();
-        private Dictionary<LocalHookCallback, int> _hookCallbacksToTokens = new();
+        private readonly Dictionary<int, LocalHookCallback> _tokensToHookCallbacks = new();
+        private readonly Dictionary<LocalHookCallback, int> _hookCallbacksToTokens = new();
 
         private void Dispatcher(HttpListener listener)
         {

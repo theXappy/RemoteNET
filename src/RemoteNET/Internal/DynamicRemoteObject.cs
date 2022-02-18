@@ -22,15 +22,15 @@ namespace RemoteNET.Internal
     public class DynamicRemoteObject : DynamicObject
     {
 
-        private Dictionary<string, ProxiedMemberType> _members = new Dictionary<string, ProxiedMemberType>();
-        private Dictionary<string, ProxiedValueMemberInfo> _fields = new Dictionary<string, ProxiedValueMemberInfo>();
-        private Dictionary<string, ProxiedValueMemberInfo> _properties = new Dictionary<string, ProxiedValueMemberInfo>();
-        private Dictionary<string, ProxiedMethodGroup> _methods = new Dictionary<string, ProxiedMethodGroup>();
-        private Dictionary<string, ProxiedEventInfo> _events = new Dictionary<string, ProxiedEventInfo>();
+        private readonly Dictionary<string, ProxiedMemberType> _members = new Dictionary<string, ProxiedMemberType>();
+        private readonly Dictionary<string, ProxiedValueMemberInfo> _fields = new Dictionary<string, ProxiedValueMemberInfo>();
+        private readonly Dictionary<string, ProxiedValueMemberInfo> _properties = new Dictionary<string, ProxiedValueMemberInfo>();
+        private readonly Dictionary<string, ProxiedMethodGroup> _methods = new Dictionary<string, ProxiedMethodGroup>();
+        private readonly Dictionary<string, ProxiedEventInfo> _events = new Dictionary<string, ProxiedEventInfo>();
 
         public RemoteApp __ra;
         public RemoteObject __ro;
-        private string __typeFullName;
+        private readonly string __typeFullName;
 
  
         public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
