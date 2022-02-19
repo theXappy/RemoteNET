@@ -57,7 +57,7 @@ namespace ScubaDiver.API.Utils
             res = default(string);
             if (!(toEncode.GetType().IsPrimitiveEtc() || toEncode.GetType().IsEnum))
             {
-                if (toEncode is Array enumerable)
+                if (toEncode is Array)
                 {
                     Type elementsType = toEncode.GetType().GetElementType();
                     if (!elementsType.IsPrimitiveEtc())
