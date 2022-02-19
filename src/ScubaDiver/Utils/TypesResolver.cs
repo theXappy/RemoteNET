@@ -1,4 +1,4 @@
-using Microsoft.Diagnostics.Runtime;
+﻿using Microsoft.Diagnostics.Runtime;
 using ScubaDiver.API.Extensions;
 using System;
 using System.Collections.Generic;

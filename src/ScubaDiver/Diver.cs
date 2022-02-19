@@ -1006,7 +1006,6 @@ namespace ScubaDiver
         {
             Logger.Debug("[Diver] Got /get_field request!");
             string body = null;
-            object results = null;
             using (StreamReader sr = new(arg.InputStream))
             {
                 body = sr.ReadToEnd();
@@ -1029,6 +1028,7 @@ namespace ScubaDiver
             // Need to figure target instance and the target type.
             // In case of a static call the target instance stays null.
             Type dumpedObjType;
+            object results;
             if (request.ObjAddress == 0)
             {
                 // Null Target -- Getting a Static field
@@ -1130,15 +1130,16 @@ namespace ScubaDiver
                 return "{\"error\":\"Failed to deserialize body\"}";
             }
 
-            // Need to figure target instance and the target type.
-            // In case of a static call the target instance stays null.
-            object instance = null;
             Type dumpedObjType;
             if (request.ObjAddress == 0)
             {
                 return "{\"error\":\"Can't set field of a null target\"}";
             }
 
+
+            // Need to figure target instance and the target type.
+            // In case of a static call the target instance stays null.
+            object instance;
             // Check if we have this objects in our pinned pool
             if (TryGetPinnedObject(request.ObjAddress, out FrozenObjectInfo poi))
             {
@@ -1153,16 +1154,13 @@ namespace ScubaDiver
                 lock (_debugObjectsLock)
                 {
                     clrObj = _runtime.Heap.GetObject(request.ObjAddress);
-                }
-                if (clrObj.Type == null)
-                {
-                    return "{\"error\":\"'address' points at an invalid address\"}";
-                }
+                    if (clrObj.Type == null)
+                    {
+                        return "{\"error\":\"'address' points at an invalid address\"}";
+                    }
 
-                // Make sure it's still in place
-                RefreshRuntime();
-                lock (_debugObjectsLock)
-                {
+                    // Make sure it's still in place
+                    RefreshRuntime();
                     clrObj = _runtime.Heap.GetObject(request.ObjAddress);
                 }
                 if (clrObj.Type == null)
