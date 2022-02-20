@@ -112,8 +112,11 @@ namespace ScubaDiver.API.Extensions
 
         public static bool IsPrimitiveEtc(this Type realType)
         {
-            return realType.IsPrimitive || realType == typeof(string) || realType == typeof(decimal) ||
-                    realType == typeof(DateTime);
+            return realType.IsPrimitive || 
+                realType == typeof(string) || 
+                realType.IsEnum ||
+                realType == typeof(decimal) ||
+                realType == typeof(DateTime);
         }
 
         public static Type GetType(this AppDomain domain, string typeFullName)
