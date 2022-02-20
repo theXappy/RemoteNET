@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Reflection;
 using ScubaDiver.API;
+using ScubaDiver.API.Utils;
 
 namespace RemoteNET.Internal.Reflection
 {
@@ -37,6 +38,8 @@ namespace RemoteNET.Internal.Reflection
         public override Type ReflectedType { get; }
         public override object GetValue(object obj)
         {
+            Console.WriteLine($"[GetValue] Of RemoteFieldInfo {this.DeclaringType.Name}.{this.Name}");
+            ObjectOrRemoteAddress oora = null;
             if (obj == null)
             {
                 // No 'this' object --> Static field
@@ -49,19 +52,45 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                return this.App.Communicator.GetField(0, DeclaringType.FullName, this.Name).ReturnedObjectOrAddress;
+                oora = this.App.Communicator.GetField(0, DeclaringType.FullName, this.Name).ReturnedObjectOrAddress;
             }
-
-            // obj is NOT null. Make sure it's a RemoteObject or DynamicRemoteObject.
-            RemoteObject ro = obj as RemoteObject;
-            ro ??= (obj as DynamicRemoteObject)?.__ro;
-            if (ro != null)
+            else
             {
-                return ro.GetField(this.Name);
+                // obj is NOT null. Make sure it's a RemoteObject or DynamicRemoteObject.
+                RemoteObject ro = obj as RemoteObject;
+                ro ??= (obj as DynamicRemoteObject)?.__ro;
+                if (ro != null)
+                {
+                    oora = ro.GetField(this.Name);
+                }
+                else
+                {
+                    throw new NotImplementedException(
+                        $"{nameof(RemoteFieldInfo)}.{nameof(GetValue)} only supports {nameof(RemoteObject)} or {nameof(DynamicRemoteObject)} targets.");
+                }
             }
 
-            throw new NotImplementedException(
-                $"{nameof(RemoteFieldInfo)}.{nameof(GetValue)} only supports {nameof(RemoteObject)} or {nameof(DynamicRemoteObject)} targets.");
+            if (oora == null)
+            {
+                string offendingFunc = obj == null ? $"{nameof(DiverCommunicator)}.{nameof(DiverCommunicator.GetField)}" : $"{nameof(RemoteObject)}.{nameof(RemoteObject.GetField)}";
+                throw new Exception($"Could not get {nameof(ObjectOrRemoteAddress)} object. Seems like invoking {offendingFunc} returned null.");
+            }
+            else
+            {
+                Console.WriteLine($"[GetValue] Of RemoteFieldInfo {this.DeclaringType.Name}.{this.Name} returned non-null OORA");
+                Console.WriteLine($"[GetValue] Of RemoteFieldInfo {this.DeclaringType.Name}.{this.Name} OORA IsRemoteAddress = {oora.IsRemoteAddress}");
+                if (oora.IsRemoteAddress)
+                {
+                    var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress);
+                    return remoteObject.Dynamify();
+                }
+                else if(oora.IsNull)
+                {
+                    return null;
+                }
+                // Primitive
+                return PrimitivesEncoder.Decode(oora.EncodedObject, oora.Type);
+            }
         }
 
         public override void SetValue(object obj, object value, BindingFlags invokeAttr, Binder binder, CultureInfo culture)
