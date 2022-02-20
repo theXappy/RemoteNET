@@ -114,7 +114,6 @@ namespace ScubaDiver.API.Extensions
         {
             return realType.IsPrimitive || 
                 realType == typeof(string) || 
-                realType.IsEnum ||
                 realType == typeof(decimal) ||
                 realType == typeof(DateTime);
         }
