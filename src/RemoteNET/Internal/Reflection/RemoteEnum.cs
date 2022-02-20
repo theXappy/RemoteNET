@@ -14,11 +14,10 @@ namespace RemoteNET.Internal.Reflection
             _remoteType = remoteType;
         }
 
-        public ObjectOrRemoteAddress GetValue(string valueName)
+        public dynamic GetValue(string valueName)
         {
             FieldInfo verboseField = _remoteType.GetField(valueName);
-            ObjectOrRemoteAddress logginVerboseOora = (ObjectOrRemoteAddress)verboseField.GetValue(null);
-            return logginVerboseOora;
+            return verboseField.GetValue(null);
         }
 
         public dynamic Dynamify()
