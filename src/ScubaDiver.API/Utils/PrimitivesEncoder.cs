@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using ScubaDiver.API.Extensions;
@@ -55,7 +55,7 @@ namespace ScubaDiver.API.Utils
         public static bool TryEncode(object toEncode, out string res)
         {
             res = default(string);
-            if (!(toEncode.GetType().IsPrimitiveEtc() || toEncode.GetType().IsEnum))
+            if (!(toEncode.GetType().IsPrimitiveEtc()))
             {
                 if (toEncode is Array)
                 {
