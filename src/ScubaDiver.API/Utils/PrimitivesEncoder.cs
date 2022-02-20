@@ -26,9 +26,7 @@ namespace ScubaDiver.API.Utils
                     $"Object to encode was not a primitive or an array. TypeFullName: {toEncode.GetType()}");
             }
 
-            object[] objectsEnumerable = enumerable.Cast<object>().ToArray();
-            Type elementsType = toEncode.GetType().GetElementType();
-            if (!elementsType.IsPrimitiveEtc())
+            if (!toEncode.GetType().IsPrimitiveEtcArray())
             {
                 // TODO: Support arrays of RemoteObjects/DynamicRemoteObject
                 throw new Exception("At least one element in the array is not primitive");
@@ -36,6 +34,7 @@ namespace ScubaDiver.API.Utils
 
             // Otherwise - this is an array of primitives.
             string output = string.Empty;
+            object[] objectsEnumerable = enumerable.Cast<object>().ToArray();
             foreach (object o in objectsEnumerable)
             {
                 string currObjectValue = Encode(o);
