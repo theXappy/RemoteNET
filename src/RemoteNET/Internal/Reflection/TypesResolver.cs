@@ -32,10 +32,21 @@ namespace RemoteNET.Internal.Reflection
             }
 
             // Search for locally available types
+            // EXCEPT for enums because that breaks RemoteEnum
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             foreach (Assembly assembly in assemblies.Where(assm => assm.FullName.Contains(assemblyName)))
             {
                 resolvedType = assembly.GetType(typeFullName);
+                if(resolvedType != null)
+                {
+                    // Found the type!
+                    // But retreat if it's an enum (and get remote proxy of it instead)
+                    if(resolvedType.IsEnum)
+                    {
+                        resolvedType = null;
+                    }
+                    break;
+                }
             }
 
             if (resolvedType != null)
