@@ -13,12 +13,10 @@ namespace RemoteNET.Internal.Reflection
             _remoteEnum = remoteEnum;
         }
 
-        public override bool TryGetMember(GetMemberBinder binder, out object result)
+        public override bool TryGetMember(GetMemberBinder binder, out dynamic result)
         {
             string memberName = binder.Name;
-            ObjectOrRemoteAddress oora = _remoteEnum.GetValue(memberName);
-            RemoteObject ro = App.GetRemoteObject(oora.RemoteAddress);
-            result = ro.Dynamify();
+            result = _remoteEnum.GetValue(memberName);
             return true;
         }
 

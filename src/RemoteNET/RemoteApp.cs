@@ -372,7 +372,11 @@ namespace RemoteNET
 
         public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
         {
-            Type remoteType = GetRemoteType(typeFullName, assembly);
+            RemoteType remoteType = GetRemoteType(typeFullName, assembly) as RemoteType;
+            if(remoteType == null)
+            {
+                throw new Exception("Failed to dump remote enum (and get a RemoteType object)");
+            }
             return new RemoteEnum(remoteType);
         }
 
