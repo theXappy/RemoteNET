@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
@@ -44,11 +45,22 @@ namespace RemoteNET.Internal.Reflection
             // invokeAttr, binder and culture currently ignored
             // TODO: Actually validate parameters and expected parameters.
 
-            ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
+            object[] paramsNoEnums = parameters.ToArray();
+            for (int i = 0; i < paramsNoEnums.Length; i++)
             {
-                remoteParams[i] = CreateRemoteParameter(parameters[i]);
+                var val = paramsNoEnums[i];
+                if (val.GetType().IsEnum)
+                {
+                    var enumClass = app.GetRemoteEnum(val.GetType().FullName);
+                    // TODO: This will break on the first enum value which represents 2 or more flags
+                    RemoteObject enumVal = enumClass.GetValue(val.ToString()) as RemoteObject;
+                    // NOTE: Object stays in place in the remote app as long as we have it's reference
+                    // in the paramsNoEnums array (so untill end of this method)
+                    paramsNoEnums[i] = enumVal;
+                }
             }
+
+            ObjectOrRemoteAddress[] remoteParams = paramsNoEnums.Select(RemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
 
             bool hasResults;
             ObjectOrRemoteAddress oora;

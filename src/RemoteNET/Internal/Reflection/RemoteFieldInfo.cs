@@ -84,7 +84,7 @@ namespace RemoteNET.Internal.Reflection
                     var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress);
                     return remoteObject.Dynamify();
                 }
-                else if(oora.IsNull)
+                else if (oora.IsNull)
                 {
                     return null;
                 }
@@ -95,6 +95,17 @@ namespace RemoteNET.Internal.Reflection
 
         public override void SetValue(object obj, object value, BindingFlags invokeAttr, Binder binder, CultureInfo culture)
         {
+            var val = value;
+            if (val.GetType().IsEnum)
+            {
+                var enumClass = this.App.GetRemoteEnum(val.GetType().FullName);
+                // TODO: This will break on the first enum value which represents 2 or more flags
+                RemoteObject enumVal = enumClass.GetValue(val.ToString()) as RemoteObject;
+                // NOTE: Object stays in place in the remote app as long as we have it's reference
+                // in the the value variable(so untill end of this method)
+                value = enumVal;
+            }
+
             // Might throw if the parameter is a local object (not RemoteObject or DynamicRemoteObject).
             ObjectOrRemoteAddress remoteNewValue = RemoteFunctionsInvokeHelper.CreateRemoteParameter(value);
 
