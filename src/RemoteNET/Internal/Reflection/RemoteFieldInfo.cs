@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Reflection;
 using ScubaDiver.API;
@@ -38,7 +38,6 @@ namespace RemoteNET.Internal.Reflection
         public override Type ReflectedType { get; }
         public override object GetValue(object obj)
         {
-            Console.WriteLine($"[GetValue] Of RemoteFieldInfo {this.DeclaringType.Name}.{this.Name}");
             ObjectOrRemoteAddress oora = null;
             if (obj == null)
             {
@@ -77,8 +76,6 @@ namespace RemoteNET.Internal.Reflection
             }
             else
             {
-                Console.WriteLine($"[GetValue] Of RemoteFieldInfo {this.DeclaringType.Name}.{this.Name} returned non-null OORA");
-                Console.WriteLine($"[GetValue] Of RemoteFieldInfo {this.DeclaringType.Name}.{this.Name} OORA IsRemoteAddress = {oora.IsRemoteAddress}");
                 if (oora.IsRemoteAddress)
                 {
                     var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress);
