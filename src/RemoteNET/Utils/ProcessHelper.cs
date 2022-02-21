@@ -23,7 +23,7 @@ namespace RemoteNET.Utils
             var candidateProcs = Process.GetProcesses().Where(proc => (proc.ProcessName + ".exe").Contains(procName)).ToArray();
             if (candidateProcs.Length == 0)
             {
-                return null;
+                throw new ArgumentException($"Could not find any processes with the name filter '{procName}'");
             }
 
             // Easy case - single match
