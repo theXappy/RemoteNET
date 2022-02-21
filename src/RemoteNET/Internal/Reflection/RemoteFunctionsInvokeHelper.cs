@@ -53,7 +53,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     var enumClass = app.GetRemoteEnum(val.GetType().FullName);
                     // TODO: This will break on the first enum value which represents 2 or more flags
-                    RemoteObject enumVal = enumClass.GetValue(val.ToString()) as RemoteObject;
+                    object enumVal = enumClass.GetValue(val.ToString());
                     // NOTE: Object stays in place in the remote app as long as we have it's reference
                     // in the paramsNoEnums array (so untill end of this method)
                     paramsNoEnums[i] = enumVal;
