@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
@@ -23,7 +24,23 @@ namespace RemoteNET
 
         public RemoteObject CreateInstance(Type t, params object[] parameters)
         {
-            ObjectOrRemoteAddress[] remoteParams = parameters.Select(RemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
+            object[] paramsNoEnums = parameters.ToArray();
+            for (int i = 0; i < paramsNoEnums.Length; i++)
+            {
+                var val = paramsNoEnums[i];
+                if (val.GetType().IsEnum)
+                {
+                    var enumClass = this._app.GetRemoteEnum(val.GetType().FullName);
+                    // TODO: This will break on the first enum value which represents 2 or more flags
+                    RemoteObject enumVal = enumClass.GetValue(val.ToString()) as RemoteObject;
+                    // NOTE: Object stays in place in the remote app as long as we have it's reference
+                    // in the paramsNoEnums array (so untill end of this method)
+                    paramsNoEnums[i] = enumVal;
+                }
+            }
+
+
+            ObjectOrRemoteAddress[] remoteParams = paramsNoEnums.Select(RemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
 
             // Create object + pin
             InvocationResults invoRes = _communicator.CreateObject(t.FullName, remoteParams);
