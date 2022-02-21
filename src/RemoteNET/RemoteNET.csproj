@@ -13,9 +13,9 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
-		<Version>1.0.1.8</Version>
-		<AssemblyVersion>1.0.1.8</AssemblyVersion>
-		<FileVersion>1.0.1.8</FileVersion>
+		<Version>1.0.1.9</Version>
+		<AssemblyVersion>1.0.1.9</AssemblyVersion>
+		<FileVersion>1.0.1.9</FileVersion>
 		<LangVersion>8</LangVersion>
 	</PropertyGroup>
 
