@@ -1432,7 +1432,7 @@ namespace ScubaDiver
         private string MakeDieResponse(HttpListenerRequest req)
         {
             Logger.Debug("[Diver] Die command received");
-            bool forceKill = req.QueryString.Get("force").ToUpper() == "TRUE";
+            bool forceKill = req.QueryString.Get("force")?.ToUpper() == "TRUE";
             lock (_registeredPidsLock)
             {
                 if (_registeredPids.Count > 0 && !forceKill)
