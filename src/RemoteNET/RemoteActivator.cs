@@ -19,10 +19,13 @@ namespace RemoteNET
         }
 
 
-        public RemoteObject CreateInstance(string typeFullName, params object[] parameters)
-            => CreateInstance(_app.GetRemoteType(typeFullName), parameters);
-
+        public RemoteObject CreateInstance(Type t) => CreateInstance(t, new object[0]);
         public RemoteObject CreateInstance(Type t, params object[] parameters)
+            => CreateInstance(t.Assembly.FullName, t.FullName, parameters);
+
+        public RemoteObject CreateInstance(string typeFullName, params object[] parameters)
+            => CreateInstance(null, typeFullName, parameters);
+        public RemoteObject CreateInstance(string assembly, string typeFullName, params object[] parameters)
         {
             object[] paramsNoEnums = parameters.ToArray();
             for (int i = 0; i < paramsNoEnums.Length; i++)
@@ -39,15 +42,16 @@ namespace RemoteNET
                 }
             }
 
-
             ObjectOrRemoteAddress[] remoteParams = paramsNoEnums.Select(RemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
 
             // Create object + pin
-            InvocationResults invoRes = _communicator.CreateObject(t.FullName, remoteParams);
+            InvocationResults invoRes = _communicator.CreateObject(typeFullName, remoteParams);
 
             // Get proxy object
             var remoteObject = _app.GetRemoteObject(invoRes.ReturnedObjectOrAddress.RemoteAddress);
             return remoteObject;
         }
+
+        public RemoteObject CreateInstance<T>() => CreateInstance(typeof(T));
     }
 }
