@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using System.Collections.Concurrent;
@@ -10,7 +10,8 @@ namespace ScubaDiver.Hooking
 
     public class HarmonyWrapper
     {
-        public static HarmonyWrapper Instance => new();
+        private static HarmonyWrapper _instance = null;
+        public static HarmonyWrapper Instance => _instance ??= new();
 
         private readonly Harmony _harmony;
         /// <summary>
