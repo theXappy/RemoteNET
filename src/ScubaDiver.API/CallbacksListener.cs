@@ -53,6 +53,7 @@ namespace ScubaDiver.API
                 _listener.Start();
                 _src = new CancellationTokenSource();
                 _listenTask = Task.Run(() => Dispatcher(_listener), _src.Token);
+                _listenTask = Task.Factory.StartNew(() => Dispatcher(_listener), _src.Token, TaskCreationOptions.AttachedToParent, TaskScheduler.Default);
 
                 bool registered = _communicator.RegisterCallbackEndpoint(ip, localHttpPort);
                 if (!registered)
