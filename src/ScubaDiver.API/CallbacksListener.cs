@@ -66,7 +66,7 @@ namespace ScubaDiver.API
 
         public void Close()
         {
-            if(IsOpen)
+            if (IsOpen)
             {
                 _src.Cancel();
                 try
@@ -93,7 +93,7 @@ namespace ScubaDiver.API
                 {
                     requestContextTask.Wait(_src.Token);
                     requestContext = requestContextTask.Result;
-                    if(_src.Token.IsCancellationRequested)
+                    if (_src.Token.IsCancellationRequested)
                     {
                         break;
                     }
@@ -141,12 +141,15 @@ namespace ScubaDiver.API
                     else
                     {
                         Console.WriteLine($"[WARN] Diver tried to trigger a callback with unknown token value: {res.Token}");
-                        body = "{\"error\":\"Unknown Token\"}"; ;
+
+                        DiverError errResults = new("Unknown Token");
+                        body = JsonConvert.SerializeObject(errResults);
                     }
                 }
                 else
                 {
-                    body = "{\"error\":\"Unknown Command\"}";
+                    DiverError errResults = new("Unknown Command");
+                    body = JsonConvert.SerializeObject(errResults);
                 }
 
                 byte[] buffer = System.Text.Encoding.UTF8.GetBytes(body);

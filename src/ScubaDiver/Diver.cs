@@ -89,7 +89,7 @@ namespace ScubaDiver
             string pidString = arg.QueryString.Get("process_id");
             if (pidString == null || !int.TryParse(pidString, out int pid))
             {
-                return "{\"error\":\"Missing parameter 'process_id'\"}";
+                return QuickError("Missing parameter 'process_id'");
             }
             bool removed;
             int remaining;
@@ -114,7 +114,7 @@ namespace ScubaDiver
             string pidString = arg.QueryString.Get("process_id");
             if (pidString == null || !int.TryParse(pidString, out int pid))
             {
-                return "{\"error\":\"Missing parameter 'process_id'\"}";
+                return QuickError("Missing parameter 'process_id'");
             }
             lock (_registeredPidsLock)
             {
@@ -189,11 +189,18 @@ namespace ScubaDiver
             string body;
             if (_responseBodyCreators.TryGetValue(request.Url.AbsolutePath, out var respBodyGenerator))
             {
-                body = respBodyGenerator(request);
+                try
+                {
+                    body = respBodyGenerator(request);
+                }
+                catch (Exception ex)
+                {
+                    body = QuickError($"Error when running command {request}.\nException:\n"+ex);
+                }
             }
             else
             {
-                body = "{\"error\":\"Unknown Command\"}";
+                body = QuickError("Unknown Command");
             }
 
             byte[] buffer = System.Text.Encoding.UTF8.GetBytes(body);
@@ -463,7 +470,7 @@ namespace ScubaDiver
             string tokenStr = arg.QueryString.Get("token");
             if (tokenStr == null || !int.TryParse(tokenStr, out int token))
             {
-                return "{\"error\":\"Missing parameter 'address'\"}";
+                return QuickError("Missing parameter 'address'");
             }
             Logger.Debug($"[Diver][MakeEventUnsubscribeResponse] Called! Token: {token}");
 
@@ -473,14 +480,14 @@ namespace ScubaDiver
                 _remoteEventHandler.TryRemove(token, out _);
                 return "{\"status\":\"OK\"}";
             }
-            return "{\"error\":\"Unknown token for event callback subscription\"}";
+            return QuickError("Unknown token for event callback subscription");
         }
         private string MakeUnhookMethodResponse(HttpListenerRequest arg)
         {
             string tokenStr = arg.QueryString.Get("token");
             if (tokenStr == null || !int.TryParse(tokenStr, out int token))
             {
-                return "{\"error\":\"Missing parameter 'address'\"}";
+                return QuickError("Missing parameter 'address'");
             }
             Logger.Debug($"[Diver][MakeUnhookMethodResponse] Called! Token: {token}");
 
@@ -489,14 +496,14 @@ namespace ScubaDiver
                 ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
                 return "{\"status\":\"OK\"}";
             }
-            return "{\"error\":\"Unknown token for event callback subscription\"}";
+            return QuickError("Unknown token for event callback subscription");
         }
         private string MakeHookMethodResponse(HttpListenerRequest arg)
         {
             Logger.Debug("[Diver] Got Hook Method request!");
             if (!HasCallbackEndpoint)
             {
-                return "{\"error\":\"Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!\"}";
+                return QuickError("Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!");
             }
             string body = null;
             using (StreamReader sr = new(arg.InputStream))
@@ -506,7 +513,7 @@ namespace ScubaDiver
 
             if (string.IsNullOrEmpty(body))
             {
-                return "{\"error\":\"Missing body\"}";
+                return QuickError("Missing body");
             }
 
             Logger.Debug("[Diver] Parsing Hook Method request body");
@@ -517,7 +524,7 @@ namespace ScubaDiver
             var request = js.Deserialize<FunctionHookRequest>(jr);
             if (request == null)
             {
-                return "{\"error\":\"Failed to deserialize body\"}";
+                return QuickError("Failed to deserialize body");
             }
             Logger.Debug("[Diver] Parsing Hook Method request body -- Done!");
 
@@ -527,7 +534,7 @@ namespace ScubaDiver
             HarmonyPatchPosition pos = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPosition);
             if (!Enum.IsDefined(typeof(HarmonyPatchPosition), pos))
             {
-                return "{\"error\":\"hook_position has an invalid or unsupported value\"}";
+                return QuickError("hook_position has an invalid or unsupported value");
             }
             Logger.Debug("[Diver] Hook Method = It's pre");
 
@@ -538,7 +545,7 @@ namespace ScubaDiver
             }
             if (resolvedType == null)
             {
-                return "{\"error\":\"Failed to resolve type\"}";
+                return QuickError("Failed to resolve type");
             }
             Logger.Debug("[Diver] Hook Method - Resolved Type");
 
@@ -553,7 +560,7 @@ namespace ScubaDiver
             MethodInfo methodInfo = resolvedType.GetMethodRecursive(methodName, paramTypes);
             if (methodInfo == null)
             {
-                return "{\"error\":\"Failed to find method in type\"}";
+                return QuickError("Failed to find method in type");
             }
             Logger.Debug("[Diver] Hook Method - Resolved Method");
 
@@ -572,7 +579,7 @@ namespace ScubaDiver
             catch (Exception ex)
             {
                 Logger.Debug($"[Diver] Failed to hook func {methodName}. Exception: {ex}");
-                return "{\"error\":\"Failed insert the hook for the function. HarmonyWrapper.AddHook failed.\"}";
+                return QuickError("Failed insert the hook for the function. HarmonyWrapper.AddHook failed.");
             }
             Logger.Debug($"[Diver] Hooked func {methodName}!");
 
@@ -593,13 +600,13 @@ namespace ScubaDiver
         {
             if (!HasCallbackEndpoint)
             {
-                return "{\"error\":\"Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!\"}";
+                return QuickError("Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!");
             }
 
             string objAddrStr = arg.QueryString.Get("address");
             if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
             {
-                return "{\"error\":\"Missing parameter 'address'\"}";
+                return QuickError("Missing parameter 'address'");
             }
             Logger.Debug($"[Diver][Debug](RegisterEventHandler) objAddrStr={objAddr:X16}");
 
@@ -607,7 +614,7 @@ namespace ScubaDiver
             if (!TryGetPinnedObject(objAddr, out FrozenObjectInfo foi))
             {
                 // Object not pinned, try get it the hard way
-                return "{\"error\":\"Object at given address wasn't pinned\"}";
+                return QuickError("Object at given address wasn't pinned");
             }
 
             object target = foi.Object;
@@ -616,13 +623,13 @@ namespace ScubaDiver
             string eventName = arg.QueryString.Get("event");
             if (eventName == null)
             {
-                return "{\"error\":\"Missing parameter 'event'\"}";
+                return QuickError("Missing parameter 'event'");
             }
             // TODO: Does this need to be done recursivly?
             EventInfo eventObj = resolvedType.GetEvent(eventName);
             if (eventObj == null)
             {
-                return "{\"error\":\"Failed to find event in type\"}";
+                return QuickError("Failed to find event in type");
             }
 
             // Let's make sure the event's delegate type has 2 args - (object, EventArgs or subclass)
@@ -631,7 +638,7 @@ namespace ScubaDiver
             ParameterInfo[] paramInfos = invokeInfo.GetParameters();
             if (paramInfos.Length != 2)
             {
-                return "{\"error\":\"Currently only events with 2 parameters (object & EventArgs) can be subscribed to.\"}";
+                return QuickError("Currently only events with 2 parameters (object & EventArgs) can be subscribed to.");
             }
             // Now I want to make sure the types of the parameters are subclasses of the expected ones.
             // Every type is a subclass of object so I skip the first param
@@ -639,7 +646,7 @@ namespace ScubaDiver
             Type secondParamType = secondParamInfo.ParameterType;
             if (!secondParamType.IsAssignableFrom(typeof(EventArgs)))
             {
-                return "{\"error\":\"Second parameter of the event's handler was not a subclass of EventArgs\"}";
+                return QuickError("Second parameter of the event's handler was not a subclass of EventArgs");
             }
 
             // TODO: Make sure delegate's return type is void? (Who even uses non-void delegates?)
@@ -677,12 +684,12 @@ namespace ScubaDiver
             string ipAddrStr = arg.QueryString.Get("ip");
             if (!IPAddress.TryParse(ipAddrStr, out IPAddress ipa))
             {
-                return "{\"error\":\"Parameter 'ip' couldn't be parsed to a valid IP Address\"}";
+                return QuickError("Parameter 'ip' couldn't be parsed to a valid IP Address");
             }
             string portAddrStr = arg.QueryString.Get("port");
             if (!int.TryParse(portAddrStr, out int port))
             {
-                return "{\"error\":\"Parameter 'port' couldn't be parsed to a valid IP Address\"}";
+                return QuickError("Parameter 'port' couldn't be parsed to a valid IP Address");
             }
             _callbacksEndpoint = new IPEndPoint(ipa, port);
             Logger.Debug($"[Diver] Register Callback Endpoint complete. Endpoint: {_callbacksEndpoint}");
@@ -693,7 +700,7 @@ namespace ScubaDiver
             string objAddrStr = arg.QueryString.Get("address");
             if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
             {
-                return "{\"error\":\"Missing parameter 'address'\"}";
+                return QuickError("Missing parameter 'address'");
             }
             Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}\n");
 
@@ -707,7 +714,7 @@ namespace ScubaDiver
             else
             {
                 // Object not pinned, try get it the hard way
-                return "{\"error\":\"Object at given address wasn't pinned\"}";
+                return QuickError("Object at given address wasn't pinned");
             }
         }
         private string MakeCreateObjectResponse(HttpListenerRequest arg)
@@ -721,7 +728,7 @@ namespace ScubaDiver
 
             if (string.IsNullOrEmpty(body))
             {
-                return "{\"error\":\"Missing body\"}";
+                return QuickError("Missing body");
             }
 
             TextReader textReader = new StringReader(body);
@@ -730,7 +737,7 @@ namespace ScubaDiver
             var request = js.Deserialize<CtorInvocationRequest>(jr);
             if (request == null)
             {
-                return "{\"error\":\"Failed to deserialize body\"}";
+                return QuickError("Failed to deserialize body");
             }
 
 
@@ -741,7 +748,7 @@ namespace ScubaDiver
             }
             if (t == null)
             {
-                return "{\"error\":\"Failed to resolve type\"}";
+                return QuickError("Failed to resolve type");
             }
 
             List<object> paramsList = new();
@@ -765,12 +772,12 @@ namespace ScubaDiver
             catch
             {
                 Debugger.Launch();
-                return "{\"error\":\"Activator.CreateInstance threw an exception\"}";
+                return QuickError("Activator.CreateInstance threw an exception");
             }
 
             if (createdObject == null)
             {
-                return "{\"error\":\"Activator.CreateInstance returned null\"}";
+                return QuickError("Activator.CreateInstance returned null");
             }
 
             // Need to return the results. If it's primitive we'll encode it
@@ -831,7 +838,7 @@ namespace ScubaDiver
 
             if (string.IsNullOrEmpty(body))
             {
-                return "{\"error\":\"Missing body\"}";
+                return QuickError("Missing body");
             }
 
             TextReader textReader = new StringReader(body);
@@ -840,7 +847,7 @@ namespace ScubaDiver
             var request = js.Deserialize<InvocationRequest>(jr);
             if (request == null)
             {
-                return "{\"error\":\"Failed to deserialize body\"}";
+                return QuickError("Failed to deserialize body");
             }
 
             // Need to figure target instance and the target type.
@@ -881,7 +888,7 @@ namespace ScubaDiver
                     }
                     if (clrObj.Type == null)
                     {
-                        return "{\"error\":\"'address' points at an invalid address\"}";
+                        return QuickError("'address' points at an invalid address");
                     }
 
                     // Make sure it's still in place
@@ -893,7 +900,7 @@ namespace ScubaDiver
                     if (clrObj.Type == null)
                     {
                         return
-                            "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address.\"}";
+                            QuickError("Object moved since last refresh. 'address' now points at an invalid address.");
                     }
 
                     ulong mt = clrObj.Type.MethodTable;
@@ -905,7 +912,7 @@ namespace ScubaDiver
                     catch (Exception)
                     {
                         return
-                            "{\"error\":\"Couldn't get handle to requested object. It could be because the Method Table mismatched or a GC collection happened.\"}";
+                            QuickError("Couldn't get handle to requested object. It could be because the Method Table mismatched or a GC collection happened.");
                     }
                 }
             }
@@ -938,7 +945,7 @@ namespace ScubaDiver
             {
                 Debugger.Launch();
                 Logger.Debug($"[Diver] Failed to Resolved method :/");
-                return "{\"error\":\"Couldn't find method in type.\"}";
+                return QuickError("Couldn't find method in type.");
             }
 
             string argsSummary = string.Join(", ", argumentTypes.Select(arg => arg.Name));
@@ -1013,7 +1020,7 @@ namespace ScubaDiver
 
             if (string.IsNullOrEmpty(body))
             {
-                return "{\"error\":\"Missing body\"}";
+                return QuickError("Missing body");
             }
 
             TextReader textReader = new StringReader(body);
@@ -1022,7 +1029,7 @@ namespace ScubaDiver
             FieldSetRequest request = js.Deserialize<FieldSetRequest>(jr);
             if (request == null)
             {
-                return "{\"error\":\"Failed to deserialize body\"}";
+                return QuickError("Failed to deserialize body");
             }
 
             // Need to figure target instance and the target type.
@@ -1039,7 +1046,7 @@ namespace ScubaDiver
                 FieldInfo staticFieldInfo = dumpedObjType.GetField(request.FieldName);
                 if (!staticFieldInfo.IsStatic)
                 {
-                    return "{\"error\":\"Trying to get field with a null target bu the field was not a static one\"}";
+                    return QuickError("Trying to get field with a null target bu the field was not a static one");
                 }
 
                 results = staticFieldInfo.GetValue(null);
@@ -1056,7 +1063,7 @@ namespace ScubaDiver
                 }
                 else
                 {
-                    return "{\"error\":\"Can't get field of a unpinned objects\"}";
+                    return QuickError("Can't get field of a unpinned objects");
                 }
 
                 // Search the method with the matching signature
@@ -1065,7 +1072,7 @@ namespace ScubaDiver
                 {
                     Debugger.Launch();
                     Logger.Debug($"[Diver] Failed to Resolved field :/");
-                    return "{\"error\":\"Couldn't find field in type.\"}";
+                    return QuickError("Couldn't find field in type.");
                 }
 
                 Logger.Debug($"[Diver] Resolved field: {fieldInfo.Name}, Containing Type: {fieldInfo.DeclaringType}");
@@ -1118,7 +1125,7 @@ namespace ScubaDiver
 
             if (string.IsNullOrEmpty(body))
             {
-                return "{\"error\":\"Missing body\"}";
+                return QuickError("Missing body");
             }
 
             TextReader textReader = new StringReader(body);
@@ -1127,13 +1134,13 @@ namespace ScubaDiver
             var request = js.Deserialize<FieldSetRequest>(jr);
             if (request == null)
             {
-                return "{\"error\":\"Failed to deserialize body\"}";
+                return QuickError("Failed to deserialize body");
             }
 
             Type dumpedObjType;
             if (request.ObjAddress == 0)
             {
-                return "{\"error\":\"Can't set field of a null target\"}";
+                return QuickError("Can't set field of a null target");
             }
 
 
@@ -1156,7 +1163,7 @@ namespace ScubaDiver
                     clrObj = _runtime.Heap.GetObject(request.ObjAddress);
                     if (clrObj.Type == null)
                     {
-                        return "{\"error\":\"'address' points at an invalid address\"}";
+                        return QuickError("'address' points at an invalid address");
                     }
 
                     // Make sure it's still in place
@@ -1166,7 +1173,7 @@ namespace ScubaDiver
                 if (clrObj.Type == null)
                 {
                     return
-                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address.\"}";
+                        QuickError("Object moved since last refresh. 'address' now points at an invalid address.");
                 }
 
                 ulong mt = clrObj.Type.MethodTable;
@@ -1178,7 +1185,7 @@ namespace ScubaDiver
                 catch (Exception)
                 {
                     return
-                        "{\"error\":\"Couldn't get handle to requested object. It could be because the Method Table or a GC collection happened.\"}";
+                        QuickError("Couldn't get handle to requested object. It could be because the Method Table or a GC collection happened.");
                 }
             }
 
@@ -1188,7 +1195,7 @@ namespace ScubaDiver
             {
                 Debugger.Launch();
                 Logger.Debug($"[Diver] Failed to Resolved field :/");
-                return "{\"error\":\"Couldn't find field in type.\"}";
+                return QuickError("Couldn't find field in type.");
             }
             Logger.Debug($"[Diver] Resolved field: {fieldInfo.Name}, Containing Type: {fieldInfo.DeclaringType}");
 
@@ -1239,32 +1246,32 @@ namespace ScubaDiver
             bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
             if (!ulong.TryParse(objAddrStr, out var objAddr))
             {
-                return "{\"error\":\"Parameter 'address' could not be parsed as ulong\"}";
+                return QuickError("Parameter 'address' could not be parsed as ulong");
             }
             if (!int.TryParse(indexStr, out var index))
             {
-                return "{\"error\":\"Parameter 'index' could not be parsed as ulong\"}";
+                return QuickError("Parameter 'index' could not be parsed as ulong");
             }
 
             // Check if we have this objects in our pinned pool
             if (!TryGetPinnedObject(objAddr, out FrozenObjectInfo arrayFoi))
             {
                 // Object not pinned, try get it the hard way
-                return "{\"error\":\"Object at given address wasn't pinned\"}";
+                return QuickError("Object at given address wasn't pinned");
             }
 
             IList asList = (arrayFoi.Object as IList);
             object[] asArray = asList?.Cast<object>().ToArray();
             if (asArray == null)
             {
-                return "{\"error\":\"Object at given address wasn't an IList\"}";
+                return QuickError("Object at given address wasn't an IList");
             }
             int length = asArray.Length;
 
 
             if (index >= length)
             {
-                return "{\"error\":\"Index out of range\"}";
+                return QuickError("Index out of range");
             }
 
             // Get the item
@@ -1319,17 +1326,17 @@ namespace ScubaDiver
             int userHashcode = 0;
             if (objAddrStr == null)
             {
-                return "{\"error\":\"Missing parameter 'address'\"}";
+                return QuickError("Missing parameter 'address'");
             }
             if (!ulong.TryParse(objAddrStr, out var objAddr))
             {
-                return "{\"error\":\"Parameter 'address' could not be parsed as ulong\"}";
+                return QuickError("Parameter 'address' could not be parsed as ulong");
             }
             if (hashCodeFallback)
             {
                 if (!int.TryParse(hashCodeStr, out userHashcode))
                 {
-                    return "{\"error\":\"Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int\"}";
+                    return QuickError("Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int");
                 }
             }
 
@@ -1349,7 +1356,7 @@ namespace ScubaDiver
             ClrObject lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
             if (lastKnownClrObj == null)
             {
-                return "{\"error\":\"No object in this address. Try finding it's address again and dumping again.\"}";
+                return QuickError("No object in this address. Try finding it's address again and dumping again.");
             }
 
             // Make sure it's still in place by refreshing the runtime
@@ -1414,7 +1421,7 @@ namespace ScubaDiver
             }
             catch (ArgumentException)
             {
-                return "{\"error\":\"Method Table value mismatched\"}";
+                return QuickError("Method Table value mismatched");
             }
 
             // Pin the result object if requested
@@ -1466,7 +1473,7 @@ namespace ScubaDiver
             if (!matchingAssemblies.Any())
             {
                 // No matching assemblies found
-                return "{\"error\":\"No assemblies found matching the query\"}";
+                return QuickError("No assemblies found matching the query");
             }
             else if (matchingAssemblies.Count > 1)
             {
@@ -1571,7 +1578,7 @@ namespace ScubaDiver
             string type = queryString.Get("name");
             if (string.IsNullOrEmpty(type))
             {
-                return "{\"error\":\"Missing parameter 'name'\"}";
+                return QuickError("Missing parameter 'name'");
             }
 
             string assembly = queryString.Get("assembly");
@@ -1625,7 +1632,13 @@ namespace ScubaDiver
                 return JsonConvert.SerializeObject(recusiveTypeDump);
             }
 
-            return "{\"error\":\"Failed to find type in searched assemblies\"}";
+            return QuickError("Failed to find type in searched assemblies");
+        }
+
+        public string QuickError(string error)
+        {
+            DiverError errResults = new(error);
+            return JsonConvert.SerializeObject(errResults);
         }
 
 
