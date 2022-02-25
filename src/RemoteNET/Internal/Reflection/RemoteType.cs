@@ -21,6 +21,7 @@ namespace RemoteNET.Internal.Reflection
         {
             App = app;
             this.FullName = fullName;
+            this.Name = fullName.Substring(fullName.LastIndexOf('.') + 1);
             this.RemoteAssemblyName = assemblyName;
             this._isArray = isArray;
         }
