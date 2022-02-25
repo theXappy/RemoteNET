@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -43,7 +43,6 @@ namespace ScubaDiver.API
         {
             if (!IsOpen)
             {
-                Console.WriteLine("[CallbacksListener.Open] Called");
                 // Need to create HTTP listener and send the Diver it's info
                 int localHttpPort = this._port;
                 string ip = "127.0.0.1";
