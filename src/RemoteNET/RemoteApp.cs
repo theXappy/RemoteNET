@@ -201,7 +201,8 @@ namespace RemoteNET
                     ThreadStart ts = () => { injectorProc.StandardOutput.ReadToEnd(); };
                     var readerThread = new Thread(ts)
                     {
-                        Name = "Injector_STD_Out_Reader"
+                        Name = "Injector_STD_Out_Reader",
+                        IsBackground = true                        
                     };
                     readerThread.Start();
                     // TODO: Get results of injector
