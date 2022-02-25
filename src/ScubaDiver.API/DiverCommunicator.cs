@@ -312,7 +312,6 @@ namespace ScubaDiver.API
 
         public void EventSubscribe(ulong targetAddr, string eventName, LocalEventCallback callback)
         {
-            Console.WriteLine($"[Communicator]EventSubscribe target: {targetAddr}, event: {eventName}, callback: {callback}");
             Dictionary<string, string> queryParams;
             string body;
             if (!_listener.IsOpen)
@@ -331,14 +330,11 @@ namespace ScubaDiver.API
 
         public void EventUnsubscribe(LocalEventCallback callback)
         {
-            Console.WriteLine($"[Communicator]EventUnsubscribe callback: {callback}");
             int token = _listener.EventUnsubscribe(callback);
 
-            Console.WriteLine($"[Communicator]EventUnsubscribe Sending HTTP request to event_unsubscribe");
             Dictionary<string, string> queryParams = new() { };
             queryParams["token"] = token.ToString();
             string body = SendRequest("event_unsubscribe", queryParams);
-            Console.WriteLine($"[Communicator]EventUnsubscribe Got resp from event_unsubscribe. Response: {body}");
             if (!body.Contains("{\"status\":\"OK\"}"))
             {
                 throw new Exception("Tried to unsubscribe from an event but the Diver's response was not 'OK'");
@@ -376,7 +372,6 @@ namespace ScubaDiver.API
             }
             EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(resJson);
 
-            Console.WriteLine($"[Hook] Received back token: {regRes.Token} from raw json: {resJson}");
             _listener.HookSubscribe(callback, regRes.Token);
             // Getting back the token tells us the hook was registered successfully.
             return true;
