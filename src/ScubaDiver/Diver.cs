@@ -362,7 +362,7 @@ namespace ScubaDiver
                 if (poi is FrozenObjectInfo foi)
                 {
                     foi.UnfreezeEvent.Set();
-                    foi.FreezeTask.Wait();
+                    foi.FreezeThread.Join();
                 }
                 return true;
             }

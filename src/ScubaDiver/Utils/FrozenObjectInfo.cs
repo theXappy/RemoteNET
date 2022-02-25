@@ -26,16 +26,16 @@ namespace ScubaDiver.Utils
         public ManualResetEvent UnfreezeEvent { get; private set; }
 
         /// <summary>
-        /// The task that is freezing the object
+        /// The thread that is freezing the object
         /// </summary>
-        public Task FreezeTask { get; private set; }
+        public Thread FreezeThread { get; private set; }
 
-        public FrozenObjectInfo(object o, ulong address, ManualResetEvent unfreezeEvent, Task freezeTask)
+        public FrozenObjectInfo(object o, ulong address, ManualResetEvent unfreezeEvent, Thread freezeThread)
         {
             Object = o;
             Address = address;
             UnfreezeEvent = unfreezeEvent;
-            FreezeTask = freezeTask;
+            FreezeThread = freezeThread;
         }
 
         public override string ToString()

@@ -13,7 +13,7 @@ namespace ScubaDiver.Utils
             FrozenObjectInfo foi = Freeze(o);
             ulong address = foi.Address;
             foi.UnfreezeEvent.Set();
-            foi.FreezeTask.Wait();
+            foi.FreezeThread.Join();
             return address;
         }
 
@@ -35,10 +35,8 @@ namespace ScubaDiver.Utils
             freezeFeedback.Close();
 
             freezingThread.Name = $"Freezer_of_{target.GetType().FullName}_at_0x{freezeAddr:X16}";
-            // TODO: This move to Threads from Tasks is quirky
-            Task freezingTask = Task.Run(() => freezingThread.Join());
 
-            return new FrozenObjectInfo(target, freezeAddr, unfreezeRequired, freezingTask);
+            return new FrozenObjectInfo(target, freezeAddr, unfreezeRequired, freezingThread);
         }
 
         /// <summary>
