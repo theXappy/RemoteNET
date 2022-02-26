@@ -86,80 +86,128 @@ namespace ScubaDiver.API
         {
             while (!_src.IsCancellationRequested)
             {
-                var requestContextTask = listener.GetContextAsync();
-                HttpListenerContext? requestContext;
-                try
+                void ListenerCallback(IAsyncResult result)
                 {
-                    requestContextTask.Wait(_src.Token);
-                    requestContext = requestContextTask.Result;
-                    if (_src.Token.IsCancellationRequested)
+                    HttpListener listener = (HttpListener)result.AsyncState;
+                    HttpListenerContext context;
+                    try
                     {
+                        context = listener.EndGetContext(result);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        Console.WriteLine("[Diver][ListenerCallback] Listener is disposed. Exiting.");
+                        return;
+                    }
+                    catch (System.Net.HttpListenerException)
+                    {
+                        // Sometimes happe at teardown. Maybe there's a race condition here and waiting on something
+                        // can prevent this but I don't really care
+                        return;
+                    }
+
+                    try
+                    {
+                        HandleDispatchedRequest(context);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("[Diver] Task faulted! Exception:");
+                        Console.WriteLine(e);
+                    }
+                }
+                Console.WriteLine("[CallbacksListener][Dispatcher] Waiting for another HTTP request...");
+                IAsyncResult asyncOperation = listener.BeginGetContext(ListenerCallback, listener);
+
+                while (true)
+                {
+                    if (asyncOperation.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(100)))
+                    {
+                        // Async operation started! We can mov on to next request
                         break;
-                    }
-                }
-                catch
-                {
-                    // Maybe be cancelled, let's check by going another iteration
-                    continue;
-                }
-                HttpListenerRequest request = requestContext.Request;
-
-                var response = requestContext.Response;
-                string body = null;
-                if (request.Url.AbsolutePath == "/invoke_callback")
-                {
-                    using (StreamReader sr = new(request.InputStream))
-                    {
-                        body = sr.ReadToEnd();
-                    }
-                    CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
-                    if (_tokensToEventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
-                    {
-                        (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray());
-
-                        InvocationResults ir = new()
-                        {
-                            VoidReturnType = voidReturnType,
-                            ReturnedObjectOrAddress = voidReturnType ? null : callbackRes
-                        };
-
-                        body = JsonConvert.SerializeObject(ir);
-                    }
-                    else if (_tokensToHookCallbacks.TryGetValue(res.Token, out LocalHookCallback hook))
-                    {
-                        // Run hook. No results expected directly (it might alter variabels inside the hook)
-                        hook(res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
-
-                        InvocationResults ir = new()
-                        {
-                            VoidReturnType = true,
-                        };
-
-                        body = JsonConvert.SerializeObject(ir);
                     }
                     else
                     {
-                        Console.WriteLine($"[WARN] Diver tried to trigger a callback with unknown token value: {res.Token}");
-
-                        DiverError errResults = new("Unknown Token");
-                        body = JsonConvert.SerializeObject(errResults);
+                        // Async event still awaiting new HTTP requests... It's a good time to check
+                        // if we were signaled to die
+                        if (_src.Token.WaitHandle.WaitOne(TimeSpan.FromMilliseconds(100)))
+                        {
+                            // Time to die.
+                            // Leaving the inner loop will get us to the outter loop where _src is checked (again)
+                            // and then it that loop will stop as well.
+                            break;
+                        }
+                        else
+                        {
+                            // No singal of die command. We can continue waiting
+                            continue;
+                        }
                     }
+                }
+            }
+        }
+
+        private void HandleDispatchedRequest(HttpListenerContext context)
+        {
+
+            Console.WriteLine($"[CallbacksListener][HandleDispatchedRequest] Dispatched! TID: {Thread.CurrentThread.ManagedThreadId}");
+            HttpListenerRequest request = context.Request;
+
+            var response = context.Response;
+            string body = null;
+            if (request.Url.AbsolutePath == "/invoke_callback")
+            {
+                using (StreamReader sr = new(request.InputStream))
+                {
+                    body = sr.ReadToEnd();
+                }
+                CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
+                if (_tokensToEventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
+                {
+                    (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray());
+
+                    InvocationResults ir = new()
+                    {
+                        VoidReturnType = voidReturnType,
+                        ReturnedObjectOrAddress = voidReturnType ? null : callbackRes
+                    };
+
+                    body = JsonConvert.SerializeObject(ir);
+                }
+                else if (_tokensToHookCallbacks.TryGetValue(res.Token, out LocalHookCallback hook))
+                {
+                    // Run hook. No results expected directly (it might alter variabels inside the hook)
+                    hook(res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
+
+                    InvocationResults ir = new()
+                    {
+                        VoidReturnType = true,
+                    };
+
+                    body = JsonConvert.SerializeObject(ir);
                 }
                 else
                 {
-                    DiverError errResults = new("Unknown Command");
+                    Console.WriteLine($"[WARN] Diver tried to trigger a callback with unknown token value: {res.Token}");
+
+                    DiverError errResults = new("Unknown Token");
                     body = JsonConvert.SerializeObject(errResults);
                 }
-
-                byte[] buffer = System.Text.Encoding.UTF8.GetBytes(body);
-                // Get a response stream and write the response to it.
-                response.ContentLength64 = buffer.Length;
-                response.ContentType = "application/json";
-                System.IO.Stream output = response.OutputStream;
-                output.Write(buffer, 0, buffer.Length);
-                // You must close the output stream.
-                output.Close();
             }
+            else
+            {
+                DiverError errResults = new("Unknown Command");
+                body = JsonConvert.SerializeObject(errResults);
+            }
+
+            byte[] buffer = System.Text.Encoding.UTF8.GetBytes(body);
+            // Get a response stream and write the response to it.
+            response.ContentLength64 = buffer.Length;
+            response.ContentType = "application/json";
+            System.IO.Stream output = response.OutputStream;
+            output.Write(buffer, 0, buffer.Length);
+            // You must close the output stream.
+            output.Close();
         }
 
         public void EventSubscribe(LocalEventCallback callback, int token)
