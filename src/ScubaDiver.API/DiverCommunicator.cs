@@ -65,6 +65,7 @@ namespace ScubaDiver.API
 
             HttpResponseMessage res = c.SendAsync(msg).Result;
             string body = res.Content.ReadAsStringAsync().Result;
+            c.Dispose();
             return body;
         }
 
