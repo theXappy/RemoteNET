@@ -15,6 +15,7 @@ using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
 using ScubaDiver.API.Utils;
+using ScubaDiver.Hooking;
 using ScubaDiver.Utils;
 using Exception = System.Exception;
 
@@ -221,26 +222,35 @@ namespace ScubaDiver
             {
                 void ListenerCallback(IAsyncResult result)
                 {
-                    HttpListener listener = (HttpListener)result.AsyncState;
-                    HttpListenerContext context;
                     try
                     {
-                        context = listener.EndGetContext(result);
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        Logger.Debug("[Diver][ListenerCallback] Listener is disposed. Exiting.");
-                        return;
-                    }
+                        HarmonyWrapper.Instance.RegisterFrameworkThread(Thread.CurrentThread.ManagedThreadId);
 
-                    try
-                    {
-                        HandleDispatchedRequest(context);
+                        HttpListener listener = (HttpListener)result.AsyncState;
+                        HttpListenerContext context;
+                        try
+                        {
+                            context = listener.EndGetContext(result);
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            Logger.Debug("[Diver][ListenerCallback] Listener is disposed. Exiting.");
+                            return;
+                        }
+
+                        try
+                        {
+                            HandleDispatchedRequest(context);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("[Diver] Task faulted! Exception:");
+                            Console.WriteLine(e);
+                        }
                     }
-                    catch (Exception e)
+                    finally
                     {
-                        Console.WriteLine("[Diver] Task faulted! Exception:");
-                        Console.WriteLine(e);
+                        HarmonyWrapper.Instance.UnregisterFrameworkThread(Thread.CurrentThread.ManagedThreadId);
                     }
                 }
                 IAsyncResult asyncOperation = listener.BeginGetContext(ListenerCallback, listener);
@@ -292,6 +302,7 @@ namespace ScubaDiver
         public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvilableCallbackToken);
         public void InvokeControllerCallback(int token, params object[] parameters)
         {
+            Console.WriteLine($"[InvokeControllerCallback] Called from TID: {Thread.CurrentThread.ManagedThreadId}");
             ReverseCommunicator reverseCommunicator = new(_callbacksEndpoint);
 
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
@@ -320,6 +331,8 @@ namespace ScubaDiver
 
             // Call callback at controller
             reverseCommunicator.InvokeCallback(token, remoteParams);
+
+            Console.WriteLine($"[InvokeControllerCallback] Finished TID: {Thread.CurrentThread.ManagedThreadId}");
         }
         /// <summary>
         /// Tries to get a <see cref="FrozenObjectInfo"/> of a pinned object
@@ -767,12 +780,17 @@ namespace ScubaDiver
             try
             {
                 object[] paramsArray = paramsList.ToArray();
+                HarmonyWrapper.Instance.AllowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
                 createdObject = Activator.CreateInstance(t, paramsArray);
             }
             catch
             {
                 Debugger.Launch();
                 return QuickError("Activator.CreateInstance threw an exception");
+            }
+            finally
+            {
+                HarmonyWrapper.Instance.DisallowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
             }
 
             if (createdObject == null)
@@ -958,12 +976,17 @@ namespace ScubaDiver
                 if (string.IsNullOrEmpty(argsSummary))
                     argsSummary = "No Arguments";
                 Logger.Debug($"[Diver] Invoking {method.Name} with those args (Count: {paramsList.Count}): `{argsSummary}`");
+                HarmonyWrapper.Instance.AllowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
                 results = method.Invoke(instance, paramsList.ToArray());
-                Console.WriteLine("[Diver] invoked function finished!");
             }
             catch (Exception e)
             {
                 return $"{{\"error\":\"Invocation caused exception: {e}\"}}";
+            }
+            finally
+            {
+                Console.WriteLine("[Diver] invoked function finished!");
+                HarmonyWrapper.Instance.DisallowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
             }
 
             InvocationResults invocResults;

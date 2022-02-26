@@ -21,6 +21,7 @@
 		<Compile Include="..\ScubaDiver\Utils\ObjectDumpFactory.cs" Link="Utils\ObjectDumpFactory.cs" />
 		<Compile Include="..\ScubaDiver\Utils\Pinnable.cs" Link="Utils\Pinnable.cs" />
 		<Compile Include="..\ScubaDiver\Utils\TypesResolver.cs" Link="Utils\TypesResolver.cs" />
+		<Compile Include="..\ScubaDiver\Utils\SmartLocksDict.cs" Link="Utils\SmartLocksDict.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
