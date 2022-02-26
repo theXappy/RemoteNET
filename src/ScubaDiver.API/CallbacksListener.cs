@@ -96,7 +96,6 @@ namespace ScubaDiver.API
                     }
                     catch (ObjectDisposedException)
                     {
-                        Console.WriteLine("[Diver][ListenerCallback] Listener is disposed. Exiting.");
                         return;
                     }
                     catch (System.Net.HttpListenerException)
@@ -116,7 +115,6 @@ namespace ScubaDiver.API
                         Console.WriteLine(e);
                     }
                 }
-                Console.WriteLine("[CallbacksListener][Dispatcher] Waiting for another HTTP request...");
                 IAsyncResult asyncOperation = listener.BeginGetContext(ListenerCallback, listener);
 
                 while (true)
@@ -149,8 +147,6 @@ namespace ScubaDiver.API
 
         private void HandleDispatchedRequest(HttpListenerContext context)
         {
-
-            Console.WriteLine($"[CallbacksListener][HandleDispatchedRequest] Dispatched! TID: {Thread.CurrentThread.ManagedThreadId}");
             HttpListenerRequest request = context.Request;
 
             var response = context.Response;

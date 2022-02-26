@@ -4,6 +4,8 @@ using HarmonyLib;
 using System.Collections.Concurrent;
 using System.Reflection;
 using ScubaDiver.API;
+using System.Threading;
+using ScubaDiver.Utils;
 
 namespace ScubaDiver.Hooking
 {
@@ -22,6 +24,13 @@ namespace ScubaDiver.Hooking
         /// Maps methods and the prefix hooks that were used to hook them. (Important for unpatching)
         /// </summary>
         private readonly Dictionary<string, MethodInfo> _singlePrefixHooks = new();
+
+        /// <summary>
+        /// Used by <see cref="SinglePrefixHook"/> to gurantee hooking code doesn't cause infinite recursion
+        /// </summary>
+        private static readonly SmartLocksDict<MethodBase> _locksDict = new();
+
+
         /// <summary>
         /// Thsis dict is static because <see cref="SinglePrefixHook"/> must be a static function (Harmony limitations)
         /// </summary>
@@ -43,6 +52,33 @@ namespace ScubaDiver.Hooking
             }
         }
 
+        /// <summary>
+        /// A "Framework Thread" is a thread currently used to invoke ScubaDiver framework code.
+        /// It's important for us to mark those threads because if they, by accident, reach a method that was hooked
+        /// we DO NOT want the hook to trigger.
+        /// We only want the hooks to trigger on "normal method invocations" within the target's code.
+        /// Note that there's an exception to that rule: If a thread is assigned to run SOME ScubaDiver framework code which
+        /// eventually drift into "normal" code (2 examples: Invocation of a remote object's method & calling of a remote constructor)
+        /// then we DO want hooks to run (the user might be explicitly calling a function so it triggers some other function & it's hook 
+        /// to check they got it right or for other reasons).
+        /// </summary>
+        public void RegisterFrameworkThread(int id)
+        {
+            _locksDict.SetSpecialThreadState(id, SmartLocksDict<MethodBase>.SmartLockThreadState.ForbidLocking);
+        }
+        public void AllowFrameworkThreadToTrigger(int id)
+        {
+            _locksDict.SetSpecialThreadState(id, SmartLocksDict<MethodBase>.SmartLockThreadState.ForbidLocking | SmartLocksDict<MethodBase>.SmartLockThreadState.TemporarilyAllowLocks);
+        }
+        public void DisallowFrameworkThreadToTrigger(int id)
+        {
+            _locksDict.SetSpecialThreadState(id, SmartLocksDict<MethodBase>.SmartLockThreadState.ForbidLocking);
+        }
+        public void UnregisterFrameworkThread(int id)
+        {
+            _locksDict.SetSpecialThreadState(id, SmartLocksDict<MethodBase>.SmartLockThreadState.AllowAllLocks);
+        }
+
         public delegate void HookCallback(object instance, object[] args);
 
         public void AddHook(MethodInfo target, HarmonyPatchPosition pos, HookCallback patch)
@@ -61,6 +97,7 @@ namespace ScubaDiver.Hooking
             MethodInfo myPrefixHook = _psHooks[paramsCount];
             // Document the `single prefix hook` used so we can remove later
             _singlePrefixHooks[uniqueId] = myPrefixHook;
+            _locksDict.Add(target);
 
             HarmonyMethod prefix = null;
             HarmonyMethod postfix = null;
@@ -97,18 +134,38 @@ namespace ScubaDiver.Hooking
             }
             _singlePrefixHooks.Remove(uniqueId);
             _actualHooks.TryRemove(uniqueId, out _);
+            _locksDict.Remove(target);
         }
+
+        
 
         private static void SinglePrefixHook(MethodBase __originalMethod, object __instance, params object[] args)
         {
-            string uniqueId = __originalMethod.DeclaringType.FullName + ":" + __originalMethod.Name;
-            if (_actualHooks.TryGetValue(uniqueId, out HookCallback funcHook))
+            SmartLocksDict<MethodBase>.AcquireResults res = _locksDict.Acquire(__originalMethod);
+            if(res == SmartLocksDict<MethodBase>.AcquireResults.AlreadyAcquireByCurrentThread ||
+                res == SmartLocksDict<MethodBase>.AcquireResults.ThreadNotAllowedToLock
+                )
             {
-                funcHook(__instance, args);
+                // Woops looks like we patched a method used in the 'ScubaDvier framework code'
+                // Luckily, this if caluse allows us to avoid recursion
+                return;
             }
-            else
+
+            try
             {
-                Console.WriteLine("!ERROR! No such hooked func");
+                string uniqueId = __originalMethod.DeclaringType.FullName + ":" + __originalMethod.Name;
+                if (_actualHooks.TryGetValue(uniqueId, out HookCallback funcHook))
+                {
+                    funcHook(__instance, args);
+                }
+                else
+                {
+                    Console.WriteLine("!ERROR! No such hooked func");
+                }
+            }
+            finally
+            {
+                _locksDict.Release(__originalMethod);
             }
         }
 
