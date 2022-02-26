@@ -124,48 +124,34 @@ namespace RemoteNET
         {
             // TODO: If target is our own process run a local Diver without DLL injections
 
-
             //
-            // First Try: Blindly check the HTTP endpoint
+            // First Try: Use discovery to check for existing diver
             //
 
             // To make the Diver's port predictable even when re-attaching we'll derive it from the PID:
             ushort diverPort = (ushort)target.Id;
-
             // TODO: Make it configurable
-            string diverAddr = "127.0.0.1";
-            DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
 
-            bool isAlive = com.CheckAliveness();
+            DiverState status = DiverDiscovery.QueryStatus(target);
 
-            if (!isAlive)
+            if (status == DiverState.Alive)
+            {
+                // Everything's fine, we can continue with the existing diver
+            }
+            else if (status == DiverState.Corpse)
+            {
+                throw new Exception("Failed to connect to remote app. It seems like the diver had already been injected but it is not responding to HTTP requests.\n" +
+                    "It's suggested to restart the target app and retry.");
+            }
+            else if (status == DiverState.NoDiver)
             {
                 //
                 // Second Try: Inject DLL, assuming not injected yet
                 //
 
-
                 // Determine if we are dealing with .NET Framework or .NET Core
                 string targetDotNetVer = target.GetSupportedTargetFramework();
                 bool isNetCore = targetDotNetVer != "net451";
-
-                // Check for defective diver - Check if the 'unmanged adapter' is already loaded in the target
-                // If it's true, and we know the HTTP endpoint is close, then the processes has a defective diver and can't be helped.
-                bool adapterModuleAlreadyInjected = false;
-                try
-                {
-                    adapterModuleAlreadyInjected = target.Modules.AsEnumerable()
-                                            .Any(module => module.ModuleName.Contains("UnmanagedAdapterDLL"));
-                }
-                catch
-                {
-                    // Sometimes this happens because x32 vs x64 process interaction is not supported
-                }
-                if (adapterModuleAlreadyInjected)
-                {
-                    throw new Exception("Failed to connect to remote app. It seems like the diver had already been injected but it is not responding to HTTP requests.\n" +
-                        "It's suggested to restart the target app and retry.");
-                }
 
 
                 // Not injected yet, Injecting adapter now (which should load the Diver)
@@ -189,8 +175,7 @@ namespace RemoteNET
                 {
                     // Injector finished early, there's probably an error.
                     var stdout = injectorProc.StandardOutput.ReadToEnd();
-                    Logger.Debug("Error with injector. Raw STDOUT:\n" + stdout);
-                    isAlive = false;
+                    throw new Exception("Injector returned error. Raw STDOUT: " + stdout);
                 }
                 else
                 {
@@ -202,24 +187,25 @@ namespace RemoteNET
                     var readerThread = new Thread(ts)
                     {
                         Name = "Injector_STD_Out_Reader",
-                        IsBackground = true                        
+                        IsBackground = true
                     };
                     readerThread.Start();
                     // TODO: Get results of injector
-                    isAlive = true;
                 }
             }
 
-            if (isAlive)
+            // Now register our program as a "client" of the diver
+            string diverAddr = "127.0.0.1";
+            DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
+            bool registered = com.RegisterClient();
+            if (registered)
             {
-                // Now register our program as a "client" of the diver
-                bool registered = com.RegisterClient();
-                if (registered)
-                {
-                    return new RemoteApp(target, com);
-                }
+                return new RemoteApp(target, com);
             }
-            return null;
+            else
+            {
+                throw new Exception("Registering our current app as a client in the Diver failed.");
+            }
         }
 
         private static void GetInjectionToolkit(Process target, bool isNetCore, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath)
@@ -374,7 +360,7 @@ namespace RemoteNET
         public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
         {
             RemoteType remoteType = GetRemoteType(typeFullName, assembly) as RemoteType;
-            if(remoteType == null)
+            if (remoteType == null)
             {
                 throw new Exception("Failed to dump remote enum (and get a RemoteType object)");
             }
