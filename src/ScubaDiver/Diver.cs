@@ -147,6 +147,7 @@ namespace ScubaDiver
 
         public void Dive(ushort listenPort)
         {
+            Logger.Debug("[Diver] Is logging debugs in release? " + Logger.DebugInRelease);
             // Start session
             RefreshRuntime();
             HttpListener listener = new();
@@ -302,7 +303,6 @@ namespace ScubaDiver
         public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvilableCallbackToken);
         public void InvokeControllerCallback(int token, params object[] parameters)
         {
-            Console.WriteLine($"[InvokeControllerCallback] Called from TID: {Thread.CurrentThread.ManagedThreadId}");
             ReverseCommunicator reverseCommunicator = new(_callbacksEndpoint);
 
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
@@ -331,8 +331,6 @@ namespace ScubaDiver
 
             // Call callback at controller
             reverseCommunicator.InvokeCallback(token, remoteParams);
-
-            Console.WriteLine($"[InvokeControllerCallback] Finished TID: {Thread.CurrentThread.ManagedThreadId}");
         }
         /// <summary>
         /// Tries to get a <see cref="FrozenObjectInfo"/> of a pinned object
@@ -567,8 +565,8 @@ namespace ScubaDiver
             {
                 paramTypes = request.ParametersTypeFullNames.Select(typeFullName => TypesResolver.Resolve(_runtime, typeFullName)).ToArray();
             }
-            Console.WriteLine($"[Diver] Hooking - Calling GetMethodRecursive With these params COUNT={paramTypes.Length}");
-            Console.WriteLine($"[Diver] Hooking - Calling GetMethodRecursive With these param types: {(string.Join(",", paramTypes.Select(t => t.FullName).ToArray()))}");
+            Logger.Debug($"[Diver] Hooking - Calling GetMethodRecursive With these params COUNT={paramTypes.Length}");
+            Logger.Debug($"[Diver] Hooking - Calling GetMethodRecursive With these param types: {(string.Join(",", paramTypes.Select(t => t.FullName).ToArray()))}");
 
             MethodInfo methodInfo = resolvedType.GetMethodRecursive(methodName, paramTypes);
             if (methodInfo == null)
@@ -985,7 +983,6 @@ namespace ScubaDiver
             }
             finally
             {
-                Console.WriteLine("[Diver] invoked function finished!");
                 HarmonyWrapper.Instance.DisallowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
             }
 
