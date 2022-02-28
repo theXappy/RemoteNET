@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 namespace RemoteNET.Internal
@@ -24,25 +26,45 @@ namespace RemoteNET.Internal
             string diverAddr = "127.0.0.1";
             DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
 
-            bool isAlive = com.CheckAliveness();
-            
-            if(isAlive)
+            // We WANT to check liveness of the diver using HTTP but this might take a LOT of time if it is dead
+            // (Trying to TCP SYN several times, with timeout between each)
+            // So a simple circut-breaker is implemented before that: If we manage to bind to the expected diver endpoint, we assume it's not alive
+
+            bool diverPortIsFree = false;
+            try
             {
-                return DiverState.Alive;
+                IPAddress localAddr = IPAddress.Parse(diverAddr);
+                TcpListener server = new TcpListener(localAddr, diverPort);
+                server.Start();
+                diverPortIsFree = true;
+                server.Stop();
+            }
+            catch
+            {
+                // Had some issues, perhapse it's the diver holding that port.
+            }
+
+            if (!diverPortIsFree)
+            {
+                if (com.CheckAliveness())
+                {
+                    return DiverState.Alive;
+                }
             }
 
             // Diver isn't alive. It's possible that it was never injected or it was injected and killed
-            bool adapterModuleAlreadyInjected = false;
+            bool containsToolkitDll = false;
             try
             {
-                adapterModuleAlreadyInjected = target.Modules.AsEnumerable()
+                containsToolkitDll |= target.Modules.AsEnumerable()
                                         .Any(module => module.ModuleName.Contains("UnmanagedAdapterDLL"));
+                containsToolkitDll |= target.GetDotNetAssemblies().Any(assm => assm.Contains("ScubaDiver"));
             }
             catch
             {
                 // Sometimes this happens because x32 vs x64 process interaction is not supported
             }
-            if (adapterModuleAlreadyInjected)
+            if (containsToolkitDll)
             {
                 return DiverState.Corpse;
             }
