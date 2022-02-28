@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32.SafeHandles;
+using Microsoft.Win32.SafeHandles;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -160,6 +160,8 @@ namespace RemoteNET.Internal.Extensions
             var wpfGfxForCoreFrameworkFound = false;
             FileVersionInfo hostPolicyVersionInfo = null;
 
+            bool mscorlibSeen = false;
+            bool clrDllSeen = false;
             foreach (var module in modules)
             {
                 if (module.szModule.StartsWith("hostpolicy.dll", StringComparison.OrdinalIgnoreCase))
@@ -178,6 +180,15 @@ namespace RemoteNET.Internal.Extensions
                 {
                     break;
                 }
+
+                if (module.szModule.StartsWith("mscorlib.", StringComparison.OrdinalIgnoreCase))
+                {
+                    mscorlibSeen = true;
+                }
+                if (module.szModule.StartsWith("clr.dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    clrDllSeen = true;
+                }
             }
 
             switch (hostPolicyVersionInfo?.ProductMajorPart)
@@ -195,7 +206,13 @@ namespace RemoteNET.Internal.Extensions
                     return "netcoreapp3.0";
 
                 default:
-                    return "net451";
+                    // SS: This is a HEURISTIC and it's *good enough* but more could be done here
+                    // like check the DLLs versions (at least I hope we can get back the full module path...)
+                    if (mscorlibSeen || clrDllSeen)
+                    {
+                        return "net451";
+                    }
+                    return "native";
             }
 
         }
