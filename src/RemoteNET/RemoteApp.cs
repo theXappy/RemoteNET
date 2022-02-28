@@ -151,6 +151,10 @@ namespace RemoteNET
 
                 // Determine if we are dealing with .NET Framework or .NET Core
                 string targetDotNetVer = target.GetSupportedTargetFramework();
+                if(targetDotNetVer == "native")
+                {
+                    throw new ArgumentException($"Process {target.ProcessName} does not seem to be a .NET Framework or .NET Core app. Can't inject to native apps.");
+                }
                 bool isNetCore = targetDotNetVer != "net451";
 
 
