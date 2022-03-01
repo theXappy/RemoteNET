@@ -146,10 +146,27 @@ namespace RemoteNET.Internal.Reflection
             return _fields.Cast<FieldInfo>().ToArray();
         }
 
-        public override MemberInfo[] GetMembers(BindingFlags bindingAttr)
+        private IEnumerable<MemberInfo> GetMembersInner(BindingFlags bf)
         {
-            throw new NotImplementedException();
+            foreach(var field in GetFields(bf))
+            {
+                yield return field;
+            }
+            foreach(var prop in GetProperties(bf))
+            {
+                yield return prop;
+            }
+            foreach(var eventt in GetEvents(bf))
+            {
+                yield return eventt;
+            }
+            foreach(var method in GetMethods(bf))
+            {
+                yield return method;
+            }
         }
+
+        public override MemberInfo[] GetMembers(BindingFlags bindingAttr) => GetMembersInner(bindingAttr).ToArray();
 
         protected override TypeAttributes GetAttributeFlagsImpl()
         {
