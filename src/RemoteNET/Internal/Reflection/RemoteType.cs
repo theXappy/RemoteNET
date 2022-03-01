@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -138,7 +138,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override FieldInfo GetField(string name, BindingFlags bindingAttr)
         {
-            return _fields.ToArray().Single(field => field.Name == name);
+            return _fields.Single(field => field.Name == name);
         }
 
         public override FieldInfo[] GetFields(BindingFlags bindingAttr)
