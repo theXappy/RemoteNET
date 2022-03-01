@@ -58,7 +58,6 @@ namespace RemoteNET.Internal
             {
                 containsToolkitDll |= target.Modules.AsEnumerable()
                                         .Any(module => module.ModuleName.Contains("UnmanagedAdapterDLL"));
-                containsToolkitDll |= target.GetDotNetAssemblies().Any(assm => assm.Contains("ScubaDiver"));
             }
             catch
             {
