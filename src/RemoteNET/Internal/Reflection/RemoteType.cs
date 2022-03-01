@@ -100,7 +100,7 @@ namespace RemoteNET.Internal.Reflection
         protected override PropertyInfo GetPropertyImpl(string name, BindingFlags bindingAttr, Binder binder, Type returnType, Type[] types,
             ParameterModifier[] modifiers)
         {
-            throw new NotImplementedException();
+            return _properties.Single(prop => prop.Name == name);
         }
 
         public override PropertyInfo[] GetProperties(BindingFlags bindingAttr) => _properties.Cast<PropertyInfo>().ToArray();
