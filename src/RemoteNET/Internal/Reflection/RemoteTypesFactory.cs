@@ -97,8 +97,13 @@ namespace RemoteNET.Internal.Reflection
             AddGroupOfFunctions(app, typeDump, typeDump.Constructors, output, areConstructors: true);
             AddFields(app, typeDump, output);
             AddProperties(app, typeDump, output);
+            AddEvents(app, typeDump, output);
 
+            // Enrich properties with getters and setters
             AttachAccessorsToProperties(output);
+
+            // Enrich events with add/remove methods
+            AttachAddAndRemoveToEvents(output);
 
             // remove on-going creation indication
             _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
@@ -108,7 +113,6 @@ namespace RemoteNET.Internal.Reflection
 
             return output;
         }
-
         private void AttachAccessorsToProperties(RemoteType output)
         {
             MethodInfo[] methods = output.GetMethods();
@@ -141,6 +145,40 @@ namespace RemoteNET.Internal.Reflection
 
                 RemotePropertyInfo propInfo = new RemotePropertyInfo(output, returnType, propDump.Name);
                 output.AddProperty(propInfo);
+            }
+        }
+
+        private void AttachAddAndRemoveToEvents(RemoteType output)
+        {
+            MethodInfo[] methods = output.GetMethods();
+            foreach (EventInfo ei in output.GetEvents())
+            {
+                RemoteEventInfo rpi = ei as RemoteEventInfo;
+                MethodInfo add = methods.FirstOrDefault(mi => mi.Name == "add_" + ei.Name);
+                rpi.AddMethod = add as RemoteMethodInfo;
+                MethodInfo remove = methods.FirstOrDefault(mi => mi.Name == "remove_" + ei.Name);
+                rpi.RemoveMethod = remove as RemoteMethodInfo;
+            }
+        }
+
+        private void AddEvents(RemoteApp app, TypeDump typeDump, RemoteType output)
+        {
+            foreach (TypeDump.TypeEvent eventType in typeDump.Events)
+            {
+                Type eventHandlerType;
+                try
+                {
+                    eventHandlerType = ResolveTypeWhileCreating(app, typeDump.Type, "evemt__resolving__logic", null, eventType.TypeFullName);
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine($"[RemoteTypesFactory] failed to create event {eventHandlerType.Name} because it's type couldn't be created.\n" +
+                                    "The throw exception was: " + e);
+                    continue;
+                }
+
+                var eventInfo = new RemoteEventInfo(output, eventHandlerType, eventHandlerType.Name);
+                output.AddEvent(eventInfo);
             }
         }
         private void AddFields(RemoteApp app, TypeDump typeDump, RemoteType output)
