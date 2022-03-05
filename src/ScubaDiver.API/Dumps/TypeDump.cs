@@ -109,6 +109,8 @@ namespace ScubaDiver.API.Dumps
         {
             public string Name { get; set; }
             public string TypeFullName { get; set; }
+            public string Assembly { get; set; }
+
             public TypeEvent()
             {
             }
@@ -116,6 +118,7 @@ namespace ScubaDiver.API.Dumps
             {
                 this.Name = ei.Name;
                 this.TypeFullName = ei.EventHandlerType.FullName;
+                this.TypeFullName = ei.EventHandlerType.Assembly.GetName().Name;
             }
         }
 
