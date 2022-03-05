@@ -168,7 +168,7 @@ namespace RemoteNET.Internal.Reflection
                 Type eventHandlerType;
                 try
                 {
-                    eventHandlerType = ResolveTypeWhileCreating(app, typeDump.Type, "evemt__resolving__logic", null, eventType.TypeFullName);
+                    eventHandlerType = ResolveTypeWhileCreating(app, typeDump.Type, "evemt__resolving__logic", eventType.Assembly, eventType.TypeFullName);
                 }
                 catch (Exception e)
                 {
@@ -181,6 +181,12 @@ namespace RemoteNET.Internal.Reflection
                 output.AddEvent(eventInfo);
             }
         }
+
+        private Type ResolveTypeWhileCreating(RemoteApp app, string type, string v, object assembly, string typeFullName)
+        {
+            throw new NotImplementedException();
+        }
+
         private void AddFields(RemoteApp app, TypeDump typeDump, RemoteType output)
         {
             foreach (TypeDump.TypeField fieldDump in typeDump.Fields)
