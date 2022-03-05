@@ -172,7 +172,7 @@ namespace RemoteNET.Internal.Reflection
                 }
                 catch (Exception e)
                 {
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create event {eventHandlerType.Name} because it's type couldn't be created.\n" +
+                    Debug.WriteLine($"[RemoteTypesFactory] failed to create event {eventType.Name} because it's type couldn't be created.\n" +
                                     "The throw exception was: " + e);
                     continue;
                 }
