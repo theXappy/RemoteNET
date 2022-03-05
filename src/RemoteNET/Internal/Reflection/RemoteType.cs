@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -13,6 +13,7 @@ namespace RemoteNET.Internal.Reflection
         private readonly List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
         private readonly List<RemoteFieldInfo> _fields = new List<RemoteFieldInfo>();
         private readonly List<RemotePropertyInfo> _properties = new List<RemotePropertyInfo>();
+        private readonly List<RemoteEventInfo> _events = new List<RemoteEventInfo>();        
         private readonly bool _isArray;
 
         public RemoteApp App { get; set; }
@@ -43,6 +44,10 @@ namespace RemoteNET.Internal.Reflection
         public void AddProperty(RemotePropertyInfo fieldInfo)
         {
             _properties.Add(fieldInfo);
+        }
+        public void AddEvent(RemoteEventInfo eventInfo)
+        {
+            _events.Add(eventInfo);
         }
 
         public override object[] GetCustomAttributes(bool inherit)
