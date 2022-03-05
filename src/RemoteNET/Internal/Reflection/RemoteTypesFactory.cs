@@ -138,7 +138,7 @@ namespace RemoteNET.Internal.Reflection
                 }
                 catch (Exception e)
                 {
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create field {propDump.Name} because it's type couldn't be created.\n" +
+                    Debug.WriteLine($"[RemoteTypesFactory] failed to create field {propDump.Name} because its type couldn't be created.\n" +
                                     "The throw exception was: " + e);
                     continue;
                 }
@@ -168,11 +168,11 @@ namespace RemoteNET.Internal.Reflection
                 Type eventHandlerType;
                 try
                 {
-                    eventHandlerType = ResolveTypeWhileCreating(app, typeDump.Type, "evemt__resolving__logic", eventType.Assembly, eventType.TypeFullName);
+                    eventHandlerType = ResolveTypeWhileCreating(app, typeDump.Type, "event__resolving__logic", eventType.Assembly, eventType.TypeFullName);
                 }
                 catch (Exception e)
                 {
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create event {eventType.Name} because it's type couldn't be created.\n" +
+                    Debug.WriteLine($"[RemoteTypesFactory] failed to create event {eventType.Name} because its type couldn't be created.\n" +
                                     "The throw exception was: " + e);
                     continue;
                 }
@@ -199,7 +199,7 @@ namespace RemoteNET.Internal.Reflection
                 }
                 catch (Exception e)
                 {
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create field {fieldDump.Name} because it's type couldn't be created.\n" +
+                    Debug.WriteLine($"[RemoteTypesFactory] failed to create field {fieldDump.Name} because its type couldn't be created.\n" +
                                     "The throw exception was: " + e);
                     continue;
                 }
@@ -258,7 +258,7 @@ namespace RemoteNET.Internal.Reflection
                 catch (Exception e)
                 {
                     // TODO: This sometimes throws because of generic results (like List<SomeAssembly.SomeObject>)
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create method {func.Name} because it's return type could be created.\n" +
+                    Debug.WriteLine($"[RemoteTypesFactory] failed to create method {func.Name} because its return type could be created.\n" +
                                     "The throw exception was: " + e);
                     // TODO: Add stub method to indicate this error to the users?
                     continue;
