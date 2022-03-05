@@ -79,7 +79,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override EventInfo[] GetEvents(BindingFlags bindingAttr)
         {
-            throw new NotImplementedException();
+            return _events.Cast<EventInfo>().ToArray();
         }
 
         public override Type[] GetNestedTypes(BindingFlags bindingAttr)
