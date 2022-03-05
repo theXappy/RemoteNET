@@ -118,7 +118,7 @@ namespace ScubaDiver.API.Dumps
             {
                 this.Name = ei.Name;
                 this.TypeFullName = ei.EventHandlerType.FullName;
-                this.TypeFullName = ei.EventHandlerType.Assembly.GetName().Name;
+                this.Assembly = ei.EventHandlerType.Assembly.GetName().Name;
             }
         }
 
