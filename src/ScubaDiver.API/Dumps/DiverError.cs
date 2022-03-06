@@ -2,7 +2,10 @@
 {
     public class DiverError
     {
-        string Error { get; set; }
+        public string Error { get; set; }
+        public DiverError()
+        {
+        }
         public DiverError(string err)
         {
             Error = err;
