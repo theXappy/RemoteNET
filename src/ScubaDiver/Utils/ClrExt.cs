@@ -2,9 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using Microsoft.Diagnostics.Runtime;
+using ScubaDiver.Utils;
 
-namespace ScubaDiver.API.Extensions
+namespace ScubaDiver.Utils
 {
     public static class ClrExt
     {
@@ -38,26 +40,26 @@ namespace ScubaDiver.API.Extensions
         /// </summary>
         /// <param name="domain">Optional domain to search. If not specified current domain is searched</param>
         /// <returns>Matching TypeFullName or null if not found</returns>
-        public static Type GetRealType(this ClrType type, AppDomain domain = null)
-        {
-            if (domain == null) domain = AppDomain.CurrentDomain;
+        public static Type GetRealType(this ClrType type) => GetRealType(type.Name);
 
-            var fullTypeName = type.Name;
-            var assemblyNamePrefix = Path.GetFileNameWithoutExtension(type.Module.AssemblyName).ToUpperInvariant();
-            foreach (var assembly in domain.GetAssemblies())
+        public static Type GetRealType(string typeFullName, string assembly = null)
+        {
+#if NETCOREAPP
+            foreach (AppDomain domain in CLRUtil.EnumAppDomains())
+#else
+            foreach (_AppDomain domain in CLRUtil.EnumAppDomains())
+#endif
             {
-                string assmName = assembly.GetName().Name;
-                if (assmName.ToUpperInvariant().StartsWith(assemblyNamePrefix) || assmName == "mscorlib" && assemblyNamePrefix.StartsWith("System"))
+                foreach (Assembly assm in domain.GetAssemblies())
                 {
-                    Type match = assembly.GetType(fullTypeName);
-                    if (match != null)
+                    Type t = assm.GetType(typeFullName, throwOnError: false);
+                    if (t != null)
                     {
-                        // Found it!
-                        return match;
+                        Logger.Debug($"[Diver][TypesResolver] Resolved type with reflection in domain: {domain.FriendlyName}");
+                        return t;
                     }
                 }
             }
-
             return null;
         }
 
