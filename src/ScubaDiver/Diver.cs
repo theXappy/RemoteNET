@@ -197,7 +197,7 @@ namespace ScubaDiver
                 }
                 catch (Exception ex)
                 {
-                    body = QuickError($"Error when running command {request}.\nException:\n"+ex);
+                    body = QuickError($"Error when running command {request}.\nException:\n" + ex);
                 }
             }
             else
@@ -1604,6 +1604,11 @@ namespace ScubaDiver
             }
 
             string assembly = queryString.Get("assembly");
+            Logger.Debug($"[Diver] Trying to dump Type: {type}");
+            if (assembly != null)
+            {
+                Logger.Debug($"[Diver] Trying to dump Type: {type}, WITH Assembly: {assembly}");
+            }
             Type resolvedType = null;
             lock (_debugObjectsLock)
             {
