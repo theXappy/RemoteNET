@@ -29,69 +29,11 @@ namespace ScubaDiver.Utils
                 return typeof(Span<Char>);
             }
 
-
-            foreach (var appDom in _runtime.AppDomains)
+            // Just searching in all app domains and all assemblies the given name
+            var realType = ClrExt.GetRealType(name, assembly);
+            if(realType != null)
             {
-                try
-                {
-                    IList<ClrModule> assembliesToSearch = appDom.Modules;
-                    if (assembly != null)
-                        assembliesToSearch = assembliesToSearch.Where(mod => Path.GetFileNameWithoutExtension(mod.Name) == assembly).ToList();
-
-                    foreach (ClrModule module in assembliesToSearch)
-                    {
-                        ClrType clrTypeInfo = module.GetTypeByName(name);
-                        if (clrTypeInfo == null)
-                        {
-                            var x = module.OldSchoolEnumerateTypeDefToMethodTableMap();
-                            var typeNames = (from tuple in x
-                                             let Token = tuple.Token
-                                             let ClrType = module.ResolveToken(Token) ?? null
-                                             where ClrType?.Name == name
-                                             select new { tuple.MethodTable, Token, ClrType }).ToList();
-                            if (typeNames.Any())
-                            {
-                                clrTypeInfo = typeNames.First().ClrType;
-                            }
-                        }
-
-                        if (clrTypeInfo == null)
-                        {
-                            continue;
-                        }
-
-                        // Found it
-                        Logger.Debug($"[Diver][TypesResolver] Resolved type from ClrMD Dump in domain: {appDom.Name}");
-                        Type typeObj = clrTypeInfo.GetRealType();
-                        return typeObj;
-                    }
-                }
-                catch
-                {
-                    // Using ClrMD Failed but we have a fallback
-                }
-            }
-
-            // Fallback - normal .NET reflection in all assemblies of all domains
-            // BEWARE: Confitional compilation 🤢
-            // .NET Core deprecated "App Domains" as a concept
-            // Which means the AppDomain class still exists but the "_AppDomain" struct isn't...
-            // In a sense, .NET Core's only possible AppDomain instance is the one representing the current (and only) App Domain in the app.
-#if NETCOREAPP
-            foreach (AppDomain domain in CLRUtil.EnumAppDomains())
-#else
-            foreach (_AppDomain domain in CLRUtil.EnumAppDomains())
-#endif
-            { 
-                foreach (Assembly assm in domain.GetAssemblies())
-                {
-                    Type t = assm.GetType(name, throwOnError: false);
-                    if (t != null)
-                    {
-                        Logger.Debug($"[Diver][TypesResolver] Resolved type with reflection in domain: {domain.FriendlyName}");
-                        return t;
-                    }
-                }
+                return realType;
             }
 
             // Special case for List<T>

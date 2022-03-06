@@ -23,6 +23,7 @@
 		<Compile Include="..\ScubaDiver\Utils\TypesResolver.cs" Link="Utils\TypesResolver.cs" />
 		<Compile Include="..\ScubaDiver\Utils\SmartLocksDict.cs" Link="Utils\SmartLocksDict.cs" />
 		<Compile Include="..\ScubaDiver\Utils\AppDomainsHelper.cs" Link="Utils\AppDomainsHelper.cs" />
+		<Compile Include="..\ScubaDiver\Utils\ClrExt.cs" Link="Utils\ClrExt.cs" />
 	</ItemGroup>
 
 	<ItemGroup>

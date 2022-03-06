@@ -47,6 +47,7 @@
     <Compile Include="RegisteredEventHandlerInfo.cs" />
     <Compile Include="RegisteredMethodHookInfo.cs" />
     <Compile Include="Utils\AppDomainsHelper.cs" />
+    <Compile Include="Utils\ClrExt.cs" />
     <Compile Include="Utils\Converter.cs" />
     <Compile Include="Utils\Freezer.cs" />
     <Compile Include="Utils\SmartLocksDict.cs" />
