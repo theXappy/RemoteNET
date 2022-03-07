@@ -150,6 +150,9 @@ namespace ScubaDiver.API.Utils
 
         public static object Decode(string toDecode, string fullTypeName)
         {
+            // NOTE: I'm allowing this decode to be estricted to the current domain (Instead of searching in all domains)
+            // because I want to believe only primitive types will be handed here and those
+            // should all be available in all domains. (hopefully)
             Type t = AppDomain.CurrentDomain.GetType(fullTypeName);
             if (t != null)
                 return Decode(toDecode, t);

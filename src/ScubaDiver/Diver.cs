@@ -43,6 +43,7 @@ namespace ScubaDiver
         // Callbacks Endpoint of the Controller process
         IPEndPoint _callbacksEndpoint;
         int _nextAvilableCallbackToken = 0;
+        private UnifiedAppDomain _unifiedAppDomain;
         private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
         private readonly ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
 
@@ -78,6 +79,7 @@ namespace ScubaDiver
             _pinnedObjects = new ConcurrentDictionary<ulong, FrozenObjectInfo>();
             _remoteEventHandler = new ConcurrentDictionary<int, RegisteredEventHandlerInfo>();
             _remoteHooks = new ConcurrentDictionary<int, RegisteredMethodHookInfo>();
+            _unifiedAppDomain = new UnifiedAppDomain(this);
         }
 
         private string MakePingResponse(HttpListenerRequest arg)
@@ -393,7 +395,7 @@ namespace ScubaDiver
             return fObj;
         }
 
-        private (bool anyErrors, List<HeapDump.HeapObject> objects) GetHeapObjects(Predicate<string> filter)
+        public (bool anyErrors, List<HeapDump.HeapObject> objects) GetHeapObjects(Predicate<string> filter)
         {
             List<HeapDump.HeapObject> objects = new();
             bool anyErrors = false;
@@ -552,7 +554,7 @@ namespace ScubaDiver
             Type resolvedType = null;
             lock (_debugObjectsLock)
             {
-                resolvedType = TypesResolver.Resolve(_runtime, typeFullName);
+                resolvedType = _unifiedAppDomain.ResolveType(typeFullName);
             }
             if (resolvedType == null)
             {
@@ -563,7 +565,7 @@ namespace ScubaDiver
             Type[] paramTypes = null;
             lock (_debugObjectsLock)
             {
-                paramTypes = request.ParametersTypeFullNames.Select(typeFullName => TypesResolver.Resolve(_runtime, typeFullName)).ToArray();
+                paramTypes = request.ParametersTypeFullNames.Select(typeFullName => _unifiedAppDomain.ResolveType(typeFullName)).ToArray();
             }
             Logger.Debug($"[Diver] Hooking - Calling GetMethodRecursive With these params COUNT={paramTypes.Length}");
             Logger.Debug($"[Diver] Hooking - Calling GetMethodRecursive With these param types: {(string.Join(",", paramTypes.Select(t => t.FullName).ToArray()))}");
@@ -755,7 +757,7 @@ namespace ScubaDiver
             Type t = null;
             lock (_debugObjectsLock)
             {
-                t = TypesResolver.Resolve(_runtime, request.TypeFullName);
+                t = _unifiedAppDomain.ResolveType(request.TypeFullName);
             }
             if (t == null)
             {
@@ -878,7 +880,7 @@ namespace ScubaDiver
 
                 lock (_debugObjectsLock)
                 {
-                    dumpedObjType = TypesResolver.Resolve(_runtime, request.TypeFullName);
+                    dumpedObjType = _unifiedAppDomain.ResolveType(request.TypeFullName);
                 }
             }
             else
@@ -920,7 +922,7 @@ namespace ScubaDiver
                     }
 
                     ulong mt = clrObj.Type.MethodTable;
-                    dumpedObjType = clrObj.Type.GetRealType();
+                    dumpedObjType = _unifiedAppDomain.ResolveType(clrObj.Type.Name);
                     try
                     {
                         instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
@@ -1063,7 +1065,7 @@ namespace ScubaDiver
                 // Null Target -- Getting a Static field
                 lock (_debugObjectsLock)
                 {
-                    dumpedObjType = TypesResolver.Resolve(_runtime, request.TypeFullName);
+                    dumpedObjType = _unifiedAppDomain.ResolveType(request.TypeFullName);
                 }
                 FieldInfo staticFieldInfo = dumpedObjType.GetField(request.FieldName);
                 if (!staticFieldInfo.IsStatic)
@@ -1199,7 +1201,7 @@ namespace ScubaDiver
                 }
 
                 ulong mt = clrObj.Type.MethodTable;
-                dumpedObjType = clrObj.Type.GetRealType();
+                dumpedObjType =  _unifiedAppDomain.ResolveType(clrObj.Type.Name);
                 try
                 {
                     instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
@@ -1339,36 +1341,16 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(invokeRes);
         }
 
-        private string MakeObjectResponse(HttpListenerRequest arg)
+        public (object instance, ulong pinnedAddress) GetObject(ulong objAddr, bool pinningRequested, int? hashcode = null)
         {
-            string objAddrStr = arg.QueryString.Get("address");
-            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
-            bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
-            string hashCodeStr = arg.QueryString.Get("hashcode");
-            int userHashcode = 0;
-            if (objAddrStr == null)
-            {
-                return QuickError("Missing parameter 'address'");
-            }
-            if (!ulong.TryParse(objAddrStr, out var objAddr))
-            {
-                return QuickError("Parameter 'address' could not be parsed as ulong");
-            }
-            if (hashCodeFallback)
-            {
-                if (!int.TryParse(hashCodeStr, out userHashcode))
-                {
-                    return QuickError("Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int");
-                }
-            }
+            bool hashCodeFallback = hashcode.HasValue;
 
             // Check if we have this objects in our pinned pool
             if (TryGetPinnedObject(objAddr, out FrozenObjectInfo foi))
             {
                 // Found pinned object!
                 object pinnedInstance = foi.Object;
-                ObjectDump alreadyPinnedObjDump = ObjectDumpFactory.Create(pinnedInstance, objAddr, foi.Address);
-                return JsonConvert.SerializeObject(alreadyPinnedObjDump);
+                return (pinnedInstance, foi.Address);
             }
 
             // Object not pinned, try get it the hard way
@@ -1378,7 +1360,7 @@ namespace ScubaDiver
             ClrObject lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
             if (lastKnownClrObj == null)
             {
-                return QuickError("No object in this address. Try finding it's address again and dumping again.");
+                throw new Exception("No object in this address. Try finding it's address again and dumping again.");
             }
 
             // Make sure it's still in place by refreshing the runtime
@@ -1405,25 +1387,25 @@ namespace ScubaDiver
                 // Let's try and save the day with some hashcode filtering (if user allowed us)
                 if (!hashCodeFallback)
                 {
-                    return
+                    throw new Exception(
                         "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                        "Hash Code fallback was NOT activated\"}";
+                        "Hash Code fallback was NOT activated\"}");
                 }
 
                 Predicate<string> typeFilter = (string type) => type.Contains(lastKnownClrObj.Type.Name);
                 (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
                 if (anyErrors)
                 {
-                    return
+                    throw new Exception(
                         "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                        "Hash Code fallback was activated but dumping function failed so non hash codes were checked\"}";
+                        "Hash Code fallback was activated but dumping function failed so non hash codes were checked\"}");
                 }
-                var matches = objects.Where(heapObj => heapObj.HashCode == userHashcode).ToList();
+                var matches = objects.Where(heapObj => heapObj.HashCode == hashcode.Value).ToList();
                 if (matches.Count != 1)
                 {
-                    return
+                    throw new Exception(
                         "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                        $"Hash Code fallback was activated but {((matches.Count > 1) ? "too many (>1)" : "no")} objects with the same hash code were found\"}}";
+                        $"Hash Code fallback was activated but {((matches.Count > 1) ? "too many (>1)" : "no")} objects with the same hash code were found\"}}");
                 }
 
                 // Single match! We are as lucky as it gets :)
@@ -1443,8 +1425,9 @@ namespace ScubaDiver
             }
             catch (ArgumentException)
             {
-                return QuickError("Method Table value mismatched");
+                throw new Exception("Method Table value mismatched");
             }
+
 
             // Pin the result object if requested
             ulong pinnedAddress = 0;
@@ -1453,9 +1436,42 @@ namespace ScubaDiver
                 foi = PinObject(instance);
                 pinnedAddress = foi.Address;
             }
+            return (instance, pinnedAddress);
+        }
 
-            ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinnedAddress);
-            return JsonConvert.SerializeObject(od);
+        private string MakeObjectResponse(HttpListenerRequest arg)
+        {
+            string objAddrStr = arg.QueryString.Get("address");
+            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
+            bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
+            string hashCodeStr = arg.QueryString.Get("hashcode");
+            int userHashcode = 0;
+            if (objAddrStr == null)
+            {
+                return QuickError("Missing parameter 'address'");
+            }
+            if (!ulong.TryParse(objAddrStr, out var objAddr))
+            {
+                return QuickError("Parameter 'address' could not be parsed as ulong");
+            }
+            if (hashCodeFallback)
+            {
+                if (!int.TryParse(hashCodeStr, out userHashcode))
+                {
+                    return QuickError("Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int");
+                }
+            }
+
+            try
+            {
+                (object instance, ulong pinnedAddress) = GetObject(objAddr, pinningRequested, hashCodeFallback? userHashcode : null);
+                ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinnedAddress);
+                return JsonConvert.SerializeObject(od);
+            }
+            catch(Exception e)
+            {
+                return QuickError("Failed Getting the object for the user. Error: " + e.Message);
+            }
         }
 
         private string MakeDieResponse(HttpListenerRequest req)
@@ -1520,6 +1536,8 @@ namespace ScubaDiver
 
             return JsonConvert.SerializeObject(dump);
         }
+
+
         private string MakeHeapResponse(HttpListenerRequest httpReq)
         {
             string filter = httpReq.QueryString.Get("type_filter");
@@ -1612,7 +1630,7 @@ namespace ScubaDiver
             Type resolvedType = null;
             lock (_debugObjectsLock)
             {
-                resolvedType = TypesResolver.Resolve(_runtime, type, assembly);
+                resolvedType = _unifiedAppDomain.ResolveType(type, assembly);
             }
 
             // 
