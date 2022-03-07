@@ -120,7 +120,7 @@ namespace ScubaDiver.API.Extensions
 
         public static Type GetType(this AppDomain domain, string typeFullName)
         {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            var assemblies = domain.GetAssemblies();
             foreach (Assembly assm in assemblies)
             {
                 Type t = assm.GetType(typeFullName);

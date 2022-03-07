@@ -35,33 +35,6 @@ namespace ScubaDiver.Utils
             return obj.AsArray().ToByteArray();
         }
 
-        /// <summary>
-        /// Finds the `TypeFullName` object matching the requested ClrType.
-        /// </summary>
-        /// <param name="domain">Optional domain to search. If not specified current domain is searched</param>
-        /// <returns>Matching TypeFullName or null if not found</returns>
-        public static Type GetRealType(this ClrType type) => GetRealType(type.Name);
-
-        public static Type GetRealType(string typeFullName, string assembly = null)
-        {
-#if NETCOREAPP
-            foreach (AppDomain domain in CLRUtil.EnumAppDomains())
-#else
-            foreach (_AppDomain domain in CLRUtil.EnumAppDomains())
-#endif
-            {
-                foreach (Assembly assm in domain.GetAssemblies())
-                {
-                    Type t = assm.GetType(typeFullName, throwOnError: false);
-                    if (t != null)
-                    {
-                        Logger.Debug($"[Diver][TypesResolver] Resolved type with reflection in domain: {domain.FriendlyName}");
-                        return t;
-                    }
-                }
-            }
-            return null;
-        }
 
         public class TypeDefToMethod
         {
