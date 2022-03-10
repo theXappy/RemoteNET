@@ -27,34 +27,40 @@ namespace ScubaDiver
             _parentDiver = parentDiver;
         }
 
+        private AppDomain[] _domains = null;
         private Assembly[] _assemblies = null;
 
-        public Assembly[] GetAssemblies()
+        public AppDomain[] GetDomains()
         {
-            if (_assemblies == null)
+            if (_domains == null)
             {
                 // Using Diver's heap searching abilities to locate all 'RuntimeAssemblies'
                 try
                 {
-                    (bool anyErrors, var candidates) = _parentDiver.GetHeapObjects(heapObjType => heapObjType == "System.Reflection.RuntimeAssembly");
+                    (bool anyErrors, var candidates) = _parentDiver.GetHeapObjects(heapObjType => heapObjType == typeof(AppDomain).FullName);
 
                     if(anyErrors)
                     {
                         throw new Exception("GetHeapObjects returned anyErrors=True");
                     }
 
-                    _assemblies = candidates.Select(cand => _parentDiver.GetObject(cand.Address, false, cand.HashCode).instance).Cast<Assembly>().ToArray();
-                    Logger.Debug("[Diver][Assemblies Finder] All assemblies were retrieved from all AppDomains :)");
+                    _domains = candidates.Select(cand => _parentDiver.GetObject(cand.Address, false, cand.HashCode).instance).Cast<AppDomain>().ToArray();
+                    Logger.Debug("[Diver][UnifiedAppDomain] All assemblies were retrieved from all AppDomains :)");
                 }
                 catch (Exception ex)
                 {
-                    Logger.Debug("[Diver][Assemblies Finder] Failed to search heap for Runtime Assemblies. Error: " + ex.Message);
+                    Logger.Debug("[Diver][UnifiedAppDomain] Failed to search heap for Runtime Assemblies. Error: " + ex.Message);
 
                     // Fallback - Just return all assemblies in the current AppDomain. It's not ALL of them but sometimes it's good enough.
-                    _assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                    _domains = new AppDomain[1] { AppDomain.CurrentDomain };
                 }
             }
-            return _assemblies;
+            return _domains;
+        }
+
+        public Assembly[] GetAssemblies()
+        {
+            return _assemblies ??= GetDomains().SelectMany(domain => domain.GetAssemblies()).ToArray();
         }
 
         public Type ResolveType(string typeFullName, string assembly = null)
@@ -64,7 +70,7 @@ namespace ScubaDiver
                 Type t = assm.GetType(typeFullName, throwOnError: false);
                 if (t != null)
                 {
-                    Logger.Debug($"[Diver][TypesResolver] Resolved type with reflection in assembly: {assm.FullName}");
+                    Logger.Debug($"[Diver][UnifiedAppDomain.ResolveType] Resolved type with reflection in assembly: {assm.FullName}");
                     return t;
                 }
             }
