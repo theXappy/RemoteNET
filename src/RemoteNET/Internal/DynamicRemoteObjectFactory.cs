@@ -27,11 +27,6 @@ namespace RemoteNET.Internal
 
         private Type GetDependentType(string fullTypeName, string assembly = null)
         {
-            if (assembly != null) {
-                Type possibleResults = TypesResolver.Instance.Resolve(assembly, fullTypeName);
-                if (possibleResults != null)
-                    return possibleResults;
-            }
             return _app.GetRemoteType(fullTypeName);
         }
 
