@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -351,7 +351,7 @@ namespace RemoteNET
         /// <returns></returns>
         public Type GetRemoteType(string typeFullName, string assembly = null)
         {
-            RemoteTypesFactory rtf = new RemoteTypesFactory(TypesResolver.Instance);
+            RemoteTypesFactory rtf = new RemoteTypesFactory(TypesResolver.Instance, true);
             rtf.AllowOwnDumping(_communicator);
             var dumpedType = _communicator.DumpType(typeFullName, assembly);
             return rtf.Create(this, dumpedType);
