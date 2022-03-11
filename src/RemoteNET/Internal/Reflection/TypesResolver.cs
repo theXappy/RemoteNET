@@ -18,6 +18,9 @@ namespace RemoteNET.Internal.Reflection
 
         private readonly Dictionary<Tuple<string, string>, Type> _cache = new Dictionary<Tuple<string, string>, Type>();
 
+        public void RegisterType(Type type)
+            => RegisterType(type.Assembly.GetName().Name, type.FullName, type);
+
         public void RegisterType(string assemblyName, string typeFullName, Type type)
         {
             _cache[new Tuple<string, string>(assemblyName, typeFullName)] = type;
