@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -360,6 +360,7 @@ namespace RemoteNET
         /// Returns a handle to a remote type based on a given local type.
         /// </summary>
         public Type GetRemoteType(Type localType) => GetRemoteType(localType.FullName, localType.Assembly.GetName().Name);
+        internal Type GetRemoteType(TypeDump typeDump) => GetRemoteType(typeDump.Type, typeDump.Assembly);
 
         public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
         {
