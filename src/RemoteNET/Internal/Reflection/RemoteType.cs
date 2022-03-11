@@ -8,7 +8,19 @@ namespace RemoteNET.Internal.Reflection
 {
     public class RemoteType : Type
     {
-        public string RemoteAssemblyName { get; private set; }
+        public class RemoteAssemblyDummy : Assembly
+        {
+            AssemblyName _name;
+            public RemoteAssemblyDummy(string assemblyName)
+            {
+                _name = new AssemblyName(assemblyName);
+            }
+            public override string FullName => throw new Exception($"You tried to get the 'FullName' property on a {nameof(RemoteAssemblyDummy)}." +
+                $"Currently, this is forbidden to reduce confusion between 'full name' and 'short name'. You shoudl call 'GetName().Name' instead.");
+
+            public override AssemblyName GetName() => _name;
+        }
+
         private readonly List<RemoteConstructorInfo> _ctors = new List<RemoteConstructorInfo>();
         private readonly List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
         private readonly List<RemoteFieldInfo> _fields = new List<RemoteFieldInfo>();
@@ -23,8 +35,8 @@ namespace RemoteNET.Internal.Reflection
             App = app;
             this.FullName = fullName;
             this.Name = fullName.Substring(fullName.LastIndexOf('.') + 1);
-            this.RemoteAssemblyName = assemblyName;
             this._isArray = isArray;
+            Assembly = new RemoteAssemblyDummy(assemblyName);
         }
 
         public void AddConstructor(RemoteConstructorInfo rci)
