@@ -33,14 +33,7 @@ namespace RemoteNET
         /// </summary>
         public new Type GetType()
         {
-            if (_type == null)
-            {
-                RemoteTypesFactory rtFactory = new RemoteTypesFactory(TypesResolver.Instance);
-                rtFactory.AllowOwnDumping(_ref.Communicator);
-                _type = rtFactory.Create(this._app, _ref.GetTypeDump());
-            }
-
-            return _type;
+            return _type ??= _app.GetRemoteType(_ref.GetTypeDump());
         }
 
         public ObjectOrRemoteAddress SetField(string fieldName, ObjectOrRemoteAddress newValue)
