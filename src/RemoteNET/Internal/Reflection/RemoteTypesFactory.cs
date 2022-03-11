@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 
@@ -13,9 +14,31 @@ namespace RemoteNET.Internal.Reflection
         private readonly TypesResolver _resolver;
         private DiverCommunicator _communicator;
 
-        public RemoteTypesFactory(TypesResolver resolver)
+        private bool _avoidGenericsRecursion;
+        private Regex _genericsRecursionRegex = new Regex(@"");
+
+        public RemoteTypesFactory(TypesResolver resolver, bool avoidGenericsRecursion)
         {
             _resolver = resolver;
+
+            // "Generic Recursion" is a made-up term which means for RemoteNET that Types that look like:
+            //      SomeType< SomeType< SomeType< SomeType< SomeType .... >>>>
+            // Are cut after the recognizing nested type in iteself many times (6+ occurences and at a very ong type name).
+            // You might ask yourself where such an object is possible and if C# even allows definid such a type.
+            // Well the example I found is within JetBra*ns "Platform.Core" assembly, where trying to dump some types result
+            // in a dependent type which looks like:
+            // JetBra*ns.DataFlow.PropertyChangedEventArgs`1[[
+            //    JetBra*ns.DataFlow.PropertyChangedEventArgs`1[[
+            //        JetBra*ns.DataFlow.PropertyChangedEventArgs`1[[
+            //          JetBra*ns.DataFlow.PropertyChangedEventArgs`1[[
+            //              JetBra*ns.DataFlow.BeforePropertyChangedEventArgs`1[[
+            //              JetBra*ns.DataFlow.BeforePropertyChangedEventArgs`1[[
+            //              JetBra*ns.DataFlow.BeforePropertyChangedEventArgs`1[[
+            //              JetBra*ns.DataFlow.BeforePropertyChangedEventArgs`1[[
+            //              JetBra*ns.DataFlow.BeforePropertyChangedEventArgs`1[[
+            //          ...
+            // I did not investigate this deeply but it seems very 
+            _avoidGenericsRecursion = avoidGenericsRecursion;
         }
 
         /// <summary>
@@ -37,6 +60,14 @@ namespace RemoteNET.Internal.Reflection
 
         public Type ResolveTypeWhileCreating(RemoteApp app, string typeInProgress, string methodName, string assembly, string type)
         {
+            if(type.Length > 1000)
+            {
+                // Only checking very long type names to reduce Regex executions
+                if (_genericsRecursionRegex.IsMatch(type)) {
+                    throw new Exception("Generics recursion was detected and avoided.");
+                }
+            }
+
             Type paramType = _resolver.Resolve(assembly, type);
 
             if (paramType == null)
