@@ -137,5 +137,10 @@ namespace RemoteNET.Internal.Reflection
 
         public override FieldAttributes Attributes { get; }
         public override RuntimeFieldHandle FieldHandle { get; }
+
+        public override string ToString()
+        {
+            return $"{FieldType.FullName} {Name}";
+        }
     }
 }
