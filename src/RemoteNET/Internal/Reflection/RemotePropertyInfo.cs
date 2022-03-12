@@ -84,5 +84,10 @@ namespace RemoteNET.Internal.Reflection
                 throw new Exception($"Couldn't retrieve 'set' method of property '{this.Name}'");
             }
         }
+
+        public override string ToString()
+        {
+            return $"{PropertyType.FullName} {Name}";
+        }
     }
 }
