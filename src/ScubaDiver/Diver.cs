@@ -149,7 +149,7 @@ namespace ScubaDiver
 
         public void Dive(ushort listenPort)
         {
-            Logger.Debug("[Diver] Is logging debugs in release? " + Logger.DebugInRelease);
+            Logger.Debug("[Diver] Is logging debugs in release? " + Logger.DebugInRelease.Value);
             // Start session
             RefreshRuntime();
             HttpListener listener = new();
