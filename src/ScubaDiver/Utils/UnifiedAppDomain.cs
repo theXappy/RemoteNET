@@ -28,7 +28,6 @@ namespace ScubaDiver
         }
 
         private AppDomain[] _domains = null;
-        private Assembly[] _assemblies = null;
 
         public AppDomain[] GetDomains()
         {
@@ -60,7 +59,7 @@ namespace ScubaDiver
 
         public Assembly[] GetAssemblies()
         {
-            return _assemblies ??= GetDomains().SelectMany(domain => domain.GetAssemblies()).ToArray();
+            return GetDomains().SelectMany(domain => domain.GetAssemblies()).ToArray();
         }
 
         public Type ResolveType(string typeFullName, string assembly = null)
