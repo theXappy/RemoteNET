@@ -49,7 +49,7 @@ namespace RemoteNET.Internal.Reflection
             for (int i = 0; i < paramsNoEnums.Length; i++)
             {
                 var val = paramsNoEnums[i];
-                if (val.GetType().IsEnum)
+                if (val != null && val.GetType().IsEnum)
                 {
                     var enumClass = app.GetRemoteEnum(val.GetType().FullName);
                     // TODO: This will break on the first enum value which represents 2 or more flags
