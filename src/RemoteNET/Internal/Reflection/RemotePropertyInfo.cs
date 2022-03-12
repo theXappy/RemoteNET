@@ -59,7 +59,7 @@ namespace RemoteNET.Internal.Reflection
             RemoteMethodInfo getMethod = GetGetMethod() as RemoteMethodInfo;
             if (getMethod != null)
             {
-                return getMethod.Invoke(obj, null);
+                return getMethod.Invoke(obj, new object[0]);
             }
             else
             {
