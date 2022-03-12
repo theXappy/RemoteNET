@@ -69,7 +69,6 @@ namespace ScubaDiver
                 Type t = assm.GetType(typeFullName, throwOnError: false);
                 if (t != null)
                 {
-                    Logger.Debug($"[Diver][UnifiedAppDomain.ResolveType] Resolved type with reflection in assembly: {assm.FullName}");
                     return t;
                 }
             }
