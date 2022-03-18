@@ -984,7 +984,7 @@ namespace ScubaDiver
             }
             catch (Exception e)
             {
-                return $"{{\"error\":\"Invocation caused exception: {e}\"}}";
+                return QuickError($"Invocation caused exception: {e}");
             }
             finally
             {
@@ -1110,7 +1110,7 @@ namespace ScubaDiver
                 }
                 catch (Exception e)
                 {
-                    return $"{{\"error\":\"Invocation caused exception: {e}\"}}";
+                    return QuickError($"Invocation caused exception: {e}");
                 }
             }
 
@@ -1237,7 +1237,7 @@ namespace ScubaDiver
             }
             catch (Exception e)
             {
-                return $"{{\"error\":\"Invocation caused exception: {e}\"}}";
+                    return QuickError($"Invocation caused exception: {e}");
             }
 
 
