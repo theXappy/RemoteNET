@@ -1,5 +1,6 @@
 ﻿using Microsoft.CSharp.RuntimeBinder;
 using RemoteNET.Internal.ProxiedReflection;
+using RemoteNET.Internal.Reflection;
 using ScubaDiver.API.Utils;
 using System;
 using System.Collections.Generic;
@@ -30,12 +31,14 @@ namespace RemoteNET.Internal
 
             public DynamicRemoteMethod(string name, DynamicRemoteObject parent, ProxiedMethodGroup methods, Type[] genericArguments = null)
             {
+                if(genericArguments == null)
+                {
+                    genericArguments = Array.Empty<Type>();
+                }
+
                 _name = name;
                 _parent = parent;
                 _methods = methods;
-
-                // Replace 0-sized arrays with null
-                genericArguments = (genericArguments != null && genericArguments.Length == 0) ? null : genericArguments;
 
                 _genericArguments = genericArguments;
             }
@@ -212,7 +215,7 @@ namespace RemoteNET.Internal
         /// </summary>
         /// <param name="methodName">Method name</param>
         /// <param name="proxy">Function to invoke when the method is called by the <see cref="DynamicRemoteObject"/></param>
-        public void AddMethod(string methodName, List<string> genericArgs, List<Tuple<Type, string>> parameters, Type retType, Func<Type[], object[], object> proxy)
+        public void AddMethod(string methodName, List<string> genericArgs, List<RemoteParameterInfo> parameters, Type retType, Func<Type[], object[], object> proxy)
         {
             // Disallowing other members of this name except other methods
             // overloading is allowed.
