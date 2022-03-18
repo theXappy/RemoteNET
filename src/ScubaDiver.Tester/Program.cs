@@ -37,6 +37,7 @@ namespace ScubaDiver.Tester
                 catch (Exception ex)
                 {
                     Console.WriteLine("ERROR: "+ex);
+                    continue;
                 }
                 break;
             }
