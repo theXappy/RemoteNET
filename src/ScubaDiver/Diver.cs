@@ -1287,22 +1287,49 @@ namespace ScubaDiver
                 return QuickError("Object at given address wasn't pinned");
             }
 
-            IList asList = (arrayFoi.Object as IList);
-            object[] asArray = asList?.Cast<object>().ToArray();
-            if (asArray == null)
+
+            object item = null;
+            if (arrayFoi.Object.GetType().IsArray)
             {
-                return QuickError("Object at given address wasn't an IList");
+                Logger.Debug("[Diver] Array access: Object is an Array!");
+                Array asArray = (Array)arrayFoi.Object;
+
+                int length = asArray.Length;
+                if (index >= length)
+                {
+                    return QuickError("Index out of range");
+                }
+
+                item = asArray.GetValue(index);
+                Logger.Debug("[Diver] Array access: Item is: " + item.ToString()) ;
             }
-            int length = asArray.Length;
-
-
-            if (index >= length)
+            else
             {
-                return QuickError("Index out of range");
-            }
+                if (arrayFoi.Object is IList asList)
+                {
+                    Logger.Debug("[Diver] Array access: Object is an ILIST!");
+                    object[] asArray = asList?.Cast<object>().ToArray();
+                    if (asArray == null)
+                    {
+                        return QuickError("Object at given address seemed to be an IList but failed to convert to array");
+                    }
+                    int length = asArray.Length;
 
-            // Get the item
-            object item = asArray[index];
+
+                    if (index >= length)
+                    {
+                        return QuickError("Index out of range");
+                    }
+
+                    // Get the item
+                    item = asArray[index];
+                }
+                else
+                {
+                    Logger.Debug("[Diver] Array access: Object is an neighter...");
+                    return QuickError("Object at given address wasn't an Array or a IList");
+                }
+            }
 
             ObjectOrRemoteAddress res;
             ulong pinAddr;
