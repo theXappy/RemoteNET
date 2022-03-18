@@ -351,7 +351,17 @@ namespace RemoteNET
         /// <returns></returns>
         public Type GetRemoteType(string typeFullName, string assembly = null)
         {
-            RemoteTypesFactory rtf = new RemoteTypesFactory(TypesResolver.Instance, true);
+            // Easy case: Trying to resolve from cache or from local assemblies
+            var resolver = TypesResolver.Instance;
+            Type res = resolver.Resolve(assembly, typeFullName);
+            if(res != null)
+            {
+                return res;
+            }
+
+            // Harder case: Dump the remote type. This takes much more time (includes dumping of depedent
+            // types) and should be avoided as much as possible.
+            RemoteTypesFactory rtf = new RemoteTypesFactory(resolver, true);
             rtf.AllowOwnDumping(_communicator);
             var dumpedType = _communicator.DumpType(typeFullName, assembly);
             return rtf.Create(this, dumpedType);
