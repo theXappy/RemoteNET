@@ -10,7 +10,8 @@ namespace ScubaDiver.API.Dumps
         {
             public class MethodParameter
             {
-                public bool IsGenericType;
+                public bool IsGenericType { get; set; }
+                public bool IsGenericParameter { get; set; }
                 public string Type { get; set; }
                 public string Name { get; set; }
                 public string Assembly { get; set; }
@@ -23,10 +24,11 @@ namespace ScubaDiver.API.Dumps
                 public MethodParameter(ParameterInfo pi)
                 {
                     IsGenericType = pi.ParameterType.IsGenericType;
+                    IsGenericParameter = pi.ParameterType.IsGenericParameter;
                     Name = pi.Name;
                     // For generic type parameters we need the 'Name' property - it returns something like "T"
                     // For non-generic we want the full name like "System.Text.StringBuilder"
-                    Type = IsGenericType ? pi.ParameterType.Name : pi.ParameterType.FullName;
+                    Type = IsGenericParameter ? pi.ParameterType.Name : pi.ParameterType.FullName;
                     Assembly = pi.ParameterType.Assembly.GetName().Name;
                 }
 
@@ -58,7 +60,13 @@ namespace ScubaDiver.API.Dumps
             public TypeMethod(MethodBase methodBase)
             {
                 Visibility = methodBase.IsPublic ? "Public" : "Private";
-                GenericArgs = methodBase.GetGenericArguments().Select(fakeType => fakeType.Name).ToList();
+                if (methodBase.ContainsGenericParameters)
+                {
+                    GenericArgs = methodBase.GetGenericArguments().Select(arg => arg.Name);
+                }
+                else {
+                    GenericArgs = new List<string>();
+                }
                 Name = methodBase.Name;
                 Parameters = methodBase.GetParameters().Select(paramInfo => new MethodParameter(paramInfo)).ToList();
                 if(methodBase is MethodInfo methodInfo)

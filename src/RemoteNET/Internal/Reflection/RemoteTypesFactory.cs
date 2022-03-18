@@ -249,7 +249,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     // First: Search cache (which means local types & already-seen remote types)
                     Type paramType = null;
-                    if (methodParameter.IsGenericType)
+                    if (methodParameter.IsGenericParameter)
                     {
                         // In case of a generic type we have no way to "resolve" it
                         // We are just creating a dummy type
