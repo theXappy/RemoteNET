@@ -31,7 +31,7 @@ namespace RemoteNET.Internal
 
             public DynamicRemoteMethod(string name, DynamicRemoteObject parent, ProxiedMethodGroup methods, Type[] genericArguments = null)
             {
-                if(genericArguments == null)
+                if (genericArguments == null)
                 {
                     genericArguments = Array.Empty<Type>();
                 }
@@ -44,7 +44,10 @@ namespace RemoteNET.Internal
             }
 
 
+
             public override bool TryInvoke(InvokeBinder binder, object[] args, out object result)
+                => TryInvoke(args, out result);
+            public bool TryInvoke(object[] args, out object result)
             {
                 List<ProxiedMethodOverload> overloads = _methods;
 
@@ -123,12 +126,12 @@ namespace RemoteNET.Internal
             // MyOtherFunc[t,p,q]
 
             public DynamicRemoteMethod this[Type t] =>
-                    new DynamicRemoteMethod(_name, _parent, _methods, _genericArguments.Concat(new Type[]{ t }).ToArray());
+                    new DynamicRemoteMethod(_name, _parent, _methods, _genericArguments.Concat(new Type[] { t }).ToArray());
 
             public DynamicRemoteMethod this[Type t1, Type t2] => this[t1][t2];
-            public DynamicRemoteMethod this[Type t1, Type t2, Type t3] => this[t1,t2][t3];
-            public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4] => this[t1,t2,t3][t4];
-            public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4, Type t5] => this[t1,t2,t3,t4][t5];
+            public DynamicRemoteMethod this[Type t1, Type t2, Type t3] => this[t1, t2][t3];
+            public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4] => this[t1, t2, t3][t4];
+            public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4, Type t5] => this[t1, t2, t3, t4][t5];
         }
 
         private readonly Dictionary<string, ProxiedMemberType> _members = new Dictionary<string, ProxiedMemberType>();
@@ -227,12 +230,12 @@ namespace RemoteNET.Internal
             {
                 _methods[methodName] = new ProxiedMethodGroup();
             }
-            _methods[methodName].Add(new ProxiedMethodOverload 
+            _methods[methodName].Add(new ProxiedMethodOverload
             {
-                ReturnType = retType, 
+                ReturnType = retType,
                 GenericArgs = genericArgs,
                 Parameters = parameters,
-                GenericProxy = proxy 
+                GenericProxy = proxy
             });
         }
 
@@ -359,9 +362,8 @@ namespace RemoteNET.Internal
             // runtime resort to calling 'TryGetMember'
 
             DynamicRemoteMethod drm = GetMethodProxy(binder.Name);
-
-            var binderType = binder.GetType();
-            var TypeArgumentsPropInfo = binderType.GetProperty("TypeArguments");
+            Type binderType = binder.GetType();
+            System.Reflection.PropertyInfo TypeArgumentsPropInfo = binderType.GetProperty("TypeArguments");
             if (TypeArgumentsPropInfo != null)
             {
                 // We got ourself a binder which implemented .NET's internal "ICSharpInvokeOrInvokeMemberBinder" Interface
@@ -370,23 +372,21 @@ namespace RemoteNET.Internal
                 // In that case, we can hijack and do the call here
                 // Otherwise - Just let TryGetMembre return a proxy
                 IList<Type> genArgs = TypeArgumentsPropInfo.GetValue(binder) as IList<Type>;
-                foreach(Type t in genArgs)
+                if (genArgs != null)
                 {
-                    // Aggregate the generic types into the dynamic remote method
-                    // Example:
-                    //  * Invoke method is Insert<,>
-                    //  * Given types are ['T', 'S']
-                    //  * First loop iteration: Inert<,> --> Insert<T,>
-                    //  * Second loop iteration: Inert<T,> --> Insert<T,S>
-                    drm = drm[t];
+                    foreach (Type t in genArgs)
+                    {
+                        // Aggregate the generic types into the dynamic remote method
+                        // Example:
+                        //  * Invoke method is Insert<,>
+                        //  * Given types are ['T', 'S']
+                        //  * First loop iteration: Inert<,> --> Insert<T,>
+                        //  * Second loop iteration: Inert<T,> --> Insert<T,S>
+                        drm = drm[t];
+                    }
                 }
             }
-            // Converting to dynamic so invoking on the object will make sense
-            dynamic finalizedMethodProxy = drm;
-
-            result = finalizedMethodProxy();
-
-            return base.TryInvokeMember(binder, args, out result);
+            return drm.TryInvoke(args, out result);
         }
 
         public bool HasMember(string name) => _members.ContainsKey(name);
