@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -66,6 +66,21 @@ namespace ScubaDiver.API
             HttpResponseMessage res = c.SendAsync(msg).Result;
             string body = res.Content.ReadAsStringAsync().Result;
             c.Dispose();
+            if (body.StartsWith("{\"error\":", StringComparison.InvariantCultureIgnoreCase))
+            {
+                // Try to parse generic error:
+                DiverError errMessage = null;
+                try
+                {
+                    errMessage = JsonConvert.DeserializeObject<DiverError>(body, _withErrors);
+                }
+                catch
+                {
+                    // Let someone else handle this...
+                }
+                if(errMessage != null)
+                    throw new RemoteException(errMessage.Error);
+            }
             return body;
         }
 
