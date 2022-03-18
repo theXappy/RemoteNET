@@ -1204,7 +1204,7 @@ namespace ScubaDiver
                 }
 
                 ulong mt = clrObj.Type.MethodTable;
-                dumpedObjType =  _unifiedAppDomain.ResolveType(clrObj.Type.Name);
+                dumpedObjType = _unifiedAppDomain.ResolveType(clrObj.Type.Name);
                 try
                 {
                     instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
@@ -1494,11 +1494,11 @@ namespace ScubaDiver
 
             try
             {
-                (object instance, ulong pinnedAddress) = GetObject(objAddr, pinningRequested, hashCodeFallback? userHashcode : null);
+                (object instance, ulong pinnedAddress) = GetObject(objAddr, pinningRequested, hashCodeFallback ? userHashcode : null);
                 ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinnedAddress);
                 return JsonConvert.SerializeObject(od);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 return QuickError("Failed Getting the object for the user. Error: " + e.Message);
             }
@@ -1652,10 +1652,10 @@ namespace ScubaDiver
             }
 
             string assembly = queryString.Get("assembly");
-            Logger.Debug($"[Diver] Trying to dump Type: {type}");
+            //Logger.Debug($"[Diver] Trying to dump Type: {type}");
             if (assembly != null)
             {
-                Logger.Debug($"[Diver] Trying to dump Type: {type}, WITH Assembly: {assembly}");
+                //Logger.Debug($"[Diver] Trying to dump Type: {type}, WITH Assembly: {assembly}");
             }
             Type resolvedType = null;
             lock (_debugObjectsLock)
