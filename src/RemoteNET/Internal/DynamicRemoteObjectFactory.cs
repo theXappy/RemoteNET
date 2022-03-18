@@ -25,6 +25,13 @@ namespace RemoteNET.Internal
             return dynRemoteObj;
         }
 
+        private Type GetDependentType(TypeDump.TypeMethod.MethodParameter parameter)
+        {
+            var typeFullName = parameter.Type;
+            var assm = parameter.Assembly;
+            var resolvedType = parameter.IsGenericParameter ? new RemoteType(_app, typeFullName, assm, false, true) : GetDependentType(typeFullName, assm);
+            return resolvedType;
+        }
         private Type GetDependentType(string fullTypeName, string assembly = null)
         {
             return _app.GetRemoteType(fullTypeName);
@@ -137,12 +144,9 @@ namespace RemoteNET.Internal
                     }
                 };
                 // TODO: Does this even work if any of the arguments is a remote one
-                List<Tuple<Type,string>> parameters = (from parameter in methodInfo.Parameters
-                                       where !parameter.IsGenericParameter // Not trying to resolve generic types (Like "T")
-                                       let typeFullName = parameter.Type
-                                       let assm = parameter.Assembly
-                                       let resolvedType = GetDependentType(typeFullName, assm)
-                                       select new Tuple<Type,string>(resolvedType,parameter.Name)).ToList();
+                List<RemoteParameterInfo> parameters = 
+                    methodInfo.Parameters.Select(paramInfo => new RemoteParameterInfo(paramInfo.Name, GetDependentType(paramInfo))).ToList();
+                    
                 Type retType = GetDependentType(methodInfo.ReturnTypeFullName, methodInfo.ReturnTypeAssembly);
                 dro.AddMethod(methodInfo.Name, methodInfo.GenericArgs, parameters, retType, proxy);
             }

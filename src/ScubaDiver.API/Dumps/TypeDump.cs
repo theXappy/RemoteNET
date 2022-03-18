@@ -62,7 +62,7 @@ namespace ScubaDiver.API.Dumps
                 Visibility = methodBase.IsPublic ? "Public" : "Private";
                 if (methodBase.ContainsGenericParameters)
                 {
-                    GenericArgs = methodBase.GetGenericArguments().Select(arg => arg.Name);
+                    GenericArgs = methodBase.GetGenericArguments().Select(arg => arg.Name).ToList();
                 }
                 else {
                     GenericArgs = new List<string>();
