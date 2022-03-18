@@ -244,36 +244,46 @@ namespace RemoteNET.Internal.Reflection
         {
             foreach (TypeDump.TypeMethod func in functions)
             {
-                if (func.ContainsGenericParameters)
-                {
-                    Debug.Write($"[RemoteTypesFactory] Skipping method {func.Name} of {typeDump.Type} because it contains generic parameters.");
-                    continue;
-                }
                 List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);
                 foreach (TypeDump.TypeMethod.MethodParameter methodParameter in func.Parameters)
                 {
                     // First: Search cache (which means local types & already-seen remote types)
                     Type paramType = null;
-                    try
+                    if (methodParameter.IsGenericType)
                     {
-                        paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
-                            methodParameter.Type);
-                        if (paramType == null)
+                        // In case of a generic type we have no way to "resolve" it
+                        // We are just creating a dummy type
+                        paramType = new RemoteType(app, typeDump.Type, "FakeAssemblyForGenericTypes", typeDump.IsArray, true);
+
+                    }
+                    else
+                    {
+                        // Non-generic parameter 
+                        // Cases that will not arrive here:
+                        //      void MyMethod<T>(T item)  <-- The 'item' parameter won't get here
+                        // Cases that will arrive here:
+                        //      void MyOtherMethod(System.Text.StringBuilder sb) <-- The 'sb' parameter WILL get here
+                        try
+                        {
+                            paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
+                                methodParameter.Type);
+                            if (paramType == null)
+                            {
+                                // TODO: Add stub method to indicate this error to the users?
+                                Debug.WriteLine(
+                                    $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
+                                    $"and it did not throw any exceptions (returned NULL).");
+                                continue;
+                            }
+                        }
+                        catch (Exception e)
                         {
                             // TODO: Add stub method to indicate this error to the users?
                             Debug.WriteLine(
                                 $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
-                                $"and it did not throw any exceptions (returned NULL).");
+                                $"and it threw this exception: " + e);
                             continue;
                         }
-                    }
-                    catch (Exception e)
-                    {
-                        // TODO: Add stub method to indicate this error to the users?
-                        Debug.WriteLine(
-                            $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
-                            $"and it threw this exception: " + e);
-                        continue;
                     }
 
                     RemoteParameterInfo rpi = new RemoteParameterInfo(methodParameter.Name, paramType);

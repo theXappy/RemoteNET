@@ -55,13 +55,6 @@ namespace RemoteNET.Internal
             // Adding all collected methods to the object
             foreach (TypeDump.TypeMethod methodInfo in allMethods)
             {
-                if (methodInfo.ContainsGenericParameters)
-                {
-                    // TODO: Support generic methods. For now their parameters aren't cprrectly parse
-                    // in the diver leaving us with missing types for them.
-                    continue;
-                }
-
                 // Edge case: Sometimes we can only see the properties' "get_" and "set_" methos so we need to infere there's a property.
                 if (methodInfo.Name.StartsWith("get_") || methodInfo.Name.StartsWith("set_"))
                 {
@@ -144,13 +137,13 @@ namespace RemoteNET.Internal
                     }
                 };
                 // TODO: Does this even work if any of the arguments is a remote one
-                List<Tuple<Type,string>> argTypes = (from prmtr in methodInfo.Parameters
+                List<Tuple<Type,string>> parameters = (from prmtr in methodInfo.Parameters
                                        let typeFullName = prmtr.Type
                                        let assm = prmtr.Assembly
                                        let resolvedType = GetDependentType(typeFullName, assm)
                                        select new Tuple<Type,string>(resolvedType,prmtr.Name)).ToList();
                 Type retType = GetDependentType(methodInfo.ReturnTypeFullName, methodInfo.ReturnTypeAssembly);
-                dro.AddMethod(methodInfo.Name, argTypes, retType, proxy);
+                dro.AddMethod(methodInfo.Name, methodInfo.GenericArgs, parameters, retType, proxy);
             }
         }
 
