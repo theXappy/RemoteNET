@@ -47,6 +47,7 @@ namespace RemoteNET.Internal
 
             public override bool TryInvoke(InvokeBinder binder, object[] args, out object result)
                 => TryInvoke(args, out result);
+
             public bool TryInvoke(object[] args, out object result)
             {
                 List<ProxiedMethodOverload> overloads = _methods;
@@ -82,11 +83,17 @@ namespace RemoteNET.Internal
                         result = overloads.Single().Proxy(args);
                     }
                 }
-                else
+                else if (overloads.Count > 1)
                 {
                     // Multiple overloads. This sucks because we need to... return some "Router" func...
+
                     throw new NotImplementedException($"Multiple overloads aren't supported at the moment. " +
                                                       $"Method `{_methods[0]}` had {overloads.Count} overloads registered.");
+                }
+                else // This case is for "overloads.Count == 0"
+                {
+                    throw new ArgumentException($"Incorrent number of parameters provided to function.\n" +
+                        $"After filtering all overloads with given amount of parameters ({args.Length}) we were left with 0 overloads.");
                 }
                 return true;
             }
