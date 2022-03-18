@@ -43,8 +43,6 @@ namespace RemoteNET.Internal
                 _genericArguments = genericArguments;
             }
 
-
-
             public override bool TryInvoke(InvokeBinder binder, object[] args, out object result)
                 => TryInvoke(args, out result);
 

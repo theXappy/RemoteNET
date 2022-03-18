@@ -36,8 +36,13 @@ namespace RemoteNET.Internal.Reflection
 
             // Search for locally available types
             // EXCEPT for enums because that breaks RemoteEnum
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (Assembly assembly in assemblies.Where(assm => assm.FullName.Contains(assemblyName ?? "")))
+            IEnumerable<Assembly> assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            // Filter assemblies but avoid filtering for "mscorlib" because it's the devil
+            if(assemblyName?.Equals("mscorlib") == false)
+            {
+                assemblies = assemblies.Where(assm => assm.FullName.Contains(assemblyName ?? ""));
+            }
+            foreach (Assembly assembly in assemblies)
             {
                 resolvedType = assembly.GetType(typeFullName);
                 if(resolvedType != null)
