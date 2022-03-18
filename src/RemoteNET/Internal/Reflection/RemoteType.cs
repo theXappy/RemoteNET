@@ -27,14 +27,18 @@ namespace RemoteNET.Internal.Reflection
         private readonly List<RemotePropertyInfo> _properties = new List<RemotePropertyInfo>();
         private readonly List<RemoteEventInfo> _events = new List<RemoteEventInfo>();        
         private readonly bool _isArray;
+        private readonly bool _isGenericParameter;
 
         public RemoteApp App { get; set; }
 
-        public RemoteType(RemoteApp app, string fullName, string assemblyName, bool isArray)
+        public override bool IsGenericParameter => _isGenericParameter;
+
+        public RemoteType(RemoteApp app, string fullName, string assemblyName, bool isArray, bool isGenericParameter = false)
         {
             App = app;
             this.FullName = fullName;
             this.Name = fullName.Substring(fullName.LastIndexOf('.') + 1);
+            this._isGenericParameter = isGenericParameter;
             this._isArray = isArray;
             Assembly = new RemoteAssemblyDummy(assemblyName);
         }

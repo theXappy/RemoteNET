@@ -59,7 +59,7 @@ namespace RemoteNET.Internal
                         {
                             throw new ArgumentException("A non-generic method was intialized with some generic arguments.");
                         }
-                        else if (overload.IsGenericMethod && overload.NumOfGenericParameters != _genericArguments.Length)
+                        else if (overload.IsGenericMethod && overload.GenericArgs?.Count != _genericArguments.Length)
                         {
                             throw new ArgumentException("Wrong number of generic arguments was provided to a generic method");
                         }
@@ -212,7 +212,7 @@ namespace RemoteNET.Internal
         /// </summary>
         /// <param name="methodName">Method name</param>
         /// <param name="proxy">Function to invoke when the method is called by the <see cref="DynamicRemoteObject"/></param>
-        public void AddMethod(string methodName, List<Tuple<Type, string>> parameters, Type retType, Func<Type[], object[], object> proxy)
+        public void AddMethod(string methodName, List<string> genericArgs, List<Tuple<Type, string>> parameters, Type retType, Func<Type[], object[], object> proxy)
         {
             // Disallowing other members of this name except other methods
             // overloading is allowed.
@@ -224,7 +224,13 @@ namespace RemoteNET.Internal
             {
                 _methods[methodName] = new ProxiedMethodGroup();
             }
-            _methods[methodName].Add(new ProxiedMethodOverload { ReturnType = retType, Parameters = parameters, GenericProxy = proxy });
+            _methods[methodName].Add(new ProxiedMethodOverload 
+            {
+                ReturnType = retType, 
+                GenericArgs = genericArgs,
+                Parameters = parameters,
+                GenericProxy = proxy 
+            });
         }
 
         public void AddEvent(string eventName, List<Type> argTypes)

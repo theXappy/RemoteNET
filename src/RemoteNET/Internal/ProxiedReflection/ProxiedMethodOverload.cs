@@ -15,7 +15,7 @@ namespace RemoteNET.Internal
             }
         }
         public Func<Type[], object[], object> GenericProxy { get; set; }
-        public int NumOfGenericParameters { get; set; }
-        public bool IsGenericMethod => NumOfGenericParameters > 0;
+        public List<string> GenericArgs { get; set; }
+        public bool IsGenericMethod => GenericArgs?.Count > 0;
     }
 }

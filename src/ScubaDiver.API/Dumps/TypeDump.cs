@@ -10,6 +10,7 @@ namespace ScubaDiver.API.Dumps
         {
             public class MethodParameter
             {
+                public bool IsGenericType;
                 public string Type { get; set; }
                 public string Name { get; set; }
                 public string Assembly { get; set; }
@@ -21,8 +22,11 @@ namespace ScubaDiver.API.Dumps
 
                 public MethodParameter(ParameterInfo pi)
                 {
+                    IsGenericType = pi.ParameterType.IsGenericType;
                     Name = pi.Name;
-                    Type = pi.ParameterType.FullName;
+                    // For generic type parameters we need the 'Name' property - it returns something like "T"
+                    // For non-generic we want the full name like "System.Text.StringBuilder"
+                    Type = IsGenericType ? pi.ParameterType.Name : pi.ParameterType.FullName;
                     Assembly = pi.ParameterType.Assembly.GetName().Name;
                 }
 
@@ -39,9 +43,13 @@ namespace ScubaDiver.API.Dumps
             public string Visibility { get; set; }
             public string Name { get; set; }
             public string ReturnTypeFullName { get; set; }
+            // This is not a list of the PARAMETERS which are generic -> This is the list of TYPES place holders usually found between
+            // the "LESS THEN" and "GEATER THEN" signs so for this methods:
+            // void SomeMethod<T,S>(T item, string item2, S item3)
+            // You'll get ["T", "S"]
+            public List<string> GenericArgs { get; set; }
             public List<MethodParameter> Parameters { get; set; }
             public string ReturnTypeAssembly { get; set; }
-            public bool ContainsGenericParameters { get; set; }
 
             public TypeMethod()
             {
@@ -50,7 +58,7 @@ namespace ScubaDiver.API.Dumps
             public TypeMethod(MethodBase methodBase)
             {
                 Visibility = methodBase.IsPublic ? "Public" : "Private";
-                ContainsGenericParameters = methodBase.ContainsGenericParameters;
+                GenericArgs = methodBase.GetGenericArguments().Select(fakeType => fakeType.Name).ToList();
                 Name = methodBase.Name;
                 Parameters = methodBase.GetParameters().Select(paramInfo => new MethodParameter(paramInfo)).ToList();
                 if(methodBase is MethodInfo methodInfo)
@@ -72,6 +80,10 @@ namespace ScubaDiver.API.Dumps
                     return false;
                 if(Parameters.Count != other.Parameters.Count)
                     return false;
+                var genericArgsMatches = GenericArgs.Zip(other.GenericArgs, (arg1, arg2) =>
+                {
+                    return arg1 == arg2;
+                });
                 var paramMatches = Parameters.Zip(other.Parameters, (param1, param2) =>
                 {
                     return param1.Name == param2.Name &&
