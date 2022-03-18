@@ -21,6 +21,112 @@ namespace RemoteNET.Internal
     [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "}")]
     public class DynamicRemoteObject : DynamicObject
     {
+        public class DynamicRemoteMethod : DynamicObject
+        {
+            string _name;
+            ProxiedMethodGroup _methods;
+            DynamicRemoteObject _parent;
+            Type[] _genericArguments;
+
+            public DynamicRemoteMethod(string name, DynamicRemoteObject parent, ProxiedMethodGroup methods, Type[] genericArguments = null)
+            {
+                _name = name;
+                _parent = parent;
+                _methods = methods;
+
+                // Replace 0-sized arrays with null
+                genericArguments = (genericArguments != null && genericArguments.Length == 0) ? null : genericArguments;
+
+                _genericArguments = genericArguments;
+            }
+
+
+            public override bool TryInvoke(InvokeBinder binder, object[] args, out object result)
+            {
+                List<ProxiedMethodOverload> overloads = _methods;
+
+                // Narrow down (hopefuly to one) overload with the same amount of types
+                // TODO: We COULD possibly check the args types (local ones, RemoteObjects, DynamicObjects, ...) if we still have multiple results
+                overloads = overloads.Where(overload => overload.Parameters.Count == args.Length).ToList();
+
+                if (overloads.Count == 1)
+                {
+                    // Easy case - a unique function name so we can just return it.
+                    ProxiedMethodOverload overload = overloads.Single();
+                    if (_genericArguments != null)
+                    {
+                        if (!overload.IsGenericMethod)
+                        {
+                            throw new ArgumentException("A non-generic method was intialized with some generic arguments.");
+                        }
+                        else if (overload.IsGenericMethod && overload.NumOfGenericParameters != _genericArguments.Length)
+                        {
+                            throw new ArgumentException("Wrong number of generic arguments was provided to a generic method");
+                        }
+                        // OK, invoking with generic arguments
+                        result = overloads.Single().GenericProxy(_genericArguments, args);
+                    }
+                    else
+                    {
+                        if (overload.IsGenericMethod)
+                        {
+                            throw new ArgumentException("A generic method was intialized with no generic arguments.");
+                        }
+                        // OK, invoking without generic arguments
+                        result = overloads.Single().Proxy(args);
+                    }
+                }
+                else
+                {
+                    // Multiple overloads. This sucks because we need to... return some "Router" func...
+                    throw new NotImplementedException($"Multiple overloads aren't supported at the moment. " +
+                                                      $"Method `{_methods[0]}` had {overloads.Count} overloads registered.");
+                }
+                return true;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is DynamicRemoteMethod method &&
+                       _name == method._name &&
+                       EqualityComparer<DynamicRemoteObject>.Default.Equals(_parent, method._parent) &&
+                       EqualityComparer<Type[]>.Default.Equals(_genericArguments, method._genericArguments);
+            }
+
+            public override int GetHashCode()
+            {
+                int hashCode = -734779080;
+                hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(_name);
+                hashCode = hashCode * -1521134295 + EqualityComparer<DynamicRemoteObject>.Default.GetHashCode(_parent);
+                hashCode = hashCode * -1521134295 + EqualityComparer<Type[]>.Default.GetHashCode(_genericArguments);
+                return hashCode;
+            }
+
+
+
+
+            // Functions to turn our base method into a gneric-one with specific arguments
+            // I wish I could've overriden the 'MyFunc<T>' notation but I don't think that syntax is
+            // modifiable in C#.
+            // Instead we go to the second best solution which is use indexers:
+            // MyFunct[typeof(T)]
+            // - or -
+            // Type t = typeof(T);
+            // MyFunc[t]
+            //
+            // Since some methods support multiple generic arguments I also overrode some multi-dimensional indexers below.
+            // This allows that to compile:
+            // Type t,p,q = ...;
+            // MyOtherFunc[t,p,q]
+
+            public DynamicRemoteMethod this[Type t] =>
+                    new DynamicRemoteMethod(_name, _parent, _methods, _genericArguments.Concat(new Type[]{ t }).ToArray());
+
+            public DynamicRemoteMethod this[Type t1, Type t2] => this[t1][t2];
+            public DynamicRemoteMethod this[Type t1, Type t2, Type t3] => this[t1,t2][t3];
+            public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4] => this[t1,t2,t3][t4];
+            public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4, Type t5] => this[t1,t2,t3,t4][t5];
+        }
 
         private readonly Dictionary<string, ProxiedMemberType> _members = new Dictionary<string, ProxiedMemberType>();
         private readonly Dictionary<string, ProxiedValueMemberInfo> _fields = new Dictionary<string, ProxiedValueMemberInfo>();
@@ -32,7 +138,7 @@ namespace RemoteNET.Internal
         public RemoteObject __ro;
         private readonly string __typeFullName;
 
- 
+
         public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
         {
             __ra = ra;
@@ -69,7 +175,7 @@ namespace RemoteNET.Internal
             if (getter != null)
                 proxyInfo.Getter = getter;
             if (setter != null)
-                proxyInfo.Setter = setter;  
+                proxyInfo.Setter = setter;
 
             _fields.Add(field, proxyInfo);
         }
@@ -106,7 +212,7 @@ namespace RemoteNET.Internal
         /// </summary>
         /// <param name="methodName">Method name</param>
         /// <param name="proxy">Function to invoke when the method is called by the <see cref="DynamicRemoteObject"/></param>
-        public void AddMethod(string methodName, List<Tuple<Type,string>> parameters, Type retType, Func<object[], object> proxy)
+        public void AddMethod(string methodName, List<Tuple<Type, string>> parameters, Type retType, Func<Type[], object[], object> proxy)
         {
             // Disallowing other members of this name except other methods
             // overloading is allowed.
@@ -118,7 +224,7 @@ namespace RemoteNET.Internal
             {
                 _methods[methodName] = new ProxiedMethodGroup();
             }
-            _methods[methodName].Add(new ProxiedMethodOverload { ReturnType = retType, Parameters = parameters, Proxy = proxy });
+            _methods[methodName].Add(new ProxiedMethodOverload { ReturnType = retType, Parameters = parameters, GenericProxy = proxy });
         }
 
         public void AddEvent(string eventName, List<Type> argTypes)
@@ -131,7 +237,7 @@ namespace RemoteNET.Internal
         public IReadOnlyDictionary<string, IProxiedMember> GetDynamicallyAddedMembers()
         {
             Dictionary<string, IProxiedMember> output = new Dictionary<string, IProxiedMember>();
-            foreach(KeyValuePair<string, ProxiedMemberType> memberAndType in _members)
+            foreach (KeyValuePair<string, ProxiedMemberType> memberAndType in _members)
             {
                 string memberName = memberAndType.Key;
                 switch (memberAndType.Value)
@@ -180,9 +286,9 @@ namespace RemoteNET.Internal
                     {
                         result = proxiedInfo.Getter();
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
-                        Console.WriteLine($"Field \"{binder.Name}\"'s getter threw an exception which sucks. Ex: "+ex);
+                        Console.WriteLine($"Field \"{binder.Name}\"'s getter threw an exception which sucks. Ex: " + ex);
                         throw;
                     }
                     break;
@@ -195,16 +301,27 @@ namespace RemoteNET.Internal
                     {
                         result = proxiedInfo.Getter();
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
-                        Console.WriteLine($"Property \"{binder.Name}\"'s getter threw an exception which sucks. Ex: "+ex);
+                        Console.WriteLine($"Property \"{binder.Name}\"'s getter threw an exception which sucks. Ex: " + ex);
                         throw;
                     }
                     break;
                 case ProxiedMemberType.Method:
-                    // Methods should go to "TryInvokeMember"
-                    result = null;
-                    return false;
+                    if (!_methods.TryGetValue(binder.Name, out var methodGroup))
+                    {
+                        throw new Exception($"Method \"{binder.Name}\" wasn't found in {nameof(_methods)} list.");
+                    }
+                    try
+                    {
+                        result = new DynamicRemoteMethod(binder.Name, this, methodGroup);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Constructing {nameof(DynamicRemoteMethod)} of \"{binder.Name}\" threw an exception. Ex: " + ex);
+                        throw;
+                    }
+                    break;
                 case ProxiedMemberType.Event:
                     result = _events[binder.Name];
                     break;
@@ -214,49 +331,14 @@ namespace RemoteNET.Internal
             return true;
         }
 
-        public override bool TryInvokeMember(
-            InvokeMemberBinder binder,
-            object[] args,
-            out object result)
-        {
-            string name = binder.Name;
-            return InvokeMethodMember(name, args, out result);
-        }
-
-        private bool InvokeMethodMember(string name, object[] args, out object result)
-        {
-            Logger.Debug("[DynamicRemoteObject] TryInvokeMember called ~");
-            if (!_members.TryGetValue(name, out ProxiedMemberType memberType))
-                throw new Exception($"No such member \"{name}\"");
-
-            switch (memberType)
-            {
-                case ProxiedMemberType.Method:
-                    List<ProxiedMethodOverload> overloads = _methods[name];
-
-                    // Narrow down (hopefuly to one) overload with the same amount of types
-                    // TODO: We COULD possibly check the args types (local ones, RemoteObjects, DynamicObjects, ...) if we still have multiple results
-                    overloads = overloads.Where(overload => overload.Parameters.Count == args.Length).ToList();
-
-                    if (overloads.Count == 1)
-                    {
-                        // Easy case - a unique function name so we can just return it.
-                        result = overloads.Single().Proxy(args);
-                    }
-                    else
-                    {
-                        // Multiple overloads. This sucks because we need to... return some "Router" func...
-                        throw new NotImplementedException($"Multiple overloads aren't supported at the moment. " +
-                                                          $"Method `{name}` had {overloads.Count} overloads registered.");
-                    }
-                    break;
-                case ProxiedMemberType.Field:
-                case ProxiedMemberType.Property:
-                default:
-                    throw new Exception($"No such method \"{name}\"");
-            }
-            return true;
-        }
+        //public override bool TryInvokeMember(
+        //    InvokeMemberBinder binder,
+        //    object[] args,
+        //    out object result)
+        //{
+        //    string name = binder.Name;
+        //    return InvokeMethodMember(name, args, out result);
+        //}
 
         public bool HasMember(string name) => _members.ContainsKey(name);
         public override bool TrySetMember(SetMemberBinder binder, object value)
@@ -360,7 +442,7 @@ namespace RemoteNET.Internal
 
         public override string ToString()
         {
-            return _methods[nameof(ToString)].Single(mi=>mi.Parameters.Count == 0).Proxy(new object[0]) as string;
+            return _methods[nameof(ToString)].Single(mi => mi.Parameters.Count == 0).Proxy(new object[0]) as string;
         }
 
         public override int GetHashCode()

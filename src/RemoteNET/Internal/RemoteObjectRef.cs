@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
@@ -19,7 +19,7 @@ namespace RemoteNET.Internal
         
         public RemoteObjectRef(ObjectDump remoteObjectInfo, TypeDump typeInfo, DiverCommunicator creatingCommunicator)
         {
-            if(typeInfo == null)
+            if (typeInfo == null)
             {
                 throw new ArgumentNullException(nameof(typeInfo));
             }
@@ -88,10 +88,10 @@ namespace RemoteNET.Internal
             }
         }
 
-        public InvocationResults InvokeMethod(string methodName, ObjectOrRemoteAddress[] args)
+        public InvocationResults InvokeMethod(string methodName, string[] genericArgsFullTypeNames, ObjectOrRemoteAddress[] args)
         {
             ThrowIfReleased();
-            return _creatingCommunicator.InvokeMethod(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, methodName, args);
+            return _creatingCommunicator.InvokeMethod(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, methodName, genericArgsFullTypeNames, args);
         }
 
         public InvocationResults SetField(string fieldName, ObjectOrRemoteAddress newValue)
@@ -135,7 +135,7 @@ namespace RemoteNET.Internal
 
         internal ObjectOrRemoteAddress GetItem(int key)
         {
-            return _creatingCommunicator.GetItem(this.Token ,key);
+            return _creatingCommunicator.GetItem(this.Token, key);
         }
     }
 }

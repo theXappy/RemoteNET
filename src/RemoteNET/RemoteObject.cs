@@ -44,8 +44,13 @@ namespace RemoteNET
         }
         public (bool hasResults, ObjectOrRemoteAddress returnedValue) InvokeMethod(string methodName,
             params ObjectOrRemoteAddress[] args)
+            => InvokeMethod(methodName, args);
+
+        public (bool hasResults, ObjectOrRemoteAddress returnedValue) InvokeMethod(string methodName,
+            string[] genericArgsFullTypeNames,
+            params ObjectOrRemoteAddress[] args)
         {
-            InvocationResults invokeRes = _ref.InvokeMethod(methodName, args);
+            InvocationResults invokeRes = _ref.InvokeMethod(methodName, genericArgsFullTypeNames, args);
             if (invokeRes.VoidReturnType)
             {
                 return (false, null);

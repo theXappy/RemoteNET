@@ -93,7 +93,7 @@ namespace RemoteNET.Internal
                 }
 
                 // Creating proxy method
-                Func<object[], object> proxy = (args) =>
+                Func<Type[], object[], object> proxy = (genericArgs, args) =>
                 {
                     ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[args.Length];
                     for (int i = 0; i < args.Length; i++)
@@ -120,8 +120,9 @@ namespace RemoteNET.Internal
                             remoteParams[i] = wrapped;
                         }
                     }
+                    string[] genericArgsFullTypeNames = genericArgs?.Select(t => t.FullName).ToArray() ?? new string[0];
 
-                    (bool hasResults, ObjectOrRemoteAddress returnedValue) = ro.InvokeMethod(methodInfo.Name, remoteParams);
+                    (bool hasResults, ObjectOrRemoteAddress returnedValue) = ro.InvokeMethod(methodInfo.Name, genericArgsFullTypeNames, remoteParams);
                     if (!hasResults)
                     {
                         // Nothing was returned

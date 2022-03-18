@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -170,6 +170,7 @@ namespace ScubaDiver.API
         }
 
         public InvocationResults InvokeMethod(ulong targetAddr, string targetTypeFullName, string methodName,
+            string[] genericArgsFullTypeNames,
             params ObjectOrRemoteAddress[] args)
         {
             InvocationRequest invocReq = new()
@@ -177,6 +178,7 @@ namespace ScubaDiver.API
                 ObjAddress = targetAddr,
                 TypeFullName = targetTypeFullName,
                 MethodName = methodName,
+                GenericArgsTypeFullNames = genericArgsFullTypeNames,
                 Parameters = args.ToList()
             };
             var requestJsonBody = JsonConvert.SerializeObject(invocReq);
@@ -262,7 +264,12 @@ namespace ScubaDiver.API
         }
 
         public InvocationResults InvokeStaticMethod(string targetTypeFullName, string methodName,
-            params ObjectOrRemoteAddress[] args) => InvokeMethod(0, targetTypeFullName, methodName, args);
+            params ObjectOrRemoteAddress[] args) =>
+            InvokeStaticMethod(targetTypeFullName, methodName, null, args);
+
+        public InvocationResults InvokeStaticMethod(string targetTypeFullName, string methodName,
+            string[] genericArgsFullTypeNames,
+            params ObjectOrRemoteAddress[] args) => InvokeMethod(0, targetTypeFullName, methodName, genericArgsFullTypeNames, args);
 
         public InvocationResults CreateObject(string typeFullName, ObjectOrRemoteAddress[] args)
         {
@@ -341,7 +348,7 @@ namespace ScubaDiver.API
                 throw new Exception("Tried to unsubscribe from an event but the Diver's response was not 'OK'");
             }
 
-            if(!_listener.HasActiveHooks)
+            if (!_listener.HasActiveHooks)
             {
                 _listener.Close();
             }

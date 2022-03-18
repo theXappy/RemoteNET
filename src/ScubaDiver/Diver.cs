@@ -957,8 +957,11 @@ namespace ScubaDiver
             // Note that for 'null' arguments we don't know the type so we use a "Wild Card" type
             Type[] argumentTypes = paramsList.Select(p => p?.GetType() ?? new WildCardType()).ToArray();
 
+            // Get types of generic arguments <T1,T2, ...>
+            Type[] genericArgumentTypes = request.GenericArgsTypeFullNames.Select(typeFullName => _unifiedAppDomain.ResolveType(typeFullName)).ToArray();
+
             // Search the method with the matching signature
-            var method = dumpedObjType.GetMethodRecursive(request.MethodName, argumentTypes);
+            var method = dumpedObjType.GetMethodRecursive(request.MethodName, genericArgumentTypes, argumentTypes);
             if (method == null)
             {
                 Debugger.Launch();
