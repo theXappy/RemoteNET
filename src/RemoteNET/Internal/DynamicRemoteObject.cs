@@ -317,19 +317,13 @@ namespace RemoteNET.Internal
                     }
                     break;
                 case ProxiedMemberType.Method:
-                    if (!_methods.TryGetValue(binder.Name, out var methodGroup))
-                    {
-                        throw new Exception($"Method \"{binder.Name}\" wasn't found in {nameof(_methods)} list.");
-                    }
-                    try
-                    {
-                        result = new DynamicRemoteMethod(binder.Name, this, methodGroup);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Constructing {nameof(DynamicRemoteMethod)} of \"{binder.Name}\" threw an exception. Ex: " + ex);
-                        throw;
-                    }
+                    // The cases that get here are when the user is trying to:
+                    // 1. Save a method in a variable:
+                    //      var methodGroup = dro.Insert;
+                    // 2. The user is trying to user the "RemoteNET way" of specifing generic:
+                    //      Type t = typeof(SomeType);
+                    //      dro.Insert[t]();
+                    result = GetMethodProxy(binder.Name);
                     break;
                 case ProxiedMemberType.Event:
                     result = _events[binder.Name];
@@ -340,14 +334,60 @@ namespace RemoteNET.Internal
             return true;
         }
 
-        //public override bool TryInvokeMember(
-        //    InvokeMemberBinder binder,
-        //    object[] args,
-        //    out object result)
-        //{
-        //    string name = binder.Name;
-        //    return InvokeMethodMember(name, args, out result);
-        //}
+        private DynamicRemoteMethod GetMethodProxy(string name)
+        {
+            if (!_methods.TryGetValue(name, out var methodGroup))
+            {
+                throw new Exception($"Method \"{name}\" wasn't found in {nameof(_methods)} list.");
+            }
+            try
+            {
+                return new DynamicRemoteMethod(name, this, methodGroup);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Constructing {nameof(DynamicRemoteMethod)} of \"{name}\" threw an exception. Ex: " + ex);
+                throw;
+            }
+        }
+
+        public override bool TryInvokeMember(InvokeMemberBinder binder, object[] args, out object result)
+        {
+            // If "TryInvokeMember" was called first (instead of "TryGetMember"
+            // That means witht the user specified generic args (if any are even requied) within '<' and '>' signs
+            // or there aren't any generic args. We can just do the call here instead of letting the dynamic
+            // runtime resort to calling 'TryGetMember'
+
+            DynamicRemoteMethod drm = GetMethodProxy(binder.Name);
+
+            var binderType = binder.GetType();
+            var TypeArgumentsPropInfo = binderType.GetProperty("TypeArguments");
+            if (TypeArgumentsPropInfo != null)
+            {
+                // We got ourself a binder which implemented .NET's internal "ICSharpInvokeOrInvokeMemberBinder" Interface
+                // https://github.com/microsoft/referencesource/blob/master/Microsoft.CSharp/Microsoft/CSharp/ICSharpInvokeOrInvokeMemberBinder.cs
+                // We can now see if the invoked for the function specified generic types
+                // In that case, we can hijack and do the call here
+                // Otherwise - Just let TryGetMembre return a proxy
+                IList<Type> genArgs = TypeArgumentsPropInfo.GetValue(binder) as IList<Type>;
+                foreach(Type t in genArgs)
+                {
+                    // Aggregate the generic types into the dynamic remote method
+                    // Example:
+                    //  * Invoke method is Insert<,>
+                    //  * Given types are ['T', 'S']
+                    //  * First loop iteration: Inert<,> --> Insert<T,>
+                    //  * Second loop iteration: Inert<T,> --> Insert<T,S>
+                    drm = drm[t];
+                }
+            }
+            // Converting to dynamic so invoking on the object will make sense
+            dynamic finalizedMethodProxy = drm;
+
+            result = finalizedMethodProxy();
+
+            return base.TryInvokeMember(binder, args, out result);
+        }
 
         public bool HasMember(string name) => _members.ContainsKey(name);
         public override bool TrySetMember(SetMemberBinder binder, object value)
