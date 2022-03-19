@@ -113,14 +113,12 @@ namespace RemoteNET.Internal
                 return hashCode;
             }
 
-
-
-
-            // Functions to turn our base method into a gneric-one with specific arguments
+            // Functions to turn our base method into a "generic" one - with specific arguments
+            // instead of generic placeholders.
             // I wish I could've overriden the 'MyFunc<T>' notation but I don't think that syntax is
             // modifiable in C#.
             // Instead we go to the second best solution which is use indexers:
-            // MyFunct[typeof(T)]
+            // MyFunc[typeof(T)]
             // - or -
             // Type t = typeof(T);
             // MyFunc[t]
