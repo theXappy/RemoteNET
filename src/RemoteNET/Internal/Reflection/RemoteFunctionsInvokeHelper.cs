@@ -40,7 +40,10 @@ namespace RemoteNET.Internal.Reflection
             }
         }
 
-        public static object Invoke(RemoteApp app, Type declaringType, string funcName, object obj, object[] parameters)
+        public static object Invoke(RemoteApp app, Type declaringType, string funcName, object obj, Type[] genericArgs, object[] parameters)
+            => Invoke(app, declaringType, funcName, obj, genericArgs.Select(arg => arg.FullName).ToArray(), parameters);
+
+        public static object Invoke(RemoteApp app, Type declaringType, string funcName, object obj, string[] genericArgsFullNames, object[] parameters)
         {
             // invokeAttr, binder and culture currently ignored
             // TODO: Actually validate parameters and expected parameters.
@@ -74,7 +77,7 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                InvocationResults invokeRes = app.Communicator.InvokeStaticMethod(declaringType.FullName, funcName, remoteParams);
+                InvocationResults invokeRes = app.Communicator.InvokeStaticMethod(declaringType.FullName, funcName, genericArgsFullNames, remoteParams);
                 if (invokeRes.VoidReturnType)
                 {
                     hasResults = false;
@@ -94,7 +97,7 @@ namespace RemoteNET.Internal.Reflection
                     throw new NotImplementedException(
                         $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(RemoteObject)} targets at the moment.");
                 }
-                (hasResults, oora) = ro.InvokeMethod(funcName, remoteParams);
+                (hasResults, oora) = ro.InvokeMethod(funcName, genericArgsFullNames, remoteParams);
             }
 
             if (!hasResults)
