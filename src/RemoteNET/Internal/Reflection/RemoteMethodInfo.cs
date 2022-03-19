@@ -15,16 +15,23 @@ namespace RemoteNET.Internal.Reflection
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
         public override MethodAttributes Attributes => throw new NotImplementedException();
 
+        public Type[] AssignedGenericArgs { get; }
         private readonly ParameterInfo[] _paramInfos;
 
         private RemoteApp App => (DeclaringType as RemoteType)?.App;
 
-        public RemoteMethodInfo(Type declaringType, Type returnType, string name, ParameterInfo[] paramInfos)
+        public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos)
         {
             Name = name;
             DeclaringType = declaringType;
             _paramInfos = paramInfos;
             ReturnType = returnType;
+
+            if(genericArgs == null)
+            {
+                genericArgs = new Type[0];
+            }
+            AssignedGenericArgs = genericArgs;
         }
 
         public override object[] GetCustomAttributes(bool inherit)
@@ -46,7 +53,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
-            return RemoteFunctionsInvokeHelper.Invoke(this.App, DeclaringType, Name, obj, parameters);
+            return RemoteFunctionsInvokeHelper.Invoke(this.App, DeclaringType, Name, obj, AssignedGenericArgs, parameters);
         }
 
         public override MethodInfo GetBaseDefinition()

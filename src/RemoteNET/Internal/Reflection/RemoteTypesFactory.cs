@@ -315,7 +315,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     // Regular method
                     RemoteMethodInfo methodInfo =
-                        new RemoteMethodInfo(declaringType, returnType, func.Name, parameters.ToArray());
+                        new RemoteMethodInfo(declaringType, returnType, func.Name, null, parameters.ToArray());
                     declaringType.AddMethod(methodInfo);
                 }
             }

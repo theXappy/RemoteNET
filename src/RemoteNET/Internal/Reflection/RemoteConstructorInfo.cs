@@ -45,7 +45,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override object Invoke(BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
-            return RemoteFunctionsInvokeHelper.Invoke(this.App, DeclaringType, Name, null, parameters);
+            return RemoteFunctionsInvokeHelper.Invoke(this.App, DeclaringType, Name, null, new Type[0], parameters);
         }
 
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
