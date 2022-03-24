@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using RemoteNET;
+using static RemoteNET.Utils.Lambda;
 
 namespace ScubaDiver.Tester
 {
@@ -201,12 +202,12 @@ namespace ScubaDiver.Tester
                                 string eventName = Console.ReadLine().Trim();
                                 //dynamic eventObj = DynamicRemoteObject.GetDynamicMember(dro, eventName);
                                 //eventObj += callback;
-                                dro.SomeEvent += callback;
+                                dro.SomeEvent += __((dynamic arg1, dynamic arg2) => Console.WriteLine("INVOKED!!"));
 
                                 Console.WriteLine("Done registring. wait for invocations.");
                                 Console.WriteLine("Press ENTER to unsubscribe.");
                                 Console.ReadLine();
-                                dro.SomeEvent -= callback;
+                                //dro.SomeEvent -= callback;
                             }
                         }
                         break;
