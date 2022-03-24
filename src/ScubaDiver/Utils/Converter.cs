@@ -5,8 +5,9 @@ using ScubaDiver.API.Extensions;
 namespace ScubaDiver.Utils
 {
     /// <summary>
-    /// This mind bending class is taken from https://github.com/denandz/KeeFarce
-    /// denandz credited Alois Kraus for this part then I'm doing the same.
+    /// The dynamic method trick is originally by Alois Kraus here: 
+    /// https://social.microsoft.com/Forums/windows/en-US/06ac44b0-30d8-44a1-86a4-1716dc431c62/how-to-convert-an-intptr-to-an-object-in-c?forum=clr
+    /// Method Table comparison was added in RemoteNET
     /// </summary>
     public class Converter<T>
     {
