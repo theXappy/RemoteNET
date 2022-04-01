@@ -2,6 +2,12 @@
 
 namespace ScubaDiver.API.Dumps
 {
+    public class TypeDumpRequest
+    {
+        public string Assembly { get; set; }
+        public string TypeFullName { get; set; }
+
+    }
 
     public class InvocationRequest
     {

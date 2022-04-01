@@ -128,23 +128,18 @@ namespace ScubaDiver.API
 
         public TypeDump DumpType(string type, string assembly = null)
         {
-            Dictionary<string, string> queryParams = new()
+            TypeDumpRequest dumpRequest = new TypeDumpRequest()
             {
-                { "name", HttpUtility.UrlEncode(type) }
+                TypeFullName = type
             };
             if (assembly != null)
             {
-                queryParams["assembly"] = assembly;
+                dumpRequest.Assembly = assembly;
             }
+            var requestJsonBody = JsonConvert.SerializeObject(dumpRequest);
 
-            string body = SendRequest("type", queryParams);
-            if (body.StartsWith("{\"error\":"))
-            {
-                throw new Exception("Diver had some issues dumping this type for us. Reported error: " + body);
-            }
-            TypeDump typeDump;
-            typeDump = JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
-            return typeDump;
+            string body = SendRequest("type", null, requestJsonBody);
+            return JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
         }
 
         public ObjectDump DumpObject(ulong address, bool pinObject = false, int? hashcode = null)

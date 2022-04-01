@@ -1642,16 +1642,38 @@ namespace ScubaDiver
 
             return JsonConvert.SerializeObject(dd);
         }
-        private string MakeTypeResponse(HttpListenerRequest req) => MakeTypeResponse(req.QueryString);
-        public string MakeTypeResponse(NameValueCollection queryString)
+        private string MakeTypeResponse(HttpListenerRequest req)
         {
-            string type = queryString.Get("name");
-            if (string.IsNullOrEmpty(type))
+            string body = null;
+            using (StreamReader sr = new(req.InputStream))
             {
-                return QuickError("Missing parameter 'name'");
+                body = sr.ReadToEnd();
+            }
+            if (string.IsNullOrEmpty(body))
+            {
+                return QuickError("Missing body");
             }
 
-            string assembly = queryString.Get("assembly");
+            TextReader textReader = new StringReader(body);
+            JsonReader jr = new JsonTextReader(textReader);
+            JsonSerializer js = new();
+            var request = js.Deserialize<TypeDumpRequest>(jr);
+            if (request == null)
+            {
+                return QuickError("Failed to deserialize body");
+            }
+
+            return MakeTypeResponse(request);
+        }
+        public string MakeTypeResponse(TypeDumpRequest dumpRequest)
+        {
+            string type = dumpRequest.TypeFullName;
+            if (string.IsNullOrEmpty(type))
+            {
+                return QuickError("Missing parameter 'TypeFullName'");
+            }
+
+            string assembly = dumpRequest.Assembly;
             //Logger.Debug($"[Diver] Trying to dump Type: {type}");
             if (assembly != null)
             {
