@@ -27,6 +27,10 @@ namespace RemoteNET.Internal.Reflection
             Name = name;
         }
 
+        public RemoteEventInfo(RemoteType declaringType, EventInfo ei) : this(declaringType,ei.EventHandlerType, ei.Name)
+        {
+        }
+
         public override MethodInfo GetAddMethod(bool nonPublic) => AddMethod;
         public override MethodInfo GetRemoveMethod(bool nonPublic) => RemoveMethod;
 

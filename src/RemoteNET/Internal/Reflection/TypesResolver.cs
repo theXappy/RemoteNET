@@ -57,7 +57,7 @@ namespace RemoteNET.Internal.Reflection
                 }
             }
 
-            if (resolvedType != null)
+            if (resolvedType != null && resolvedType is RemoteType)
             {
                 RegisterType(assemblyName, typeFullName, resolvedType);
             }

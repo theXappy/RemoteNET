@@ -6,6 +6,9 @@ namespace RemoteNET.Internal.Reflection
 {
     public class RemotePropertyInfo : PropertyInfo
     {
+        private RemoteType remoteType;
+        private PropertyInfo pi;
+
         private RemoteApp App => (DeclaringType as RemoteType)?.App;
         public override PropertyAttributes Attributes => throw new NotImplementedException();
 
@@ -28,6 +31,10 @@ namespace RemoteNET.Internal.Reflection
             PropertyType = propType;
             DeclaringType = declaringType;
             Name = name;
+        }
+
+        public RemotePropertyInfo(RemoteType declaringType, PropertyInfo pi) : this(declaringType, pi.PropertyType, pi.Name)
+        {
         }
 
         public override MethodInfo[] GetAccessors(bool nonPublic)

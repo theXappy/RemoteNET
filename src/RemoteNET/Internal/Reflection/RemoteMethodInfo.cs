@@ -20,6 +20,14 @@ namespace RemoteNET.Internal.Reflection
 
         private RemoteApp App => (DeclaringType as RemoteType)?.App;
 
+        public RemoteMethodInfo(RemoteType declaringType, MethodInfo mi) :
+            this(declaringType,
+                mi.ReturnType,
+                mi.Name,
+                mi.GetGenericArguments(),
+                mi.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
+        {
+        }
         public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos)
         {
             Name = name;

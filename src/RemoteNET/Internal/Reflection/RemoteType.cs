@@ -33,6 +33,29 @@ namespace RemoteNET.Internal.Reflection
 
         public override bool IsGenericParameter => _isGenericParameter;
 
+        public RemoteType(RemoteApp app, Type localType) : this(app, localType.FullName, localType.Assembly.GetName().Name, localType.IsArray, localType.IsGenericParameter)
+        {
+            if(localType is RemoteType)
+            {
+                throw new ArgumentException("This constructor of RemoteType is designed to copy a LOCAL Type object. A RemoteType object was provided instead.");
+            }
+
+            // TODO: This ctor is experimentatl because it makes a LOT of assumptions.
+            // Most notably the RemoteXXXInfo objects freely use mi's,ci's,pi's (etc) "ReturnType","FieldType","PropertyType"
+            // not checking if they are actually RemoteTypes themselves...
+
+            foreach (MethodInfo mi in localType.GetMethods())
+                AddMethod(new RemoteMethodInfo(this, mi));
+            foreach (ConstructorInfo ci in localType.GetConstructors())
+                AddConstructor(new RemoteConstructorInfo(this, ci));
+            foreach (PropertyInfo pi in localType.GetProperties())
+                AddProperty(new RemotePropertyInfo(this, pi));
+            foreach (FieldInfo fi in localType.GetFields())
+                AddField(new RemoteFieldInfo(this, fi));
+            foreach (EventInfo ei in localType.GetEvents())
+                AddEvent(new RemoteEventInfo(this, ei));
+        }
+
         public RemoteType(RemoteApp app, string fullName, string assemblyName, bool isArray, bool isGenericParameter = false)
         {
             App = app;

@@ -69,6 +69,22 @@ namespace RemoteNET.Internal.Reflection
             }
 
             Type paramType = _resolver.Resolve(assembly, type);
+            if (paramType != null)
+            {
+                // Either found in cache or found locally.
+                
+                // If it's a local type we need to wrap it in a "fake" RemoteType (So method invocations will actually 
+                // happend in the remote app, for example)
+                // (But not for primitives...)
+                if (!(paramType is RemoteType) && !paramType.IsPrimitive)
+                {
+                    paramType = new RemoteType(app, paramType);
+                    // TODO: Registring here in the cache is a hack but we couldn't register within "TypesResolver.Resolve"
+                    // because we don't have the RemoteApp to associate the fake remote type with.
+                    // Maybe this should move somewhere else...
+                    _resolver.RegisterType(paramType);
+                }
+            }
 
             if (paramType == null)
             {
