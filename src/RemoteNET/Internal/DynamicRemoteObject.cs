@@ -58,7 +58,7 @@ namespace RemoteNET.Internal
                 {
                     // Easy case - a unique function name so we can just return it.
                     ProxiedMethodOverload overload = overloads.Single();
-                    if (_genericArguments != null)
+                    if (_genericArguments != null && _genericArguments.Any())
                     {
                         if (!overload.IsGenericMethod)
                         {
