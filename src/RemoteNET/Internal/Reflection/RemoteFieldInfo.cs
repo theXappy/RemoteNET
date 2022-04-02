@@ -8,6 +8,9 @@ namespace RemoteNET.Internal.Reflection
 {
     public class RemoteFieldInfo : FieldInfo
     {
+        private RemoteType remoteType;
+        private FieldInfo fi;
+
         private RemoteApp App => (DeclaringType as RemoteType)?.App;
         public override object[] GetCustomAttributes(bool inherit)
         {
@@ -33,6 +36,10 @@ namespace RemoteNET.Internal.Reflection
             FieldType = fieldType;
             DeclaringType = declaringType;
             Name = name;
+        }
+
+        public RemoteFieldInfo(RemoteType declaringType, FieldInfo fi) : this(declaringType, fi.FieldType, fi.Name)
+        {
         }
 
         public override Type ReflectedType { get; }

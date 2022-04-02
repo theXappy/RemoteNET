@@ -26,6 +26,12 @@ namespace RemoteNET.Internal.Reflection
             _paramInfos = paramInfos;
         }
 
+        public RemoteConstructorInfo(RemoteType declaringType, ConstructorInfo ci) : 
+            this(declaringType,
+                 ci.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
+        {
+        }
+
         public override object[] GetCustomAttributes(bool inherit)
         {
             throw new NotImplementedException();
@@ -51,7 +57,7 @@ namespace RemoteNET.Internal.Reflection
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
             // Empiricly it seems that invoking a ctor on an existing object should return null.
-            if(obj == null)
+            if (obj == null)
             {
                 // Last chace - If this overload was used but no real object given lets redirect to normal Invoke (this also happens with norma 'ConstructorInfo's)
                 return Invoke(invokeAttr, binder, parameters, culture);
