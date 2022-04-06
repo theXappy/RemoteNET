@@ -1,10 +1,10 @@
 ﻿using RemoteNET.Internal.ProxiedReflection;
+using RemoteNET.Internal.Reflection;
 using System.Collections.Generic;
 
 namespace RemoteNET.Internal
 {
-    public class ProxiedMethodGroup : List<ProxiedMethodOverload>, IProxiedMember
+    public class ProxiedMethodGroup : List<RemoteMethodInfo>
     {
-        public ProxiedMemberType Type => ProxiedMemberType.Method;
     }
 }
