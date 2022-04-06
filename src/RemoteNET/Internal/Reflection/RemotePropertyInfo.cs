@@ -23,8 +23,11 @@ namespace RemoteNET.Internal.Reflection
 
         public override Type ReflectedType => throw new NotImplementedException();
 
-        public RemoteMethodInfo GetMethod { get; set; }
-        public RemoteMethodInfo SetMethod { get; set; }
+        public RemoteMethodInfo RemoteGetMethod { get; set; }
+        public RemoteMethodInfo RemoteSetMethod { get; set; }
+
+        public override MethodInfo GetMethod => RemoteGetMethod;
+        public override MethodInfo SetMethod => RemoteSetMethod;
 
         public RemotePropertyInfo(Type declaringType, Type propType, string name)
         {
