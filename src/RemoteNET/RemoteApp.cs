@@ -356,6 +356,19 @@ namespace RemoteNET
             Type res = resolver.Resolve(assembly, typeFullName);
             if(res != null)
             {
+                // Either found in cache or found locally.
+
+                // If it's a local type we need to wrap it in a "fake" RemoteType (So method invocations will actually 
+                // happend in the remote app, for example)
+                // (But not for primitives...)
+                if (!(res is RemoteType) && !res.IsPrimitive)
+                {
+                    res = new RemoteType(this, res);
+                    // TODO: Registring here in the cache is a hack but we couldn't register within "TypesResolver.Resolve"
+                    // because we don't have the RemoteApp to associate the fake remote type with.
+                    // Maybe this should move somewhere else...
+                    resolver.RegisterType(res);
+                }
                 return res;
             }
 
