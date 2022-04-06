@@ -31,6 +31,10 @@ namespace RemoteNET.Internal.Reflection
                 RemoteObject originRemoteObject = dro.__ro;
                 return ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetType().FullName);
             }
+            else if (parameter is Type t)
+            {
+                return ObjectOrRemoteAddress.FromType(t);
+            }
             else
             {
                 throw new Exception(
