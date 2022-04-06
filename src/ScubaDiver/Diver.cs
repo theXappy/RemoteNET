@@ -831,6 +831,8 @@ namespace ScubaDiver
             {
                 case { IsNull: true }:
                     return null;
+                case { IsType: true }:
+                    return _unifiedAppDomain.ResolveType(param.Type, param.Assembly);
                 case { IsRemoteAddress: false }:
                     return PrimitivesEncoder.Decode(param.EncodedObject, param.Type);
                 case { IsRemoteAddress: true }:
