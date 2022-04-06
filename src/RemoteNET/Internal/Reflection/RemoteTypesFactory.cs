@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -177,9 +177,9 @@ namespace RemoteNET.Internal.Reflection
             {
                 RemotePropertyInfo rpi = pi as RemotePropertyInfo;
                 MethodInfo getter = methods.FirstOrDefault(mi => mi.Name == "get_" + pi.Name);
-                rpi.GetMethod = getter as RemoteMethodInfo;
+                rpi.RemoteGetMethod = getter as RemoteMethodInfo;
                 MethodInfo setter = methods.FirstOrDefault(mi => mi.Name == "set_" + pi.Name);
-                rpi.SetMethod = setter as RemoteMethodInfo;
+                rpi.RemoteSetMethod = setter as RemoteMethodInfo;
             }
         }
 

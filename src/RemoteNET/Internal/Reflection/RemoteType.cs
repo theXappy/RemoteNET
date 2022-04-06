@@ -49,7 +49,12 @@ namespace RemoteNET.Internal.Reflection
             foreach (ConstructorInfo ci in localType.GetConstructors())
                 AddConstructor(new RemoteConstructorInfo(this, ci));
             foreach (PropertyInfo pi in localType.GetProperties())
-                AddProperty(new RemotePropertyInfo(this, pi));
+            {
+                RemotePropertyInfo remotePropInfo = new RemotePropertyInfo(this, pi);
+                remotePropInfo.RemoteGetMethod = _methods.FirstOrDefault(m => m.Name == "get_" + pi.Name);
+                remotePropInfo.RemoteSetMethod = _methods.FirstOrDefault(m => m.Name == "set_" + pi.Name);
+                AddProperty(remotePropInfo);
+            }
             foreach (FieldInfo fi in localType.GetFields())
                 AddField(new RemoteFieldInfo(this, fi));
             foreach (EventInfo ei in localType.GetEvents())
