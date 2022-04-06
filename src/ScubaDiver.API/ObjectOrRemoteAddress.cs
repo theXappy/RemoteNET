@@ -1,4 +1,5 @@
 ﻿using ScubaDiver.API.Utils;
+using System;
 
 namespace ScubaDiver.API
 {
@@ -8,7 +9,9 @@ namespace ScubaDiver.API
         /// Whether <see cref="RemoteAddress"/> or <see cref="EncodedObject"/> are set.
         /// </summary>
         public bool IsRemoteAddress { get; set; }
+        public bool IsType { get; set; }
         public string Type { get; set; }
+        public string Assembly { get; set; }
         public ulong RemoteAddress { get; set; }
         public string EncodedObject { get; set; }
         public bool IsNull => IsRemoteAddress && RemoteAddress == 0;
@@ -20,5 +23,8 @@ namespace ScubaDiver.API
             new() { IsRemoteAddress = true, RemoteAddress = addr, Type = type };
         public static ObjectOrRemoteAddress Null =>
             new() { IsRemoteAddress = true, RemoteAddress = 0, Type = typeof(object).FullName };
+
+        public static ObjectOrRemoteAddress FromType(Type type) =>
+            new() { Type = type.FullName, Assembly = type.Assembly.GetName().Name, IsType = true };
     }
 }
