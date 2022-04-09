@@ -16,7 +16,7 @@ namespace RemoteNET.Internal.Reflection
 
         private bool _avoidGenericsRecursion;
 
-        public RemoteTypesFactory(TypesResolver resolver, bool avoidGenericsRecursion)
+        public RemoteTypesFactory(TypesResolver resolver, DiverCommunicator communicator, bool avoidGenericsRecursion)
         {
             _resolver = resolver;
 
@@ -38,14 +38,7 @@ namespace RemoteNET.Internal.Reflection
             //          ...
             // I did not investigate this deeply but it seems very 
             _avoidGenericsRecursion = avoidGenericsRecursion;
-        }
-
-        /// <summary>
-        /// Allows the factory to further dump remote types if needed when creating other remote types.
-        /// </summary>
-        public void AllowOwnDumping(DiverCommunicator com)
-        {
-            _communicator = com;
+            _communicator = communicator;
         }
 
         /// <summary>
@@ -59,19 +52,20 @@ namespace RemoteNET.Internal.Reflection
 
         public Type ResolveTypeWhileCreating(RemoteApp app, string typeInProgress, string methodName, string assembly, string type)
         {
-            if(type.Length > 200)
+            if (type.Length > 200)
             {
                 // Only checking very long type names to reduce Regex executions
-                if (type.Contains("[][][][][][]")) {
+                if (type.Contains("[][][][][][]"))
+                {
                     throw new Exception("Nestered self arrays types was detected and avoided.");
                 }
             }
-            if(type.Length > 500)
+            if (type.Length > 500)
             {
                 // Too long for any reasonable type
                 throw new Exception("Incredibly long type names aren't supported.");
             }
-            if(type.Contains("JetBrains.DataFlow.PropertyChangedEventArgs") && type.Length > 100) 
+            if (type.Contains("JetBrains.DataFlow.PropertyChangedEventArgs") && type.Length > 100)
             {
                 // Too long for any reasonable type
                 throw new Exception("Incredibly long type names aren't supported.");
@@ -82,7 +76,7 @@ namespace RemoteNET.Internal.Reflection
             if (paramType != null)
             {
                 // Either found in cache or found locally.
-                
+
                 // If it's a local type we need to wrap it in a "fake" RemoteType (So method invocations will actually 
                 // happend in the remote app, for example)
                 // (But not for primitives...)
@@ -102,41 +96,47 @@ namespace RemoteNET.Internal.Reflection
                 if (!_onGoingCreations.TryGetValue(
                     new Tuple<string, string>(assembly, type), out paramType) || paramType == null)
                 {
-                    // Third: Try to dump type (if we're allowed)
-                    if (_communicator == null)
+                    TypeDump dumpedArgType =
+                        _communicator.DumpType(type, assembly);
+                    if (dumpedArgType == null)
                     {
-                        throw new NotImplementedException(
-                            $"Can not create {nameof(RemoteType)} for type {typeInProgress} because its " +
-                            $"method {methodName} contains a parameter of type {type} which couldn't be resolved.\n" +
-                            $"This could be resolved by allowing {nameof(RemoteTypesFactory)} to dump types. See the {nameof(AllowOwnDumping)} method.");
+                        throw new Exception(
+                            $"{nameof(RemoteTypesFactory)} tried to dump type {type} when handling method {methodName} of type" +
+                            $"{typeInProgress} but the {nameof(DiverCommunicator)}.{nameof(DiverCommunicator.DumpType)} function failed.");
                     }
-                    else
-                    {
-                        TypeDump dumpedArgType =
-                            _communicator.DumpType(type, assembly);
-                        if (dumpedArgType == null)
-                        {
-                            throw new Exception(
-                                $"{nameof(RemoteTypesFactory)} tried to dump type {type} when handling method {methodName} of type" +
-                                $"{typeInProgress} but the {nameof(DiverCommunicator)}.{nameof(DiverCommunicator.DumpType)} function failed.");
-                        }
 
-                        Type newCreatedType = this.Create(app, dumpedArgType);
-                        if (newCreatedType == null)
-                        {
-                            // remove on-going creation indication
-                            throw new Exception(
-                                $"{nameof(RemoteTypesFactory)} tried to dump type {type} when handling method {methodName} of type" +
-                                $"{typeInProgress} but the inner {nameof(RemoteTypesFactory)}.{nameof(RemoteTypesFactory.Create)} function failed.");
-                        }
-                        paramType = newCreatedType;
+                    Type newCreatedType = this.Create(app, dumpedArgType);
+                    if (newCreatedType == null)
+                    {
+                        // remove on-going creation indication
+                        throw new Exception(
+                            $"{nameof(RemoteTypesFactory)} tried to dump type {type} when handling method {methodName} of type" +
+                            $"{typeInProgress} but the inner {nameof(RemoteTypesFactory)}.{nameof(RemoteTypesFactory.Create)} function failed.");
                     }
+                    paramType = newCreatedType;
                 }
             }
             return paramType;
         }
 
 
+        private Type Create(RemoteApp app, string fullTypeName, string assembly)
+        {
+            Type shortOutput = _resolver.Resolve(assembly, fullTypeName);
+            if (shortOutput != null)
+            {
+                return shortOutput;
+            }
+
+            TypeDump parentDump = _communicator.DumpType(fullTypeName, assembly);
+            if (parentDump == null)
+            {
+                throw new Exception(
+                    $"{nameof(RemoteTypesFactory)} tried to dump type {fullTypeName} " +
+                    $"but the {nameof(DiverCommunicator)}.{nameof(DiverCommunicator.DumpType)} function failed.");
+            }
+            return Create(app, parentDump);
+        }
 
         public Type Create(RemoteApp app, TypeDump typeDump)
         {
@@ -151,22 +151,23 @@ namespace RemoteNET.Internal.Reflection
             // Temporarily indicate we are on-going creation
             _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.Type)] = output;
 
-            TypeDump parentdump = typeDump.ParentDump;
-            if (parentdump != null) {
+            string parentType = typeDump.ParentFullTypeName;
+            if (parentType != null)
+            {
                 Lazy<Type> parent = new Lazy<Type>(() =>
                 {
                     try
                     {
-                        Type t = Create(app, parentdump);
-                        return t;
+                        return Create(app, parentType, typeDump.ParentAssembly);
+                        
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine("Failed to dump parent from: " + parentdump);
+                        Debug.WriteLine("Failed to dump parent type: " + parentType);
                         Debug.WriteLine(ex.ToString());
                         return null;
                     }
-                    });
+                });
                 output.SetParent(parent);
             }
             AddMembers(app, typeDump, output);
@@ -317,8 +318,8 @@ namespace RemoteNET.Internal.Reflection
                             //      void MyOtherMethod(System.Text.StringBuilder sb) <-- The 'sb' parameter WILL get here
                             try
                             {
-                                 Type paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
-                                    methodParameter.Type);
+                                Type paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
+                                   methodParameter.Type);
                                 if (paramType == null)
                                 {
                                     // TODO: Add stub method to indicate this error to the users?
