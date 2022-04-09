@@ -1696,13 +1696,13 @@ namespace ScubaDiver
 
                 var ctors = typeObj.GetConstructors((BindingFlags)0xffff).Select(ci => new TypeDump.TypeMethod(ci))
                     .ToList();
-                var methods = typeObj.GetMethods((BindingFlags)0xffff).Select(mi => new TypeDump.TypeMethod(mi))
+                var methods = typeObj.GetRuntimeMethods().Select(mi => new TypeDump.TypeMethod(mi))
                     .ToList();
-                var fields = typeObj.GetFields((BindingFlags)0xffff).Select(fi => new TypeDump.TypeField(fi))
+                var fields = typeObj.GetRuntimeFields().Select(fi => new TypeDump.TypeField(fi))
                     .ToList();
-                var events = typeObj.GetEvents((BindingFlags)0xffff).Select(ei => new TypeDump.TypeEvent(ei))
+                var events = typeObj.GetRuntimeEvents().Select(ei => new TypeDump.TypeEvent(ei))
                     .ToList();
-                var props = typeObj.GetProperties((BindingFlags)0xffff).Select(pi => new TypeDump.TypeProperty(pi))
+                var props = typeObj.GetRuntimeProperties().Select(pi => new TypeDump.TypeProperty(pi))
                     .ToList();
 
                 TypeDump td = new()
