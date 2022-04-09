@@ -25,7 +25,7 @@ namespace RemoteNET.Internal.Reflection
         private readonly List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
         private readonly List<RemoteFieldInfo> _fields = new List<RemoteFieldInfo>();
         private readonly List<RemotePropertyInfo> _properties = new List<RemotePropertyInfo>();
-        private readonly List<RemoteEventInfo> _events = new List<RemoteEventInfo>();        
+        private readonly List<RemoteEventInfo> _events = new List<RemoteEventInfo>();
         private readonly bool _isArray;
         private readonly bool _isGenericParameter;
 
@@ -40,7 +40,7 @@ namespace RemoteNET.Internal.Reflection
 
         public RemoteType(RemoteApp app, Type localType) : this(app, localType.FullName, localType.Assembly.GetName().Name, localType.IsArray, localType.IsGenericParameter)
         {
-            if(localType is RemoteType)
+            if (localType is RemoteType)
             {
                 throw new ArgumentException("This constructor of RemoteType is designed to copy a LOCAL Type object. A RemoteType object was provided instead.");
             }
@@ -172,7 +172,7 @@ namespace RemoteNET.Internal.Reflection
         {
             var methodGroup = _methods.Where(method =>
                 method.Name == name);
-            if(types == null)
+            if (types == null)
             {
                 // Parameters unknown from caller. Hope we have only one method to return.
                 return methodGroup.Single();
@@ -185,7 +185,7 @@ namespace RemoteNET.Internal.Reflection
                 // comparing with local parameters (like System.String)
                 bool matchingExpectingTypes = parameters
                     .Select(arg => arg.ParameterType.FullName)
-                    .SequenceEqual(types.Select(type=>type.FullName));
+                    .SequenceEqual(types.Select(type => type.FullName));
                 return matchingExpectingTypes;
             }
 
@@ -193,6 +193,7 @@ namespace RemoteNET.Internal.Reflection
             return methodGroup.Single(overloadsComparer);
         }
 
+        
         public override MethodInfo[] GetMethods(BindingFlags bindingAttr)
         {
             return _methods.Cast<MethodInfo>().ToArray();
@@ -210,19 +211,19 @@ namespace RemoteNET.Internal.Reflection
 
         private IEnumerable<MemberInfo> GetMembersInner(BindingFlags bf)
         {
-            foreach(var field in GetFields(bf))
+            foreach (var field in GetFields(bf))
             {
                 yield return field;
             }
-            foreach(var prop in GetProperties(bf))
+            foreach (var prop in GetProperties(bf))
             {
                 yield return prop;
             }
-            foreach(var eventt in GetEvents(bf))
+            foreach (var eventt in GetEvents(bf))
             {
                 yield return eventt;
             }
-            foreach(var method in GetMethods(bf))
+            foreach (var method in GetMethods(bf))
             {
                 yield return method;
             }
