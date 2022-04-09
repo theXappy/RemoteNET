@@ -1716,10 +1716,11 @@ namespace ScubaDiver
                     Properties = props,
                     IsArray = typeObj.IsArray,
                 };
-                if (typeObj != typeof(object))
+                if (typeObj.BaseType != null) 
                 {
-                    // Has parent. Parse it as well
-                    td.ParentDump = ParseType(typeObj.BaseType);
+                    // Has parent. Add its identifier
+                    td.ParentFullTypeName = typeObj.BaseType.FullName;
+                    td.ParentAssembly = typeObj.BaseType.Assembly.GetName().Name;
                 }
 
                 return td;
