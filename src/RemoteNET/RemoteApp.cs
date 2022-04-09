@@ -374,8 +374,7 @@ namespace RemoteNET
 
             // Harder case: Dump the remote type. This takes much more time (includes dumping of depedent
             // types) and should be avoided as much as possible.
-            RemoteTypesFactory rtf = new RemoteTypesFactory(resolver, true);
-            rtf.AllowOwnDumping(_communicator);
+            RemoteTypesFactory rtf = new RemoteTypesFactory(resolver, _communicator, avoidGenericsRecursion: true);
             var dumpedType = _communicator.DumpType(typeFullName, assembly);
             return rtf.Create(this, dumpedType);
         }
