@@ -9,6 +9,8 @@ namespace RemoteNET.Internal.Reflection
 {
     public class RemoteEventInfo : EventInfo
     {
+        private Lazy<Type> _eventHandlerType;
+
         public override EventAttributes Attributes => throw new NotImplementedException();
 
         public override Type DeclaringType { get; }
@@ -19,15 +21,20 @@ namespace RemoteNET.Internal.Reflection
 
         public RemoteMethodInfo AddMethod { get; set; }
         public RemoteMethodInfo RemoveMethod { get; set; }
-        public override Type EventHandlerType { get; }
-        public RemoteEventInfo(RemoteType declaringType, Type eventHandlerType, string name)
+        public override Type EventHandlerType => _eventHandlerType.Value;
+        public RemoteEventInfo(RemoteType declaringType, Lazy<Type> eventHandlerType, string name)
         {
             DeclaringType = declaringType;
-            this.EventHandlerType = eventHandlerType;
+            _eventHandlerType = eventHandlerType;
             Name = name;
         }
 
-        public RemoteEventInfo(RemoteType declaringType, EventInfo ei) : this(declaringType,ei.EventHandlerType, ei.Name)
+        public RemoteEventInfo(RemoteType declaringType, Type eventHandlerType, string name) :
+            this(declaringType, new Lazy<Type>(() => eventHandlerType), name)
+        {
+        }
+
+        public RemoteEventInfo(RemoteType declaringType, EventInfo ei) : this(declaringType, new Lazy<Type>(() => ei.EventHandlerType), ei.Name)
         {
         }
 

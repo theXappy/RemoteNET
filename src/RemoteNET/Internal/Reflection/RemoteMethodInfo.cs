@@ -5,12 +5,15 @@ using System.Reflection;
 
 namespace RemoteNET.Internal.Reflection
 {
+    [System.Diagnostics.DebuggerDisplay("??? {Name}( ... )")]
     public class RemoteMethodInfo : MethodInfo
     {
+        private Lazy<Type> _retType;
+
         public override ICustomAttributeProvider ReturnTypeCustomAttributes => throw new NotImplementedException();
         public override string Name { get; }
         public override Type DeclaringType { get; }
-        public override Type ReturnType { get; }
+        public override Type ReturnType => _retType.Value;
         public override Type ReflectedType => throw new NotImplementedException();
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
         public override MethodAttributes Attributes => throw new NotImplementedException();
@@ -22,24 +25,28 @@ namespace RemoteNET.Internal.Reflection
 
         public RemoteMethodInfo(RemoteType declaringType, MethodInfo mi) :
             this(declaringType,
-                mi.ReturnType,
+                new Lazy<Type>(()=>mi.ReturnType),
                 mi.Name,
                 mi.GetGenericArguments(),
                 mi.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
         {
         }
-        public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos)
+        public RemoteMethodInfo(Type declaringType, Lazy<Type> returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos)
         {
             Name = name;
             DeclaringType = declaringType;
             _paramInfos = paramInfos;
-            ReturnType = returnType;
+            _retType = returnType;
 
             if(genericArgs == null)
             {
                 genericArgs = new Type[0];
             }
             AssignedGenericArgs = genericArgs;
+        }
+        public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos) :
+            this(declaringType, new Lazy<Type>(() => returnType), name, genericArgs, paramInfos)
+        { 
         }
 
         public override object[] GetCustomAttributes(bool inherit)
@@ -76,8 +83,15 @@ namespace RemoteNET.Internal.Reflection
 
         public override string ToString()
         {
-            string args = string.Join(", ", _paramInfos.Select(pi => pi.ParameterType.FullName));
-            return $"{this.ReturnType.FullName} {this.Name}({args})";
+            try
+            {
+                string args = string.Join(", ", _paramInfos.Select(pi => pi.ParameterType.FullName));
+                return $"{this.ReturnType.FullName} {this.Name}({args})";
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
         }
     }
 }

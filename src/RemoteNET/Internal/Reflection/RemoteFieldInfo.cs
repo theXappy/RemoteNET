@@ -27,18 +27,23 @@ namespace RemoteNET.Internal.Reflection
             throw new NotImplementedException();
         }
 
-        public override Type FieldType { get; }
+        private Lazy<Type> _fieldType;
+        public override Type FieldType => _fieldType.Value;
         public override Type DeclaringType { get; }
         public override string Name { get; }
 
-        public RemoteFieldInfo(Type declaringType, Type fieldType, string name)
+        public RemoteFieldInfo(Type declaringType, Lazy<Type> fieldType, string name)
         {
-            FieldType = fieldType;
+            _fieldType = fieldType;
             DeclaringType = declaringType;
             Name = name;
         }
 
-        public RemoteFieldInfo(RemoteType declaringType, FieldInfo fi) : this(declaringType, fi.FieldType, fi.Name)
+        public RemoteFieldInfo(Type declaringType, Type fieldType, string name) : this(declaringType, new Lazy<Type>(() => fieldType), name)
+        {
+        }
+
+        public RemoteFieldInfo(RemoteType declaringType, FieldInfo fi) : this(declaringType, new Lazy<Type>(()=> fi.FieldType), fi.Name)
         {
         }
 
