@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -64,11 +64,19 @@ namespace RemoteNET.Internal.Reflection
         public RemoteType(RemoteApp app, string fullName, string assemblyName, bool isArray, bool isGenericParameter = false)
         {
             App = app;
-            this.FullName = fullName;
-            this.Name = fullName.Substring(fullName.LastIndexOf('.') + 1);
-            this._isGenericParameter = isGenericParameter;
-            this._isArray = isArray;
+            FullName = fullName;
+            _isGenericParameter = isGenericParameter;
+            _isArray = isArray;
             Assembly = new RemoteAssemblyDummy(assemblyName);
+
+            // Derieving name from full name
+            Name = fullName.Substring(fullName.LastIndexOf('.') + 1);
+            if (fullName.Contains("`"))
+            {
+                // Generic. Need to cut differently
+                string outterTypeFullName = fullName.Substring(0, fullName.IndexOf('`'));
+                Name = outterTypeFullName.Substring(outterTypeFullName.LastIndexOf('.') + 1);
+            }
         }
 
         public void AddConstructor(RemoteConstructorInfo rci)
