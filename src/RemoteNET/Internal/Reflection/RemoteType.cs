@@ -33,6 +33,11 @@ namespace RemoteNET.Internal.Reflection
 
         public override bool IsGenericParameter => _isGenericParameter;
 
+        private Lazy<Type> _parent;
+        public override Type BaseType => _parent?.Value;
+        public Type Parent => _parent?.Value;
+
+
         public RemoteType(RemoteApp app, Type localType) : this(app, localType.FullName, localType.Assembly.GetName().Name, localType.IsArray, localType.IsGenericParameter)
         {
             if(localType is RemoteType)
@@ -223,6 +228,11 @@ namespace RemoteNET.Internal.Reflection
             }
         }
 
+        internal void SetParent(Lazy<Type> parent)
+        {
+            _parent = parent;
+        }
+
         public override MemberInfo[] GetMembers(BindingFlags bindingAttr) => GetMembersInner(bindingAttr).ToArray();
 
         protected override TypeAttributes GetAttributeFlagsImpl()
@@ -276,7 +286,6 @@ namespace RemoteNET.Internal.Reflection
         public override string FullName { get; }
         public override string Namespace { get; }
         public override string AssemblyQualifiedName { get; }
-        public override Type BaseType { get; }
 
         public override object[] GetCustomAttributes(Type attributeType, bool inherit)
         {
