@@ -35,8 +35,6 @@ namespace RemoteNET.Internal.Reflection
 
         private Lazy<Type> _parent;
         public override Type BaseType => _parent?.Value;
-        public Type Parent => _parent?.Value;
-
 
         public RemoteType(RemoteApp app, Type localType) : this(app, localType.FullName, localType.Assembly.GetName().Name, localType.IsArray, localType.IsGenericParameter)
         {
@@ -131,12 +129,12 @@ namespace RemoteNET.Internal.Reflection
 
         public override EventInfo GetEvent(string name, BindingFlags bindingAttr)
         {
-            throw new NotImplementedException();
+            return GetEvents().Single(ei => ei.Name == name);
         }
 
         public override EventInfo[] GetEvents(BindingFlags bindingAttr)
         {
-            return _events.Cast<EventInfo>().ToArray();
+            return _events.ToArray();
         }
 
         public override Type[] GetNestedTypes(BindingFlags bindingAttr)
@@ -162,15 +160,18 @@ namespace RemoteNET.Internal.Reflection
         protected override PropertyInfo GetPropertyImpl(string name, BindingFlags bindingAttr, Binder binder, Type returnType, Type[] types,
             ParameterModifier[] modifiers)
         {
-            return _properties.Single(prop => prop.Name == name);
+            return GetProperties().Single(prop => prop.Name == name);
         }
 
-        public override PropertyInfo[] GetProperties(BindingFlags bindingAttr) => _properties.Cast<PropertyInfo>().ToArray();
+        public override PropertyInfo[] GetProperties(BindingFlags bindingAttr)
+        {
+            return _properties.ToArray();
+        }
 
         protected override MethodInfo GetMethodImpl(string name, BindingFlags bindingAttr, Binder binder, CallingConventions callConvention,
             Type[] types, ParameterModifier[] modifiers)
         {
-            var methodGroup = _methods.Where(method =>
+            var methodGroup = GetMethods().Where(method =>
                 method.Name == name);
             if (types == null)
             {
@@ -178,7 +179,7 @@ namespace RemoteNET.Internal.Reflection
                 return methodGroup.Single();
             }
 
-            bool overloadsComparer(RemoteMethodInfo method)
+            bool overloadsComparer(MethodInfo method)
             {
                 var parameters = method.GetParameters();
                 // Compare Full Names mainly because the RemoteMethodInfo contains RemoteParameterInfos and we might be 
@@ -193,20 +194,20 @@ namespace RemoteNET.Internal.Reflection
             return methodGroup.Single(overloadsComparer);
         }
 
-        
+
         public override MethodInfo[] GetMethods(BindingFlags bindingAttr)
         {
-            return _methods.Cast<MethodInfo>().ToArray();
+            return _methods.ToArray();
         }
 
         public override FieldInfo GetField(string name, BindingFlags bindingAttr)
         {
-            return _fields.Single(field => field.Name == name);
+            return GetFields().Single(field => field.Name == name);
         }
 
         public override FieldInfo[] GetFields(BindingFlags bindingAttr)
         {
-            return _fields.Cast<FieldInfo>().ToArray();
+            return _fields.ToArray();
         }
 
         private IEnumerable<MemberInfo> GetMembersInner(BindingFlags bf)
