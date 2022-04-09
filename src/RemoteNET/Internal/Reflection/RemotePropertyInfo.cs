@@ -6,8 +6,7 @@ namespace RemoteNET.Internal.Reflection
 {
     public class RemotePropertyInfo : PropertyInfo
     {
-        private RemoteType remoteType;
-        private PropertyInfo pi;
+        private Lazy<Type> _propType;
 
         private RemoteApp App => (DeclaringType as RemoteType)?.App;
         public override PropertyAttributes Attributes => throw new NotImplementedException();
@@ -15,7 +14,7 @@ namespace RemoteNET.Internal.Reflection
         public override bool CanRead => GetMethod != null;
         public override bool CanWrite => SetMethod != null;
 
-        public override Type PropertyType { get; }
+        public override Type PropertyType => _propType.Value;
 
         public override Type DeclaringType { get; }
 
@@ -29,14 +28,18 @@ namespace RemoteNET.Internal.Reflection
         public override MethodInfo GetMethod => RemoteGetMethod;
         public override MethodInfo SetMethod => RemoteSetMethod;
 
-        public RemotePropertyInfo(Type declaringType, Type propType, string name)
+        public RemotePropertyInfo(Type declaringType, Lazy<Type> propType, string name)
         {
-            PropertyType = propType;
+            _propType = propType;
             DeclaringType = declaringType;
             Name = name;
         }
+        public RemotePropertyInfo(Type declaringType, Type propType, string name) :
+            this(declaringType, new Lazy<Type>(()=> propType), name)
+        {
+        }
 
-        public RemotePropertyInfo(RemoteType declaringType, PropertyInfo pi) : this(declaringType, pi.PropertyType, pi.Name)
+        public RemotePropertyInfo(RemoteType declaringType, PropertyInfo pi) : this(declaringType, new Lazy<Type>(()=> pi.PropertyType), pi.Name)
         {
         }
 
