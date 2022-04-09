@@ -150,6 +150,38 @@ namespace RemoteNET.Internal.Reflection
 
             // Temporarily indicate we are on-going creation
             _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.Type)] = output;
+
+            TypeDump parentdump = typeDump.ParentDump;
+            if (parentdump != null) {
+                Lazy<Type> parent = new Lazy<Type>(() =>
+                {
+                    try
+                    {
+                        Type t = Create(app, parentdump);
+                        return t;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("Failed to dump parent from: " + parentdump);
+                        Debug.WriteLine(ex.ToString());
+                        return null;
+                    }
+                    });
+                output.SetParent(parent);
+            }
+            AddMembers(app, typeDump, output);
+
+            // remove on-going creation indication
+            _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
+
+            // Register at resolver
+            _resolver.RegisterType(typeDump.Assembly, typeDump.Type, output);
+
+            return output;
+        }
+
+        private void AddMembers(RemoteApp app, TypeDump typeDump, RemoteType output)
+        {
             AddGroupOfFunctions(app, typeDump, typeDump.Methods, output, areConstructors: false);
             AddGroupOfFunctions(app, typeDump, typeDump.Constructors, output, areConstructors: true);
             AddFields(app, typeDump, output);
@@ -161,15 +193,8 @@ namespace RemoteNET.Internal.Reflection
 
             // Enrich events with add/remove methods
             AttachAddAndRemoveToEvents(output);
-
-            // remove on-going creation indication
-            _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
-
-            // Register at resolver
-            _resolver.RegisterType(typeDump.Assembly, typeDump.Type, output);
-
-            return output;
         }
+
         private void AttachAccessorsToProperties(RemoteType output)
         {
             MethodInfo[] methods = output.GetMethods();
@@ -187,20 +212,22 @@ namespace RemoteNET.Internal.Reflection
         {
             foreach (TypeDump.TypeProperty propDump in typeDump.Properties)
             {
-                Type returnType;
-                try
+                Lazy<Type> factory = new Lazy<Type>(() =>
                 {
-                    returnType = ResolveTypeWhileCreating(app, typeDump.Type, "prop__resolving__logic",
-                    propDump.Assembly, propDump.TypeFullName);
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create field {propDump.Name} because its type couldn't be created.\n" +
-                                    "The throw exception was: " + e);
-                    continue;
-                }
+                    try
+                    {
+                        return ResolveTypeWhileCreating(app, typeDump.Type, "prop__resolving__logic",
+                        propDump.Assembly, propDump.TypeFullName);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine($"[RemoteTypesFactory] failed to create field {propDump.Name} because its type couldn't be created.\n" +
+                                        "The throw exception was: " + e);
+                        return null;
+                    }
+                });
 
-                RemotePropertyInfo propInfo = new RemotePropertyInfo(output, returnType, propDump.Name);
+                RemotePropertyInfo propInfo = new RemotePropertyInfo(output, factory, propDump.Name);
                 output.AddProperty(propInfo);
             }
         }
@@ -222,46 +249,45 @@ namespace RemoteNET.Internal.Reflection
         {
             foreach (TypeDump.TypeEvent eventType in typeDump.Events)
             {
-                Type eventHandlerType;
-                try
+                Lazy<Type> factory = new Lazy<Type>(() =>
                 {
-                    eventHandlerType = ResolveTypeWhileCreating(app, typeDump.Type, "event__resolving__logic", eventType.Assembly, eventType.TypeFullName);
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create event {eventType.Name} because its type couldn't be created.\n" +
-                                    "The throw exception was: " + e);
-                    continue;
-                }
+                    try
+                    {
+                        return ResolveTypeWhileCreating(app, typeDump.Type, "event__resolving__logic", eventType.Assembly, eventType.TypeFullName);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine($"[RemoteTypesFactory] failed to create event {eventType.Name} because its type couldn't be created.\n" +
+                                        "The throw exception was: " + e);
+                        return null;
+                    }
+                });
 
-                var eventInfo = new RemoteEventInfo(output, eventHandlerType, eventHandlerType.Name);
+                var eventInfo = new RemoteEventInfo(output, factory, eventType.Name);
                 output.AddEvent(eventInfo);
             }
-        }
-
-        private Type ResolveTypeWhileCreating(RemoteApp app, string type, string v, object assembly, string typeFullName)
-        {
-            throw new NotImplementedException();
         }
 
         private void AddFields(RemoteApp app, TypeDump typeDump, RemoteType output)
         {
             foreach (TypeDump.TypeField fieldDump in typeDump.Fields)
             {
-                Type returnType;
-                try
+                Lazy<Type> factory = new Lazy<Type>(() =>
                 {
-                    returnType = ResolveTypeWhileCreating(app, typeDump.Type, "field__resolving__logic",
-                    fieldDump.Assembly, fieldDump.TypeFullName);
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create field {fieldDump.Name} because its type couldn't be created.\n" +
-                                    "The throw exception was: " + e);
-                    continue;
-                }
+                    try
+                    {
+                        return ResolveTypeWhileCreating(app, typeDump.Type, "field__resolving__logic",
+                        fieldDump.Assembly, fieldDump.TypeFullName);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine($"[RemoteTypesFactory] failed to create field {fieldDump.Name} because its type couldn't be created.\n" +
+                                        "The throw exception was: " + e);
+                        return null;
+                    }
+                });
 
-                RemoteFieldInfo fieldInfo = new RemoteFieldInfo(output, returnType, fieldDump.Name);
+                RemoteFieldInfo fieldInfo = new RemoteFieldInfo(output, factory, fieldDump.Name);
                 output.AddField(fieldInfo);
             }
         }
@@ -273,63 +299,67 @@ namespace RemoteNET.Internal.Reflection
                 List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);
                 foreach (TypeDump.TypeMethod.MethodParameter methodParameter in func.Parameters)
                 {
-                    // First: Search cache (which means local types & already-seen remote types)
-                    Type paramType = null;
-                    if (methodParameter.IsGenericParameter)
+                    Lazy<Type> paramFactory = new Lazy<Type>(() =>
                     {
-                        // In case of a generic type we have no way to "resolve" it
-                        // We are just creating a dummy type
-                        paramType = new RemoteType(app, typeDump.Type, "FakeAssemblyForGenericTypes", typeDump.IsArray, true);
-
-                    }
-                    else
-                    {
-                        // Non-generic parameter 
-                        // Cases that will not arrive here:
-                        //      void MyMethod<T>(T item)  <-- The 'item' parameter won't get here
-                        // Cases that will arrive here:
-                        //      void MyOtherMethod(System.Text.StringBuilder sb) <-- The 'sb' parameter WILL get here
-                        try
+                        // First: Search cache (which means local types & already-seen remote types)
+                        if (methodParameter.IsGenericParameter)
                         {
-                            paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
-                                methodParameter.Type);
-                            if (paramType == null)
+                            // In case of a generic type we have no way to "resolve" it
+                            // We are just creating a dummy type
+                            return new RemoteType(app, typeDump.Type, "FakeAssemblyForGenericTypes", typeDump.IsArray, true);
+                        }
+                        else
+                        {
+                            // Non-generic parameter 
+                            // Cases that will not arrive here:
+                            //      void MyMethod<T>(T item)  <-- The 'item' parameter won't get here
+                            // Cases that will arrive here:
+                            //      void MyOtherMethod(System.Text.StringBuilder sb) <-- The 'sb' parameter WILL get here
+                            try
+                            {
+                                 Type paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
+                                    methodParameter.Type);
+                                if (paramType == null)
+                                {
+                                    // TODO: Add stub method to indicate this error to the users?
+                                    Debug.WriteLine(
+                                        $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
+                                        $"and it did not throw any exceptions (returned NULL).");
+                                    return null;
+                                }
+                                return paramType;
+                            }
+                            catch (Exception e)
                             {
                                 // TODO: Add stub method to indicate this error to the users?
                                 Debug.WriteLine(
                                     $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
-                                    $"and it did not throw any exceptions (returned NULL).");
-                                continue;
+                                    $"and it threw this exception: " + e);
+                                return null;
                             }
                         }
-                        catch (Exception e)
-                        {
-                            // TODO: Add stub method to indicate this error to the users?
-                            Debug.WriteLine(
-                                $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
-                                $"and it threw this exception: " + e);
-                            continue;
-                        }
-                    }
+                    });
 
-                    RemoteParameterInfo rpi = new RemoteParameterInfo(methodParameter.Name, paramType);
+                    RemoteParameterInfo rpi = new RemoteParameterInfo(methodParameter.Name, paramFactory);
                     parameters.Add(rpi);
                 }
 
-                Type returnType;
-                try
+                Lazy<Type> factory = new Lazy<Type>(() =>
                 {
-                    returnType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name,
-                    func.ReturnTypeAssembly, func.ReturnTypeFullName);
-                }
-                catch (Exception e)
-                {
-                    // TODO: This sometimes throws because of generic results (like List<SomeAssembly.SomeObject>)
-                    Debug.WriteLine($"[RemoteTypesFactory] failed to create method {func.Name} because its return type could be created.\n" +
-                                    "The throw exception was: " + e);
-                    // TODO: Add stub method to indicate this error to the users?
-                    continue;
-                }
+                    try
+                    {
+                        return ResolveTypeWhileCreating(app, typeDump.Type, func.Name,
+                        func.ReturnTypeAssembly, func.ReturnTypeFullName);
+                    }
+                    catch (Exception e)
+                    {
+                        // TODO: This sometimes throws because of generic results (like List<SomeAssembly.SomeObject>)
+                        Debug.WriteLine($"[RemoteTypesFactory] failed to create method {func.Name} because its return type could be created.\n" +
+                                        "The throw exception was: " + e);
+                        // TODO: Add stub method to indicate this error to the users?
+                        return null;
+                    }
+                });
 
                 if (areConstructors)
                 {
@@ -341,7 +371,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     // Regular method
                     RemoteMethodInfo methodInfo =
-                        new RemoteMethodInfo(declaringType, returnType, func.Name, null, parameters.ToArray());
+                        new RemoteMethodInfo(declaringType, factory, func.Name, null, parameters.ToArray());
                     declaringType.AddMethod(methodInfo);
                 }
             }
