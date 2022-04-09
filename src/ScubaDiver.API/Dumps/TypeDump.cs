@@ -1,9 +1,11 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
 namespace ScubaDiver.API.Dumps
 {
+    [DebuggerDisplay("TypeDump of {"+nameof(Type)+"} (Assembly: {" + (nameof(Assembly)) +"})")]
     public class TypeDump
     {
         public class TypeMethod
