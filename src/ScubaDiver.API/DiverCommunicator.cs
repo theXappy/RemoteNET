@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using Newtonsoft.Json;
@@ -60,7 +61,8 @@ namespace ScubaDiver.API
             else
             {
                 msg = new HttpRequestMessage(HttpMethod.Post, url);
-                msg.Content = new StringContent(jsonBody);
+                msg.Content = new StringContent(jsonBody, Encoding.UTF8,
+                                    "application/json");
             }
 
             HttpResponseMessage res = c.SendAsync(msg).Result;
@@ -139,7 +141,9 @@ namespace ScubaDiver.API
             var requestJsonBody = JsonConvert.SerializeObject(dumpRequest);
 
             string body = SendRequest("type", null, requestJsonBody);
-            return JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
+            TypeDump? results = JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
+
+            return results;
         }
 
         public ObjectDump DumpObject(ulong address, bool pinObject = false, int? hashcode = null)
