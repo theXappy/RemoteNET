@@ -22,8 +22,7 @@ namespace RemoteNET.Internal.Reflection
 
             // "Generic Recursion" is a made-up term which means for RemoteNET that Types that look like:
             //      SomeType< SomeType< SomeType< SomeType< SomeType .... >>>>
-            // Are cut after the recognizing nested type in iteself many times (6+ occurences and at a very ong type name).
-            // You might ask yourself where such an object is possible and if C# even allows definid such a type.
+            // You might ask yourself where such an object is possible and if C# even allows defining such a type.
             // Well the example I found is within JetBra*ns "Platform.Core" assembly, where trying to dump some types result
             // in a dependent type which looks like:
             // JetBra*ns.DataFlow.PropertyChangedEventArgs`1[[
@@ -36,7 +35,6 @@ namespace RemoteNET.Internal.Reflection
             //              JetBra*ns.DataFlow.BeforePropertyChangedEventArgs`1[[
             //              JetBra*ns.DataFlow.BeforePropertyChangedEventArgs`1[[
             //          ...
-            // I did not investigate this deeply but it seems very 
             _avoidGenericsRecursion = avoidGenericsRecursion;
             _communicator = communicator;
         }
@@ -54,7 +52,6 @@ namespace RemoteNET.Internal.Reflection
         {
             if (type.Length > 200)
             {
-                // Only checking very long type names to reduce Regex executions
                 if (type.Contains("[][][][][][]"))
                 {
                     throw new Exception("Nestered self arrays types was detected and avoided.");
