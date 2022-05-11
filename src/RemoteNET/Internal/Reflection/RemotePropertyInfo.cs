@@ -90,7 +90,7 @@ namespace RemoteNET.Internal.Reflection
             RemoteMethodInfo setMethod = GetSetMethod() as RemoteMethodInfo;
             if (setMethod != null)
             {
-                setMethod.Invoke(obj, null);
+                setMethod.Invoke(obj, new object[1] { value });
             }
             else
             {
