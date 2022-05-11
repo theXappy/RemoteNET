@@ -310,7 +310,7 @@ namespace RemoteNET.Internal
             // At least 1 member with that name
             MemberInfo firstMember = matches[0];
             MemberTypes type = firstMember.MemberType;
-            bool singleMatch = matches.Count > 1;
+            bool singleMatch = matches.Count == 1;
 
             // In case we are resolving a field or property
             switch (type)
