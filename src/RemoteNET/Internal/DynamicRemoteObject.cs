@@ -443,5 +443,27 @@ namespace RemoteNET.Internal
             }
             set => throw new NotImplementedException();
         }
+
+
+        private static T[] __cast_to_array<T>(DynamicRemoteObject dro)
+        {
+            dynamic dyn = dro;
+            int length = dyn.Length;
+            T[] array = new T[length];
+            for (int i = 0; i < length; i++)
+                array[i] = dyn[i];
+            return array;            
+        }
+
+        public static implicit operator bool[](DynamicRemoteObject dro) => __cast_to_array<bool>(dro);
+        public static implicit operator byte[](DynamicRemoteObject dro) => __cast_to_array<byte>(dro);
+        public static implicit operator char[](DynamicRemoteObject dro) => __cast_to_array<char>(dro);
+        public static implicit operator short[](DynamicRemoteObject dro) => __cast_to_array<short>(dro);
+        public static implicit operator ushort[](DynamicRemoteObject dro) => __cast_to_array<ushort>(dro);
+        public static implicit operator int[](DynamicRemoteObject dro) => __cast_to_array<int>(dro);
+        public static implicit operator uint[](DynamicRemoteObject dro) => __cast_to_array<uint>(dro);
+        public static implicit operator long[](DynamicRemoteObject dro) => __cast_to_array<long>(dro);
+        public static implicit operator ulong[](DynamicRemoteObject dro) => __cast_to_array<ulong>(dro);
+        public static implicit operator string[](DynamicRemoteObject dro) => __cast_to_array<string>(dro);
     }
 }
