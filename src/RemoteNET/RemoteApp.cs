@@ -84,6 +84,7 @@ namespace RemoteNET
 
         private readonly RemoteObjectsCollection _remoteObjects;
 
+        public Process Process => _procWithDiver;
         public RemoteActivator Activator { get; private set; }
         public RemoteHarmony Harmony { get; private set; }
 
