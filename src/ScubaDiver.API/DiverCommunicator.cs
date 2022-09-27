@@ -7,7 +7,6 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
-using Newtonsoft.Json;
 using ScubaDiver.API.Dumps;
 
 namespace ScubaDiver.API
@@ -18,10 +17,7 @@ namespace ScubaDiver.API
     /// </summary>
     public class DiverCommunicator
     {
-        readonly JsonSerializerSettings _withErrors = new()
-        {
-            MissingMemberHandling = MissingMemberHandling.Error
-        };
+        readonly object _withErrors = NewtonsoftProxy.JsonSerializerSettingsWithErrors;
 
         private readonly string _hostname;
         private readonly int _port;

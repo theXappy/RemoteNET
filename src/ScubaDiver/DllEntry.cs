@@ -9,8 +9,16 @@ namespace ScubaDiver
     {
         public static Assembly AssembliesResolverFunc(object sender, ResolveEventArgs args)
         {
+            string requestedAssemblyName = new AssemblyName(args.Name).Name;
+            foreach(Assembly loadedAssembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if(loadedAssembly.GetName().Name == requestedAssemblyName)
+                    return loadedAssembly;
+            }
+
+            // Assembly not loaded in target, try to load from the Diver's dll files
             string folderPath = Path.GetDirectoryName(typeof(DllEntry).Assembly.Location);
-            string assemblyPath = Path.Combine(folderPath, new AssemblyName(args.Name).Name + ".dll");
+            string assemblyPath = Path.Combine(folderPath, requestedAssemblyName + ".dll");
             if (!File.Exists(assemblyPath)) return null;
             Assembly assembly = Assembly.LoadFrom(assemblyPath);
             return assembly;

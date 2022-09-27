@@ -10,7 +10,6 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using Microsoft.Diagnostics.Runtime;
-using Newtonsoft.Json;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
@@ -150,6 +149,11 @@ namespace ScubaDiver
         public void Dive(ushort listenPort)
         {
             Logger.Debug("[Diver] Is logging debugs in release? " + Logger.DebugInRelease.Value);
+
+            // Load or Hijack Newtonsoft.Json
+            var nsJson = InitNewtonsoftJson();
+            Logger.Debug("[Diver] Newtonsoft.Json's module path: " + nsJson.Location);
+
             // Start session
             RefreshRuntime();
             HttpListener listener = new();
@@ -183,6 +187,15 @@ namespace ScubaDiver
             }
 
             Logger.Debug("[Diver] Dispatcher returned, Dive is complete.");
+        }
+
+        private Assembly InitNewtonsoftJson()
+        {
+            // This will trigger our resolver to either get a pre-loaded Newtonsoft.Json version
+            // (used by our target) or, if not found, load our own dll.
+            Assembly ass = Assembly.Load(new AssemblyName("Newtonsoft.Json"));
+            NewtonsoftProxy.Init(ass);
+            return ass;
         }
 
         private void HandleDispatchedRequest(HttpListenerContext requestContext)
@@ -531,10 +544,7 @@ namespace ScubaDiver
 
             Logger.Debug("[Diver] Parsing Hook Method request body");
 
-            TextReader textReader = new StringReader(body);
-            JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new();
-            var request = js.Deserialize<FunctionHookRequest>(jr);
+            var request = JsonConvert.DeserializeObject<FunctionHookRequest>(body);
             if (request == null)
             {
                 return QuickError("Failed to deserialize body");
@@ -744,10 +754,7 @@ namespace ScubaDiver
                 return QuickError("Missing body");
             }
 
-            TextReader textReader = new StringReader(body);
-            JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new();
-            var request = js.Deserialize<CtorInvocationRequest>(jr);
+            var request = JsonConvert.DeserializeObject<CtorInvocationRequest>(body);
             if (request == null)
             {
                 return QuickError("Failed to deserialize body");
@@ -862,9 +869,7 @@ namespace ScubaDiver
             }
 
             TextReader textReader = new StringReader(body);
-            JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new();
-            var request = js.Deserialize<InvocationRequest>(jr);
+            var request = JsonConvert.DeserializeObject<InvocationRequest>(body);
             if (request == null)
             {
                 return QuickError("Failed to deserialize body");
@@ -1053,9 +1058,7 @@ namespace ScubaDiver
             }
 
             TextReader textReader = new StringReader(body);
-            JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new();
-            FieldSetRequest request = js.Deserialize<FieldSetRequest>(jr);
+            FieldSetRequest request = JsonConvert.DeserializeObject<FieldSetRequest>(body);
             if (request == null)
             {
                 return QuickError("Failed to deserialize body");
@@ -1157,10 +1160,7 @@ namespace ScubaDiver
                 return QuickError("Missing body");
             }
 
-            TextReader textReader = new StringReader(body);
-            JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new();
-            var request = js.Deserialize<FieldSetRequest>(jr);
+            var request = JsonConvert.DeserializeObject<FieldSetRequest>(body);
             if (request == null)
             {
                 return QuickError("Failed to deserialize body");
@@ -1239,7 +1239,7 @@ namespace ScubaDiver
             }
             catch (Exception e)
             {
-                    return QuickError($"Invocation caused exception: {e}");
+                return QuickError($"Invocation caused exception: {e}");
             }
 
 
@@ -1303,7 +1303,7 @@ namespace ScubaDiver
                 }
 
                 item = asArray.GetValue(index);
-                Logger.Debug("[Diver] Array access: Item is: " + item.ToString()) ;
+                Logger.Debug("[Diver] Array access: Item is: " + item.ToString());
             }
             else
             {
@@ -1657,9 +1657,7 @@ namespace ScubaDiver
             }
 
             TextReader textReader = new StringReader(body);
-            JsonReader jr = new JsonTextReader(textReader);
-            JsonSerializer js = new();
-            var request = js.Deserialize<TypeDumpRequest>(jr);
+            var request = JsonConvert.DeserializeObject<TypeDumpRequest>(body);
             if (request == null)
             {
                 return QuickError("Failed to deserialize body");
@@ -1716,7 +1714,7 @@ namespace ScubaDiver
                     Properties = props,
                     IsArray = typeObj.IsArray,
                 };
-                if (typeObj.BaseType != null) 
+                if (typeObj.BaseType != null)
                 {
                     // Has parent. Add its identifier
                     td.ParentFullTypeName = typeObj.BaseType.FullName;
