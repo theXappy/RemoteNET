@@ -13,6 +13,7 @@ using RemoteNET.Properties;
 using RemoteNET.Utils;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Utils;
 
 namespace RemoteNET
 {
@@ -81,7 +82,7 @@ namespace RemoteNET
 
         private Process _procWithDiver;
         private DiverCommunicator _communicator;
-
+        private DomainsDump _domains;
         private readonly RemoteObjectsCollection _remoteObjects;
 
         public Process Process => _procWithDiver;
@@ -152,7 +153,7 @@ namespace RemoteNET
 
                 // Determine if we are dealing with .NET Framework or .NET Core
                 string targetDotNetVer = target.GetSupportedTargetFramework();
-                if(targetDotNetVer == "native")
+                if (targetDotNetVer == "native")
                 {
                     throw new ArgumentException($"Process {target.ProcessName} does not seem to be a .NET Framework or .NET Core app. Can't inject to native apps.");
                 }
@@ -330,6 +331,26 @@ namespace RemoteNET
         // Remote Heap querying
         //
 
+        public IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter)
+        {
+            Predicate<string> matchesFilter = Filter.CreatePredicate(typeFullNameFilter);
+
+            _domains ??= _communicator.DumpDomains();
+            foreach (DomainsDump.AvailableDomain domain in _domains.AvailableDomains)
+            {
+                foreach (string assembly in domain.AvailableModules)
+                {
+                    foreach (TypesDump.TypeIdentifiers type in _communicator.DumpTypes(assembly).Types)
+                    {
+                        // TODO: Filtering should probably be done in the Diver's side
+                        if (matchesFilter(type.TypeName))
+                            yield return new CandidateType(type.TypeName, assembly, type.MethodTable, type.Token);
+                    }
+                }
+            }
+
+        }
+
         public IEnumerable<CandidateObject> QueryInstances(Type typeFilter) => QueryInstances(typeFilter.FullName);
         /// <summary>
         /// Gets all object candidates for a specific filter
@@ -355,7 +376,7 @@ namespace RemoteNET
             // Easy case: Trying to resolve from cache or from local assemblies
             var resolver = TypesResolver.Instance;
             Type res = resolver.Resolve(assembly, typeFullName);
-            if(res != null)
+            if (res != null)
             {
                 // Either found in cache or found locally.
 
@@ -384,6 +405,7 @@ namespace RemoteNET
         /// </summary>
         public Type GetRemoteType(Type localType) => GetRemoteType(localType.FullName, localType.Assembly.GetName().Name);
         internal Type GetRemoteType(TypeDump typeDump) => GetRemoteType(typeDump.Type, typeDump.Assembly);
+        internal Type GetRemoteType(CandidateType candidate) => GetRemoteType(candidate.TypeFullName, candidate.Assembly);
 
         public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
         {
