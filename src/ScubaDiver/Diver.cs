@@ -1631,7 +1631,10 @@ namespace ScubaDiver
                     available.Add(new DomainsDump.AvailableDomain()
                     {
                         Name = clrAppDomain.Name,
-                        AvailableModules = clrAppDomain.Modules.Select(m => Path.GetFileNameWithoutExtension(m.Name)).ToList()
+                        AvailableModules = clrAppDomain.Modules
+                                                .Select(m => Path.GetFileNameWithoutExtension(m.Name))
+                                                .Where(m => !string.IsNullOrWhiteSpace(m))
+                                                .ToList()
                     });
                 }
             }
