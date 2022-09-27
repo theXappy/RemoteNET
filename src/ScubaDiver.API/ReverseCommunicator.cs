@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using Newtonsoft.Json;
 using ScubaDiver.API.Dumps;
 
 namespace ScubaDiver.API
@@ -12,10 +11,7 @@ namespace ScubaDiver.API
     /// </summary>
     public class ReverseCommunicator
     {
-        readonly JsonSerializerSettings _withErrors = new()
-        {
-            MissingMemberHandling = MissingMemberHandling.Error
-        };
+        readonly object _withErrors = NewtonsoftProxy.JsonSerializerSettingsWithErrors;
 
         private readonly string _hostname;
         private readonly int _port;

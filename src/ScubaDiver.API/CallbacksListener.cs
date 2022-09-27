@@ -5,7 +5,6 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using ScubaDiver.API.Dumps;
 using static ScubaDiver.API.DiverCommunicator;
 
@@ -18,10 +17,7 @@ namespace ScubaDiver.API
         CancellationTokenSource _src = null;
 
         int _port;
-        readonly JsonSerializerSettings _withErrors = new()
-        {
-            MissingMemberHandling = MissingMemberHandling.Error
-        };
+        readonly object _withErrors = NewtonsoftProxy.JsonSerializerSettingsWithErrors;
         private readonly Dictionary<int, LocalEventCallback> _tokensToEventHandlers = new();
         private readonly Dictionary<LocalEventCallback, int> _eventHandlersToToken = new();
 
