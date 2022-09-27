@@ -142,7 +142,11 @@ namespace RemoteNET.Internal
         public RemoteApp __ra;
         public RemoteObject __ro;
         public RemoteType __type;
-        public MemberInfo[] __members;
+
+
+        private IEnumerable<MemberInfo> __ongoingMembersDumper = null;
+        private List<MemberInfo> __membersInner = null;
+        public IEnumerable<MemberInfo> __members => MindFuck();
 
         public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
         {
@@ -153,7 +157,6 @@ namespace RemoteNET.Internal
             {
                 throw new ArgumentException("Can only create DynamicRemoteObjects of RemoteObjects with Remote Types. (As returned from GetType())");
             }
-            __members = __type.GetMembers((BindingFlags)0xffff);
         }
 
 
@@ -162,12 +165,74 @@ namespace RemoteNET.Internal
         /// </summary>
         public new Type GetType() => __type;
 
+        private IEnumerable<MemberInfo> GetAllMembersRecursive()
+        {
+            Type lastType = __type;
+            Type nextType = __type;
+            do
+            {
+                var members = nextType.GetMembers((BindingFlags)0xffff);
+                foreach (var member in members)
+                    yield return member;
+                lastType = nextType;
+                nextType = nextType.BaseType;
+            }
+            while (nextType != null || lastType == typeof(object));
+        }
+
+        private IEnumerable<MemberInfo> MindFuck()
+        {
+            if(__membersInner != null && __ongoingMembersDumper == null)
+            {
+                return __membersInner;
+            }
+            // Defining a new method so we can use "yield return" (Outter function already returned a "real" IEnumerable in the above case
+            // so using "yield return" as well is forbidden.
+            IEnumerable<MemberInfo> Aggregator()
+            {
+                __membersInner ??= new List<MemberInfo>();
+                __ongoingMembersDumper ??= GetAllMembersRecursive();
+                foreach (var member in __membersInner)
+                {
+                    yield return member;
+                }
+                foreach(var member in __ongoingMembersDumper)
+                {
+                    __membersInner.Add(member);
+                    yield return member;
+                }
+                __ongoingMembersDumper = null;
+
+            };
+            return Aggregator();
+        }
+
         //
         // Dynamic Object API 
         //
         public override bool TryGetMember(GetMemberBinder binder, out object result)
         {
-            List<MemberInfo> matches = __members.Where(member => member.Name == binder.Name).ToList();
+            Type lastType = __type;
+            Type nextType = __type;
+            do
+            {
+                bool found = TryGetMember(nextType, binder.Name, out result);
+                if (found)
+                    return true;
+                lastType = nextType;
+                nextType = nextType.BaseType;
+            }
+            while (nextType != null || lastType == typeof(object));
+
+            result = null;
+            return false;
+        }
+
+        private bool TryGetMember(Type t, string name, out object result)
+        {
+            result = null;
+            MemberInfo[] members = t.GetMembers((BindingFlags)0xffff);
+            List<MemberInfo> matches = members.Where(member => member.Name == name).ToList();
 
             if (!matches.Any())
             {
@@ -184,9 +249,9 @@ namespace RemoteNET.Internal
             switch (type)
             {
                 case MemberTypes.Field:
-                    if(!singleMatch)
+                    if (!singleMatch)
                     {
-                        throw new ArgumentException($"Multiple members were found for the name `{binder.Name}` and at least one of them was a field");
+                        throw new ArgumentException($"Multiple members were found for the name `{name}` and at least one of them was a field");
                     }
                     try
                     {
@@ -194,14 +259,14 @@ namespace RemoteNET.Internal
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Field \"{binder.Name}\"'s getter threw an exception which sucks. Ex: " + ex);
+                        Console.WriteLine($"Field \"{name}\"'s getter threw an exception which sucks. Ex: " + ex);
                         throw;
                     }
                     break;
                 case MemberTypes.Property:
-                    if(!singleMatch)
+                    if (!singleMatch)
                     {
-                        throw new ArgumentException($"Multiple members were found for the name `{binder.Name}` and at least one of them was a property");
+                        throw new ArgumentException($"Multiple members were found for the name `{name}` and at least one of them was a property");
                     }
                     try
                     {
@@ -209,7 +274,7 @@ namespace RemoteNET.Internal
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Property \"{binder.Name}\"'s getter threw an exception which sucks. Ex: " + ex);
+                        Console.WriteLine($"Property \"{name}\"'s getter threw an exception which sucks. Ex: " + ex);
                         throw;
                     }
                     break;
@@ -220,17 +285,18 @@ namespace RemoteNET.Internal
                     // 2. The user is trying to user the "RemoteNET way" of specifing generic:
                     //      Type t = typeof(SomeType);
                     //      dro.Insert[t]();
-                    result = GetMethodProxy(binder.Name);
+                    result = GetMethodProxy(name);
                     break;
                 case MemberTypes.Event:
                     // TODO: 
                     throw new NotImplementedException("Disabled since moving to RemoteType based impl");
                     break;
                 default:
-                    throw new Exception($"No such member \"{binder.Name}\"");
+                    throw new Exception($"No such member \"{name}\"");
             }
             return true;
         }
+            
 
         private DynamicRemoteMethod GetMethodProxy(string name)
         {
