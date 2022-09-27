@@ -76,7 +76,7 @@ namespace ScubaDiver.API
                 {
                     // Let someone else handle this...
                 }
-                if(errMessage != null)
+                if (errMessage != null)
                     throw new RemoteException(errMessage.Error);
             }
             return body;
@@ -122,6 +122,24 @@ namespace ScubaDiver.API
             string body = SendRequest("heap", queryParams);
             HeapDump heapDump = JsonConvert.DeserializeObject<HeapDump>(body);
             return heapDump;
+        }
+        public DomainsDump DumpDomains()
+        {
+            string body = SendRequest("domains", null);
+            DomainsDump? results = JsonConvert.DeserializeObject<DomainsDump>(body, _withErrors);
+
+            return results;
+        }
+
+        public TypesDump DumpTypes(string assembly)
+        {
+            Dictionary<string, string> queryParams = new() { };
+            queryParams["assembly"] = assembly;
+
+            string body = SendRequest("type", queryParams);
+            TypesDump? results = JsonConvert.DeserializeObject<TypesDump>(body, _withErrors);
+
+            return results;
         }
 
         public TypeDump DumpType(string type, string assembly = null)
