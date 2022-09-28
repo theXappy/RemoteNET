@@ -404,8 +404,8 @@ namespace RemoteNET
         /// Returns a handle to a remote type based on a given local type.
         /// </summary>
         public Type GetRemoteType(Type localType) => GetRemoteType(localType.FullName, localType.Assembly.GetName().Name);
+        public Type GetRemoteType(CandidateType candidate) => GetRemoteType(candidate.TypeFullName, candidate.Assembly);
         internal Type GetRemoteType(TypeDump typeDump) => GetRemoteType(typeDump.Type, typeDump.Assembly);
-        internal Type GetRemoteType(CandidateType candidate) => GetRemoteType(candidate.TypeFullName, candidate.Assembly);
 
         public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
         {
