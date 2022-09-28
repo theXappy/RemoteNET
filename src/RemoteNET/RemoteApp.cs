@@ -157,12 +157,11 @@ namespace RemoteNET
                 {
                     throw new ArgumentException($"Process {target.ProcessName} does not seem to be a .NET Framework or .NET Core app. Can't inject to native apps.");
                 }
-                bool isNetCore = targetDotNetVer != "net451";
 
 
                 // Not injected yet, Injecting adapter now (which should load the Diver)
                 // Get different injection kit (for .NET framework or .NET core & x86 or x64)
-                GetInjectionToolkit(target, isNetCore, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath);
+                GetInjectionToolkit(target, targetDotNetVer, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath);
                 string adapterExecutionArg = string.Join("*", scubaDiverDllPath,
                     "ScubaDiver.DllEntry",
                     "EntryPoint",
@@ -214,8 +213,11 @@ namespace RemoteNET
             }
         }
 
-        private static void GetInjectionToolkit(Process target, bool isNetCore, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath)
+        private static void GetInjectionToolkit(Process target, string targetDotNetVer, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath)
         {
+            bool isNetCore = targetDotNetVer != "net451";
+            bool isNet5 = targetDotNetVer == "net5.0-windows";
+
             // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
             remoteNetAppDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -258,11 +260,13 @@ namespace RemoteNET
             }
 
             // Unzip scuba diver and dependencies into their own directory
+            string targetDiver = isNet5 ? "ScubaDiver_Net5" :
+                                    (isNetCore ? "ScubaDiver_NetCore" : "ScubaDiver");
             var scubaDestDirInfo = new DirectoryInfo(
                                             Path.Combine(
                                                 remoteNetAppDataDir,
-                                                isNetCore ? "Scuba_NetCore" : "Scuba")
-                                            );
+                                                targetDiver
+                                            ));
             if (!scubaDestDirInfo.Exists)
             {
                 scubaDestDirInfo.Create();
@@ -280,7 +284,7 @@ namespace RemoteNET
                 tempDirInfo.Delete(recursive: true);
             }
             tempDirInfo.Create();
-            using (var diverZipMemoryStream = new MemoryStream(isNetCore ? Resources.ScubaDiver_NetCore : Resources.ScubaDiver))
+            using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDivers))
             {
                 ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
                 // This extracts the "Scuba" directory from the zip to *tempDir*
@@ -288,7 +292,7 @@ namespace RemoteNET
             }
 
             // Going over unzipped files and checking which of those we need to copy to our AppData directory
-            tempDirInfo = new DirectoryInfo(Path.Combine(tempDir, isNetCore ? "Scuba_NetCore" : "Scuba"));
+            tempDirInfo = new DirectoryInfo(Path.Combine(tempDir, targetDiver));
             foreach (FileInfo fileInfo in tempDirInfo.GetFiles())
             {
                 string destPath = Path.Combine(scubaDestDirInfo.FullName, fileInfo.Name);
@@ -317,14 +321,9 @@ namespace RemoteNET
             if (isNetCore)
             {
                 Logger.Debug("[DEBUG] .NET Core target!");
-                scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
-                   .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver_NetCore.dll")).FullName;
             }
-            else
-            {
-                scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
-                .Single(scubaFile => scubaFile.Name.EndsWith("ScubaDiver.dll")).FullName;
-            }
+            scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
+               .Single(scubaFile => scubaFile.Name.EndsWith($"{targetDiver}.dll")).FullName;
         }
 
         //
