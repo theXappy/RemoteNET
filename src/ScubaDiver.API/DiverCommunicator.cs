@@ -136,7 +136,7 @@ namespace ScubaDiver.API
             Dictionary<string, string> queryParams = new() { };
             queryParams["assembly"] = assembly;
 
-            string body = SendRequest("type", queryParams);
+            string body = SendRequest("types", queryParams);
             TypesDump? results = JsonConvert.DeserializeObject<TypesDump>(body, _withErrors);
 
             return results;
