@@ -28,6 +28,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnmanagedAdapterDLL", "Unma
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnmanagedAdapterDLL_x64", "UnmanagedAdapterDLL_x64\UnmanagedAdapterDLL_x64.vcxproj", "{E9771628-EF64-4DD8-9906-E7B1990A0FB9}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScubaDiver_Net5", "ScubaDiver_NetCore5\ScubaDiver_Net5.csproj", "{776CB808-45B2-4D13-8B5D-E48BD0B37AB2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed = Debug|Mixed
@@ -70,6 +72,10 @@ Global
 		{E9771628-EF64-4DD8-9906-E7B1990A0FB9}.Debug|Mixed.Build.0 = Debug|x64
 		{E9771628-EF64-4DD8-9906-E7B1990A0FB9}.Release|Mixed.ActiveCfg = Release|x64
 		{E9771628-EF64-4DD8-9906-E7B1990A0FB9}.Release|Mixed.Build.0 = Release|x64
+		{776CB808-45B2-4D13-8B5D-E48BD0B37AB2}.Debug|Mixed.ActiveCfg = Debug|Any CPU
+		{776CB808-45B2-4D13-8B5D-E48BD0B37AB2}.Debug|Mixed.Build.0 = Debug|Any CPU
+		{776CB808-45B2-4D13-8B5D-E48BD0B37AB2}.Release|Mixed.ActiveCfg = Release|Any CPU
+		{776CB808-45B2-4D13-8B5D-E48BD0B37AB2}.Release|Mixed.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -86,6 +86,6 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy /Y /s "$(TargetDir)" "$(SolutionDir)dist\$(ConfigurationName)\Scuba\"</PostBuildEvent>
+    <PostBuildEvent>xcopy /Y /s "$(TargetDir)" "$(SolutionDir)dist\$(ConfigurationName)\$(ProjectName)\"</PostBuildEvent>
   </PropertyGroup>
 </Project>

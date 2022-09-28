@@ -83,19 +83,9 @@ namespace RemoteNET.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
-        internal static byte[] ScubaDiver {
+        internal static byte[] ScubaDivers {
             get {
-                object obj = ResourceManager.GetObject("ScubaDiver", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] ScubaDiver_NetCore {
-            get {
-                object obj = ResourceManager.GetObject("ScubaDiver_NetCore", resourceCulture);
+                object obj = ResourceManager.GetObject("ScubaDivers", resourceCulture);
                 return ((byte[])(obj));
             }
         }
