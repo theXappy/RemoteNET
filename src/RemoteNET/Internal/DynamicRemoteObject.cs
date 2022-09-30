@@ -80,7 +80,7 @@ namespace RemoteNET.Internal
                             throw new ArgumentException("A generic method was intialized with no generic arguments.");
                         }
                         // OK, invoking without generic arguments
-                        result = overloads.Single().Invoke(_parent.__ro,args);
+                        result = overloads.Single().Invoke(_parent.__ro, args);
                     }
                 }
                 else if (overloads.Count > 1)
@@ -153,7 +153,7 @@ namespace RemoteNET.Internal
             __ra = ra;
             __ro = ro;
             __type = ro.GetType() as RemoteType;
-            if(__type == null && ro.GetType() != null)
+            if (__type == null && ro.GetType() != null)
             {
                 throw new ArgumentException("Can only create DynamicRemoteObjects of RemoteObjects with Remote Types. (As returned from GetType())");
             }
@@ -169,20 +169,60 @@ namespace RemoteNET.Internal
         {
             Type lastType = __type;
             Type nextType = __type;
+
+            // We use this dictionary to make sure overides from subclasses dont get exported twice (for the parent as well)
+            Dictionary<string, List<MethodInfo>> _processedOverloads = new Dictionary<string, List<MethodInfo>>();
             do
             {
                 var members = nextType.GetMembers((BindingFlags)0xffff);
-                foreach (var member in members)
+                foreach (MemberInfo member in members)
+                {
+                    if (member is MethodInfo newMethods)
+                    {
+                        var newParameters = newMethods.GetParameters();
+                        if (!_processedOverloads.ContainsKey(member.Name))
+                            _processedOverloads[member.Name] = new List<MethodInfo>();
+                        List<MethodInfo> oldMethods = _processedOverloads[member.Name];
+
+
+                        bool overriden = false;
+                        foreach (var oldMethod in oldMethods)
+                        {
+                            var oldParameters = oldMethod.GetParameters();
+                            if (oldParameters.Length != newParameters.Length)
+                                break;
+
+                            bool allParametersMatch = true;
+                            for (int i = 0; i < oldParameters.Length; i++)
+                            {
+                                if (oldParameters[i].ParameterType != newParameters[i].ParameterType)
+                                {
+                                    allParametersMatch = false;
+                                    break;
+                                }
+                            }
+                            if (allParametersMatch)
+                            {
+                                overriden = true;
+                                break;
+                            }
+                        }
+                        if (overriden)
+                            continue;
+                        _processedOverloads[member.Name].Add(newMethods);
+
+                    }
                     yield return member;
+                }
                 lastType = nextType;
                 nextType = nextType.BaseType;
             }
-            while (nextType != null || lastType == typeof(object));
+            while (nextType != null && lastType != typeof(object));
         }
 
         private IEnumerable<MemberInfo> MindFuck()
         {
-            if(__membersInner != null && __ongoingMembersDumper == null)
+            if (__membersInner != null && __ongoingMembersDumper == null)
             {
                 return __membersInner;
             }
@@ -196,7 +236,7 @@ namespace RemoteNET.Internal
                 {
                     yield return member;
                 }
-                foreach(var member in __ongoingMembersDumper)
+                foreach (var member in __ongoingMembersDumper)
                 {
                     __membersInner.Add(member);
                     yield return member;
@@ -296,21 +336,21 @@ namespace RemoteNET.Internal
             }
             return true;
         }
-            
+
 
         private DynamicRemoteMethod GetMethodProxy(string name)
         {
             var methods = __members.Where(member => member.Name == name).ToArray();
-            if(methods.Length == 0)
+            if (methods.Length == 0)
             {
                 throw new Exception($"Method \"{name}\" wasn't found in the members of type {__type.Name}.");
             }
 
-            if(methods.Any(member => member.MemberType != MemberTypes.Method))
+            if (methods.Any(member => member.MemberType != MemberTypes.Method))
             {
                 throw new Exception($"A member callde \"{name}\" exists in the type and it isn't a method (It's a {methods.First(m => m.MemberType != MemberTypes.Method).MemberType})");
             }
-            if(methods.Any(member => !(member is RemoteMethodInfo)))
+            if (methods.Any(member => !(member is RemoteMethodInfo)))
             {
                 throw new Exception($"A method overload for \"{name}\" wasn't a MethodInfo");
             }
@@ -417,26 +457,26 @@ namespace RemoteNET.Internal
                     // TODO:
                     throw new NotImplementedException("Not implemented since moving to RemoteType based impl");
 
-                    //
-                    // =========================        OLD IMPL:     ======================================
-                    //
-                    //ProxiedEventInfo eventProxy = _events[binder.Name];
-                    //if (eventProxy == value)
-                    //{
-                    //    // This "setting" of the event happens after regsistering an event handler because of how the "+=" operator works.
-                    //    // Since the "+" operator of DynamicEventProxy returns the same instance we can spot THIS EXACT scenario and allow it without raising errors.
-                    //    return true;
-                    //}
-                    //else
-                    //{
-                    //    // This is an INVALID setting of the event "field". For example:
-                    //    // dynObject.SomeEvent = "123";
-                    //    //  - or even -
-                    //    // dynObject.SomeEvent = new EventHandler(new Action<object,EventArgs>((a,b)=>{}));
+                //
+                // =========================        OLD IMPL:     ======================================
+                //
+                //ProxiedEventInfo eventProxy = _events[binder.Name];
+                //if (eventProxy == value)
+                //{
+                //    // This "setting" of the event happens after regsistering an event handler because of how the "+=" operator works.
+                //    // Since the "+" operator of DynamicEventProxy returns the same instance we can spot THIS EXACT scenario and allow it without raising errors.
+                //    return true;
+                //}
+                //else
+                //{
+                //    // This is an INVALID setting of the event "field". For example:
+                //    // dynObject.SomeEvent = "123";
+                //    //  - or even -
+                //    // dynObject.SomeEvent = new EventHandler(new Action<object,EventArgs>((a,b)=>{}));
 
-                    //    // We are telling the user it's not not allowed just like normal .NET does not allow setting values to events.
-                    //    throw new Exception($"The event {binder.Name} can only appear on the left hand side of += or -=.");
-                    //}
+                //    // We are telling the user it's not not allowed just like normal .NET does not allow setting values to events.
+                //    throw new Exception($"The event {binder.Name} can only appear on the left hand side of += or -=.");
+                //}
                 default:
                     throw new Exception($"No such member \"{binder.Name}\".");
             }
@@ -478,7 +518,8 @@ namespace RemoteNET.Internal
 
         public override string ToString()
         {
-            return (__members.Single(mi => mi.Name == nameof(ToString) && ((MethodInfo)mi).GetParameters().Length == 0) as MethodInfo).Invoke(__ro, new object[0]) as string;
+            var matchingMethods = __members.Where(mi => mi.Name == nameof(ToString) && ((MethodInfo)mi).GetParameters().Length == 0).ToList();
+            return (matchingMethods.Single() as MethodInfo).Invoke(__ro, new object[0]) as string;
         }
 
         public override int GetHashCode()
@@ -518,7 +559,7 @@ namespace RemoteNET.Internal
             T[] array = new T[length];
             for (int i = 0; i < length; i++)
                 array[i] = dyn[i];
-            return array;            
+            return array;
         }
 
         public static implicit operator bool[](DynamicRemoteObject dro) => __cast_to_array<bool>(dro);
