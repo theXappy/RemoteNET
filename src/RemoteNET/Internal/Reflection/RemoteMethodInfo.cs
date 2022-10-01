@@ -5,10 +5,9 @@ using System.Reflection;
 
 namespace RemoteNET.Internal.Reflection
 {
-    [System.Diagnostics.DebuggerDisplay("??? {Name}( ... )")]
     public class RemoteMethodInfo : MethodInfo
     {
-        private Lazy<Type> _retType;
+        private LazyRemoteTypeResolver _retType;
 
         public override ICustomAttributeProvider ReturnTypeCustomAttributes => throw new NotImplementedException();
         public override string Name { get; }
@@ -25,13 +24,13 @@ namespace RemoteNET.Internal.Reflection
 
         public RemoteMethodInfo(RemoteType declaringType, MethodInfo mi) :
             this(declaringType,
-                new Lazy<Type>(()=>mi.ReturnType),
+                new LazyRemoteTypeResolver(mi.ReturnType),
                 mi.Name,
                 mi.GetGenericArguments(),
                 mi.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
         {
         }
-        public RemoteMethodInfo(Type declaringType, Lazy<Type> returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos)
+        public RemoteMethodInfo(Type declaringType, LazyRemoteTypeResolver returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos)
         {
             Name = name;
             DeclaringType = declaringType;
@@ -44,8 +43,9 @@ namespace RemoteNET.Internal.Reflection
             }
             AssignedGenericArgs = genericArgs;
         }
+
         public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos) :
-            this(declaringType, new Lazy<Type>(() => returnType), name, genericArgs, paramInfos)
+            this(declaringType, new LazyRemoteTypeResolver(returnType), name, genericArgs, paramInfos)
         { 
         }
 
@@ -85,8 +85,8 @@ namespace RemoteNET.Internal.Reflection
         {
             try
             {
-                string args = string.Join(", ", _paramInfos.Select(pi => pi.ParameterType.FullName));
-                return $"{this.ReturnType.FullName} {this.Name}({args})";
+                string args = string.Join(", ", _paramInfos.Select(pi => pi.ToString()));
+                return $"{_retType.TypeFullName} {Name}({args})";
             }
             catch (Exception ex)
             {
