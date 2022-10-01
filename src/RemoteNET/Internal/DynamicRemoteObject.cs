@@ -264,7 +264,6 @@ namespace RemoteNET.Internal
             MemberTypes type = firstMember.MemberType;
             bool singleMatch = matches.Count == 1;
 
-            // In case we are resolving a field or property
             switch (type)
             {
                 case MemberTypes.Field:
@@ -301,7 +300,7 @@ namespace RemoteNET.Internal
                     // The cases that get here are when the user is trying to:
                     // 1. Save a method in a variable:
                     //      var methodGroup = dro.Insert;
-                    // 2. The user is trying to user the "RemoteNET way" of specifing generic:
+                    // 2. The user is trying to use the "RemoteNET way" of specifing generic:
                     //      Type t = typeof(SomeType);
                     //      dro.Insert[t]();
                     result = GetMethodProxy(name);
@@ -327,7 +326,7 @@ namespace RemoteNET.Internal
 
             if (methods.Any(member => member.MemberType != MemberTypes.Method))
             {
-                throw new Exception($"A member callde \"{name}\" exists in the type and it isn't a method (It's a {methods.First(m => m.MemberType != MemberTypes.Method).MemberType})");
+                throw new Exception($"A member called \"{name}\" exists in the type and it isn't a method (It's a {methods.First(m => m.MemberType != MemberTypes.Method).MemberType})");
             }
             if (methods.Any(member => !(member is RemoteMethodInfo)))
             {
