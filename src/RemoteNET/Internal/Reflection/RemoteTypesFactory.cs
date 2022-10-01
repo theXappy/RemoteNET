@@ -337,8 +337,10 @@ namespace RemoteNET.Internal.Reflection
                             }
                         }
                     });
-
-                    RemoteParameterInfo rpi = new RemoteParameterInfo(methodParameter.Name, paramFactory);
+                    LazyRemoteTypeResolver paramTypeResolver = new LazyRemoteTypeResolver(paramFactory,
+                                   methodParameter.Assembly,
+                                   methodParameter.Type);
+                    RemoteParameterInfo rpi = new RemoteParameterInfo(methodParameter.Name, paramTypeResolver);
                     parameters.Add(rpi);
                 }
 
@@ -358,6 +360,7 @@ namespace RemoteNET.Internal.Reflection
                         return null;
                     }
                 });
+                LazyRemoteTypeResolver resolver = new LazyRemoteTypeResolver(factory, func.ReturnTypeAssembly, func.ReturnTypeFullName);
 
                 if (areConstructors)
                 {
@@ -369,7 +372,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     // Regular method
                     RemoteMethodInfo methodInfo =
-                        new RemoteMethodInfo(declaringType, factory, func.Name, null, parameters.ToArray());
+                        new RemoteMethodInfo(declaringType, resolver, func.Name, null, parameters.ToArray());
                     declaringType.AddMethod(methodInfo);
                 }
             }
