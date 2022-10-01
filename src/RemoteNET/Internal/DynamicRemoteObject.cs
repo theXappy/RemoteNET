@@ -1,6 +1,7 @@
 ﻿using Microsoft.CSharp.RuntimeBinder;
 using RemoteNET.Internal.ProxiedReflection;
 using RemoteNET.Internal.Reflection;
+using RemoteNET.Utils;
 using ScubaDiver.API.Utils;
 using System;
 using System.Collections.Generic;
@@ -170,45 +171,23 @@ namespace RemoteNET.Internal
             Type lastType = __type;
             Type nextType = __type;
 
-            // We use this dictionary to make sure overides from subclasses dont get exported twice (for the parent as well)
-            Dictionary<string, List<MethodInfo>> _processedOverloads = new Dictionary<string, List<MethodInfo>>();
+            // We use this dictionary to make sure overides from subclasses don't get exported twice (for the parent as well)
+            Dictionary<string, List<MethodBase>> _processedOverloads = new Dictionary<string, List<MethodBase>>();
             do
             {
                 var members = nextType.GetMembers((BindingFlags)0xffff);
                 foreach (MemberInfo member in members)
                 {
-                    if (member is MethodInfo newMethods)
+                    if (member is MethodBase newMethods)
                     {
-                        var newParameters = newMethods.GetParameters();
                         if (!_processedOverloads.ContainsKey(member.Name))
-                            _processedOverloads[member.Name] = new List<MethodInfo>();
-                        List<MethodInfo> oldMethods = _processedOverloads[member.Name];
+                            _processedOverloads[member.Name] = new List<MethodBase>();
+                        List<MethodBase> oldMethods = _processedOverloads[member.Name];
 
-
-                        bool overriden = false;
-                        foreach (var oldMethod in oldMethods)
-                        {
-                            var oldParameters = oldMethod.GetParameters();
-                            if (oldParameters.Length != newParameters.Length)
-                                break;
-
-                            bool allParametersMatch = true;
-                            for (int i = 0; i < oldParameters.Length; i++)
-                            {
-                                if (oldParameters[i].ParameterType != newParameters[i].ParameterType)
-                                {
-                                    allParametersMatch = false;
-                                    break;
-                                }
-                            }
-                            if (allParametersMatch)
-                            {
-                                overriden = true;
-                                break;
-                            }
-                        }
+                        bool overriden = oldMethods.Any(oldMethod => oldMethod.SignatureEquals(newMethods));
                         if (overriden)
                             continue;
+
                         _processedOverloads[member.Name].Add(newMethods);
 
                     }
