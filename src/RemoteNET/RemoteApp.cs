@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -23,6 +23,8 @@ namespace RemoteNET
         {
             // The WeakReferences are to RemoteObject
             private readonly Dictionary<ulong, WeakReference<RemoteObject>> _pinnedAddressesToRemoteObjects;
+            private readonly object _lock = new object();
+
             private readonly RemoteApp _app;
 
             public RemoteObjectsCollection(RemoteApp app)
@@ -53,28 +55,44 @@ namespace RemoteNET
             public RemoteObject GetRemoteObject(ulong address, int? hashcode = null)
             {
                 RemoteObject ro;
-                if (_pinnedAddressesToRemoteObjects.TryGetValue(address, out WeakReference<RemoteObject> wr))
+                WeakReference<RemoteObject> weakRef;
+                // Easiert way - Non-collected and previouslt obtained object ("Cached")
+                if (_pinnedAddressesToRemoteObjects.TryGetValue(address, out weakRef) &&
+                    weakRef.TryGetTarget(out ro))
                 {
-                    bool gotTarget = wr.TryGetTarget(out ro);
-                    if (gotTarget)
-                    {
-                        // Not GC'd!
-                        return ro;
-                    }
-                    else
-                    {
-                        // Object was GC'd...
-                        _pinnedAddressesToRemoteObjects.Remove(address);
-                        // Now let's make sure the GC'd object finalizer was also called (otherwise some "object moved" errors might happen).
-                        GC.WaitForPendingFinalizers();
-                        // Now we need to-read the since stuff might have moved
-                    }
+                    // Not GC'd!
+                    return ro;
                 }
 
-                // Get remote
-                ro = this.GetRemoteObjectUncached(address, hashcode);
-                wr = new WeakReference<RemoteObject>(ro);
-                _pinnedAddressesToRemoteObjects[ro.RemoteToken] = wr;
+                // Harder case - At time of checking, item wasn't cached.
+                // We need exclusive access to the cahce now to make sure we are the only one adding it.
+                lock (_lock)
+                {
+                    // Last chance - when we waited on the lock some other thread might've added it to the cache.
+                    if (_pinnedAddressesToRemoteObjects.TryGetValue(address, out weakRef))
+                    {
+                        bool gotTarget = weakRef.TryGetTarget(out ro);
+                        if (gotTarget)
+                        {
+                            // Not GC'd!
+                            return ro;
+                        }
+                        else
+                        {
+                            // Object was GC'd...
+                            _pinnedAddressesToRemoteObjects.Remove(address);
+                            // Now let's make sure the GC'd object finalizer was also called (otherwise some "object moved" errors might happen).
+                            GC.WaitForPendingFinalizers();
+                            // Now we need to-read the remote object since stuff might have moved
+                        }
+                    }
+
+                    // Get remote
+                    ro = this.GetRemoteObjectUncached(address, hashcode);
+                    // Add to cache
+                    weakRef = new WeakReference<RemoteObject>(ro);
+                    _pinnedAddressesToRemoteObjects[ro.RemoteToken] = weakRef;
+                }
 
                 return ro;
             }
@@ -322,8 +340,19 @@ namespace RemoteNET
             {
                 Logger.Debug("[DEBUG] .NET Core target!");
             }
-            scubaDiverDllPath = scubaDestDirInfo.EnumerateFiles()
-               .Single(scubaFile => scubaFile.Name.EndsWith($"{targetDiver}.dll")).FullName;
+            var matches = scubaDestDirInfo.EnumerateFiles().Where(scubaFile => scubaFile.Name.EndsWith($"{targetDiver}.dll"));
+            if (matches.Count() != 1)
+            {
+                Debugger.Launch();
+                throw new Exception($"Expected exactly 1 ScubaDiver dll to match '{targetDiver}' but found: " + matches.Count() + "\n" +
+                    "Results: \n" +
+                    String.Join("\n", matches.Select(m => m.FullName)) +
+                    "Target Framework Parameter: " +
+                    targetDotNetVer
+                    );
+            }
+
+            scubaDiverDllPath = matches.Single().FullName;
         }
 
         //
