@@ -1393,7 +1393,11 @@ namespace ScubaDiver
             // Make sure we had such an object in the last dumped runtime (this will help us later if the object moves
             // since we'll know what type we are looking for)
             // Make sure it's still in place
-            ClrObject lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
+            ClrObject lastKnownClrObj = default(ClrObject);
+            lock (_debugObjectsLock)
+            {
+                lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
+            }
             if (lastKnownClrObj == null)
             {
                 throw new Exception("No object in this address. Try finding it's address again and dumping again.");
