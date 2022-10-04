@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
+﻿using System.Reflection;
 
 namespace RemoteNET.Utils
 {
@@ -17,7 +13,7 @@ namespace RemoteNET.Utils
 
             if((a is MethodInfo aInfo) && (b is MethodInfo bInfo))
             {
-                return aInfo.ReturnType == bInfo.ReturnType;
+                return aInfo.ReturnType.FullName == bInfo.ReturnType.FullName;
             }
             else if((a is ConstructorInfo aCtro) && (b is ConstructorInfo bCtor))
             {
