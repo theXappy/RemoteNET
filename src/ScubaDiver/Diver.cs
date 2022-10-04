@@ -404,7 +404,6 @@ namespace ScubaDiver
         {
             FrozenObjectInfo fObj = Freezer.Freeze(instance);
             _pinnedObjects.TryAdd(fObj.Address, fObj);
-
             return fObj;
         }
 
