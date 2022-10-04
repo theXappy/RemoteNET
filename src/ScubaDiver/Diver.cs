@@ -725,7 +725,7 @@ namespace ScubaDiver
             {
                 return QuickError("Missing parameter 'address'");
             }
-            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}\n");
+            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}");
 
             // Check if we have this objects in our pinned pool
             if (TryGetPinnedObject(objAddr, out _))
