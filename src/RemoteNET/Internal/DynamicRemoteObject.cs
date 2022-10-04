@@ -517,7 +517,11 @@ namespace RemoteNET.Internal
             get
             {
                 ScubaDiver.API.ObjectOrRemoteAddress oora = __ro.GetItem(key);
-                if (oora.IsRemoteAddress)
+                if(oora.IsNull)
+                {
+                    return null;
+                }
+                else if (oora.IsRemoteAddress)
                 {
                     return this.__ra.GetRemoteObject(oora.RemoteAddress).Dynamify();
                 }
