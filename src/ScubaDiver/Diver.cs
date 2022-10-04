@@ -1303,7 +1303,7 @@ namespace ScubaDiver
                 }
 
                 item = asArray.GetValue(index);
-                Logger.Debug("[Diver] Array access: Item is: " + item.ToString());
+                Logger.Debug("[Diver] Array access: Item is: " + (item?.ToString() ?? "NULL"));
             }
             else
             {
@@ -1335,7 +1335,11 @@ namespace ScubaDiver
 
             ObjectOrRemoteAddress res;
             ulong pinAddr;
-            if (item.GetType().IsPrimitiveEtc())
+            if(item == null)
+            {
+                res = ObjectOrRemoteAddress.Null;
+            }
+            else if (item.GetType().IsPrimitiveEtc())
             {
                 // TODO: Something else?
                 res = ObjectOrRemoteAddress.FromObj(item);
