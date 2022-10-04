@@ -212,7 +212,7 @@ namespace ScubaDiver
                 }
                 catch (Exception ex)
                 {
-                    body = QuickError($"Error when running command {request}.\nException:\n" + ex);
+                    body = QuickError(ex.Message, ex.StackTrace);
                 }
             }
             else
@@ -1335,7 +1335,7 @@ namespace ScubaDiver
 
             ObjectOrRemoteAddress res;
             ulong pinAddr;
-            if(item == null)
+            if (item == null)
             {
                 res = ObjectOrRemoteAddress.Null;
             }
@@ -1709,9 +1709,13 @@ namespace ScubaDiver
             return QuickError("Failed to find type in searched assemblies");
         }
 
-        public string QuickError(string error)
+        public string QuickError(string error, string stackTrace = null)
         {
-            DiverError errResults = new(error);
+            if (stackTrace == null)
+            {
+                stackTrace = (new StackTrace(true)).ToString();
+            }
+            DiverError errResults = new(error, stackTrace);
             return JsonConvert.SerializeObject(errResults);
         }
 

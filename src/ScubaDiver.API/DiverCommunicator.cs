@@ -75,9 +75,10 @@ namespace ScubaDiver.API
                 catch
                 {
                     // Let someone else handle this...
+                    throw;
                 }
                 if (errMessage != null)
-                    throw new RemoteException(errMessage.Error);
+                    throw new RemoteException(errMessage.Error, errMessage.StackTrace);
             }
             return body;
         }

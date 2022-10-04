@@ -182,13 +182,17 @@ namespace ScubaDiver.API
                 {
                     Console.WriteLine($"[WARN] Diver tried to trigger a callback with unknown token value: {res.Token}");
 
-                    DiverError errResults = new("Unknown Token");
+                    // TODO: I'm not sure the usage of 'DiverError' here is good. It's sent from the Communicator's side
+                    // to the Diver's side...
+                    DiverError errResults = new("Unknown Token", String.Empty);
                     body = JsonConvert.SerializeObject(errResults);
                 }
             }
             else
             {
-                DiverError errResults = new("Unknown Command");
+                // TODO: I'm not sure the usage of 'DiverError' here is good. It's sent from the Communicator's side
+                // to the Diver's side...
+                DiverError errResults = new("Unknown Token", String.Empty);
                 body = JsonConvert.SerializeObject(errResults);
             }
 
