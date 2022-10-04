@@ -72,7 +72,7 @@ namespace RemoteNET.Utils
                 throw new TooManyProcessesException($"Too many processes contains '{procName}' in their name.\n" +
                     $"Those were NOT found to be a single 'tree' of processes with a single parent (root) process.\n" +
                     $"The processes that were found:\n" +
-                    $"{procsList}" +
+                    $"{procsList}\n" +
                     $"You should narrow it down with a more exclusive substring", candidateProcs.ToArray());
             }
         }
