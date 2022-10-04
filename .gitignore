@@ -332,3 +332,7 @@ ASALocalRun/
 
 # Local History for Visual Studio
 .localhistory/
+
+src/RemoteNET/CompileAndLocalPublishRemoteNet.exe
+
+src/RemoteNET/publish.ps1
