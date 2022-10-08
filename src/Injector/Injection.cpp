@@ -11,7 +11,7 @@ DWORD GetProcessIdByName(const char * name)
 {
 	using namespace Hades;
 
-	PROCESSENTRY32 entry;
+	PROCESSENTRY32 entry = { 0 };
 	entry.dwSize = sizeof(PROCESSENTRY32);
 	char buf[MAX_PATH] = { 0 };
 	size_t charsConverted = 0;
