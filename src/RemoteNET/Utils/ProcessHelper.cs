@@ -42,7 +42,7 @@ namespace RemoteNET.Utils
                 {
                     parentProc = proc.GetParent();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     parentProc = null;
                 }
