@@ -336,10 +336,6 @@ namespace RemoteNET
 
             // We are done with our temp directory
             tempDirInfo.Delete(recursive: true);
-            if (isNetCore)
-            {
-                Logger.Debug("[DEBUG] .NET Core target!");
-            }
             var matches = scubaDestDirInfo.EnumerateFiles().Where(scubaFile => scubaFile.Name.EndsWith($"{targetDiver}.dll"));
             if (matches.Count() != 1)
             {
