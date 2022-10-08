@@ -55,11 +55,12 @@ namespace ScubaDiver.API
             return body;
         }
 
-        public InvocationResults InvokeCallback(int token,
+        public InvocationResults InvokeCallback(int token, string stackTrace,
             params ObjectOrRemoteAddress[] args)
         {
             CallbackInvocationRequest invocReq = new()
             {
+                StackTrace = stackTrace,
                 Token = token,
                 Parameters = args.ToList()
             };

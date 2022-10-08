@@ -7,7 +7,7 @@ using System.Reflection;
 
 namespace RemoteNET
 {
-    public delegate void HookAction(dynamic instance, dynamic[] args);
+    public delegate void HookAction(HookContext context, dynamic instance, dynamic[] args);
 
     public class RemoteHarmony
     {
@@ -75,7 +75,7 @@ namespace RemoteNET
 
         private LocalHookCallback WrapCallback(HookAction callback)
         {
-            LocalHookCallback hookProxy = (ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args) =>
+            LocalHookCallback hookProxy = (HookContext context, ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args) =>
             {
                 // Converting instance to DRO
                 DynamicRemoteObject droInstance;
@@ -122,7 +122,7 @@ namespace RemoteNET
                 }
 
                 // Call the callback with the proxied parameters (using DynamicRemoteObjects)
-                callback.DynamicInvoke(new object[2] { droInstance, decodedParameters });
+                callback.DynamicInvoke(new object[3] { context, droInstance, decodedParameters });
             };
             return hookProxy;
         }
