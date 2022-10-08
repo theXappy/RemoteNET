@@ -8,9 +8,6 @@ namespace RemoteNET.Internal.Reflection
 {
     public class RemoteFieldInfo : FieldInfo
     {
-        private RemoteType remoteType;
-        private FieldInfo fi;
-
         private RemoteApp App => (DeclaringType as RemoteType)?.App;
         public override object[] GetCustomAttributes(bool inherit)
         {
