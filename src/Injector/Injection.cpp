@@ -98,10 +98,16 @@ BOOL InjectAndRunThenUnload(DWORD ProcessId, const char * DllName, const std::st
 		cout << "CallExport failed" << endl;
 	}
 
+#ifdef _WIN64
+	DWORDLONG hLibModuleExtended = hLibModule;
+#else
+	DWORD hLibModuleExtended = hLibModule;
+#endif
+
 	// Unload the dll, so we can run again if we choose
 	EnsureCloseHandle FreeThread = CreateRemoteThread(Proc, NULL, NULL,
 		(LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "FreeLibrary"),
-		(LPVOID)hLibModule, NULL, NULL);
+		(LPVOID)hLibModuleExtended, NULL, NULL);
 	WaitForSingleObject(FreeThread, INFINITE);
 
 	return true;
