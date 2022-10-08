@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using RemoteNET;
+using ScubaDiver.API;
 using static RemoteNET.Utils.Lambda;
 
 namespace ScubaDiver.Tester
@@ -65,7 +66,8 @@ namespace ScubaDiver.Tester
             Console.WriteLine("7. Subscribe to Event");
             Console.WriteLine("8. Hook Method");
             Console.WriteLine("9. Get Remote Object");
-            Console.WriteLine("10. Exit");
+            Console.WriteLine("10. Enumerate Remote Collection");
+            Console.WriteLine("11. Exit");
             string input = Console.ReadLine();
             uint index;
             if (int.TryParse(input, out int userChoice))
@@ -277,7 +279,7 @@ namespace ScubaDiver.Tester
                                 }
                             });
 
-                            HookAction callback = (dynamic instace, dynamic[] args) =>
+                            HookAction callback = (HookContext context, dynamic instace, dynamic[] args) =>
                             {
                                 Console.WriteLine($"$$$ Hooked Function {type}.{methodName} called! $$$");
                                 foreach (dynamic d in args)
@@ -344,6 +346,25 @@ namespace ScubaDiver.Tester
                         }
                         break;
                     case 10:
+                        {
+                            // Getting object
+                            Console.WriteLine("Enter local index of remote object:");
+                            if (!uint.TryParse(Console.ReadLine(), out index) || index >= remoteObjects.Count)
+                            {
+                                Console.WriteLine("Bad input.");
+                            }
+                            else
+                            {
+                                var remoteObj = remoteObjects[(int)index];
+                                var dynObject = remoteObj.Dynamify();
+                                foreach (dynamic dyn in dynObject)
+                                {
+                                    Console.WriteLine(dyn);
+                                }
+                            }
+                        }
+                        break;
+                    case 11:
                         // Exiting
                         return true;
                 }
