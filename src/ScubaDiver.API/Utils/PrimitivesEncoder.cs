@@ -14,7 +14,16 @@ namespace ScubaDiver.API.Utils
         /// <returns>Encoded value as a string</returns>
         public static string Encode(object toEncode)
         {
-            if (toEncode.GetType().IsPrimitiveEtc())
+            if (toEncode == null) // This is specific for the String case, but I can't gurantee it here...
+                return string.Empty;
+
+            Type t = toEncode.GetType();
+            if (t == typeof(string))
+            {
+                return $"\"{toEncode}\"";
+            }
+
+            if (t.IsPrimitiveEtc())
             {
                 // These types can just be ".Parse()"-ed back
                 return toEncode.ToString();
@@ -23,10 +32,10 @@ namespace ScubaDiver.API.Utils
             if (!(toEncode is Array enumerable))
             {
                 throw new ArgumentException(
-                    $"Object to encode was not a primitive or an array. TypeFullName: {toEncode.GetType()}");
+                    $"Object to encode was not a primitive or an array. TypeFullName: {t}");
             }
 
-            if (!toEncode.GetType().IsPrimitiveEtcArray())
+            if (!t.IsPrimitiveEtcArray())
             {
                 // TODO: Support arrays of RemoteObjects/DynamicRemoteObject
                 throw new Exception("At least one element in the array is not primitive");
@@ -62,7 +71,7 @@ namespace ScubaDiver.API.Utils
                     if (!elementsType.IsPrimitiveEtc())
                     {
                         // Array of non-primitives --> not primitive
-                        return true;
+                        return false;
                     }
                     else
                     {
@@ -92,7 +101,14 @@ namespace ScubaDiver.API.Utils
         {
             // Easiest case - strings are encoded to themselves
             if (resultType == typeof(string))
-                return toDecode;
+            {
+                if (toDecode == "null")
+                    return null;
+                else if (toDecode[0] == '"' && toDecode[toDecode.Length-1] == '"')
+                    return toDecode.Substring(1, toDecode.Length - 2);
+                else
+                    throw new Exception("Missing qoutes on encoded string");
+            }
 
             if (resultType.IsPrimitiveEtc())
             {
