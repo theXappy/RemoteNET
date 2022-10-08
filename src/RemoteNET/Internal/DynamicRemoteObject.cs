@@ -358,8 +358,8 @@ namespace RemoteNET.Internal
 
         public override bool TryInvokeMember(InvokeMemberBinder binder, object[] args, out object result)
         {
-            // If "TryInvokeMember" was called first (instead of "TryGetMember"
-            // That means witht the user specified generic args (if any are even requied) within '<' and '>' signs
+            // If "TryInvokeMember" was called first (instead of "TryGetMember")
+            // it means that the user specified generic args (if any are even requied) within '<' and '>' signs
             // or there aren't any generic args. We can just do the call here instead of letting the dynamic
             // runtime resort to calling 'TryGetMember'
 
@@ -373,8 +373,7 @@ namespace RemoteNET.Internal
                 // We can now see if the invoked for the function specified generic types
                 // In that case, we can hijack and do the call here
                 // Otherwise - Just let TryGetMembre return a proxy
-                IList<Type> genArgs = TypeArgumentsPropInfo.GetValue(binder) as IList<Type>;
-                if (genArgs != null)
+                if (TypeArgumentsPropInfo.GetValue(binder) is IList<Type> genArgs)
                 {
                     foreach (Type t in genArgs)
                     {

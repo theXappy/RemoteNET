@@ -145,7 +145,7 @@ namespace ScubaDiver.API
 
         public TypeDump DumpType(string type, string assembly = null)
         {
-            TypeDumpRequest dumpRequest = new TypeDumpRequest()
+            TypeDumpRequest dumpRequest = new()
             {
                 TypeFullName = type
             };
@@ -276,7 +276,7 @@ namespace ScubaDiver.API
 
         public ObjectOrRemoteAddress GetItem(ulong token, ObjectOrRemoteAddress key)
         {
-            IndexedItemAccessRequest indexedItemAccess = new IndexedItemAccessRequest()
+            IndexedItemAccessRequest indexedItemAccess = new()
             {
                 CollectionAddress = token,
                 PinRequest = true,

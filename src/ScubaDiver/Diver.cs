@@ -1185,7 +1185,7 @@ namespace ScubaDiver
             else
             {
                 // Object not pinned, try get it the hard way
-                ClrObject clrObj = default(ClrObject);
+                ClrObject clrObj = default;
                 lock (_debugObjectsLock)
                 {
                     clrObj = _runtime.Heap.GetObject(request.ObjAddress);
@@ -1305,7 +1305,7 @@ namespace ScubaDiver
             {
                 Logger.Debug("[Diver] Array access: Object is an Array!");
                 Array asArray = (Array)arrayFoi.Object;
-                if (!(index is int intIndex))
+                if (index is not int intIndex)
                     return QuickError("Tried to access an Array with a non-int index");
 
                 int length = asArray.Length;
@@ -1322,7 +1322,7 @@ namespace ScubaDiver
                 if (asArray == null)
                     return QuickError("Object at given address seemed to be an IList but failed to convert to array");
 
-                if (!(index is int intIndex))
+                if (index is not int intIndex)
                     return QuickError("Tried to access an IList with a non-int index");
 
                 int length = asArray.Length;
@@ -1345,7 +1345,7 @@ namespace ScubaDiver
                 if (asArray == null)
                     return QuickError("Object at given address seemed to be an IEnumerable but failed to convert to array");
 
-                if (!(index is int intIndex))
+                if (index is not int intIndex)
                     return QuickError("Tried to access an IEnumerable (which isn't an Array, IList or IDictionary) with a non-int index");
 
                 int length = asArray.Length;
@@ -1420,19 +1420,19 @@ namespace ScubaDiver
             // Make sure we had such an object in the last dumped runtime (this will help us later if the object moves
             // since we'll know what type we are looking for)
             // Make sure it's still in place
-            ClrObject lastKnownClrObj = default(ClrObject);
+            ClrObject lastKnownClrObj = default;
             lock (_debugObjectsLock)
             {
                 lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
             }
-            if (lastKnownClrObj == default(ClrObject))
+            if (lastKnownClrObj == default)
             {
                 throw new Exception("No object in this address. Try finding it's address again and dumping again.");
             }
 
             // Make sure it's still in place by refreshing the runtime
             RefreshRuntime();
-            ClrObject clrObj = default(ClrObject);
+            ClrObject clrObj = default;
             lock (_debugObjectsLock)
             {
                 clrObj = _runtime.Heap.GetObject(objAddr);
@@ -1695,7 +1695,7 @@ namespace ScubaDiver
             // 
             // Defining a sub-function that parses a type and it's parents recursively
             //
-            TypeDump ParseType(Type typeObj)
+            static TypeDump ParseType(Type typeObj)
             {
                 if (typeObj == null) return null;
 
