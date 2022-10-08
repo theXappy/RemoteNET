@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using RemoteNET.Internal;
-using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Dumps;
 
@@ -121,7 +120,7 @@ namespace RemoteNET
             }
         }
 
-        internal ObjectOrRemoteAddress GetItem(int key)
+        internal ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
         {
             return  _ref.GetItem(key);
         }

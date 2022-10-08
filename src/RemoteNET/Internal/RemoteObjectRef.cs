@@ -133,7 +133,7 @@ namespace RemoteNET.Internal
             return $"RemoteObjectRef. Address: {_remoteObjectInfo.PinnedAddress}, TypeFullName: {_typeInfo.Type}";
         }
 
-        internal ObjectOrRemoteAddress GetItem(int key)
+        internal ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
         {
             return _creatingCommunicator.GetItem(this.Token, key);
         }

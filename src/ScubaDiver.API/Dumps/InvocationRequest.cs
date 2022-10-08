@@ -23,5 +23,11 @@ namespace ScubaDiver.API.Dumps
             Parameters = new();
         }
     }
-    
+    public class IndexedItemAccessRequest
+    {
+        public ulong CollectionAddress { get; set; }
+        public bool PinRequest { get; set; }
+        public ObjectOrRemoteAddress Index { get; set; }
+    }
+
 }

@@ -168,8 +168,10 @@ namespace ScubaDiver.API
                 }
                 else if (_tokensToHookCallbacks.TryGetValue(res.Token, out LocalHookCallback hook))
                 {
+                    HookContext hookContext = new HookContext(res.StackTrace);
+
                     // Run hook. No results expected directly (it might alter variabels inside the hook)
-                    hook(res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
+                    hook(hookContext, res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
 
                     InvocationResults ir = new()
                     {

@@ -316,7 +316,7 @@ namespace ScubaDiver
 
 
         public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvilableCallbackToken);
-        public void InvokeControllerCallback(int token, params object[] parameters)
+        public void InvokeControllerCallback(int token, string stackTrace, params object[] parameters)
         {
             ReverseCommunicator reverseCommunicator = new(_callbacksEndpoint);
 
@@ -345,7 +345,7 @@ namespace ScubaDiver
             }
 
             // Call callback at controller
-            reverseCommunicator.InvokeCallback(token, remoteParams);
+            reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
         }
         /// <summary>
         /// Tries to get a <see cref="FrozenObjectInfo"/> of a pinned object
@@ -591,7 +591,7 @@ namespace ScubaDiver
             int token = AssignCallbackToken();
             Logger.Debug($"[Diver] Hook Method - Assigned Token: {token}");
 
-            Hooking.HarmonyWrapper.HookCallback patchCallback = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
+            Hooking.HarmonyWrapper.HookCallback patchCallback = (obj, args) => InvokeControllerCallback(token, (new StackTrace()).ToString(), new object[2] { obj, args });
 
             Logger.Debug($"[Diver] Hooking function {methodName}...");
             try
@@ -677,7 +677,7 @@ namespace ScubaDiver
             // assign subscriber unique id
             int token = AssignCallbackToken();
 
-            EventHandler eventHandler = (obj, args) => InvokeControllerCallback(token, new object[2] { obj, args });
+            EventHandler eventHandler = (obj, args) => InvokeControllerCallback(token, "UNUSED", new object[2] { obj, args });
 
             Logger.Debug($"[Diver] Adding event handler to event {eventName}...");
             eventObj.AddEventHandler(target, eventHandler);
@@ -1269,17 +1269,29 @@ namespace ScubaDiver
         }
         private string MakeArrayItemResponse(HttpListenerRequest arg)
         {
-            string objAddrStr = arg.QueryString.Get("address");
-            string indexStr = arg.QueryString.Get("index");
-            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
-            if (!ulong.TryParse(objAddrStr, out var objAddr))
+            string body = null;
+            using (StreamReader sr = new(arg.InputStream))
             {
-                return QuickError("Parameter 'address' could not be parsed as ulong");
+                body = sr.ReadToEnd();
             }
-            if (!int.TryParse(indexStr, out var index))
+
+            if (string.IsNullOrEmpty(body))
             {
-                return QuickError("Parameter 'index' could not be parsed as ulong");
+                return QuickError("Missing body");
             }
+
+            var request = JsonConvert.DeserializeObject<IndexedItemAccessRequest>(body);
+            if (request == null)
+            {
+                return QuickError("Failed to deserialize body");
+            }
+
+
+
+
+            ulong objAddr = request.CollectionAddress;
+            object index = ParseParameterObject(request.Index);
+            bool pinningRequested = request.PinRequest;
 
             // Check if we have this objects in our pinned pool
             if (!TryGetPinnedObject(objAddr, out FrozenObjectInfo arrayFoi))
@@ -1288,52 +1300,68 @@ namespace ScubaDiver
                 return QuickError("Object at given address wasn't pinned");
             }
 
-
             object item = null;
             if (arrayFoi.Object.GetType().IsArray)
             {
                 Logger.Debug("[Diver] Array access: Object is an Array!");
                 Array asArray = (Array)arrayFoi.Object;
+                if (!(index is int intIndex))
+                    return QuickError("Tried to access an Array with a non-int index");
 
                 int length = asArray.Length;
-                if (index >= length)
-                {
+                if (intIndex >= length)
                     return QuickError("Index out of range");
-                }
 
-                item = asArray.GetValue(index);
+                item = asArray.GetValue(intIndex);
                 Logger.Debug("[Diver] Array access: Item is: " + (item?.ToString() ?? "NULL"));
+            }
+            else if (arrayFoi.Object is IList asList)
+            {
+                Logger.Debug("[Diver] Array access: Object is an ILIST!");
+                object[] asArray = asList?.Cast<object>().ToArray();
+                if (asArray == null)
+                    return QuickError("Object at given address seemed to be an IList but failed to convert to array");
+
+                if (!(index is int intIndex))
+                    return QuickError("Tried to access an IList with a non-int index");
+
+                int length = asArray.Length;
+                if (intIndex >= length)
+                    return QuickError("Index out of range");
+
+                // Get the item
+                item = asArray[intIndex];
+            }
+            else if (arrayFoi.Object is IDictionary dict)
+            {
+                Logger.Debug("[Diver] Array access: Object is an IDICTIONARY!");
+                item = dict[index];
+            }
+            else if (arrayFoi.Object is IEnumerable enumerable)
+            {
+                // Last result - generic IEnumerables can be enumerated into arrays.
+                // BEWARE: This could lead to "runining" of the IEnumerable if it's a not "resetable"
+                object[] asArray = enumerable?.Cast<object>().ToArray();
+                if (asArray == null)
+                    return QuickError("Object at given address seemed to be an IEnumerable but failed to convert to array");
+
+                if (!(index is int intIndex))
+                    return QuickError("Tried to access an IEnumerable (which isn't an Array, IList or IDictionary) with a non-int index");
+
+                int length = asArray.Length;
+                if (intIndex >= length)
+                    return QuickError("Index out of range");
+
+                // Get the item
+                item = asArray[intIndex];
             }
             else
             {
-                if (arrayFoi.Object is IList asList)
-                {
-                    Logger.Debug("[Diver] Array access: Object is an ILIST!");
-                    object[] asArray = asList?.Cast<object>().ToArray();
-                    if (asArray == null)
-                    {
-                        return QuickError("Object at given address seemed to be an IList but failed to convert to array");
-                    }
-                    int length = asArray.Length;
-
-
-                    if (index >= length)
-                    {
-                        return QuickError("Index out of range");
-                    }
-
-                    // Get the item
-                    item = asArray[index];
-                }
-                else
-                {
-                    Logger.Debug("[Diver] Array access: Object is an neighter...");
-                    return QuickError("Object at given address wasn't an Array or a IList");
-                }
+                Logger.Debug("[Diver] Array access: Object isn't an Array, IList, IDictionary or IEnumerable");
+                return QuickError("Object isn't an Array, IList, IDictionary or IEnumerable");
             }
 
             ObjectOrRemoteAddress res;
-            ulong pinAddr;
             if (item == null)
             {
                 res = ObjectOrRemoteAddress.Null;
@@ -1397,7 +1425,7 @@ namespace ScubaDiver
             {
                 lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
             }
-            if (lastKnownClrObj == null)
+            if (lastKnownClrObj == default(ClrObject))
             {
                 throw new Exception("No object in this address. Try finding it's address again and dumping again.");
             }

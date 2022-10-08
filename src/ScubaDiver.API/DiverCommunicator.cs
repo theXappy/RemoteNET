@@ -274,18 +274,21 @@ namespace ScubaDiver.API
             }
         }
 
-        public ObjectOrRemoteAddress GetItem(ulong token, int key)
+        public ObjectOrRemoteAddress GetItem(ulong token, ObjectOrRemoteAddress key)
         {
-            Dictionary<string, string> queryParams = new()
+            IndexedItemAccessRequest indexedItemAccess = new IndexedItemAccessRequest()
             {
-                { "address", token.ToString() },
-                { "pinRequest", "true" },
-                { "index", key.ToString() }
+                CollectionAddress = token,
+                PinRequest = true,
+                Index = key
             };
-            string body = SendRequest("get_item", queryParams);
+            var requestJsonBody = JsonConvert.SerializeObject(indexedItemAccess);
+
+            var body = SendRequest("get_item", null, requestJsonBody);
+
             if (body.Contains("\"error\":"))
             {
-                throw new Exception("Diver failed to dump item of array object. Error: " + body);
+                throw new Exception("Diver failed to dump item of remote collection object. Error: " + body);
             }
             InvocationResults invokeRes = JsonConvert.DeserializeObject<InvocationResults>(body);
             return invokeRes.ReturnedObjectOrAddress;
@@ -385,8 +388,6 @@ namespace ScubaDiver.API
 
         public bool HookMethod(string type, string methodName, HarmonyPatchPosition pos, LocalHookCallback callback, List<string> parametersTypeFullNames = null)
         {
-            Dictionary<string, string> queryParams;
-            string body;
             if (!_listener.IsOpen)
             {
                 _listener.Open();
