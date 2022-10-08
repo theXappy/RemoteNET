@@ -4,6 +4,7 @@ using RemoteNET.Internal.Reflection;
 using RemoteNET.Utils;
 using ScubaDiver.API.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
@@ -23,7 +24,7 @@ namespace RemoteNET.Internal
     /// 
     /// </summary>
     [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "}")]
-    public class DynamicRemoteObject : DynamicObject
+    public class DynamicRemoteObject : DynamicObject, IEnumerable
     {
         public class DynamicRemoteMethod : DynamicObject
         {
@@ -146,6 +147,7 @@ namespace RemoteNET.Internal
 
 
         private IEnumerable<MemberInfo> __ongoingMembersDumper = null;
+        private IEnumerator<MemberInfo> __ongoingMembersDumperEnumerator = null;
         private List<MemberInfo> __membersInner = null;
         public IEnumerable<MemberInfo> __members => MindFuck();
 
@@ -160,9 +162,8 @@ namespace RemoteNET.Internal
             }
         }
 
-
         /// <summary>
-        /// Gets the type of the proxied remote object, in the remote app. (This does not reutrn `typeof(RemoteObject)`)
+        /// Gets the type of the proxied remote object, in the remote app. (This does not reutrn `typeof(DynamicRemoteMethod)`)
         /// </summary>
         public new Type GetType() => __type;
 
@@ -211,24 +212,34 @@ namespace RemoteNET.Internal
             {
                 __membersInner ??= new List<MemberInfo>();
                 __ongoingMembersDumper ??= GetAllMembersRecursive();
+                __ongoingMembersDumperEnumerator ??= __ongoingMembersDumper.GetEnumerator();
                 foreach (var member in __membersInner)
                 {
                     yield return member;
                 }
-                foreach (var member in __ongoingMembersDumper)
+                while(__ongoingMembersDumperEnumerator.MoveNext())
                 {
+                    var member = __ongoingMembersDumperEnumerator.Current;
                     __membersInner.Add(member);
                     yield return member;
                 }
                 __ongoingMembersDumper = null;
+                __ongoingMembersDumperEnumerator = null;
 
             };
             return Aggregator();
         }
 
-        //
-        // Dynamic Object API 
-        //
+        public T InvokeMethod<T>(string name, params object[] args)
+        {
+            var matchingMethods = from member in __members
+                                  where member.Name == name
+                                  where ((MethodInfo)member).GetParameters().Length == args.Length
+                                  select member;
+            return (T)(matchingMethods.Single() as MethodInfo).Invoke(__ro, args);
+        }
+
+        #region Dynamic Object API 
         public override bool TryGetMember(GetMemberBinder binder, out object result)
         {
             Type lastType = __type;
@@ -308,7 +319,6 @@ namespace RemoteNET.Internal
                 case MemberTypes.Event:
                     // TODO: 
                     throw new NotImplementedException("Disabled since moving to RemoteType based impl");
-                    break;
                 default:
                     throw new Exception($"No such member \"{name}\"");
             }
@@ -462,8 +472,8 @@ namespace RemoteNET.Internal
         }
 
         /// <summary>
-        /// Helper function to access the member 'memberName' of the object 'obj.
-        /// This is equivilent to explicitly compiling the expression 'obj.memberName'.
+        /// Helper function to access the member <paramref name="memberName"/> of the object <paramref name="obj"/>.
+        /// This is equivilent to explicitly compiling the expression '<paramref name="obj"/>.<paramref name="memberName"/>'.
         /// </summary>
         public static bool TryGetDynamicMember(object obj, string memberName, out object output)
         {
@@ -493,47 +503,47 @@ namespace RemoteNET.Internal
                 return false;
             }
         }
+#endregion
 
-        public override string ToString()
-        {
-            var matchingMethods = __members.Where(mi => mi.Name == nameof(ToString) && ((MethodInfo)mi).GetParameters().Length == 0).ToList();
-            return (matchingMethods.Single() as MethodInfo).Invoke(__ro, new object[0]) as string;
-        }
+        #region ToString / GetHashCode / Equals
 
-        public override int GetHashCode()
-        {
-            // ReSharper disable once NonReadonlyMemberInGetHashCode
-            return (int)(__members.Single(mi => mi.Name == nameof(GetHashCode) && ((MethodInfo)mi).GetParameters().Length == 0) as MethodInfo).Invoke(__ro, new object[0]);
-        }
+        public override string ToString() => InvokeMethod<string>(nameof(ToString));
+
+        public override int GetHashCode() => InvokeMethod<int>(nameof(GetHashCode));
 
         public override bool Equals(object obj)
         {
             throw new NotImplementedException($"Can not call `Equals` on {nameof(DynamicRemoteObject)} instances");
         }
+        #endregion
 
-        // TODO: key should be dynamic and even encoded as ObjectOrRemoteAddress later in the calls chain if required.
-        public dynamic this[int key]
+        /// <summary>
+        /// Array access. Key can be any primitive / RemoteObject / DynamicRemoteObject
+        /// </summary>
+        public dynamic this[object key]
         {
             get
             {
-                ScubaDiver.API.ObjectOrRemoteAddress oora = __ro.GetItem(key);
-                if(oora.IsNull)
+
+                ScubaDiver.API.ObjectOrRemoteAddress ooraKey = RemoteFunctionsInvokeHelper.CreateRemoteParameter(key);
+                ScubaDiver.API.ObjectOrRemoteAddress item = __ro.GetItem(ooraKey);
+                if (item.IsNull)
                 {
                     return null;
                 }
-                else if (oora.IsRemoteAddress)
+                else if (item.IsRemoteAddress)
                 {
-                    return this.__ra.GetRemoteObject(oora.RemoteAddress).Dynamify();
+                    return this.__ra.GetRemoteObject(item.RemoteAddress).Dynamify();
                 }
                 else
                 {
-                    return PrimitivesEncoder.Decode(oora.EncodedObject, oora.Type);
+                    return PrimitivesEncoder.Decode(item.EncodedObject, item.Type);
                 }
             }
             set => throw new NotImplementedException();
         }
 
-
+        #region Array Casting
         private static T[] __cast_to_array<T>(DynamicRemoteObject dro)
         {
             dynamic dyn = dro;
@@ -554,5 +564,15 @@ namespace RemoteNET.Internal
         public static implicit operator long[](DynamicRemoteObject dro) => __cast_to_array<long>(dro);
         public static implicit operator ulong[](DynamicRemoteObject dro) => __cast_to_array<ulong>(dro);
         public static implicit operator string[](DynamicRemoteObject dro) => __cast_to_array<string>(dro);
+        #endregion
+
+        public IEnumerator GetEnumerator()
+        {
+            if (!__members.Any(member => member.Name == nameof(GetEnumerator)))
+                throw new Exception($"No method called {nameof(GetEnumerator)} found. The remote object probably doesn't implement IEnumerable");
+
+            dynamic enumeratorDro = InvokeMethod<object>(nameof(GetEnumerator));
+            return new DynamicRemoteEnumerator(enumeratorDro);
+        }
     }
 }
