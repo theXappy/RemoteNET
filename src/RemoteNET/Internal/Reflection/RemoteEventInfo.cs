@@ -19,8 +19,12 @@ namespace RemoteNET.Internal.Reflection
 
         public override Type ReflectedType => throw new NotImplementedException();
 
-        public RemoteMethodInfo AddMethod { get; set; }
-        public RemoteMethodInfo RemoveMethod { get; set; }
+        public RemoteMethodInfo RemoteAddMethod { get; set; }
+        public RemoteMethodInfo RemoteRemoveMethod { get; set; }
+        public override MethodInfo AddMethod => RemoteAddMethod;
+        public override MethodInfo RemoveMethod => RemoteRemoveMethod;
+
+
         public override Type EventHandlerType => _eventHandlerType.Value;
         public RemoteEventInfo(RemoteType declaringType, Lazy<Type> eventHandlerType, string name)
         {
@@ -38,8 +42,8 @@ namespace RemoteNET.Internal.Reflection
         {
         }
 
-        public override MethodInfo GetAddMethod(bool nonPublic) => AddMethod;
-        public override MethodInfo GetRemoveMethod(bool nonPublic) => RemoveMethod;
+        public override MethodInfo GetAddMethod(bool nonPublic) => RemoteAddMethod;
+        public override MethodInfo GetRemoveMethod(bool nonPublic) => RemoteRemoveMethod;
 
         public override object[] GetCustomAttributes(bool inherit)
         {

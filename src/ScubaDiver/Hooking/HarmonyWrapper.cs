@@ -116,7 +116,6 @@ namespace ScubaDiver.Hooking
                     break;
                 default:
                     throw new ArgumentException("Invalid value for the `HarmonyPatchPosition pos` arg");
-                    break;
             }
             _harmony.Patch(target,
                 prefix,

@@ -237,9 +237,9 @@ namespace RemoteNET.Internal.Reflection
             {
                 RemoteEventInfo rpi = ei as RemoteEventInfo;
                 MethodInfo add = methods.FirstOrDefault(mi => mi.Name == "add_" + ei.Name);
-                rpi.AddMethod = add as RemoteMethodInfo;
+                rpi.RemoteAddMethod = add as RemoteMethodInfo;
                 MethodInfo remove = methods.FirstOrDefault(mi => mi.Name == "remove_" + ei.Name);
-                rpi.RemoveMethod = remove as RemoteMethodInfo;
+                rpi.RemoteRemoveMethod = remove as RemoteMethodInfo;
             }
         }
 

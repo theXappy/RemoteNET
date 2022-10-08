@@ -88,7 +88,7 @@ namespace RemoteNET.Internal.Reflection
                 string args = string.Join(", ", _paramInfos.Select(pi => pi.ToString()));
                 return $"{_retType.TypeFullName} {Name}({args})";
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }

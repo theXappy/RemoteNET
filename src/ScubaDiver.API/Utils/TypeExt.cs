@@ -31,11 +31,11 @@ namespace ScubaDiver.API.Extensions
         /// <param name="methodName">Method name</param>
         /// <param name="parameterTypes">Types of parameters in the function, in order.</param>
         /// <returns></returns>
-        public static MethodInfo GetMethodRecursive(this Type t, string methodName, Type[] parameterTypes = null)
+        public static MethodInfo GetMethodRecursive(this Type t, string methodName, Type[]? parameterTypes = null)
             => GetMethodRecursive(t, methodName, null, parameterTypes);
 
 
-        public static MethodInfo GetMethodRecursive(this Type t, string methodName, Type[] genericArgumentTypes, Type[] parameterTypes)
+        public static MethodInfo GetMethodRecursive(this Type t, string methodName, Type[]? genericArgumentTypes, Type[]? parameterTypes)
         {
             var methods = t.GetMethods((BindingFlags)0xffff).Where(m=>m.Name == methodName);
             if(genericArgumentTypes != null && genericArgumentTypes.Length > 0)
