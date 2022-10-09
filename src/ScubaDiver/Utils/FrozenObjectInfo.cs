@@ -3,7 +3,7 @@
 namespace ScubaDiver
 {
     /// <summary>
-    /// This object represents an object that has been pinned by <see cref="Diver"/>.
+    /// This object represents an object that has been pinned at a specific address.
     /// Creating this object alone isn't enough to pin an object. It is only used to keep track of
     /// pinned objects' metadata.
     /// </summary>

@@ -4,18 +4,12 @@ using System.Threading;
 
 namespace ScubaDiver
 {
-
     internal static class Freezer
     {
-        public static ulong GetAddress(object o)
-        {
-            FrozenObjectInfo foi = Freeze(o);
-            ulong address = foi.Address;
-            foi.UnfreezeEvent.Set();
-            foi.FreezeThread.Join();
-            return address;
-        }
-
+        /// <summary>
+        /// Freezes an object at it's current address
+        /// </summary>
+        /// <param name="target">Object to freeze</param>
         public static FrozenObjectInfo Freeze(object target)
         {
             ulong freezeAddr = 0;
@@ -43,11 +37,11 @@ namespace ScubaDiver
         /// </summary>
         /// <param name="o">Object to freeze</param>
         /// <param name="freezeAddr">
-        /// Used to report back the freezed object's address. Only valid after <see cref="freezeFeedback"/> was set!
+        /// Used to report back the freezed object's address. Only valid after <see cref="freezeCompleted"/> was set!
         /// </param>
-        /// <param name="freezeFeedback">Event which the freezer will call once the object is frozen</param>
+        /// <param name="freezeCompleted">Event which the freezer will call once the object is frozen</param>
         /// <param name="unfreezeRequested">Event the freezer waits on until unfreezing is requested by the caller</param>
-        private static unsafe void FreezeInternal(object o, ref ulong freezeAddr, ManualResetEvent freezeFeedback, ManualResetEvent unfreezeRequested)
+        private static unsafe void FreezeInternal(object o, ref ulong freezeAddr, ManualResetEvent freezeCompleted, ManualResetEvent unfreezeRequested)
         {
             // TODO: This "costs" us a thread (probably from the thread pool) for every pinned object.
             // Maybe this should be done in another class and support multiple objects per thread
@@ -74,7 +68,7 @@ namespace ScubaDiver
                 // it's 4 bytes in x32 and 8 bytes in x64 (Hence using `IntPtr.Size`)
                 IntPtr iPtr = new(ptr);
                 freezeAddr = ((ulong)iPtr.ToInt64()) - (ulong)IntPtr.Size;
-                freezeFeedback.Set();
+                freezeCompleted.Set();
                 unfreezeRequested.WaitOne();
                 GC.KeepAlive(iPtr);
             }
