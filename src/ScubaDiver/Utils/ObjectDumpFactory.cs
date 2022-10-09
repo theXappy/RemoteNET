@@ -1,12 +1,11 @@
-﻿using ScubaDiver.API.Dumps;
-using ScubaDiver.API.Utils;
-using ScubaDiver.API.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Linq;
+using System.Reflection;
+using ScubaDiver.API.Interactions.Dumps;
+using ScubaDiver.API.Utils;
 
-namespace ScubaDiver.Utils
+namespace ScubaDiver
 {
     public static class ObjectDumpFactory
     {

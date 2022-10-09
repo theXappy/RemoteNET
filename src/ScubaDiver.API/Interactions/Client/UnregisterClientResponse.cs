@@ -1,4 +1,4 @@
-﻿namespace ScubaDiver.API.Dumps
+﻿namespace ScubaDiver.API.Interactions.Client
 {
     public class UnregisterClientResponse
     {

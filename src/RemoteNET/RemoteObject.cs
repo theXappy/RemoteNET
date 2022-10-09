@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using RemoteNET.Internal;
 using ScubaDiver.API;
-using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Interactions;
+using ScubaDiver.API.Interactions.Dumps;
 
 namespace RemoteNET
 {

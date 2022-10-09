@@ -1,6 +1,6 @@
 ﻿using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
-using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.API.Utils;
 using System;
 using System.Collections.Generic;

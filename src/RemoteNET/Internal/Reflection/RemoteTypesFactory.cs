@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using ScubaDiver.API;
-using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Interactions.Dumps;
 
 namespace RemoteNET.Internal.Reflection
 {

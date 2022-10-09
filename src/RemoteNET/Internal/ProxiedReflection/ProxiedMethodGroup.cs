@@ -1,8 +1,7 @@
-﻿using RemoteNET.Internal.ProxiedReflection;
+﻿using System.Collections.Generic;
 using RemoteNET.Internal.Reflection;
-using System.Collections.Generic;
 
-namespace RemoteNET.Internal
+namespace RemoteNET.Internal.ProxiedReflection
 {
     public class ProxiedMethodGroup : List<RemoteMethodInfo>
     {

@@ -1,4 +1,4 @@
-﻿namespace RemoteNET.Internal
+﻿namespace RemoteNET.Internal.ProxiedReflection
 {
     public enum ProxiedMemberType
     {

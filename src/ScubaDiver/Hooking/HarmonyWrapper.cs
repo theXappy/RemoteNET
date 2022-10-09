@@ -5,7 +5,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using ScubaDiver.API;
 using System.Threading;
-using ScubaDiver.Utils;
+using ScubaDiver.API.Hooking;
 
 namespace ScubaDiver.Hooking
 {

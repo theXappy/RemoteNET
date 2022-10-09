@@ -5,11 +5,17 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Hooking;
+using ScubaDiver.API.Interactions;
+using ScubaDiver.API.Interactions.Callbacks;
+using ScubaDiver.API.Utils;
 using static ScubaDiver.API.DiverCommunicator;
 
 namespace ScubaDiver.API
 {
+    /// <summary>
+    /// Listens for 'callbacks' invocations from the Diver - Callbacks for remote events and remote hooked functions
+    /// </summary>
     public class CallbacksListener
     {
         private HttpListener _listener = null;
@@ -168,7 +174,7 @@ namespace ScubaDiver.API
                 }
                 else if (_tokensToHookCallbacks.TryGetValue(res.Token, out LocalHookCallback hook))
                 {
-                    HookContext hookContext = new HookContext(res.StackTrace);
+                    HookContext hookContext = new(res.StackTrace);
 
                     // Run hook. No results expected directly (it might alter variabels inside the hook)
                     hook(hookContext, res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
@@ -192,9 +198,10 @@ namespace ScubaDiver.API
             }
             else
             {
+                Console.WriteLine($"[WARN] Diver tried to trigger an unexpected path: {request.Url.AbsolutePath}");
                 // TODO: I'm not sure the usage of 'DiverError' here is good. It's sent from the Communicator's side
                 // to the Diver's side...
-                DiverError errResults = new("Unknown Token", String.Empty);
+                DiverError errResults = new("Unknown path in URL", String.Empty);
                 body = JsonConvert.SerializeObject(errResults);
             }
 
@@ -202,7 +209,7 @@ namespace ScubaDiver.API
             // Get a response stream and write the response to it.
             response.ContentLength64 = buffer.Length;
             response.ContentType = "application/json";
-            System.IO.Stream output = response.OutputStream;
+            Stream output = response.OutputStream;
             output.Write(buffer, 0, buffer.Length);
             // You must close the output stream.
             output.Close();

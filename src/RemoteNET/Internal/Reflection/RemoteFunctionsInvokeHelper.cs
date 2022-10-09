@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Linq;
 using ScubaDiver.API;
-using ScubaDiver.API.Dumps;
 using ScubaDiver.API.Extensions;
+using ScubaDiver.API.Interactions;
 using ScubaDiver.API.Utils;
 
 namespace RemoteNET.Internal.Reflection

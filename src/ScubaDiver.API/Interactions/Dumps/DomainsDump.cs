@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ScubaDiver.API.Dumps
+namespace ScubaDiver.API.Interactions.Dumps
 {
     public class DomainsDump
     {

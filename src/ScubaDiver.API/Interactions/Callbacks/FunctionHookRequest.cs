@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ScubaDiver.API.Dumps
+namespace ScubaDiver.API.Interactions.Callbacks
 {
     public class FunctionHookRequest
     {
@@ -11,5 +11,5 @@ namespace ScubaDiver.API.Dumps
         public string HookPosition { get; set; } // FFS: "Pre" or "Post"
 
     }
-    
+
 }

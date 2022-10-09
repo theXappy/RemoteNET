@@ -1,4 +1,4 @@
-﻿namespace ScubaDiver.API
+﻿namespace ScubaDiver.API.Hooking
 {
 
     /// Used by RmoteHarmony and Communicator

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace ScubaDiver.API
+namespace ScubaDiver.API.Utils
 {
     public static class JsonConvert
     {

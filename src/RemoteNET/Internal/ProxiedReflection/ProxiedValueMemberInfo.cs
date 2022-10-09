@@ -1,7 +1,6 @@
-﻿using RemoteNET.Internal.ProxiedReflection;
-using System;
+﻿using System;
 
-namespace RemoteNET.Internal
+namespace RemoteNET.Internal.ProxiedReflection
 {
     /// <summary>
     /// Info of proxied field or property

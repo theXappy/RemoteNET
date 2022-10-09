@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ScubaDiver.API.Dumps
+namespace ScubaDiver.API.Interactions.Callbacks
 {
     public class CallbackInvocationRequest
     {
@@ -13,5 +13,5 @@ namespace ScubaDiver.API.Dumps
             Parameters = new();
         }
     }
-    
+
 }

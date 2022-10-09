@@ -1,4 +1,4 @@
-﻿namespace ScubaDiver.API
+﻿namespace ScubaDiver.API.Hooking
 {
     public class HookContext
     {

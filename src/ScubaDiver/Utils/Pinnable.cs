@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace ScubaDiver.Utils
+namespace ScubaDiver
 {
     /// <summary>
     /// This class is used to make arbitrary objects "Pinnable" in the .NET process's heap.
