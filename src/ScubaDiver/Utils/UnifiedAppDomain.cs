@@ -9,11 +9,7 @@ namespace ScubaDiver.Utils
     /// </summary>
     public class UnifiedAppDomain
     {
-        // NOTE: Under the hhok this app doesn't really have access to all 'AppDomain' objects
-        // because those are very hard to retrieve.
-        // Instead this class steals all instances of 'RuntimeAssembly' from the heap, which is actually all the assemblies from all the App Domains.
-
-        private Diver _parentDiver;
+        private readonly Diver _parentDiver;
 
         /// <summary>
         /// Parent diver, which is currently running in the app
@@ -24,20 +20,20 @@ namespace ScubaDiver.Utils
             _parentDiver = parentDiver;
         }
 
-        private AppDomain[] _domains = null;
+        private AppDomain[] _domains;
 
         public AppDomain[] GetDomains()
         {
             if (_domains == null)
             {
-                // Using Diver's heap searching abilities to locate all 'RuntimeAssemblies'
+                // Using Diver's heap searching abilities to locate all 'System.AppDomain'
                 try
                 {
                     (bool anyErrors, var candidates) = _parentDiver.GetHeapObjects(heapObjType => heapObjType == typeof(AppDomain).FullName);
 
                     if(anyErrors)
                     {
-                        throw new Exception("GetHeapObjects returned anyErrors=True");
+                        throw new Exception("GetHeapObjects returned anyErrors: True");
                     }
 
                     _domains = candidates.Select(cand => _parentDiver.GetObject(cand.Address, false, cand.HashCode).instance).Cast<AppDomain>().ToArray();
@@ -47,8 +43,8 @@ namespace ScubaDiver.Utils
                 {
                     Logger.Debug("[Diver][UnifiedAppDomain] Failed to search heap for Runtime Assemblies. Error: " + ex.Message);
 
-                    // Fallback - Just return all assemblies in the current AppDomain. It's not ALL of them but sometimes it's good enough.
-                    _domains = new AppDomain[1] { AppDomain.CurrentDomain };
+                    // Fallback - Just return all assemblies in the current AppDomain. Obviously, it's not ALL of them but sometimes it's good enough.
+                    _domains = new[] { AppDomain.CurrentDomain };
                 }
             }
             return _domains;
@@ -61,7 +57,7 @@ namespace ScubaDiver.Utils
 
         public Type ResolveType(string typeFullName, string assembly = null)
         {
-            foreach (Assembly assm in this.GetAssemblies())
+            foreach (Assembly assm in GetAssemblies())
             {
                 Type t = assm.GetType(typeFullName, throwOnError: false);
                 if (t != null)

@@ -28,7 +28,7 @@ namespace ScubaDiver
         public static int EntryPoint(string pwzArgument)
         {
             // UnmanagedAdapterDLL needs to call a C# function with exactly this signature.
-            // So we use it to just create a diver, and run the Dive func (blocking)
+            // So we use it to just create a diver, and run the Start func (blocking)
 
             // Diver needs some assemblies which might not be loaded in the target process
             // so starting off with registering an assembly resolver to the Diver's dll's directory
@@ -39,7 +39,7 @@ namespace ScubaDiver
             {
                 Diver _instance = new();
                 ushort port = ushort.Parse(pwzArgument);
-                _instance.Dive(port);
+                _instance.Start(port);
 
                 // Diver killed (politely)
                 Logger.Debug("[Diver] Diver finished gracefully, Entry point returning");

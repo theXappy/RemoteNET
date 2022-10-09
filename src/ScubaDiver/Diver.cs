@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using Microsoft.Diagnostics.Runtime;
 using ScubaDiver.API;
@@ -25,13 +26,13 @@ using Exception = System.Exception;
 
 namespace ScubaDiver
 {
-
     public class Diver : IDisposable
     {
         // Runtime analysis and exploration fields
-        private readonly object _debugObjectsLock = new();
+        private readonly object _clrMdLock = new();
         private DataTarget _dt = null;
         private ClrRuntime _runtime = null;
+        // Address to Object converter
         private readonly Converter<object> _converter = new();
 
         // Clients Tracking
@@ -45,15 +46,14 @@ namespace ScubaDiver
         private readonly ConcurrentDictionary<ulong, FrozenObjectInfo> _pinnedObjects;
 
         // Callbacks Endpoint of the Controller process
-        IPEndPoint _callbacksEndpoint;
-        int _nextAvilableCallbackToken = 0;
-        private UnifiedAppDomain _unifiedAppDomain;
+        private IPEndPoint _callbacksEndpoint;
+        private int _nextAvailableCallbackToken;
+        private readonly UnifiedAppDomain _unifiedAppDomain;
         private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
         private readonly ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
+        private bool HasCallbackEndpoint => _callbacksEndpoint != null;
 
         private readonly ManualResetEvent _stayAlive = new(true);
-
-        public bool HasCallbackEndpoint => _callbacksEndpoint != null;
 
         public Diver()
         {
@@ -86,72 +86,7 @@ namespace ScubaDiver
             _unifiedAppDomain = new UnifiedAppDomain(this);
         }
 
-        private string MakePingResponse(HttpListenerRequest arg)
-        {
-            return "{\"status\":\"pong\"}";
-        }
-
-        private string MakeUnregisterClientResponse(HttpListenerRequest arg)
-        {
-            string pidString = arg.QueryString.Get("process_id");
-            if (pidString == null || !int.TryParse(pidString, out int pid))
-            {
-                return QuickError("Missing parameter 'process_id'");
-            }
-            bool removed;
-            int remaining;
-            lock (_registeredPidsLock)
-            {
-                removed = _registeredPids.Remove(pid);
-                remaining = _registeredPids.Count;
-            }
-            Logger.Debug("[Diver] Client unregistered. ID = " + pid);
-
-            UnregisterClientResponse ucResponse = new()
-            {
-                WasRemvoed = removed,
-                OtherClientsAmount = remaining
-            };
-
-            return JsonConvert.SerializeObject(ucResponse);
-        }
-
-        private string MakeRegisterClientResponse(HttpListenerRequest arg)
-        {
-            string pidString = arg.QueryString.Get("process_id");
-            if (pidString == null || !int.TryParse(pidString, out int pid))
-            {
-                return QuickError("Missing parameter 'process_id'");
-            }
-            lock (_registeredPidsLock)
-            {
-                _registeredPids.Add(pid);
-            }
-            Logger.Debug("[Diver] New client registered. ID = " + pid);
-            return "{\"status\":\"OK'\"}";
-        }
-
-        void RefreshRuntime()
-        {
-            lock (_debugObjectsLock)
-            {
-                _runtime?.Dispose();
-                _runtime = null;
-                _dt?.Dispose();
-                _dt = null;
-
-                // This works like 'fork()', it does NOT create a dump file and uses it as the target
-                // Instead it creates a secondary process which is a copy of the current one, but without any running threads.
-                // Then our process attaches to the other one and reads its memory.
-                //
-                // NOTE: This subprocess inherits handles to DLLs in the current process so it might "lock"
-                // both UnmanagedAdapterDLL.dll and ScubaDiver.dll
-                _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
-                _runtime = _dt.ClrVersions.Single().CreateRuntime();
-            }
-        }
-
-        public void Dive(ushort listenPort)
+        public void Start(ushort listenPort)
         {
             Logger.Debug("[Diver] Is logging debugs in release? " + Logger.DebugInRelease.Value);
 
@@ -176,7 +111,7 @@ namespace ScubaDiver
             listener.Stop();
             listener.Close();
             Logger.Debug("[Diver] Closing ClrMD runtime and snapshot");
-            lock (_debugObjectsLock)
+            lock (_clrMdLock)
             {
                 _runtime?.Dispose();
                 _runtime = null;
@@ -191,9 +126,29 @@ namespace ScubaDiver
                 Logger.Debug($"[Diver] Addr {pinAddr:X16} unpinning returned {res}");
             }
 
-            Logger.Debug("[Diver] Dispatcher returned, Dive is complete.");
+            Logger.Debug("[Diver] Dispatcher returned, Start is complete.");
         }
 
+        #region Helpers
+        void RefreshRuntime()
+        {
+            lock (_clrMdLock)
+            {
+                _runtime?.Dispose();
+                _runtime = null;
+                _dt?.Dispose();
+                _dt = null;
+
+                // This works like 'fork()', it does NOT create a dump file and uses it as the target
+                // Instead it creates a secondary process which is a copy of the current one, but without any running threads.
+                // Then our process attaches to the other one and reads its memory.
+                //
+                // NOTE: This subprocess inherits handles to DLLs in the current process so it might "lock"
+                // both UnmanagedAdapterDLL.dll and ScubaDiver.dll
+                _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
+                _runtime = _dt.ClrVersions.Single().CreateRuntime();
+            }
+        }
         private Assembly InitNewtonsoftJson()
         {
             // This will trigger our resolver to either get a pre-loaded Newtonsoft.Json version
@@ -202,7 +157,42 @@ namespace ScubaDiver
             NewtonsoftProxy.Init(ass);
             return ass;
         }
+        private object ParseParameterObject(ObjectOrRemoteAddress param)
+        {
+            switch (param)
+            {
+                case { IsNull: true }:
+                    return null;
+                case { IsType: true }:
+                    return _unifiedAppDomain.ResolveType(param.Type, param.Assembly);
+                case { IsRemoteAddress: false }:
+                    return PrimitivesEncoder.Decode(param.EncodedObject, param.Type);
+                case { IsRemoteAddress: true }:
+                    if (TryGetPinnedObject(param.RemoteAddress, out FrozenObjectInfo poi))
+                    {
+                        return poi.Object;
+                    }
+                    break;
+            }
 
+            Debugger.Launch();
+            throw new NotImplementedException(
+                $"Don't know how to parse this parameter into an object of type `{param.Type}`");
+        }
+
+        public string QuickError(string error, string stackTrace = null)
+        {
+            if (stackTrace == null)
+            {
+                stackTrace = (new StackTrace(true)).ToString();
+            }
+            DiverError errResults = new(error, stackTrace);
+            return JsonConvert.SerializeObject(errResults);
+        }
+
+        #endregion
+
+        #region HTTP Dispatching
         private void HandleDispatchedRequest(HttpListenerContext requestContext)
         {
             HttpListenerRequest request = requestContext.Request;
@@ -225,11 +215,11 @@ namespace ScubaDiver
                 body = QuickError("Unknown Command");
             }
 
-            byte[] buffer = System.Text.Encoding.UTF8.GetBytes(body);
+            byte[] buffer = Encoding.UTF8.GetBytes(body);
             // Get a response stream and write the response to it.
             response.ContentLength64 = buffer.Length;
             response.ContentType = "application/json";
-            System.IO.Stream output = response.OutputStream;
+            Stream output = response.OutputStream;
             output.Write(buffer, 0, buffer.Length);
             // You must close the output stream.
             output.Close();
@@ -312,45 +302,115 @@ namespace ScubaDiver
             }
             foreach (RegisteredMethodHookInfo rmhi in _remoteHooks.Values)
             {
-                ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
+                HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
             }
             _remoteEventHandler.Clear();
             _remoteHooks.Clear();
             Logger.Debug("[Diver] Removed all event subscriptions & hooks");
         }
+        #endregion
 
-
-        public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvilableCallbackToken);
-        public void InvokeControllerCallback(int token, string stackTrace, params object[] parameters)
+        #region Object Pinning
+        public (object instance, ulong pinnedAddress) GetObject(ulong objAddr, bool pinningRequested, int? hashcode = null)
         {
-            ReverseCommunicator reverseCommunicator = new(_callbacksEndpoint);
+            bool hashCodeFallback = hashcode.HasValue;
 
-            ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
+            // Check if we have this objects in our pinned pool
+            if (TryGetPinnedObject(objAddr, out FrozenObjectInfo foi))
             {
-                object parameter = parameters[i];
-                if (parameter == null)
-                {
-                    remoteParams[i] = ObjectOrRemoteAddress.Null;
-                }
-                else if (parameter.GetType().IsPrimitiveEtc())
-                {
-                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
-                }
-                else // Not primitive
-                {
-                    if (!IsPinned(parameter, out FrozenObjectInfo foi))
-                    {
-                        // Pin and mark for unpinning later
-                        foi = PinObject(parameter);
-                    }
-
-                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(foi.Address, foi.Object.GetType().FullName);
-                }
+                // Found pinned object!
+                object pinnedInstance = foi.Object;
+                return (pinnedInstance, foi.Address);
             }
 
-            // Call callback at controller
-            reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
+            // Object not pinned, try get it the hard way
+            // Make sure we had such an object in the last dumped runtime (this will help us later if the object moves
+            // since we'll know what type we are looking for)
+            // Make sure it's still in place
+            ClrObject lastKnownClrObj = default;
+            lock (_clrMdLock)
+            {
+                lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
+            }
+            if (lastKnownClrObj == default)
+            {
+                throw new Exception("No object in this address. Try finding it's address again and dumping again.");
+            }
+
+            // Make sure it's still in place by refreshing the runtime
+            RefreshRuntime();
+            ClrObject clrObj = default;
+            lock (_clrMdLock)
+            {
+                clrObj = _runtime.Heap.GetObject(objAddr);
+            }
+
+            //
+            // Figuring out the Method Table value and the actual Object's address
+            //
+            ulong methodTable;
+            ulong finalObjAddress;
+            if (clrObj.Type != null)
+            {
+                methodTable = clrObj.Type.MethodTable;
+                finalObjAddress = clrObj.Address;
+            }
+            else
+            {
+                // Object moved! 
+                // Let's try and save the day with some hashcode filtering (if user allowed us)
+                if (!hashCodeFallback)
+                {
+                    throw new Exception(
+                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                        "Hash Code fallback was NOT activated\"}");
+                }
+
+                Predicate<string> typeFilter = (string type) => type.Contains(lastKnownClrObj.Type.Name);
+                (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
+                if (anyErrors)
+                {
+                    throw new Exception(
+                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                        "Hash Code fallback was activated but dumping function failed so non hash codes were checked\"}");
+                }
+                var matches = objects.Where(heapObj => heapObj.HashCode == hashcode.Value).ToList();
+                if (matches.Count != 1)
+                {
+                    throw new Exception(
+                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
+                        $"Hash Code fallback was activated but {((matches.Count > 1) ? "too many (>1)" : "no")} objects with the same hash code were found\"}}");
+                }
+
+                // Single match! We are as lucky as it gets :)
+                HeapDump.HeapObject heapObj = matches.Single();
+                ulong newObjAddress = heapObj.Address;
+                finalObjAddress = newObjAddress;
+                methodTable = heapObj.MethodTable;
+            }
+
+            //
+            // Actually convert the address back into an Object reference.
+            //
+            object instance;
+            try
+            {
+                instance = _converter.ConvertFromIntPtr(finalObjAddress, methodTable);
+            }
+            catch (ArgumentException)
+            {
+                throw new Exception("Method Table value mismatched");
+            }
+
+
+            // Pin the result object if requested
+            ulong pinnedAddress = 0;
+            if (pinningRequested)
+            {
+                foi = PinObject(instance);
+                pinnedAddress = foi.Address;
+            }
+            return (instance, pinnedAddress);
         }
         /// <summary>
         /// Tries to get a <see cref="FrozenObjectInfo"/> of a pinned object
@@ -412,6 +472,8 @@ namespace ScubaDiver
             return fObj;
         }
 
+        #endregion
+
         public (bool anyErrors, List<HeapDump.HeapObject> objects) GetHeapObjects(Predicate<string> filter)
         {
             List<HeapDump.HeapObject> objects = new();
@@ -425,7 +487,7 @@ namespace ScubaDiver
                 anyErrors = false;
 
                 RefreshRuntime();
-                lock (_debugObjectsLock)
+                lock (_clrMdLock)
                 {
                     foreach (ClrObject clrObj in _runtime.Heap.EnumerateObjects())
                     {
@@ -494,24 +556,237 @@ namespace ScubaDiver
             return (anyErrors, objects);
         }
 
+        #region Ping Handler
 
-        private string MakeEventUnsubscribeResponse(HttpListenerRequest arg)
+        private string MakePingResponse(HttpListenerRequest arg)
         {
-            string tokenStr = arg.QueryString.Get("token");
-            if (tokenStr == null || !int.TryParse(tokenStr, out int token))
-            {
-                return QuickError("Missing parameter 'address'");
-            }
-            Logger.Debug($"[Diver][MakeEventUnsubscribeResponse] Called! Token: {token}");
-
-            if (_remoteEventHandler.TryGetValue(token, out RegisteredEventHandlerInfo eventInfo))
-            {
-                eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
-                _remoteEventHandler.TryRemove(token, out _);
-                return "{\"status\":\"OK\"}";
-            }
-            return QuickError("Unknown token for event callback subscription");
+            return "{\"status\":\"pong\"}";
         }
+
+        #endregion
+
+        #region Client Registration Handlers
+        private string MakeRegisterClientResponse(HttpListenerRequest arg)
+        {
+            string pidString = arg.QueryString.Get("process_id");
+            if (pidString == null || !int.TryParse(pidString, out int pid))
+            {
+                return QuickError("Missing parameter 'process_id'");
+            }
+            lock (_registeredPidsLock)
+            {
+                _registeredPids.Add(pid);
+            }
+            Logger.Debug("[Diver] New client registered. ID = " + pid);
+            return "{\"status\":\"OK'\"}";
+        }
+        private string MakeUnregisterClientResponse(HttpListenerRequest arg)
+        {
+            string pidString = arg.QueryString.Get("process_id");
+            if (pidString == null || !int.TryParse(pidString, out int pid))
+            {
+                return QuickError("Missing parameter 'process_id'");
+            }
+            bool removed;
+            int remaining;
+            lock (_registeredPidsLock)
+            {
+                removed = _registeredPids.Remove(pid);
+                remaining = _registeredPids.Count;
+            }
+            Logger.Debug("[Diver] Client unregistered. ID = " + pid);
+
+            UnregisterClientResponse ucResponse = new()
+            {
+                WasRemvoed = removed,
+                OtherClientsAmount = remaining
+            };
+
+            return JsonConvert.SerializeObject(ucResponse);
+        }
+
+        #endregion
+
+        private string MakeDomainsResponse(HttpListenerRequest req)
+        {
+            List<DomainsDump.AvailableDomain> available = new();
+            lock (_clrMdLock)
+            {
+                foreach (ClrAppDomain clrAppDomain in _runtime.AppDomains)
+                {
+                    available.Add(new DomainsDump.AvailableDomain()
+                    {
+                        Name = clrAppDomain.Name,
+                        AvailableModules = clrAppDomain.Modules
+                            .Select(m => Path.GetFileNameWithoutExtension(m.Name))
+                            .Where(m => !string.IsNullOrWhiteSpace(m))
+                            .ToList()
+                    });
+                }
+            }
+
+            DomainsDump dd = new()
+            {
+                Current = AppDomain.CurrentDomain.FriendlyName,
+                AvailableDomains = available
+            };
+
+            return JsonConvert.SerializeObject(dd);
+        }
+        private string MakeTypesResponse(HttpListenerRequest req)
+        {
+            string assembly = req.QueryString.Get("assembly");
+
+            // Try exact match assembly 
+            IEnumerable<ClrModule> allAssembliesInApp = null;
+            lock (_clrMdLock)
+            {
+                allAssembliesInApp = _runtime.AppDomains.SelectMany(appDom => appDom.Modules);
+            }
+            List<ClrModule> matchingAssemblies = allAssembliesInApp.Where(module => Path.GetFileNameWithoutExtension(module.Name) == assembly).ToList();
+            if (matchingAssemblies.Count == 0)
+            {
+                // No exact matches, widen search to any assembly *containing* the query
+                matchingAssemblies = allAssembliesInApp.Where(module => Path.GetFileNameWithoutExtension(module.Name).Contains(assembly)).ToList();
+            }
+
+            if (!matchingAssemblies.Any())
+            {
+                // No matching assemblies found
+                return QuickError("No assemblies found matching the query");
+            }
+            else if (matchingAssemblies.Count > 1)
+            {
+                return $"{{\"error\":\"Too many assemblies found matching the query. Expected: 1, Got: {matchingAssemblies.Count}\"}}";
+            }
+
+            // Got here - we have a single matching assembly.
+            ClrModule matchingAssembly = matchingAssemblies.Single();
+
+            var typeNames = from tuple in matchingAssembly.OldSchoolEnumerateTypeDefToMethodTableMap()
+                            let token = tuple.Token
+                            let typeName = matchingAssembly.ResolveToken(token)?.Name ?? "Unknown"
+                            select new TypesDump.TypeIdentifiers()
+                            { MethodTable = tuple.MethodTable, Token = token, TypeName = typeName };
+
+
+            TypesDump dump = new()
+            {
+                AssemblyName = assembly,
+                Types = typeNames.ToList()
+            };
+
+            return JsonConvert.SerializeObject(dump);
+        }
+        public string MakeTypeResponse(TypeDumpRequest dumpRequest)
+        {
+            string type = dumpRequest.TypeFullName;
+            if (string.IsNullOrEmpty(type))
+            {
+                return QuickError("Missing parameter 'TypeFullName'");
+            }
+
+            string assembly = dumpRequest.Assembly;
+            //Logger.Debug($"[Diver] Trying to dump Type: {type}");
+            if (assembly != null)
+            {
+                //Logger.Debug($"[Diver] Trying to dump Type: {type}, WITH Assembly: {assembly}");
+            }
+            Type resolvedType = null;
+            lock (_clrMdLock)
+            {
+                resolvedType = _unifiedAppDomain.ResolveType(type, assembly);
+            }
+
+            // 
+            // Defining a sub-function that parses a type and it's parents recursively
+            //
+            static TypeDump ParseType(Type typeObj)
+            {
+                if (typeObj == null) return null;
+
+                var ctors = typeObj.GetConstructors((BindingFlags)0xffff).Select(ci => new TypeDump.TypeMethod(ci))
+                    .ToList();
+                var methods = typeObj.GetRuntimeMethods().Select(mi => new TypeDump.TypeMethod(mi))
+                    .ToList();
+                var fields = typeObj.GetRuntimeFields().Select(fi => new TypeDump.TypeField(fi))
+                    .ToList();
+                var events = typeObj.GetRuntimeEvents().Select(ei => new TypeDump.TypeEvent(ei))
+                    .ToList();
+                var props = typeObj.GetRuntimeProperties().Select(pi => new TypeDump.TypeProperty(pi))
+                    .ToList();
+
+                TypeDump td = new()
+                {
+                    Type = typeObj.FullName,
+                    Assembly = typeObj.Assembly.GetName().Name,
+                    Methods = methods,
+                    Constructors = ctors,
+                    Fields = fields,
+                    Events = events,
+                    Properties = props,
+                    IsArray = typeObj.IsArray,
+                };
+                if (typeObj.BaseType != null)
+                {
+                    // Has parent. Add its identifier
+                    td.ParentFullTypeName = typeObj.BaseType.FullName;
+                    td.ParentAssembly = typeObj.BaseType.Assembly.GetName().Name;
+                }
+
+                return td;
+            }
+
+            if (resolvedType != null)
+            {
+                TypeDump recusiveTypeDump = ParseType(resolvedType);
+                return JsonConvert.SerializeObject(recusiveTypeDump);
+            }
+
+            return QuickError("Failed to find type in searched assemblies");
+        }
+        private string MakeTypeResponse(HttpListenerRequest req)
+        {
+            string body = null;
+            using (StreamReader sr = new(req.InputStream))
+            {
+                body = sr.ReadToEnd();
+            }
+            if (string.IsNullOrEmpty(body))
+            {
+                return QuickError("Missing body");
+            }
+
+            TextReader textReader = new StringReader(body);
+            var request = JsonConvert.DeserializeObject<TypeDumpRequest>(body);
+            if (request == null)
+            {
+                return QuickError("Failed to deserialize body");
+            }
+
+            return MakeTypeResponse(request);
+        }
+        private string MakeHeapResponse(HttpListenerRequest arg)
+        {
+            string filter = arg.QueryString.Get("type_filter");
+
+            // Default filter - no filter. Just return everything.
+            Predicate<string> matchesFilter = Filter.CreatePredicate(filter);
+
+            (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(matchesFilter);
+            if (anyErrors)
+            {
+                return "{\"error\":\"All dumping trials failed because at least 1 " +
+                       "object moved between the snapshot and the heap enumeration\"}";
+            }
+
+            HeapDump hd = new() { Objects = objects };
+
+            var resJson = JsonConvert.SerializeObject(hd);
+            return resJson;
+        }
+        #region Hooks & Events Handlers
+
         private string MakeUnhookMethodResponse(HttpListenerRequest arg)
         {
             string tokenStr = arg.QueryString.Get("token");
@@ -523,7 +798,7 @@ namespace ScubaDiver
 
             if (_remoteHooks.TryGetValue(token, out RegisteredMethodHookInfo rmhi))
             {
-                ScubaDiver.Hooking.HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
+                HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
                 return "{\"status\":\"OK\"}";
             }
             return QuickError("Unknown token for event callback subscription");
@@ -566,7 +841,7 @@ namespace ScubaDiver
             Logger.Debug("[Diver] Hook Method = It's pre");
 
             Type resolvedType = null;
-            lock (_debugObjectsLock)
+            lock (_clrMdLock)
             {
                 resolvedType = _unifiedAppDomain.ResolveType(typeFullName);
             }
@@ -577,7 +852,7 @@ namespace ScubaDiver
             Logger.Debug("[Diver] Hook Method - Resolved Type");
 
             Type[] paramTypes = null;
-            lock (_debugObjectsLock)
+            lock (_clrMdLock)
             {
                 paramTypes = request.ParametersTypeFullNames.Select(typeFullName => _unifiedAppDomain.ResolveType(typeFullName)).ToArray();
             }
@@ -596,12 +871,12 @@ namespace ScubaDiver
             int token = AssignCallbackToken();
             Logger.Debug($"[Diver] Hook Method - Assigned Token: {token}");
 
-            Hooking.HarmonyWrapper.HookCallback patchCallback = (obj, args) => InvokeControllerCallback(token, (new StackTrace()).ToString(), new object[2] { obj, args });
+            HarmonyWrapper.HookCallback patchCallback = (obj, args) => InvokeControllerCallback(token, (new StackTrace()).ToString(), new object[2] { obj, args });
 
             Logger.Debug($"[Diver] Hooking function {methodName}...");
             try
             {
-                ScubaDiver.Hooking.HarmonyWrapper.Instance.AddHook(methodInfo, pos, patchCallback);
+                HarmonyWrapper.Instance.AddHook(methodInfo, pos, patchCallback);
             }
             catch (Exception ex)
             {
@@ -621,8 +896,23 @@ namespace ScubaDiver
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
+        private string MakeEventUnsubscribeResponse(HttpListenerRequest arg)
+        {
+            string tokenStr = arg.QueryString.Get("token");
+            if (tokenStr == null || !int.TryParse(tokenStr, out int token))
+            {
+                return QuickError("Missing parameter 'address'");
+            }
+            Logger.Debug($"[Diver][MakeEventUnsubscribeResponse] Called! Token: {token}");
 
-
+            if (_remoteEventHandler.TryGetValue(token, out RegisteredEventHandlerInfo eventInfo))
+            {
+                eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
+                _remoteEventHandler.TryRemove(token, out _);
+                return "{\"status\":\"OK\"}";
+            }
+            return QuickError("Unknown token for event callback subscription");
+        }
         private string MakeEventSubscribeResponse(HttpListenerRequest arg)
         {
             if (!HasCallbackEndpoint)
@@ -700,7 +990,6 @@ namespace ScubaDiver
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
-
         private string MakeRegisterCallbacksEndpointResponse(HttpListenerRequest arg)
         {
             // This API is used by the Diver's controller to set an 'End Point' (IP + Port) where
@@ -722,26 +1011,72 @@ namespace ScubaDiver
             Logger.Debug($"[Diver] Register Callback Endpoint complete. Endpoint: {_callbacksEndpoint}");
             return "{\"status\":\"OK\"}";
         }
-        private string MakeUnpinResponse(HttpListenerRequest arg)
+        public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvailableCallbackToken);
+        public void InvokeControllerCallback(int token, string stackTrace, params object[] parameters)
+        {
+            ReverseCommunicator reverseCommunicator = new(_callbacksEndpoint);
+
+            ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                object parameter = parameters[i];
+                if (parameter == null)
+                {
+                    remoteParams[i] = ObjectOrRemoteAddress.Null;
+                }
+                else if (parameter.GetType().IsPrimitiveEtc())
+                {
+                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
+                }
+                else // Not primitive
+                {
+                    if (!IsPinned(parameter, out FrozenObjectInfo foi))
+                    {
+                        // Pin and mark for unpinning later
+                        foi = PinObject(parameter);
+                    }
+
+                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(foi.Address, foi.Object.GetType().FullName);
+                }
+            }
+
+            // Call callback at controller
+            reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
+        }
+
+        #endregion
+        private string MakeObjectResponse(HttpListenerRequest arg)
         {
             string objAddrStr = arg.QueryString.Get("address");
-            if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
+            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
+            bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
+            string hashCodeStr = arg.QueryString.Get("hashcode");
+            int userHashcode = 0;
+            if (objAddrStr == null)
             {
                 return QuickError("Missing parameter 'address'");
             }
-            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}");
-
-            // Check if we have this objects in our pinned pool
-            if (TryGetPinnedObject(objAddr, out _))
+            if (!ulong.TryParse(objAddrStr, out var objAddr))
             {
-                // Found pinned object!
-                UnpinObject(objAddr);
-                return "{\"status\":\"OK\"}";
+                return QuickError("Parameter 'address' could not be parsed as ulong");
             }
-            else
+            if (hashCodeFallback)
             {
-                // Object not pinned, try get it the hard way
-                return QuickError("Object at given address wasn't pinned");
+                if (!int.TryParse(hashCodeStr, out userHashcode))
+                {
+                    return QuickError("Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int");
+                }
+            }
+
+            try
+            {
+                (object instance, ulong pinnedAddress) = GetObject(objAddr, pinningRequested, hashCodeFallback ? userHashcode : null);
+                ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinnedAddress);
+                return JsonConvert.SerializeObject(od);
+            }
+            catch (Exception e)
+            {
+                return QuickError("Failed Getting the object for the user. Error: " + e.Message);
             }
         }
         private string MakeCreateObjectResponse(HttpListenerRequest arg)
@@ -766,7 +1101,7 @@ namespace ScubaDiver
 
 
             Type t = null;
-            lock (_debugObjectsLock)
+            lock (_clrMdLock)
             {
                 t = _unifiedAppDomain.ResolveType(request.TypeFullName);
             }
@@ -836,28 +1171,7 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(invoRes);
 
         }
-        private object ParseParameterObject(ObjectOrRemoteAddress param)
-        {
-            switch (param)
-            {
-                case { IsNull: true }:
-                    return null;
-                case { IsType: true }:
-                    return _unifiedAppDomain.ResolveType(param.Type, param.Assembly);
-                case { IsRemoteAddress: false }:
-                    return PrimitivesEncoder.Decode(param.EncodedObject, param.Type);
-                case { IsRemoteAddress: true }:
-                    if (TryGetPinnedObject(param.RemoteAddress, out FrozenObjectInfo poi))
-                    {
-                        return poi.Object;
-                    }
-                    break;
-            }
 
-            Debugger.Launch();
-            throw new NotImplementedException(
-                $"Don't know how to parse this parameter into an object of type `{param.Type}`");
-        }
         private string MakeInvokeResponse(HttpListenerRequest arg)
         {
             Logger.Debug("[Diver] Got /Invoke request!");
@@ -889,7 +1203,7 @@ namespace ScubaDiver
                 // Null target - static call
                 //
 
-                lock (_debugObjectsLock)
+                lock (_clrMdLock)
                 {
                     dumpedObjType = _unifiedAppDomain.ResolveType(request.TypeFullName);
                 }
@@ -911,7 +1225,7 @@ namespace ScubaDiver
                 {
                     // Object not pinned, try get it the hard way
                     ClrObject clrObj;
-                    lock (_debugObjectsLock)
+                    lock (_clrMdLock)
                     {
                         clrObj = _runtime.Heap.GetObject(request.ObjAddress);
                     }
@@ -922,7 +1236,7 @@ namespace ScubaDiver
 
                     // Make sure it's still in place
                     RefreshRuntime();
-                    lock (_debugObjectsLock)
+                    lock (_clrMdLock)
                     {
                         clrObj = _runtime.Heap.GetObject(request.ObjAddress);
                     }
@@ -1075,7 +1389,7 @@ namespace ScubaDiver
             if (request.ObjAddress == 0)
             {
                 // Null Target -- Getting a Static field
-                lock (_debugObjectsLock)
+                lock (_clrMdLock)
                 {
                     dumpedObjType = _unifiedAppDomain.ResolveType(request.TypeFullName);
                 }
@@ -1191,7 +1505,7 @@ namespace ScubaDiver
             {
                 // Object not pinned, try get it the hard way
                 ClrObject clrObj = default;
-                lock (_debugObjectsLock)
+                lock (_clrMdLock)
                 {
                     clrObj = _runtime.Heap.GetObject(request.ObjAddress);
                     if (clrObj.Type == null)
@@ -1408,144 +1722,28 @@ namespace ScubaDiver
 
             return JsonConvert.SerializeObject(invokeRes);
         }
-
-        public (object instance, ulong pinnedAddress) GetObject(ulong objAddr, bool pinningRequested, int? hashcode = null)
-        {
-            bool hashCodeFallback = hashcode.HasValue;
-
-            // Check if we have this objects in our pinned pool
-            if (TryGetPinnedObject(objAddr, out FrozenObjectInfo foi))
-            {
-                // Found pinned object!
-                object pinnedInstance = foi.Object;
-                return (pinnedInstance, foi.Address);
-            }
-
-            // Object not pinned, try get it the hard way
-            // Make sure we had such an object in the last dumped runtime (this will help us later if the object moves
-            // since we'll know what type we are looking for)
-            // Make sure it's still in place
-            ClrObject lastKnownClrObj = default;
-            lock (_debugObjectsLock)
-            {
-                lastKnownClrObj = _runtime.Heap.GetObject(objAddr);
-            }
-            if (lastKnownClrObj == default)
-            {
-                throw new Exception("No object in this address. Try finding it's address again and dumping again.");
-            }
-
-            // Make sure it's still in place by refreshing the runtime
-            RefreshRuntime();
-            ClrObject clrObj = default;
-            lock (_debugObjectsLock)
-            {
-                clrObj = _runtime.Heap.GetObject(objAddr);
-            }
-
-            //
-            // Figuring out the Method Table value and the actual Object's address
-            //
-            ulong methodTable;
-            ulong finalObjAddress;
-            if (clrObj.Type != null)
-            {
-                methodTable = clrObj.Type.MethodTable;
-                finalObjAddress = clrObj.Address;
-            }
-            else
-            {
-                // Object moved! 
-                // Let's try and save the day with some hashcode filtering (if user allowed us)
-                if (!hashCodeFallback)
-                {
-                    throw new Exception(
-                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                        "Hash Code fallback was NOT activated\"}");
-                }
-
-                Predicate<string> typeFilter = (string type) => type.Contains(lastKnownClrObj.Type.Name);
-                (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
-                if (anyErrors)
-                {
-                    throw new Exception(
-                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                        "Hash Code fallback was activated but dumping function failed so non hash codes were checked\"}");
-                }
-                var matches = objects.Where(heapObj => heapObj.HashCode == hashcode.Value).ToList();
-                if (matches.Count != 1)
-                {
-                    throw new Exception(
-                        "{\"error\":\"Object moved since last refresh. 'address' now points at an invalid address. " +
-                        $"Hash Code fallback was activated but {((matches.Count > 1) ? "too many (>1)" : "no")} objects with the same hash code were found\"}}");
-                }
-
-                // Single match! We are as lucky as it gets :)
-                HeapDump.HeapObject heapObj = matches.Single();
-                ulong newObjAddress = heapObj.Address;
-                finalObjAddress = newObjAddress;
-                methodTable = heapObj.MethodTable;
-            }
-
-            //
-            // Actually convert the address back into an Object reference.
-            //
-            object instance;
-            try
-            {
-                instance = _converter.ConvertFromIntPtr(finalObjAddress, methodTable);
-            }
-            catch (ArgumentException)
-            {
-                throw new Exception("Method Table value mismatched");
-            }
-
-
-            // Pin the result object if requested
-            ulong pinnedAddress = 0;
-            if (pinningRequested)
-            {
-                foi = PinObject(instance);
-                pinnedAddress = foi.Address;
-            }
-            return (instance, pinnedAddress);
-        }
-
-        private string MakeObjectResponse(HttpListenerRequest arg)
+        private string MakeUnpinResponse(HttpListenerRequest arg)
         {
             string objAddrStr = arg.QueryString.Get("address");
-            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
-            bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
-            string hashCodeStr = arg.QueryString.Get("hashcode");
-            int userHashcode = 0;
-            if (objAddrStr == null)
+            if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
             {
                 return QuickError("Missing parameter 'address'");
             }
-            if (!ulong.TryParse(objAddrStr, out var objAddr))
-            {
-                return QuickError("Parameter 'address' could not be parsed as ulong");
-            }
-            if (hashCodeFallback)
-            {
-                if (!int.TryParse(hashCodeStr, out userHashcode))
-                {
-                    return QuickError("Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int");
-                }
-            }
+            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}");
 
-            try
+            // Check if we have this objects in our pinned pool
+            if (TryGetPinnedObject(objAddr, out _))
             {
-                (object instance, ulong pinnedAddress) = GetObject(objAddr, pinningRequested, hashCodeFallback ? userHashcode : null);
-                ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinnedAddress);
-                return JsonConvert.SerializeObject(od);
+                // Found pinned object!
+                UnpinObject(objAddr);
+                return "{\"status\":\"OK\"}";
             }
-            catch (Exception e)
+            else
             {
-                return QuickError("Failed Getting the object for the user. Error: " + e.Message);
+                // Object not pinned, try get it the hard way
+                return QuickError("Object at given address wasn't pinned");
             }
         }
-
         private string MakeDieResponse(HttpListenerRequest req)
         {
             Logger.Debug("[Diver] Die command received");
@@ -1563,203 +1761,11 @@ namespace ScubaDiver
             _stayAlive.Reset();
             return "{\"status\":\"Goodbye\"}";
         }
-        private string MakeTypesResponse(HttpListenerRequest req)
-        {
-            string assembly = req.QueryString.Get("assembly");
-
-            // Try exact match assembly 
-            IEnumerable<ClrModule> allAssembliesInApp = null;
-            lock (_debugObjectsLock)
-            {
-                allAssembliesInApp = _runtime.AppDomains.SelectMany(appDom => appDom.Modules);
-            }
-            List<ClrModule> matchingAssemblies = allAssembliesInApp.Where(module => Path.GetFileNameWithoutExtension(module.Name) == assembly).ToList();
-            if (matchingAssemblies.Count == 0)
-            {
-                // No exact matches, widen search to any assembly *containing* the query
-                matchingAssemblies = allAssembliesInApp.Where(module => Path.GetFileNameWithoutExtension(module.Name).Contains(assembly)).ToList();
-            }
-
-            if (!matchingAssemblies.Any())
-            {
-                // No matching assemblies found
-                return QuickError("No assemblies found matching the query");
-            }
-            else if (matchingAssemblies.Count > 1)
-            {
-                return $"{{\"error\":\"Too many assemblies found matching the query. Expected: 1, Got: {matchingAssemblies.Count}\"}}";
-            }
-
-            // Got here - we have a single matching assembly.
-            ClrModule matchingAssembly = matchingAssemblies.Single();
-
-            var typeNames = from tuple in matchingAssembly.OldSchoolEnumerateTypeDefToMethodTableMap()
-                            let token = tuple.Token
-                            let typeName = matchingAssembly.ResolveToken(token)?.Name ?? "Unknown"
-                            select new TypesDump.TypeIdentifiers()
-                            { MethodTable = tuple.MethodTable, Token = token, TypeName = typeName };
-
-
-            TypesDump dump = new()
-            {
-                AssemblyName = assembly,
-                Types = typeNames.ToList()
-            };
-
-            return JsonConvert.SerializeObject(dump);
-        }
-
-
-        private string MakeHeapResponse(HttpListenerRequest httpReq)
-        {
-            string filter = httpReq.QueryString.Get("type_filter");
-
-            // Default filter - no filter. Just return everything.
-            Predicate<string> matchesFilter = Filter.CreatePredicate(filter);
-
-            (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(matchesFilter);
-            if (anyErrors)
-            {
-                return "{\"error\":\"All dumping trials failed because at least 1 " +
-                    "object moved between the snapshot and the heap enumeration\"}";
-            }
-
-            HeapDump hd = new() { Objects = objects };
-
-            var resJson = JsonConvert.SerializeObject(hd);
-            return resJson;
-        }
-        private string MakeDomainsResponse(HttpListenerRequest req)
-        {
-            // TODO: Allow moving between domains?
-            List<DomainsDump.AvailableDomain> available = new();
-            lock (_debugObjectsLock)
-            {
-                foreach (ClrAppDomain clrAppDomain in _runtime.AppDomains)
-                {
-                    available.Add(new DomainsDump.AvailableDomain()
-                    {
-                        Name = clrAppDomain.Name,
-                        AvailableModules = clrAppDomain.Modules
-                                                .Select(m => Path.GetFileNameWithoutExtension(m.Name))
-                                                .Where(m => !string.IsNullOrWhiteSpace(m))
-                                                .ToList()
-                    });
-                }
-            }
-
-            DomainsDump dd = new()
-            {
-                Current = AppDomain.CurrentDomain.FriendlyName,
-                AvailableDomains = available
-            };
-
-            return JsonConvert.SerializeObject(dd);
-        }
-        private string MakeTypeResponse(HttpListenerRequest req)
-        {
-            string body = null;
-            using (StreamReader sr = new(req.InputStream))
-            {
-                body = sr.ReadToEnd();
-            }
-            if (string.IsNullOrEmpty(body))
-            {
-                return QuickError("Missing body");
-            }
-
-            TextReader textReader = new StringReader(body);
-            var request = JsonConvert.DeserializeObject<TypeDumpRequest>(body);
-            if (request == null)
-            {
-                return QuickError("Failed to deserialize body");
-            }
-
-            return MakeTypeResponse(request);
-        }
-        public string MakeTypeResponse(TypeDumpRequest dumpRequest)
-        {
-            string type = dumpRequest.TypeFullName;
-            if (string.IsNullOrEmpty(type))
-            {
-                return QuickError("Missing parameter 'TypeFullName'");
-            }
-
-            string assembly = dumpRequest.Assembly;
-            //Logger.Debug($"[Diver] Trying to dump Type: {type}");
-            if (assembly != null)
-            {
-                //Logger.Debug($"[Diver] Trying to dump Type: {type}, WITH Assembly: {assembly}");
-            }
-            Type resolvedType = null;
-            lock (_debugObjectsLock)
-            {
-                resolvedType = _unifiedAppDomain.ResolveType(type, assembly);
-            }
-
-            // 
-            // Defining a sub-function that parses a type and it's parents recursively
-            //
-            static TypeDump ParseType(Type typeObj)
-            {
-                if (typeObj == null) return null;
-
-                var ctors = typeObj.GetConstructors((BindingFlags)0xffff).Select(ci => new TypeDump.TypeMethod(ci))
-                    .ToList();
-                var methods = typeObj.GetRuntimeMethods().Select(mi => new TypeDump.TypeMethod(mi))
-                    .ToList();
-                var fields = typeObj.GetRuntimeFields().Select(fi => new TypeDump.TypeField(fi))
-                    .ToList();
-                var events = typeObj.GetRuntimeEvents().Select(ei => new TypeDump.TypeEvent(ei))
-                    .ToList();
-                var props = typeObj.GetRuntimeProperties().Select(pi => new TypeDump.TypeProperty(pi))
-                    .ToList();
-
-                TypeDump td = new()
-                {
-                    Type = typeObj.FullName,
-                    Assembly = typeObj.Assembly.GetName().Name,
-                    Methods = methods,
-                    Constructors = ctors,
-                    Fields = fields,
-                    Events = events,
-                    Properties = props,
-                    IsArray = typeObj.IsArray,
-                };
-                if (typeObj.BaseType != null)
-                {
-                    // Has parent. Add its identifier
-                    td.ParentFullTypeName = typeObj.BaseType.FullName;
-                    td.ParentAssembly = typeObj.BaseType.Assembly.GetName().Name;
-                }
-
-                return td;
-            }
-
-            if (resolvedType != null)
-            {
-                TypeDump recusiveTypeDump = ParseType(resolvedType);
-                return JsonConvert.SerializeObject(recusiveTypeDump);
-            }
-
-            return QuickError("Failed to find type in searched assemblies");
-        }
-
-        public string QuickError(string error, string stackTrace = null)
-        {
-            if (stackTrace == null)
-            {
-                stackTrace = (new StackTrace(true)).ToString();
-            }
-            DiverError errResults = new(error, stackTrace);
-            return JsonConvert.SerializeObject(errResults);
-        }
-
 
         // IDisposable
         public void Dispose()
         {
-            lock (_debugObjectsLock)
+            lock (_clrMdLock)
             {
                 _runtime?.Dispose();
                 _dt?.Dispose();
