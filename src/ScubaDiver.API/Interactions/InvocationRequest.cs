@@ -1,13 +1,7 @@
 ﻿using System.Collections.Generic;
 
-namespace ScubaDiver.API.Dumps
+namespace ScubaDiver.API.Interactions
 {
-    public class TypeDumpRequest
-    {
-        public string Assembly { get; set; }
-        public string TypeFullName { get; set; }
-
-    }
 
     public class InvocationRequest
     {
@@ -22,12 +16,6 @@ namespace ScubaDiver.API.Dumps
             GenericArgsTypeFullNames = new string[0];
             Parameters = new();
         }
-    }
-    public class IndexedItemAccessRequest
-    {
-        public ulong CollectionAddress { get; set; }
-        public bool PinRequest { get; set; }
-        public ObjectOrRemoteAddress Index { get; set; }
     }
 
 }

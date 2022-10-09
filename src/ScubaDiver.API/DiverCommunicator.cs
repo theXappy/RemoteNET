@@ -7,11 +7,16 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
-using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Exceptions;
+using ScubaDiver.API.Hooking;
+using ScubaDiver.API.Interactions;
+using ScubaDiver.API.Interactions.Callbacks;
+using ScubaDiver.API.Interactions.Dumps;
+using ScubaDiver.API.Interactions.Object;
+using ScubaDiver.API.Utils;
 
 namespace ScubaDiver.API
 {
-
     /// <summary>
     /// Communicates with a diver in a remote process
     /// </summary>

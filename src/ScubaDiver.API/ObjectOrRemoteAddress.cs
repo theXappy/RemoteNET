@@ -3,6 +3,9 @@ using System;
 
 namespace ScubaDiver.API
 {
+    /// <summary>
+    /// Either an encoded object (for primitive types like int, string, primitibe arrays...) or info of a remote object
+    /// </summary>
     public class ObjectOrRemoteAddress
     {
         /// <summary>

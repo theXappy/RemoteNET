@@ -3,9 +3,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
-namespace ScubaDiver.API.Dumps
+namespace ScubaDiver.API.Interactions.Dumps
 {
-    [DebuggerDisplay("TypeDump of {"+nameof(Type)+"} (Assembly: {" + (nameof(Assembly)) +"})")]
+    [DebuggerDisplay("TypeDump of {" + nameof(Type) + "} (Assembly: {" + nameof(Assembly) + "})")]
     public class TypeDump
     {
         public class TypeMethod
@@ -20,7 +20,7 @@ namespace ScubaDiver.API.Dumps
 
                 public MethodParameter()
                 {
-                    
+
                 }
 
                 public MethodParameter(ParameterInfo pi)
@@ -36,8 +36,8 @@ namespace ScubaDiver.API.Dumps
 
                 public override string ToString()
                 {
-                    return 
-                        (string.IsNullOrEmpty(Assembly) ? string.Empty : (Assembly+".")) +
+                    return
+                        (string.IsNullOrEmpty(Assembly) ? string.Empty : Assembly + ".") +
                         (string.IsNullOrEmpty(Type) ? "UNKNOWN_TYPE" : Type) + " " +
                            (string.IsNullOrEmpty(Name) ? "MISSING_NAME" : Name);
 
@@ -66,12 +66,13 @@ namespace ScubaDiver.API.Dumps
                 {
                     GenericArgs = methodBase.GetGenericArguments().Select(arg => arg.Name).ToList();
                 }
-                else {
+                else
+                {
                     GenericArgs = new List<string>();
                 }
                 Name = methodBase.Name;
                 Parameters = methodBase.GetParameters().Select(paramInfo => new MethodParameter(paramInfo)).ToList();
-                if(methodBase is MethodInfo methodInfo)
+                if (methodBase is MethodInfo methodInfo)
                 {
                     ReturnTypeFullName = methodInfo.ReturnType.FullName;
                     ReturnTypeAssembly = methodInfo.ReturnType.Assembly.GetName().Name;
@@ -88,7 +89,7 @@ namespace ScubaDiver.API.Dumps
             {
                 if (Name != other.Name)
                     return false;
-                if(Parameters.Count != other.Parameters.Count)
+                if (Parameters.Count != other.Parameters.Count)
                     return false;
                 var genericArgsMatches = GenericArgs.Zip(other.GenericArgs, (arg1, arg2) =>
                 {
@@ -105,7 +106,7 @@ namespace ScubaDiver.API.Dumps
             public override string ToString()
             {
 
-                return $"{this.ReturnTypeFullName} {this.Name}({string.Join(",", Parameters)})";
+                return $"{ReturnTypeFullName} {Name}({string.Join(",", Parameters)})";
             }
         }
         public class TypeField
@@ -138,9 +139,9 @@ namespace ScubaDiver.API.Dumps
             }
             public TypeEvent(EventInfo ei)
             {
-                this.Name = ei.Name;
-                this.TypeFullName = ei.EventHandlerType.FullName;
-                this.Assembly = ei.EventHandlerType.Assembly.GetName().Name;
+                Name = ei.Name;
+                TypeFullName = ei.EventHandlerType.FullName;
+                Assembly = ei.EventHandlerType.Assembly.GetName().Name;
             }
         }
 

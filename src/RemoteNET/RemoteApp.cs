@@ -12,7 +12,7 @@ using RemoteNET.Internal.Utils;
 using RemoteNET.Properties;
 using RemoteNET.Utils;
 using ScubaDiver.API;
-using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.API.Utils;
 
 namespace RemoteNET

@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
 using Microsoft.Diagnostics.Runtime;
-using ScubaDiver.Utils;
 
-namespace ScubaDiver.Utils
+namespace ScubaDiver
 {
     public static class ClrExt
     {

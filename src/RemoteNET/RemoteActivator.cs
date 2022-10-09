@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
-using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Interactions;
 
 namespace RemoteNET
 {

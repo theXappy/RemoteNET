@@ -1,7 +1,10 @@
 ﻿using System;
 
-namespace ScubaDiver.API
+namespace ScubaDiver.API.Exceptions
 {
+    /// <summary>
+    /// Encapsulates an exception that was thrown in the remote object and catched by the Diver.
+    /// </summary>
     public class RemoteException : Exception
     {
         public string RemoteMessage { get; private set; }

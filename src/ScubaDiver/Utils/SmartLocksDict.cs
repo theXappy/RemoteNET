@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace ScubaDiver.Utils
+namespace ScubaDiver
 {
     /// <summary>
     /// This collection allows saving a "lock" for every element where:

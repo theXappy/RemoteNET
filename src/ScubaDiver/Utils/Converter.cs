@@ -2,7 +2,7 @@
 using System.Reflection.Emit;
 using ScubaDiver.API.Extensions;
 
-namespace ScubaDiver.Utils
+namespace ScubaDiver
 {
     /// <summary>
     /// The dynamic method trick is originally by Alois Kraus here: 

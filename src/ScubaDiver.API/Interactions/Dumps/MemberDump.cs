@@ -1,4 +1,4 @@
-﻿namespace ScubaDiver.API.Dumps
+﻿namespace ScubaDiver.API.Interactions.Dumps
 {
     /// <summary>
     /// Dump of a specific member (field, property) of a specific object

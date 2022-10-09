@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Tasks;
 
-namespace ScubaDiver.Utils
+namespace ScubaDiver
 {
 
     internal static class Freezer

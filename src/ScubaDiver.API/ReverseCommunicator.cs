@@ -2,12 +2,14 @@
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using ScubaDiver.API.Dumps;
+using ScubaDiver.API.Interactions;
+using ScubaDiver.API.Interactions.Callbacks;
+using ScubaDiver.API.Utils;
 
 namespace ScubaDiver.API
 {
     /// <summary>
-    /// The reverse communicator is used by the Diver to communicate back with it's controller regarding callbacks invocations
+    /// The reverse communicator is used by the Diver to communicate back with its controller regarding callbacks invocations
     /// </summary>
     public class ReverseCommunicator
     {

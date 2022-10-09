@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace ScubaDiver.API
+namespace ScubaDiver.API.Exceptions
 {
     internal class RemoteObjectMovedException : Exception
     {

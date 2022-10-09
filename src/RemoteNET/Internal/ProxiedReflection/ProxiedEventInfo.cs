@@ -1,9 +1,8 @@
-﻿using RemoteNET.Internal.ProxiedReflection;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace RemoteNET.Internal
+namespace RemoteNET.Internal.ProxiedReflection
 {
     public class ProxiedEventInfo : IProxiedMember
     {

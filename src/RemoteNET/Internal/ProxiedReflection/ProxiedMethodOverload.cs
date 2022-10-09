@@ -1,8 +1,8 @@
-﻿using RemoteNET.Internal.Reflection;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using RemoteNET.Internal.Reflection;
 
-namespace RemoteNET.Internal
+namespace RemoteNET.Internal.ProxiedReflection
 {
     public class ProxiedMethodOverload
     {

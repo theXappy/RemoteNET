@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using RemoteNET;
 using ScubaDiver.API;
+using ScubaDiver.API.Hooking;
 using static RemoteNET.Utils.Lambda;
 
 namespace ScubaDiver.Tester

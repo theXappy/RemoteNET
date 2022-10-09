@@ -1,7 +1,6 @@
 ﻿using System.Threading;
-using System.Threading.Tasks;
 
-namespace ScubaDiver.Utils
+namespace ScubaDiver
 {
     /// <summary>
     /// This object represents an object that has been pinned by <see cref="Diver"/>.
