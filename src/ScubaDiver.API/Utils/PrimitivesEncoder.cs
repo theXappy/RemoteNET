@@ -29,7 +29,7 @@ namespace ScubaDiver.API.Utils
                 return toEncode.ToString();
             }
 
-            if (!(toEncode is Array enumerable))
+            if (toEncode is not Array enumerable)
             {
                 throw new ArgumentException(
                     $"Object to encode was not a primitive or an array. TypeFullName: {t}");
@@ -62,7 +62,7 @@ namespace ScubaDiver.API.Utils
 
         public static bool TryEncode(object toEncode, out string res)
         {
-            res = default(string);
+            res = default;
             if (!(toEncode.GetType().IsPrimitiveEtc()))
             {
                 if (toEncode is Array)
