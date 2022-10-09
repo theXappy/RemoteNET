@@ -39,25 +39,25 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Diver.cs" />
-    <Compile Include="DllEntry.cs" />
-    <Compile Include="Hooking\HarmonyWrapper.cs" />
-    <Compile Include="Logger.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RegisteredEventHandlerInfo.cs" />
-    <Compile Include="RegisteredMethodHookInfo.cs" />
-    <Compile Include="Utils\ClrExt.cs" />
-    <Compile Include="Utils\Converter.cs" />
-    <Compile Include="Utils\Freezer.cs" />
-    <Compile Include="Utils\FrozenObjectInfo.cs" />
-    <Compile Include="Utils\ObjectDumpFactory.cs" />
-    <Compile Include="Utils\Pinnable.cs" />
-    <Compile Include="Utils\SmartLocksDict.cs" />
-    <Compile Include="Utils\TypesResolver.cs" />
-    <Compile Include="Utils\UnifiedAppDomain.cs" />
+    <Compile Include="..\Diver.cs" />
+    <Compile Include="..\DllEntry.cs" />
+    <Compile Include="..\Hooking\HarmonyWrapper.cs" />
+    <Compile Include="..\Logger.cs" />
+    <Compile Include="..\Properties\AssemblyInfo.cs" />
+    <Compile Include="..\RegisteredEventHandlerInfo.cs" />
+    <Compile Include="..\RegisteredMethodHookInfo.cs" />
+    <Compile Include="..\Utils\ClrExt.cs" />
+    <Compile Include="..\Utils\Converter.cs" />
+    <Compile Include="..\Utils\Freezer.cs" />
+    <Compile Include="..\Utils\FrozenObjectInfo.cs" />
+    <Compile Include="..\Utils\ObjectDumpFactory.cs" />
+    <Compile Include="..\Utils\Pinnable.cs" />
+    <Compile Include="..\Utils\SmartLocksDict.cs" />
+    <Compile Include="..\Utils\TypesResolver.cs" />
+    <Compile Include="..\Utils\UnifiedAppDomain.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="app.config" />
+    <None Include="..\app.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -79,7 +79,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj">
+    <ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj">
       <Project>{0fe20420-27e2-467f-ab2d-78b6a795b255}</Project>
       <Name>ScubaDiver.API</Name>
     </ProjectReference>
