@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net5.0</TargetFramework>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+		<RootNamespace>ScubaDiver</RootNamespace>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<LangVersion>latest</LangVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Include="..\Diver.cs" />
+		<Compile Include="..\DllEntry.cs" />
+		<Compile Include="..\Hooking\HarmonyWrapper.cs" />
+		<Compile Include="..\Logger.cs" />
+		<Compile Include="..\RegisteredEventHandlerInfo.cs" />
+		<Compile Include="..\RegisteredMethodHookInfo.cs" />
+		<Compile Include="..\Utils\ClrExt.cs" />
+		<Compile Include="..\Utils\Converter.cs" />
+		<Compile Include="..\Utils\Freezer.cs" />
+		<Compile Include="..\Utils\FrozenObjectInfo.cs" />
+		<Compile Include="..\Utils\ObjectDumpFactory.cs" />
+		<Compile Include="..\Utils\Pinnable.cs" />
+		<Compile Include="..\Utils\SmartLocksDict.cs" />
+		<Compile Include="..\Utils\TypesResolver.cs" />
+		<Compile Include="..\Utils\UnifiedAppDomain.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Diagnostics.Runtime" Version="2.0.222201" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+		<PackageReference Include="Lib.Harmony" Version="2.2.2" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj" />
+	</ItemGroup>
+
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="xcopy /Y /s &quot;$(TargetDir)&quot; &quot;$(SolutionDir)dist\$(ConfigurationName)\$(ProjectName)\&quot;" />
+	</Target>
+
+</Project>
