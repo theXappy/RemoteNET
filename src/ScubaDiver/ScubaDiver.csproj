@@ -39,7 +39,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Utils\UnifiedAppDomain.cs" />
     <Compile Include="Diver.cs" />
     <Compile Include="DllEntry.cs" />
     <Compile Include="Hooking\HarmonyWrapper.cs" />
@@ -50,11 +49,12 @@
     <Compile Include="Utils\ClrExt.cs" />
     <Compile Include="Utils\Converter.cs" />
     <Compile Include="Utils\Freezer.cs" />
-    <Compile Include="Utils\SmartLocksDict.cs" />
+    <Compile Include="Utils\FrozenObjectInfo.cs" />
     <Compile Include="Utils\ObjectDumpFactory.cs" />
     <Compile Include="Utils\Pinnable.cs" />
-    <Compile Include="Utils\FrozenObjectInfo.cs" />
+    <Compile Include="Utils\SmartLocksDict.cs" />
     <Compile Include="Utils\TypesResolver.cs" />
+    <Compile Include="Utils\UnifiedAppDomain.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
