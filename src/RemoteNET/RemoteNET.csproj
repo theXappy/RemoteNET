@@ -11,7 +11,6 @@
 		<RepositoryUrl>https://github.com/theXappy/RemoteNET</RepositoryUrl>
 		<PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
 		<Version>1.0.1.14</Version>
 		<AssemblyVersion>1.0.1.14</AssemblyVersion>
