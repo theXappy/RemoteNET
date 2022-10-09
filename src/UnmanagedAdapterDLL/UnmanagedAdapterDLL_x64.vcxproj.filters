@@ -15,27 +15,27 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\UnmanagedAdapterDLL\stdafx.h">
+    <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\UnmanagedAdapterDLL\targetver.h">
+    <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\UnmanagedAdapterDLL\msgboxf.h">
+    <ClInclude Include="msgboxf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\UnmanagedAdapterDLL\UnmanagedAdapter.h">
+    <ClInclude Include="UnmanagedAdapter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\UnmanagedAdapterDLL\dllmain.cpp">
+    <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\UnmanagedAdapterDLL\UnmanagedAdapterDLL.cpp">
+    <ClCompile Include="UnmanagedAdapterDLL.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\UnmanagedAdapterDLL\stdafx.cpp">
+    <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

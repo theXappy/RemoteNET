@@ -85,14 +85,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\UnmanagedAdapterDLL\UnmanagedAdapter.h" />
-    <ClInclude Include="..\UnmanagedAdapterDLL\msgboxf.h" />
-    <ClInclude Include="..\UnmanagedAdapterDLL\stdafx.h" />
-    <ClInclude Include="..\UnmanagedAdapterDLL\targetver.h" />
+    <ClInclude Include="UnmanagedAdapter.h" />
+    <ClInclude Include="msgboxf.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\UnmanagedAdapterDLL\UnmanagedAdapterDLL.cpp" />
-    <ClCompile Include="..\UnmanagedAdapterDLL\dllmain.cpp">
+    <ClCompile Include="UnmanagedAdapterDLL.cpp" />
+    <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </PrecompiledHeader>
@@ -100,7 +100,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\UnmanagedAdapterDLL\stdafx.cpp">
+    <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
