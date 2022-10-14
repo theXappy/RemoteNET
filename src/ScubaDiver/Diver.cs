@@ -1595,18 +1595,11 @@ namespace ScubaDiver
             }
 
             if (string.IsNullOrEmpty(body))
-            {
                 return QuickError("Missing body");
-            }
 
             var request = JsonConvert.DeserializeObject<IndexedItemAccessRequest>(body);
             if (request == null)
-            {
                 return QuickError("Failed to deserialize body");
-            }
-
-
-
 
             ulong objAddr = request.CollectionAddress;
             object index = ParseParameterObject(request.Index);
@@ -1622,7 +1615,6 @@ namespace ScubaDiver
             object item = null;
             if (arrayFoi.Object.GetType().IsArray)
             {
-                Logger.Debug("[Diver] Array access: Object is an Array!");
                 Array asArray = (Array)arrayFoi.Object;
                 if (index is not int intIndex)
                     return QuickError("Tried to access an Array with a non-int index");
@@ -1632,11 +1624,9 @@ namespace ScubaDiver
                     return QuickError("Index out of range");
 
                 item = asArray.GetValue(intIndex);
-                Logger.Debug("[Diver] Array access: Item is: " + (item?.ToString() ?? "NULL"));
             }
             else if (arrayFoi.Object is IList asList)
             {
-                Logger.Debug("[Diver] Array access: Object is an ILIST!");
                 object[] asArray = asList?.Cast<object>().ToArray();
                 if (asArray == null)
                     return QuickError("Object at given address seemed to be an IList but failed to convert to array");
