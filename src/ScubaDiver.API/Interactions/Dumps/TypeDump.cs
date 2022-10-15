@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
@@ -75,13 +76,13 @@ namespace ScubaDiver.API.Interactions.Dumps
                 if (methodBase is MethodInfo methodInfo)
                 {
                     ReturnTypeFullName = methodInfo.ReturnType.FullName;
+                    ReturnTypeFullName ??= methodInfo.Name + String.Join(",", (object[])methodInfo.ReturnType.GenericTypeArguments);
                     ReturnTypeAssembly = methodInfo.ReturnType.Assembly.GetName().Name;
                 }
                 else
                 {
                     ReturnTypeFullName = "System.Void";
                     ReturnTypeAssembly = "mscorlib";
-
                 }
             }
 
