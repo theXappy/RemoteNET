@@ -859,10 +859,36 @@ namespace ScubaDiver
             Logger.Debug($"[Diver] Hooking - Calling GetMethodRecursive With these params COUNT={paramTypes.Length}");
             Logger.Debug($"[Diver] Hooking - Calling GetMethodRecursive With these param types: {(string.Join(",", paramTypes.Select(t => t.FullName).ToArray()))}");
 
-            MethodInfo methodInfo = resolvedType.GetMethodRecursive(methodName, paramTypes);
+            MethodBase methodInfo;
+            if (methodName == ".ctor")
+            {
+                var methods = resolvedType.GetConstructors((BindingFlags)0xffff).Where(m => m.Name == methodName);
+                MethodBase[] exactMatches = methods
+                    .Where(m =>
+                        m.GetParameters()
+                            .Select(pi => pi.ParameterType)
+                            .SequenceEqual(paramTypes))
+                    .Cast<MethodBase>()
+                    .ToArray();
+                if (exactMatches != null && exactMatches.Length == 1)
+                {
+                    methodInfo = exactMatches.First();
+                }
+                else
+                {
+                    // Do a less strict search
+                    methodInfo = methods.SingleOrDefault(m => m.GetParameters().Select(pi => pi.ParameterType)
+                        .SequenceEqual(paramTypes, new TypeExt.WildCardEnabledTypesComparer()));
+                }
+            }
+            else
+            {
+                methodInfo = resolvedType.GetMethodRecursive(methodName, paramTypes);
+            }
+
             if (methodInfo == null)
             {
-                return QuickError("Failed to find method in type");
+                return QuickError($"Failed to find method {methodName} in type {resolvedType.Name}");
             }
             Logger.Debug("[Diver] Hook Method - Resolved Method");
 
@@ -1277,7 +1303,6 @@ namespace ScubaDiver
                 Logger.Debug("[Diver] Invoking without parameters");
             }
 
-            Logger.Debug($"[Diver] Resolved target object type: {dumpedObjType.FullName}");
             // Infer parameter types from received parameters.
             // Note that for 'null' arguments we don't know the type so we use a "Wild Card" type
             Type[] argumentTypes = paramsList.Select(p => p?.GetType() ?? new WildCardType()).ToArray();

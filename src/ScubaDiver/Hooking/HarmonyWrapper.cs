@@ -81,7 +81,7 @@ namespace ScubaDiver.Hooking
 
         public delegate void HookCallback(object instance, object[] args);
 
-        public void AddHook(MethodInfo target, HarmonyPatchPosition pos, HookCallback patch)
+        public void AddHook(MethodBase target, HarmonyPatchPosition pos, HookCallback patch)
         {
             //
             // Save a side the patch callback to invoke when the target is called
@@ -124,7 +124,7 @@ namespace ScubaDiver.Hooking
                 finalizer);
         }
 
-        public void RemovePrefix(MethodInfo target)
+        public void RemovePrefix(MethodBase target)
         {
             string uniqueId = target.DeclaringType.FullName + ":" + target.Name;
             if (_singlePrefixHooks.TryGetValue(uniqueId, out MethodInfo spHook))
