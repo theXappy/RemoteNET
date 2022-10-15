@@ -12,7 +12,7 @@ namespace ScubaDiver
         /// <summary>
         /// The method that was hooked
         /// </summary>
-        public MethodInfo OriginalHookedMethod { get; set; }
+        public MethodBase OriginalHookedMethod { get; set; }
 
     }
 }
