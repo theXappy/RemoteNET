@@ -22,7 +22,8 @@ namespace ScubaDiver.API
         Task _listenTask = null;
         CancellationTokenSource _src = null;
 
-        int _port;
+        public IPAddress IP { get; set; }
+        public int Port { get; set; }
         readonly object _withErrors = NewtonsoftProxy.JsonSerializerSettingsWithErrors;
         private readonly Dictionary<int, LocalEventCallback> _tokensToEventHandlers = new();
         private readonly Dictionary<LocalEventCallback, int> _eventHandlersToToken = new();
@@ -32,10 +33,11 @@ namespace ScubaDiver.API
 
         DiverCommunicator _communicator;
 
-        public CallbacksListener(DiverCommunicator communicator, int port)
+        public CallbacksListener(DiverCommunicator communicator, int callbacksPort)
         {
             _communicator = communicator;
-            _port = port;
+            Port = callbacksPort;
+            IP = IPAddress.Parse("127.0.0.1");
         }
 
         public bool IsOpen { get; private set; }
@@ -46,21 +48,13 @@ namespace ScubaDiver.API
             if (!IsOpen)
             {
                 // Need to create HTTP listener and send the Diver it's info
-                int localHttpPort = this._port;
-                string ip = "127.0.0.1";
                 _listener = new HttpListener();
-                string listeningUrl = $"http://{ip}:{localHttpPort}/";
+                string listeningUrl = $"http://{IP}:{Port}/";
                 _listener.Prefixes.Add(listeningUrl);
                 _listener.Start();
                 _src = new CancellationTokenSource();
                 _listenTask = Task.Run(() => Dispatcher(_listener), _src.Token);
                 _listenTask = Task.Factory.StartNew(() => Dispatcher(_listener), _src.Token, TaskCreationOptions.AttachedToParent, TaskScheduler.Default);
-
-                bool registered = _communicator.RegisterCallbackEndpoint(ip, localHttpPort);
-                if (!registered)
-                {
-                    throw new Exception("Could not register local callbacks endpoint at remote diver. Communicator returned false");
-                }
                 IsOpen = true;
             }
         }
