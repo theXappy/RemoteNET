@@ -37,7 +37,7 @@ namespace ScubaDiver
         /// </summary>
         /// <param name="o">Object to freeze</param>
         /// <param name="freezeAddr">
-        /// Used to report back the freezed object's address. Only valid after <see cref="freezeCompleted"/> was set!
+        /// Used to report back the frozen object's address. Only valid after <see cref="freezeCompleted"/> was set!
         /// </param>
         /// <param name="freezeCompleted">Event which the freezer will call once the object is frozen</param>
         /// <param name="unfreezeRequested">Event the freezer waits on until unfreezing is requested by the caller</param>
