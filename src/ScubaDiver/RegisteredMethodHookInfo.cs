@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Reflection;
 
 namespace ScubaDiver
@@ -13,6 +14,11 @@ namespace ScubaDiver
         /// The method that was hooked
         /// </summary>
         public MethodBase OriginalHookedMethod { get; set; }
+
+        /// <summary>
+        /// The IP Endpoint listening for invocations
+        /// </summary>
+        public IPEndPoint Endpoint { get; set; }
 
     }
 }
