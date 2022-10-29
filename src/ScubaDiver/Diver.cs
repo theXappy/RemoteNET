@@ -10,6 +10,7 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Diagnostics.Runtime;
 using ScubaDiver.API;
 using ScubaDiver.API.Extensions;
@@ -46,6 +47,7 @@ namespace ScubaDiver
         private readonly ConcurrentDictionary<ulong, FrozenObjectInfo> _pinnedObjects;
 
         // Callbacks Endpoint of the Controller process
+        private bool _monitorEndpoints = true;
         private int _nextAvailableCallbackToken;
         private readonly UnifiedAppDomain _unifiedAppDomain;
         private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
@@ -102,7 +104,18 @@ namespace ScubaDiver
             listener.Start();
             Logger.Debug($"[Diver] Listening on {listeningUrl}...");
 
+            Task endpointsMonitor = Task.Run(CallbacksEndpointsMonitor);
             Dispatcher(listener);
+            Logger.Debug("[Diver] Stopping Callback Endpoints Monitor");
+            _monitorEndpoints = false;
+            try
+            {
+                endpointsMonitor.Wait();
+            }
+            catch
+            {
+                // IDC
+            }
 
             Logger.Debug("[Diver] Closing listener");
             listener.Stop();
@@ -124,6 +137,43 @@ namespace ScubaDiver
             }
 
             Logger.Debug("[Diver] Dispatcher returned, Start is complete.");
+        }
+
+        private void CallbacksEndpointsMonitor()
+        {
+            while (_monitorEndpoints)
+            {
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+                IPEndPoint endpoint;
+                foreach (var registeredMethodHookInfo in _remoteHooks)
+                {
+                    endpoint = registeredMethodHookInfo.Value.Endpoint;
+                    ReverseCommunicator reverseCommunicator = new(endpoint);
+                    Logger.Debug($"[Diver] Checking if callback client at {endpoint} is alive. Token = {registeredMethodHookInfo.Key}. Type = Method Hook");
+                    bool alive = reverseCommunicator.CheckIfAlive();
+                    Logger.Debug($"[Diver] Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) is alive = {alive}");
+                    if (!alive)
+                    {
+                        Logger.Debug(
+                            $"[Diver] Dead Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) DROPPED!");
+                        _remoteHooks.TryRemove(registeredMethodHookInfo.Key, out _);
+                    }
+                }
+                foreach (var registeredEventHandlerInfo in _remoteEventHandler)
+                {
+                    endpoint = registeredEventHandlerInfo.Value.Endpoint;
+                    ReverseCommunicator reverseCommunicator = new(endpoint);
+                    Logger.Debug($"[Diver] Checking if callback client at {endpoint} is alive. Token = {registeredEventHandlerInfo.Key}. Type = Event");
+                    bool alive = reverseCommunicator.CheckIfAlive();
+                    Logger.Debug($"[Diver] Callback client at {endpoint} (Token = {registeredEventHandlerInfo.Key}) is alive = {alive}");
+                    if (!alive)
+                    {
+                        Logger.Debug(
+                            $"[Diver] Dead Callback client at {endpoint} (Token = {registeredEventHandlerInfo.Key}) DROPPED!");
+                        _remoteEventHandler.TryRemove(registeredEventHandlerInfo.Key, out _);
+                    }
+                }
+            }
         }
 
         #region Helpers

@@ -147,6 +147,19 @@ namespace ScubaDiver.API
 
             var response = context.Response;
             string body = null;
+            if (request.Url.AbsolutePath == "/ping")
+            {
+                string pongRes = "{\"status\":\"pong\"}";
+                byte[] pongResBytes = System.Text.Encoding.UTF8.GetBytes(pongRes);
+                // Get a response stream and write the response to it.
+                response.ContentLength64 = pongResBytes.Length;
+                response.ContentType = "application/json";
+                Stream outputStream = response.OutputStream;
+                outputStream.Write(pongResBytes, 0, pongResBytes.Length);
+                // You must close the output stream.
+                outputStream.Close();
+                return;
+            }
             if (request.Url.AbsolutePath == "/invoke_callback")
             {
                 using (StreamReader sr = new(request.InputStream))

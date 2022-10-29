@@ -57,6 +57,21 @@ namespace ScubaDiver.API
             return body;
         }
 
+        public bool CheckIfAlive()
+        {
+            try
+            {
+                var resJson = SendRequest("ping");
+                if (resJson == null)
+                    return false;
+                return resJson.Contains("pong");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public InvocationResults InvokeCallback(int token, string stackTrace,
             params ObjectOrRemoteAddress[] args)
         {
