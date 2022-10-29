@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -44,16 +45,13 @@ namespace ScubaDiver.API
             queryParams ??= new();
 
             HttpClient httpClient = new();
-            string query = "";
-            bool firstParam = true;
+            NameValueCollection queryString = new NameValueCollection();
             foreach (KeyValuePair<string, string> kvp in queryParams)
             {
-                query += firstParam ? "?" : "&";
-                query += $"{kvp.Key}={kvp.Value}";
-                firstParam = false;
+                queryString.Add(kvp.Key, kvp.Value);
             }
 
-            string url = $"http://{_hostname}:{_diverPort}/{path}{query}";
+            string url = $"http://{_hostname}:{_diverPort}/{path}{queryString}";
             HttpRequestMessage msg;
             if (jsonBody == null)
             {
