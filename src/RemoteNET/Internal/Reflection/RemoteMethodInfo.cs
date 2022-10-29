@@ -42,7 +42,7 @@ namespace RemoteNET.Internal.Reflection
             _paramInfos = paramInfos;
             _retType = returnType;
 
-            genericArgs ??= new Type[0];
+            genericArgs ??= Type.EmptyTypes;
             AssignedGenericArgs = genericArgs;
         }
 
