@@ -25,25 +25,25 @@ namespace ScubaDiver.API
         readonly object _withErrors = NewtonsoftProxy.JsonSerializerSettingsWithErrors;
 
         private readonly string _hostname;
-        private readonly int _port;
+        private readonly int _diverPort;
 
         private int? _process_id = null;
         private CallbacksListener _listener;
 
-        public DiverCommunicator(string hostname, int port)
+        public DiverCommunicator(string hostname, int diverPort)
         {
             _hostname = hostname;
-            _port = port;
-            _listener = new CallbacksListener(this, _port + 1);
+            _diverPort = diverPort;
+            _listener = new CallbacksListener(this, _diverPort + 1);
         }
-        public DiverCommunicator(IPAddress ipa, int port) : this(ipa.ToString(), port) { }
+        public DiverCommunicator(IPAddress ipa, int diverPort) : this(ipa.ToString(), diverPort) { }
         public DiverCommunicator(IPEndPoint ipe) : this(ipe.Address, ipe.Port) { }
 
         private string SendRequest(string path, Dictionary<string, string> queryParams = null, string jsonBody = null)
         {
             queryParams ??= new();
 
-            HttpClient c = new();
+            HttpClient httpClient = new();
             string query = "";
             bool firstParam = true;
             foreach (KeyValuePair<string, string> kvp in queryParams)
@@ -53,7 +53,7 @@ namespace ScubaDiver.API
                 firstParam = false;
             }
 
-            string url = $"http://{_hostname}:{_port}/{path}" + query;
+            string url = $"http://{_hostname}:{_diverPort}/{path}{query}";
             HttpRequestMessage msg;
             if (jsonBody == null)
             {
@@ -66,22 +66,14 @@ namespace ScubaDiver.API
                                     "application/json");
             }
 
-            HttpResponseMessage res = c.SendAsync(msg).Result;
+            HttpResponseMessage res = httpClient.SendAsync(msg).Result;
             string body = res.Content.ReadAsStringAsync().Result;
-            c.Dispose();
+            httpClient.Dispose();
+
             if (body.StartsWith("{\"error\":", StringComparison.InvariantCultureIgnoreCase))
             {
-                // Try to parse generic error:
-                DiverError errMessage = null;
-                try
-                {
-                    errMessage = JsonConvert.DeserializeObject<DiverError>(body, _withErrors);
-                }
-                catch
-                {
-                    // Let someone else handle this...
-                    throw;
-                }
+                // Diver sent back an error. We parse it here and throwing a 'proxied' exception
+                var errMessage = JsonConvert.DeserializeObject<DiverError>(body, _withErrors);
                 if (errMessage != null)
                     throw new RemoteException(errMessage.Error, errMessage.StackTrace);
             }
@@ -99,20 +91,6 @@ namespace ScubaDiver.API
             return body?.Contains("Goodbye") ?? false;
         }
 
-        internal bool RegisterCallbackEndpoint(string ip, int localHttpPort)
-        {
-            Dictionary<string, string> queryParams = new();
-            queryParams["ip"] = ip;
-            queryParams["port"] = localHttpPort.ToString();
-            string body = SendRequest("register_callbacks_ep", queryParams);
-            if (!body.Contains("\"status\":\"OK\""))
-            {
-                throw new Exception("Local HTTP server created but informing the remote Diver resulted in an error. " +
-                    "Raw response: " + body);
-            }
-            return true;
-        }
-
         /// <summary>
         /// Dumps the heap of the remote process
         /// </summary>
@@ -120,7 +98,7 @@ namespace ScubaDiver.API
         /// <returns></returns>
         public HeapDump DumpHeap(string typeFilter = null)
         {
-            Dictionary<string, string> queryParams = new() { };
+            Dictionary<string, string> queryParams = new();
             if (typeFilter != null)
             {
                 queryParams["type_filter"] = typeFilter;
@@ -368,6 +346,8 @@ namespace ScubaDiver.API
             queryParams = new() { };
             queryParams["address"] = targetAddr.ToString();
             queryParams["event"] = eventName;
+            queryParams["ip"] = _listener.IP.ToString();
+            queryParams["port"] = _listener.Port.ToString();
             body = SendRequest("event_subscribe", queryParams);
             EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(body);
             _listener.EventSubscribe(callback, regRes.Token);
@@ -377,7 +357,7 @@ namespace ScubaDiver.API
         {
             int token = _listener.EventUnsubscribe(callback);
 
-            Dictionary<string, string> queryParams = new() { };
+            Dictionary<string, string> queryParams = new();
             queryParams["token"] = token.ToString();
             string body = SendRequest("event_unsubscribe", queryParams);
             if (!body.Contains("{\"status\":\"OK\"}"))
@@ -400,6 +380,8 @@ namespace ScubaDiver.API
 
             FunctionHookRequest req = new()
             {
+                IP = _listener.IP.ToString(),
+                Port = _listener.Port,
                 TypeFullName = type,
                 MethodName = methodName,
                 HookPosition = pos.ToString(),
