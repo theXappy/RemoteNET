@@ -45,13 +45,13 @@ namespace ScubaDiver.API
             queryParams ??= new();
 
             HttpClient httpClient = new();
-            NameValueCollection queryString = new NameValueCollection();
+            NameValueCollection queryString = HttpUtility.ParseQueryString(string.Empty);
             foreach (KeyValuePair<string, string> kvp in queryParams)
             {
                 queryString.Add(kvp.Key, kvp.Value);
             }
 
-            string url = $"http://{_hostname}:{_diverPort}/{path}{queryString}";
+            string url = $"http://{_hostname}:{_diverPort}/{path}?{queryString}";
             HttpRequestMessage msg;
             if (jsonBody == null)
             {
