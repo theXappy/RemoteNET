@@ -370,9 +370,11 @@ namespace RemoteNET.Internal.Reflection
                 }
                 else
                 {
+                    Type[] genericArgs = func.GenericArgs.Select(arg => new DummyGenericType(arg)).ToArray();
+
                     // Regular method
                     RemoteMethodInfo methodInfo =
-                        new RemoteMethodInfo(declaringType, resolver, func.Name, null, parameters.ToArray());
+                        new RemoteMethodInfo(declaringType, resolver, func.Name, genericArgs, parameters.ToArray());
                     declaringType.AddMethod(methodInfo);
                 }
             }

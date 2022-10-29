@@ -16,6 +16,11 @@ namespace RemoteNET.Internal.Reflection
         public override Type ReflectedType => throw new NotImplementedException();
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
         public override MethodAttributes Attributes => throw new NotImplementedException();
+        
+        public override bool IsGenericMethod => AssignedGenericArgs.Length > 0;
+        public override bool IsGenericMethodDefinition => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
+        public override bool ContainsGenericParameters => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
+        public override Type[] GetGenericArguments() => AssignedGenericArgs;
 
         public Type[] AssignedGenericArgs { get; }
         private readonly ParameterInfo[] _paramInfos;
@@ -37,16 +42,18 @@ namespace RemoteNET.Internal.Reflection
             _paramInfos = paramInfos;
             _retType = returnType;
 
-            if(genericArgs == null)
-            {
-                genericArgs = new Type[0];
-            }
+            genericArgs ??= new Type[0];
             AssignedGenericArgs = genericArgs;
         }
 
         public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos) :
             this(declaringType, new LazyRemoteTypeResolver(returnType), name, genericArgs, paramInfos)
         { 
+        }
+
+        public override MethodInfo MakeGenericMethod(params Type[] typeArguments)
+        {
+            return new RemoteMethodInfo(DeclaringType, ReturnType, Name, typeArguments, _paramInfos);
         }
 
         public override object[] GetCustomAttributes(bool inherit)
