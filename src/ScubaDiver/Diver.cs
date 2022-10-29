@@ -46,12 +46,10 @@ namespace ScubaDiver
         private readonly ConcurrentDictionary<ulong, FrozenObjectInfo> _pinnedObjects;
 
         // Callbacks Endpoint of the Controller process
-        private IPEndPoint _callbacksEndpoint;
         private int _nextAvailableCallbackToken;
         private readonly UnifiedAppDomain _unifiedAppDomain;
         private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
         private readonly ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
-        private bool HasCallbackEndpoint => _callbacksEndpoint != null;
 
         private readonly ManualResetEvent _stayAlive = new(true);
 
@@ -73,7 +71,6 @@ namespace ScubaDiver
                 {"/unpin", MakeUnpinResponse},
                 {"/types", MakeTypesResponse},
                 {"/type", MakeTypeResponse},
-                {"/register_callbacks_ep", MakeRegisterCallbacksEndpointResponse},
                 {"/event_subscribe", MakeEventSubscribeResponse},
                 {"/event_unsubscribe", MakeEventUnsubscribeResponse},
                 {"/hook_method", MakeHookMethodResponse},
@@ -806,90 +803,53 @@ namespace ScubaDiver
         private string MakeHookMethodResponse(HttpListenerRequest arg)
         {
             Logger.Debug("[Diver] Got Hook Method request!");
-            if (!HasCallbackEndpoint)
-            {
-                return QuickError("Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!");
-            }
-            string body = null;
+            string body;
             using (StreamReader sr = new(arg.InputStream))
             {
                 body = sr.ReadToEnd();
             }
 
             if (string.IsNullOrEmpty(body))
-            {
                 return QuickError("Missing body");
-            }
-
-            Logger.Debug("[Diver] Parsing Hook Method request body");
 
             var request = JsonConvert.DeserializeObject<FunctionHookRequest>(body);
             if (request == null)
-            {
                 return QuickError("Failed to deserialize body");
-            }
-            Logger.Debug("[Diver] Parsing Hook Method request body -- Done!");
 
+            if (!IPAddress.TryParse(request.IP, out IPAddress ipAddress))
+            {
+                return QuickError("Failed to parse IP address. Input: " + request.IP);
+            }
+            int port = request.Port;
+            IPEndPoint endpoint = new IPEndPoint(ipAddress, port);
             string typeFullName = request.TypeFullName;
             string methodName = request.MethodName;
             string hookPosition = request.HookPosition;
             HarmonyPatchPosition pos = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPosition);
             if (!Enum.IsDefined(typeof(HarmonyPatchPosition), pos))
-            {
                 return QuickError("hook_position has an invalid or unsupported value");
-            }
-            Logger.Debug("[Diver] Hook Method = It's pre");
 
-            Type resolvedType = null;
+            Type resolvedType;
             lock (_clrMdLock)
             {
                 resolvedType = _unifiedAppDomain.ResolveType(typeFullName);
             }
             if (resolvedType == null)
-            {
                 return QuickError("Failed to resolve type");
-            }
-            Logger.Debug("[Diver] Hook Method - Resolved Type");
 
-            Type[] paramTypes = null;
+            Type[] paramTypes;
             lock (_clrMdLock)
             {
                 paramTypes = request.ParametersTypeFullNames.Select(typeFullName => _unifiedAppDomain.ResolveType(typeFullName)).ToArray();
             }
-            Logger.Debug($"[Diver] Hooking - Calling GetMethodRecursive With these params COUNT={paramTypes.Length}");
-            Logger.Debug($"[Diver] Hooking - Calling GetMethodRecursive With these param types: {(string.Join(",", paramTypes.Select(t => t.FullName).ToArray()))}");
 
-            MethodBase methodInfo;
-            if (methodName == ".ctor")
-            {
-                var methods = resolvedType.GetConstructors((BindingFlags)0xffff).Where(m => m.Name == methodName);
-                MethodBase[] exactMatches = methods
-                    .Where(m =>
-                        m.GetParameters()
-                            .Select(pi => pi.ParameterType)
-                            .SequenceEqual(paramTypes))
-                    .Cast<MethodBase>()
-                    .ToArray();
-                if (exactMatches != null && exactMatches.Length == 1)
-                {
-                    methodInfo = exactMatches.First();
-                }
-                else
-                {
-                    // Do a less strict search
-                    methodInfo = methods.SingleOrDefault(m => m.GetParameters().Select(pi => pi.ParameterType)
-                        .SequenceEqual(paramTypes, new TypeExt.WildCardEnabledTypesComparer()));
-                }
-            }
-            else
-            {
-                methodInfo = resolvedType.GetMethodRecursive(methodName, paramTypes);
-            }
+            // We might be searching for a constructor. Switch based on method name.
+            MethodBase methodInfo = methodName == ".ctor"
+                ? resolvedType.GetConstructor(paramTypes)
+                : resolvedType.GetMethodRecursive(methodName, paramTypes);
 
             if (methodInfo == null)
-            {
                 return QuickError($"Failed to find method {methodName} in type {resolvedType.Name}");
-            }
             Logger.Debug("[Diver] Hook Method - Resolved Method");
 
             // We're all good regarding the signature!
@@ -897,7 +857,8 @@ namespace ScubaDiver
             int token = AssignCallbackToken();
             Logger.Debug($"[Diver] Hook Method - Assigned Token: {token}");
 
-            HarmonyWrapper.HookCallback patchCallback = (obj, args) => InvokeControllerCallback(token, (new StackTrace()).ToString(), new object[2] { obj, args });
+            // Preparing a proxy method that Harmony will invoke
+            HarmonyWrapper.HookCallback patchCallback = (obj, args) => InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), obj, args);
 
             Logger.Debug($"[Diver] Hooking function {methodName}...");
             try
@@ -906,18 +867,22 @@ namespace ScubaDiver
             }
             catch (Exception ex)
             {
+                // Hooking filed so we cleanup the Hook Info we inserted beforehand 
+                _remoteHooks.TryRemove(token, out _);
+
                 Logger.Debug($"[Diver] Failed to hook func {methodName}. Exception: {ex}");
                 return QuickError("Failed insert the hook for the function. HarmonyWrapper.AddHook failed.");
             }
             Logger.Debug($"[Diver] Hooked func {methodName}!");
 
-
-            // Save all the registeration info so it can be removed later upon request
+            // Keeping all hooking information aside so we can unhook later.
             _remoteHooks[token] = new RegisteredMethodHookInfo()
             {
+                Endpoint = endpoint,
                 OriginalHookedMethod = methodInfo,
                 RegisteredProxy = patchCallback
             };
+
 
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
@@ -941,16 +906,18 @@ namespace ScubaDiver
         }
         private string MakeEventSubscribeResponse(HttpListenerRequest arg)
         {
-            if (!HasCallbackEndpoint)
-            {
-                return QuickError("Callbacks endpoint missing. You must call /register_callbacks_ep before using this method!");
-            }
-
             string objAddrStr = arg.QueryString.Get("address");
+            string ipAddrStr = arg.QueryString.Get("ip");
+            string portStr = arg.QueryString.Get("port");
             if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
             {
-                return QuickError("Missing parameter 'address'");
+                return QuickError("Missing parameter 'address' (object address)");
             }
+            if (!IPAddress.TryParse(ipAddrStr, out IPAddress ipAddress) || int.TryParse(portStr, out int port))
+            {
+                return QuickError("Failed to parse either IP Address ('ip' param) or port ('port' param)");
+            }
+            IPEndPoint endpoint = new IPEndPoint(ipAddress, port);
             Logger.Debug($"[Diver][Debug](RegisterEventHandler) objAddrStr={objAddr:X16}");
 
             // Check if we have this objects in our pinned pool
@@ -998,7 +965,7 @@ namespace ScubaDiver
             // assign subscriber unique id
             int token = AssignCallbackToken();
 
-            EventHandler eventHandler = (obj, args) => InvokeControllerCallback(token, "UNUSED", new object[2] { obj, args });
+            EventHandler eventHandler = (obj, args) => InvokeControllerCallback(endpoint, token, "UNUSED", new object[2] { obj, args });
 
             Logger.Debug($"[Diver] Adding event handler to event {eventName}...");
             eventObj.AddEventHandler(target, eventHandler);
@@ -1010,37 +977,17 @@ namespace ScubaDiver
             {
                 EventInfo = eventObj,
                 Target = target,
-                RegisteredProxy = eventHandler
+                RegisteredProxy = eventHandler,
+                Endpoint = endpoint
             };
 
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
-        private string MakeRegisterCallbacksEndpointResponse(HttpListenerRequest arg)
-        {
-            // This API is used by the Diver's controller to set an 'End Point' (IP + Port) where
-            // it listens to callback requests (via HTTP)
-            // Callbacks are used for:
-            // 1. Invoking remote events (at Diver's side) callbacks (at controller side)
-            // 2. Invoking function hooks (FFU)
-            string ipAddrStr = arg.QueryString.Get("ip");
-            if (!IPAddress.TryParse(ipAddrStr, out IPAddress ipa))
-            {
-                return QuickError("Parameter 'ip' couldn't be parsed to a valid IP Address");
-            }
-            string portAddrStr = arg.QueryString.Get("port");
-            if (!int.TryParse(portAddrStr, out int port))
-            {
-                return QuickError("Parameter 'port' couldn't be parsed to a valid IP Address");
-            }
-            _callbacksEndpoint = new IPEndPoint(ipa, port);
-            Logger.Debug($"[Diver] Register Callback Endpoint complete. Endpoint: {_callbacksEndpoint}");
-            return "{\"status\":\"OK\"}";
-        }
         public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvailableCallbackToken);
-        public void InvokeControllerCallback(int token, string stackTrace, params object[] parameters)
+        public void InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
         {
-            ReverseCommunicator reverseCommunicator = new(_callbacksEndpoint);
+            ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)

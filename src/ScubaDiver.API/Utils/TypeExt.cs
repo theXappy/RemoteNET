@@ -38,8 +38,8 @@ namespace ScubaDiver.API.Utils
 
         public static MethodInfo GetMethodRecursive(this Type t, string methodName, Type[]? genericArgumentTypes, Type[]? parameterTypes)
         {
-            var methods = t.GetMethods((BindingFlags)0xffff).Where(m=>m.Name == methodName);
-            if(genericArgumentTypes != null && genericArgumentTypes.Length > 0)
+            var methods = t.GetMethods((BindingFlags)0xffff).Where(m => m.Name == methodName);
+            if (genericArgumentTypes != null && genericArgumentTypes.Length > 0)
             {
                 methods = methods.Where(m => m.ContainsGenericParameters == true)
                                  .Where(m => m.GetGenericArguments().Length == genericArgumentTypes.Length)
@@ -51,7 +51,8 @@ namespace ScubaDiver.API.Utils
             {
                 method = methods.SingleOrDefault();
             }
-            else {
+            else
+            {
                 MethodInfo[]? exactMatches = methods.Where(m => m.GetParameters().Select(pi => pi.ParameterType).SequenceEqual(parameterTypes)).ToArray();
                 if (exactMatches != null && exactMatches.Length == 1)
                 {
@@ -80,9 +81,31 @@ namespace ScubaDiver.API.Utils
             // Check parent (until `object`)
             return t.BaseType.GetMethodRecursive(methodName, parameterTypes);
         }
-        public static MethodInfo GetMethodRecursive(this Type t, string methodName)
+        public static MethodInfo GetMethodRecursive(this Type t, string methodName) => GetMethodRecursive(t, methodName, null);
+
+        public static ConstructorInfo GetConstructor(Type resolvedType, Type[]? parameterTypes = null)
         {
-            return GetMethodRecursive(t, methodName, null);
+            ConstructorInfo ctorInfo;
+
+            var methods = resolvedType.GetConstructors((BindingFlags)0xffff);
+            ConstructorInfo[] exactMatches = methods
+                .Where(m =>
+                    m.GetParameters()
+                        .Select(pi => pi.ParameterType)
+                        .SequenceEqual(parameterTypes))
+                .ToArray();
+            if (exactMatches.Length == 1)
+            {
+                ctorInfo = exactMatches.First();
+            }
+            else
+            {
+                // Do a less strict search
+                ctorInfo = methods.SingleOrDefault(m => m.GetParameters().Select(pi => pi.ParameterType)
+                     .SequenceEqual(parameterTypes, new TypeExt.WildCardEnabledTypesComparer()));
+            }
+
+            return ctorInfo;
         }
 
         /// <summary>
@@ -123,8 +146,8 @@ namespace ScubaDiver.API.Utils
 
         public static bool IsPrimitiveEtc(this Type realType)
         {
-            return realType.IsPrimitive || 
-                realType == typeof(string) || 
+            return realType.IsPrimitive ||
+                realType == typeof(string) ||
                 realType == typeof(decimal) ||
                 realType == typeof(DateTime);
         }

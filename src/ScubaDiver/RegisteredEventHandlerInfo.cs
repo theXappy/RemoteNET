@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Reflection;
 
 namespace ScubaDiver
@@ -14,5 +15,10 @@ namespace ScubaDiver
         // not - we will always be able to safely access it
         public object Target { get; set; }
         public EventInfo EventInfo { get; set; }
+
+        /// <summary>
+        /// Endpoint listening for invocations of the event
+        /// </summary>
+        public IPEndPoint Endpoint { get; set; }
     }
 }
