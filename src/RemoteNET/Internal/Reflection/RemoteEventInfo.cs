@@ -65,5 +65,10 @@ namespace RemoteNET.Internal.Reflection
         {
             throw new NotImplementedException();
         }
+
+        public override string ToString()
+        {
+            return $"{_eventHandlerType.Value} {Name}";
+        }
     }
 }
