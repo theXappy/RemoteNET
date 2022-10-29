@@ -843,11 +843,13 @@ namespace ScubaDiver
             }
             Logger.Debug($"[Diver][MakeUnhookMethodResponse] Called! Token: {token}");
 
-            if (_remoteHooks.TryGetValue(token, out RegisteredMethodHookInfo rmhi))
+            if (_remoteHooks.TryRemove(token, out RegisteredMethodHookInfo rmhi))
             {
                 HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
                 return "{\"status\":\"OK\"}";
             }
+
+            Logger.Debug($"[Diver][MakeUnhookMethodResponse] Unknown token for event callback subscription. Token: {token}");
             return QuickError("Unknown token for event callback subscription");
         }
         private string MakeHookMethodResponse(HttpListenerRequest arg)
@@ -946,10 +948,9 @@ namespace ScubaDiver
             }
             Logger.Debug($"[Diver][MakeEventUnsubscribeResponse] Called! Token: {token}");
 
-            if (_remoteEventHandler.TryGetValue(token, out RegisteredEventHandlerInfo eventInfo))
+            if (_remoteEventHandler.TryRemove(token, out RegisteredEventHandlerInfo eventInfo))
             {
                 eventInfo.EventInfo.RemoveEventHandler(eventInfo.Target, eventInfo.RegisteredProxy);
-                _remoteEventHandler.TryRemove(token, out _);
                 return "{\"status\":\"OK\"}";
             }
             return QuickError("Unknown token for event callback subscription");
