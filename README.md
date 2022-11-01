@@ -138,7 +138,7 @@ foreach (CandidateObject candidateRsa in rsaProviderCandidates)
 }
 ```
 ### ✳️ Remote Events
-You can also subscribe to/unsubscribe from remote events. The syntax is similar to "normal C#" altough not exact:
+You can also subscribe to/unsubscribe from remote events. The syntax is similar to "normal C#" although not exact:
 ```C#
 CandidateObject cand = remoteApp.QueryInstances("System.IO.FileSystemWatcher").Single();
 RemoteObject remoteFileSysWatcher = remoteApp.GetRemoteObject(cand);
@@ -163,7 +163,7 @@ The limitations:
 
 ## Thanks
 **denandz** for his interesting project **KeeFarce** which was a major inspiration for this project.  
-Also multiple parts of this project are directly taken from KeeFarce (DLL Injection, Bootstrap, IntPtr-to-Object converter).
+Also, multiple parts of this project are directly taken from KeeFarce (DLL Injection, Bootstrap, IntPtr-to-Object converter).
 
 **icons8** for the "Puppet" icon
 
