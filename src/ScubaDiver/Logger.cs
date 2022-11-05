@@ -11,7 +11,7 @@ namespace ScubaDiver
         {
 #if DEBUG
 #else // RELEASE
-            // We want to allow debug writing in release only if the magic enviroment var is set.
+            // We want to allow debug writing in release only if the magic environment var is set.
             // in debug, this `if` does not exist and logging to console always takes place.
             if(DebugInRelease.Value)
 #endif
