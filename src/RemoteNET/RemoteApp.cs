@@ -279,7 +279,7 @@ namespace RemoteNET
 
             // Unzip scuba diver and dependencies into their own directory
             string targetDiver = isNet5 ? "ScubaDiver_Net5" :
-                                    (isNetCore ? "ScubaDiver_NetCore" : "ScubaDiver");
+                                    (isNetCore ? "ScubaDiver_NetCore" : "ScubaDiver_NetFramework");
             var scubaDestDirInfo = new DirectoryInfo(
                                             Path.Combine(
                                                 remoteNetAppDataDir,
