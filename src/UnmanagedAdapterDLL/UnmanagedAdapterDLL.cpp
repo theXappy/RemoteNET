@@ -112,6 +112,10 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 
 	if (pClr != NULL)
 	{
+		if (consoleAllocated) {
+			DebugOut(L"[UnmanagedAdapter] Freeing temp console\n");
+			FreeConsole();
+		}
 		DWORD result;
 		hr = pClr->ExecuteInDefaultAppDomain(
 			managedDllLocation.c_str(),
@@ -124,9 +128,6 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 		msgboxf("[UnmanagedAdapter] could not spawn CLR\n");
 	}
 
-	if (consoleAllocated) {
-		FreeConsole();
-	}
 }
 
 ICLRRuntimeHost* StartCLR(LPCWSTR dotNetVersion)
