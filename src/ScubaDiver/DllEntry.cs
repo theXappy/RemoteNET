@@ -100,7 +100,7 @@ namespace ScubaDiver
                     IntPtr stdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
                     SafeFileHandle safeFileHandle = new SafeFileHandle(stdHandle, true);
                     FileStream fileStream = new FileStream(safeFileHandle, FileAccess.Write);
-                    Encoding encoding = System.Text.Encoding.GetEncoding(MY_CODE_PAGE);
+                    Encoding encoding = Encoding.ASCII;
                     StreamWriter standardOutput = new StreamWriter(fileStream, encoding);
                     standardOutput.AutoFlush = true;
                     Console.SetOut(standardOutput);
