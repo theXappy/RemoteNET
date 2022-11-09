@@ -386,7 +386,7 @@ namespace RemoteNET
         /// </param>
         public IEnumerable<CandidateObject> QueryInstances(string typeFullNameFilter, bool dumpHashcodes = true)
         {
-            return _communicator.DumpHeap(typeFullNameFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type, heapObj.HashCode));
+            return _communicator.DumpHeap(typeFullNameFilter, dumpHashcodes).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type, heapObj.HashCode));
         }
 
         //
