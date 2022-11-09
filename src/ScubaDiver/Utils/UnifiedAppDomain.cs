@@ -29,7 +29,7 @@ namespace ScubaDiver.Utils
                 // Using Diver's heap searching abilities to locate all 'System.AppDomain'
                 try
                 {
-                    (bool anyErrors, var candidates) = _parentDiver.GetHeapObjects(heapObjType => heapObjType == typeof(AppDomain).FullName);
+                    (bool anyErrors, var candidates) = _parentDiver.GetHeapObjects(heapObjType => heapObjType == typeof(AppDomain).FullName, true);
 
                     if(anyErrors)
                     {

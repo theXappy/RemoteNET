@@ -414,7 +414,7 @@ namespace ScubaDiver
                 }
 
                 Predicate<string> typeFilter = (string type) => type.Contains(lastKnownClrObj.Type.Name);
-                (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter);
+                (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(typeFilter, true);
                 if (anyErrors)
                 {
                     throw new Exception(
@@ -521,7 +521,7 @@ namespace ScubaDiver
 
         #endregion
 
-        public (bool anyErrors, List<HeapDump.HeapObject> objects) GetHeapObjects(Predicate<string> filter)
+        public (bool anyErrors, List<HeapDump.HeapObject> objects) GetHeapObjects(Predicate<string> filter, bool dumpHashcodes)
         {
             List<HeapDump.HeapObject> objects = new();
             bool anyErrors = false;
@@ -546,37 +546,37 @@ namespace ScubaDiver
                         {
                             ulong mt = clrObj.Type.MethodTable;
                             int hashCode = 0;
-                            // TODO: Should I make hashcode dumping optional?
-                            // maybe make the type filter mandatory?
-                            // getting handles to every single object in the heap (in the worst case)
-                            // to dump it's hashcode sounds like it'll trigger a GC every single trial...
-                            object instance = null;
-                            try
-                            {
-                                instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
-                            }
-                            catch (Exception)
-                            {
-                                // Exiting heap enumeration and signaling that this trial has failed.
-                                anyErrors = true;
-                                break;
-                            }
 
-                            // We got the object in our hands so we haven't spotted a GC collection or anything else scary
-                            // now getting the hashcode which is itself a challange since 
-                            // objects might (very rudely) throw exceptions on this call.
-                            // I'm looking at you, System.Reflection.Emit.SignatureHelper
-                            //
-                            // We don't REALLY care if we don't get a has code. It just means those objects would
-                            // be a bit more hard to grab later.
-                            try
+                            if (dumpHashcodes)
                             {
-                                hashCode = instance.GetHashCode();
-                            }
-                            catch
-                            {
-                                // TODO: Maybe we need a boolean in HeapObject to indicate we couldn't get the hashcode...
-                                hashCode = 0;
+                                object instance = null;
+                                try
+                                {
+                                    instance = _converter.ConvertFromIntPtr(clrObj.Address, mt);
+                                }
+                                catch (Exception)
+                                {
+                                    // Exiting heap enumeration and signaling that this trial has failed.
+                                    anyErrors = true;
+                                    break;
+                                }
+
+                                // We got the object in our hands so we haven't spotted a GC collection or anything else scary
+                                // now getting the hashcode which is itself a challenge since 
+                                // objects might (very rudely) throw exceptions on this call.
+                                // I'm looking at you, System.Reflection.Emit.SignatureHelper
+                                //
+                                // We don't REALLY care if we don't get a has code. It just means those objects would
+                                // be a bit more hard to grab later.
+                                try
+                                {
+                                    hashCode = instance.GetHashCode();
+                                }
+                                catch
+                                {
+                                    // TODO: Maybe we need a boolean in HeapObject to indicate we couldn't get the hashcode...
+                                    hashCode = 0;
+                                }
                             }
 
                             objects.Add(new HeapDump.HeapObject()
@@ -816,11 +816,13 @@ namespace ScubaDiver
         private string MakeHeapResponse(HttpListenerRequest arg)
         {
             string filter = arg.QueryString.Get("type_filter");
+            string dumpHashcodesStr = arg.QueryString.Get("dump_hashcodes");
+            bool dumpHashcodes = dumpHashcodesStr?.ToLower() == "true";
 
-            // Default filter - no filter. Just return everything.
+                                 // Default filter - no filter. Just return everything.
             Predicate<string> matchesFilter = Filter.CreatePredicate(filter);
 
-            (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(matchesFilter);
+            (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(matchesFilter, dumpHashcodes);
             if (anyErrors)
             {
                 return "{\"error\":\"All dumping trials failed because at least 1 " +
