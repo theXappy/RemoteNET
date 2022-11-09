@@ -94,13 +94,14 @@ namespace ScubaDiver.API
         /// </summary>
         /// <param name="typeFilter">TypeFullName filter of objects to get from the heap. Support leading/trailing wildcard (*). NULL returns all objects</param>
         /// <returns></returns>
-        public HeapDump DumpHeap(string typeFilter = null)
+        public HeapDump DumpHeap(string typeFilter = null, bool dumpHashcodes = true)
         {
             Dictionary<string, string> queryParams = new();
             if (typeFilter != null)
             {
                 queryParams["type_filter"] = typeFilter;
             }
+            queryParams["dump_hashcodes"] = dumpHashcodes.ToString();
             string body = SendRequest("heap", queryParams);
             HeapDump heapDump = JsonConvert.DeserializeObject<HeapDump>(body);
             return heapDump;

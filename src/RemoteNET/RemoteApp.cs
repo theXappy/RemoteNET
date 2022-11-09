@@ -375,12 +375,16 @@ namespace RemoteNET
 
         }
 
-        public IEnumerable<CandidateObject> QueryInstances(Type typeFilter) => QueryInstances(typeFilter.FullName);
+        public IEnumerable<CandidateObject> QueryInstances(Type typeFilter, bool dumpHashcodes = true) => QueryInstances(typeFilter.FullName, dumpHashcodes);
+
         /// <summary>
         /// Gets all object candidates for a specific filter
         /// </summary>
         /// <param name="typeFullNameFilter">Objects with Full Type Names of this EXACT string will be returned. You can use '*' as a "0 or more characters" wildcard</param>
-        public IEnumerable<CandidateObject> QueryInstances(string typeFullNameFilter)
+        /// <param name="dumpHashcodes">Whether to also dump hashcodes of every matching object.
+        /// This makes resolving the candidates later more reliable but for wide queries (e.g. "*") this might fail the entire search since it causes instabilities in the heap when examining it.
+        /// </param>
+        public IEnumerable<CandidateObject> QueryInstances(string typeFullNameFilter, bool dumpHashcodes = true)
         {
             return _communicator.DumpHeap(typeFullNameFilter).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type, heapObj.HashCode));
         }
