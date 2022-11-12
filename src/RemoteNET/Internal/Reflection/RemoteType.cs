@@ -212,6 +212,10 @@ namespace RemoteNET.Internal.Reflection
 
         private IEnumerable<MemberInfo> GetMembersInner(BindingFlags bf)
         {
+            foreach (var ctor in GetConstructors(bf))
+            {
+                yield return ctor;
+            }
             foreach (var field in GetFields(bf))
             {
                 yield return field;
