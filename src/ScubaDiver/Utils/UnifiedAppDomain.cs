@@ -57,6 +57,15 @@ namespace ScubaDiver.Utils
 
         public Type ResolveType(string typeFullName, string assembly = null)
         {
+            if (typeFullName.Contains('<') && typeFullName.EndsWith(">"))
+            {
+                string genericParams = typeFullName.Substring(typeFullName.LastIndexOf('<'));
+                int numOfParams = genericParams.Split(',').Length;
+
+                string nonGenericPart = typeFullName.Substring(0,typeFullName.LastIndexOf('<'));
+                typeFullName = $"{nonGenericPart}`{numOfParams}";
+            }
+
             foreach (Assembly assm in GetAssemblies())
             {
                 Type t = assm.GetType(typeFullName, throwOnError: false);
