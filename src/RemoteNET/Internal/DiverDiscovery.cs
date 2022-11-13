@@ -14,7 +14,8 @@ namespace RemoteNET.Internal
     {
         NoDiver,
         Alive,
-        Corpse
+        Corpse,
+        HollowSnapshot
     }
     public static class DiverDiscovery
     {
@@ -65,6 +66,9 @@ namespace RemoteNET.Internal
             }
             if (containsToolkitDll)
             {
+                // Check if the this is a snapshot created by the diver.
+                if (target.Threads.Count == 0)
+                    return DiverState.HollowSnapshot;
                 return DiverState.Corpse;
             }
             return DiverState.NoDiver;
