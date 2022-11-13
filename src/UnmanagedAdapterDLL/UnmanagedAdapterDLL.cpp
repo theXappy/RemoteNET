@@ -37,12 +37,12 @@ enum FrameworkType ParseFrameworkType(const std::wstring& framework)
 }
 
 bool ShouldOpenDebugConosle() {
-#if _DEBUG
-	return true;
-#else
-	GetEnvironmentVariable(L"REMOTE_NET_MAGIC_DEBUG", NULL, 0);
+//#if _DEBUG
+//	return true;
+//#else
+	GetEnvironmentVariable(L"REMOTE_NET_UA_MAGIC_DEBUG", NULL, 0);
 	return GetLastError() != ERROR_ENVVAR_NOT_FOUND;
-#endif
+//#endif
 }
 
 DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
