@@ -5,7 +5,7 @@ namespace ScubaDiver
 {
     internal class Logger
     {
-        public static Lazy<bool> DebugInRelease = new(() => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("REMOTE_NET_MAGIC_DEBUG")));
+        public static Lazy<bool> DebugInRelease = new(() => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("REMOTE_NET_DIVER_MAGIC_DEBUG")));
 
         internal static void Debug(string s)
         {
