@@ -27,11 +27,20 @@ namespace ScubaDiver.API.Interactions.Dumps
                 public MethodParameter(ParameterInfo pi)
                 {
                     IsGenericType = pi.ParameterType.IsGenericType;
-                    IsGenericParameter = pi.ParameterType.IsGenericParameter;
+                    IsGenericParameter = pi.ParameterType.IsGenericParameter || pi.ParameterType.ContainsGenericParameters;
                     Name = pi.Name;
                     // For generic type parameters we need the 'Name' property - it returns something like "T"
                     // For non-generic we want the full name like "System.Text.StringBuilder"
                     Type = IsGenericParameter ? pi.ParameterType.Name : pi.ParameterType.FullName;
+                    if (IsGenericParameter &&
+                        pi.ParameterType.GenericTypeArguments.Any() &&
+                        Type.Contains('`'))
+                    {
+                        Type = Type.Substring(0, Type.IndexOf('`'));
+                        Type += '<';
+                        Type += String.Join(", ", (object[])pi.ParameterType.GenericTypeArguments);
+                        Type += '>';
+                    }
                     Assembly = pi.ParameterType.Assembly.GetName().Name;
                 }
 
@@ -63,20 +72,33 @@ namespace ScubaDiver.API.Interactions.Dumps
             public TypeMethod(MethodBase methodBase)
             {
                 Visibility = methodBase.IsPublic ? "Public" : "Private";
-                if (methodBase.ContainsGenericParameters)
+                GenericArgs = new List<string>();
+                if (methodBase.ContainsGenericParameters && methodBase is not ConstructorInfo)
                 {
-                    GenericArgs = methodBase.GetGenericArguments().Select(arg => arg.Name).ToList();
+                    try
+                    {
+                        GenericArgs = methodBase.GetGenericArguments().Select(arg => arg.Name).ToList();
+                    }
+                    catch (Exception ex)
+                    {
+                    }
                 }
-                else
-                {
-                    GenericArgs = new List<string>();
-                }
+
                 Name = methodBase.Name;
                 Parameters = methodBase.GetParameters().Select(paramInfo => new MethodParameter(paramInfo)).ToList();
                 if (methodBase is MethodInfo methodInfo)
                 {
                     ReturnTypeFullName = methodInfo.ReturnType.FullName;
-                    ReturnTypeFullName ??= methodInfo.Name + String.Join(",", (object[])methodInfo.ReturnType.GenericTypeArguments);
+                    if (ReturnTypeFullName == null)
+                    {
+                        string baseType = methodInfo.ReturnType.Name;
+                        if (baseType.Contains('`'))
+                            baseType = baseType.Substring(0, baseType.IndexOf('`'));
+                        ReturnTypeFullName ??= baseType + "<" +
+                                               String.Join(", ", (object[])methodInfo.ReturnType.GenericTypeArguments) +
+                                               ">";
+                    }
+
                     ReturnTypeAssembly = methodInfo.ReturnType.Assembly.GetName().Name;
                 }
                 else
