@@ -89,6 +89,16 @@ namespace ScubaDiver.API
             return body?.Contains("Goodbye") ?? false;
         }
 
+        public bool InjectDll(string path)
+        {
+            var res = SendRequest("inject", new Dictionary<string, string>()
+            {
+                { "dll_path", path }
+            });
+
+            return res.Contains("dll loaded");
+        }
+
         /// <summary>
         /// Dumps the heap of the remote process
         /// </summary>
