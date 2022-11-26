@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
@@ -434,6 +435,16 @@ namespace RemoteNET
         public Type GetRemoteType(Type localType) => GetRemoteType(localType.FullName, localType.Assembly.GetName().Name);
         public Type GetRemoteType(CandidateType candidate) => GetRemoteType(candidate.TypeFullName, candidate.Assembly);
         internal Type GetRemoteType(TypeDump typeDump) => GetRemoteType(typeDump.Type, typeDump.Assembly);
+
+        /// <summary>
+        /// Loads an assembly into the remote process
+        /// </summary>
+        public bool LoadAssembly(Assembly assembly) => LoadAssembly(assembly.Location);
+
+        /// <summary>
+        /// Loads an assembly into the remote process
+        /// </summary>
+        public bool LoadAssembly(string path) => _communicator.InjectDll(path);
 
         public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
         {
