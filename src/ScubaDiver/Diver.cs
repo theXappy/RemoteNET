@@ -59,31 +59,38 @@ namespace ScubaDiver
         {
             _responseBodyCreators = new Dictionary<string, Func<HttpListenerRequest, string>>()
             {
+                // Divert maintenance
                 {"/ping", MakePingResponse},
                 {"/die", MakeDieResponse},
                 {"/register_client", MakeRegisterClientResponse},
                 {"/unregister_client", MakeUnregisterClientResponse},
+                // DLL Injection
+                {"/inject", MakeInjectResponse},
+                // Dumping
                 {"/domains", MakeDomainsResponse},
                 {"/heap", MakeHeapResponse},
+                {"/types", MakeTypesResponse},
+                {"/type", MakeTypeResponse},
+                // Remote Object API
+                {"/object", MakeObjectResponse},
+                {"/create_object", MakeCreateObjectResponse},
                 {"/invoke", MakeInvokeResponse},
                 {"/get_field", MakeGetFieldResponse},
                 {"/set_field", MakeSetFieldResponse},
-                {"/create_object", MakeCreateObjectResponse},
-                {"/object", MakeObjectResponse},
                 {"/unpin", MakeUnpinResponse},
-                {"/types", MakeTypesResponse},
-                {"/type", MakeTypeResponse},
                 {"/event_subscribe", MakeEventSubscribeResponse},
                 {"/event_unsubscribe", MakeEventUnsubscribeResponse},
+                {"/get_item", MakeArrayItemResponse},
+                // Harmony
                 {"/hook_method", MakeHookMethodResponse},
                 {"/unhook_method", MakeUnhookMethodResponse},
-                {"/get_item", MakeArrayItemResponse},
             };
             _pinnedObjects = new ConcurrentDictionary<ulong, FrozenObjectInfo>();
             _remoteEventHandler = new ConcurrentDictionary<int, RegisteredEventHandlerInfo>();
             _remoteHooks = new ConcurrentDictionary<int, RegisteredMethodHookInfo>();
             _unifiedAppDomain = new UnifiedAppDomain(this);
         }
+
 
         public void Start(ushort listenPort)
         {
@@ -602,6 +609,25 @@ namespace ScubaDiver
             }
             return (anyErrors, objects);
         }
+
+        #region DLL Injecion Handler
+
+        private string MakeInjectResponse(HttpListenerRequest req)
+        {
+            string dllPath = req.QueryString.Get("dll_path");
+            try
+            {
+                Assembly.LoadFile(dllPath);
+                return "{\"status\":\"dll loaded\"}";
+            }
+            catch (Exception ex)
+            {
+                return QuickError(ex.Message, ex.StackTrace);
+            }
+        }
+
+        #endregion
+
 
         #region Ping Handler
 
