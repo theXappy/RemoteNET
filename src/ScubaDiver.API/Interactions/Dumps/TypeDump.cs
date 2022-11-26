@@ -79,7 +79,7 @@ namespace ScubaDiver.API.Interactions.Dumps
                     {
                         GenericArgs = methodBase.GetGenericArguments().Select(arg => arg.Name).ToList();
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                     }
                 }
