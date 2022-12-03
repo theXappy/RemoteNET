@@ -720,7 +720,18 @@ namespace ScubaDiver
             if (matchingAssemblies.Count == 0)
             {
                 // No exact matches, widen search to any assembly *containing* the query
-                matchingAssemblies = allAssembliesInApp.Where(module => Path.GetFileNameWithoutExtension(module.Name).Contains(assembly)).ToList();
+                matchingAssemblies = allAssembliesInApp.Where(module =>
+                {
+                    try
+                    {
+                        return Path.GetFileNameWithoutExtension(module.Name).Contains(assembly);
+                    }
+                    catch
+                    {
+                    }
+
+                    return false;
+                }).ToList();
             }
 
             if (!matchingAssemblies.Any())
