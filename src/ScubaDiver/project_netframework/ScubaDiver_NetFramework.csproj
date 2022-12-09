@@ -48,8 +48,8 @@
     <Compile Include="..\RegisteredMethodHookInfo.cs" />
     <Compile Include="..\Utils\ClrExt.cs" />
     <Compile Include="..\Utils\Converter.cs" />
-    <Compile Include="..\Utils\Freezer.cs" />
-    <Compile Include="..\Utils\FrozenObjectInfo.cs" />
+    <Compile Include="..\Utils\FreezeFuncsFactory.cs" />
+	<Compile Include="..\Utils\FrozenObjectsCollection.cs" />
     <Compile Include="..\Utils\ObjectDumpFactory.cs" />
     <Compile Include="..\Utils\Pinnable.cs" />
     <Compile Include="..\Utils\SmartLocksDict.cs" />
