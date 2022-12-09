@@ -43,15 +43,15 @@ namespace ScubaDiver
         // HTTP Responses fields
         private readonly Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
 
-        // Pinning objects fields
-        private readonly ConcurrentDictionary<ulong, FrozenObjectInfo> _pinnedObjects;
-
         // Callbacks Endpoint of the Controller process
         private bool _monitorEndpoints = true;
         private int _nextAvailableCallbackToken;
         private readonly UnifiedAppDomain _unifiedAppDomain;
         private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
         private readonly ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
+
+        // Object freezing (pinning)
+        FrozenObjectsCollection _freezer = new FrozenObjectsCollection();
 
         private readonly ManualResetEvent _stayAlive = new(true);
 
@@ -85,7 +85,6 @@ namespace ScubaDiver
                 {"/hook_method", MakeHookMethodResponse},
                 {"/unhook_method", MakeUnhookMethodResponse},
             };
-            _pinnedObjects = new ConcurrentDictionary<ulong, FrozenObjectInfo>();
             _remoteEventHandler = new ConcurrentDictionary<int, RegisteredEventHandlerInfo>();
             _remoteHooks = new ConcurrentDictionary<int, RegisteredMethodHookInfo>();
             _unifiedAppDomain = new UnifiedAppDomain(this);
@@ -137,11 +136,8 @@ namespace ScubaDiver
             }
 
             Logger.Debug("[Diver] Unpinning objects");
-            foreach (ulong pinAddr in _pinnedObjects.Keys.ToList())
-            {
-                bool res = UnpinObject(pinAddr);
-                Logger.Debug($"[Diver] Addr {pinAddr:X16} unpinning returned {res}");
-            }
+            _freezer.UnpinAll();
+            Logger.Debug("[Diver] Unpinning finished");
 
             Logger.Debug("[Diver] Dispatcher returned, Start is complete.");
         }
@@ -222,9 +218,9 @@ namespace ScubaDiver
                 case { IsRemoteAddress: false }:
                     return PrimitivesEncoder.Decode(param.EncodedObject, param.Type);
                 case { IsRemoteAddress: true }:
-                    if (TryGetPinnedObject(param.RemoteAddress, out FrozenObjectInfo poi))
+                    if (_freezer.TryGetPinnedObject(param.RemoteAddress, out object pinnedObj))
                     {
-                        return poi.Object;
+                        return pinnedObj;
                     }
                     break;
             }
@@ -370,11 +366,10 @@ namespace ScubaDiver
             bool hashCodeFallback = hashcode.HasValue;
 
             // Check if we have this objects in our pinned pool
-            if (TryGetPinnedObject(objAddr, out FrozenObjectInfo foi))
+            if (_freezer.TryGetPinnedObject(objAddr, out object pinnedObj))
             {
                 // Found pinned object!
-                object pinnedInstance = foi.Object;
-                return (pinnedInstance, foi.Address);
+                return (pinnedObj, objAddr);
             }
 
             // Object not pinned, try get it the hard way
@@ -461,69 +456,9 @@ namespace ScubaDiver
             ulong pinnedAddress = 0;
             if (pinningRequested)
             {
-                foi = PinObject(instance);
-                pinnedAddress = foi.Address;
+                pinnedAddress = _freezer.Pin(instance);
             }
             return (instance, pinnedAddress);
-        }
-        /// <summary>
-        /// Tries to get a <see cref="FrozenObjectInfo"/> of a pinned object
-        /// </summary>
-        /// <param name="objAddress">Address of the object to check wether it's pinned</param>
-        /// <param name="foi">The frozen object info</param>
-        /// <returns>True if the object was pinned, False if it was not</returns>
-        public bool TryGetPinnedObject(ulong objAddress, out FrozenObjectInfo foi)
-        {
-            return _pinnedObjects.TryGetValue(objAddress, out foi);
-        }
-        /// <summary>
-        /// Checks if an object is pinned
-        /// </summary>
-        /// <param name="instance">The object to check</param>
-        /// <param name="foi">The FrozenObjectInfo in case the object was pinned</param>
-        /// <returns>True if it was pinned, False if it wasn't</returns>
-        public bool IsPinned(object instance, out FrozenObjectInfo foi)
-        {
-            // TODO: There are more efficient ways to do this
-            foreach (FrozenObjectInfo currFoi in _pinnedObjects.Values)
-            {
-                if (currFoi.Object == instance)
-                {
-                    foi = currFoi;
-                    return true;
-                }
-            }
-            foi = null;
-            return false;
-        }
-        /// <summary>
-        /// Unpins an object
-        /// </summary>
-        /// <returns>True if it was pinned, false if not.</returns>
-        public bool UnpinObject(ulong objAddress)
-        {
-            if (_pinnedObjects.TryRemove(objAddress, out FrozenObjectInfo poi))
-            {
-                if (poi is FrozenObjectInfo foi)
-                {
-                    foi.UnfreezeEvent.Set();
-                    foi.FreezeThread.Join();
-                }
-                return true;
-            }
-            return false;
-        }
-        /// <summary>
-        /// Pins an object, possibly at a specific address.
-        /// </summary>
-        /// <param name="instance">The object to pin</param>
-        /// <param name="requiredPinningAddress">Current objects address if keeping it is crucial or null if it doesn't matter</param>
-        /// <returns></returns>
-        public FrozenObjectInfo PinObject(object instance)
-        {
-            FrozenObjectInfo fObj = Freezer.Freeze(instance);
-            _pinnedObjects.TryAdd(fObj.Address, fObj);
-            return fObj;
         }
 
         #endregion
@@ -617,7 +552,16 @@ namespace ScubaDiver
             string dllPath = req.QueryString.Get("dll_path");
             try
             {
-                Assembly.LoadFile(dllPath);
+                var asm = Assembly.LoadFile(dllPath);
+                // We must request all Types or otherwise the Type object won't be created
+                // (I think there's some lazy initialization behind the scenes)
+                var allTypes = asm.GetTypes();
+                // This will prevent the compiler from removing the above lines because of "unused code"
+                GC.KeepAlive(allTypes);
+                
+                // ClrMD must take a new snapshot to see our new assembly
+                RefreshRuntime();
+
                 return "{\"status\":\"dll loaded\"}";
             }
             catch (Exception ex)
@@ -1011,13 +955,12 @@ namespace ScubaDiver
             Logger.Debug($"[Diver][Debug](RegisterEventHandler) objAddrStr={objAddr:X16}");
 
             // Check if we have this objects in our pinned pool
-            if (!TryGetPinnedObject(objAddr, out FrozenObjectInfo foi))
+            if (!_freezer.TryGetPinnedObject(objAddr, out object target))
             {
                 // Object not pinned, try get it the hard way
                 return QuickError("Object at given address wasn't pinned");
             }
 
-            object target = foi.Object;
             Type resolvedType = target.GetType();
 
             string eventName = arg.QueryString.Get("event");
@@ -1093,13 +1036,14 @@ namespace ScubaDiver
                 }
                 else // Not primitive
                 {
-                    if (!IsPinned(parameter, out FrozenObjectInfo foi))
+                    // Check fi the object was pinned
+                    if (!_freezer.TryGetPinningAddress(parameter, out ulong addr))
                     {
                         // Pin and mark for unpinning later
-                        foi = PinObject(parameter);
+                        addr = _freezer.Pin(parameter);
                     }
 
-                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(foi.Address, foi.Object.GetType().FullName);
+                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(addr, parameter.GetType().FullName);
                 }
             }
 
@@ -1220,8 +1164,7 @@ namespace ScubaDiver
             else
             {
                 // Pinning results
-                var pinnedObj = PinObject(createdObject);
-                pinAddr = pinnedObj.Address;
+                pinAddr = _freezer.Pin(createdObject);
                 res = ObjectOrRemoteAddress.FromToken(pinAddr, createdObject.GetType().FullName);
             }
 
@@ -1278,10 +1221,9 @@ namespace ScubaDiver
                 //
 
                 // Check if we have this objects in our pinned pool
-                if (TryGetPinnedObject(request.ObjAddress, out FrozenObjectInfo poi))
+                if (_freezer.TryGetPinnedObject(request.ObjAddress, out instance))
                 {
                     // Found pinned object!
-                    instance = poi.Object;
                     dumpedObjType = instance.GetType();
                 }
                 else
@@ -1407,8 +1349,7 @@ namespace ScubaDiver
                     else
                     {
                         // Pinning results
-                        FrozenObjectInfo foi = PinObject(results);
-                        ulong resultsAddress = foi.Address;
+                        ulong resultsAddress = _freezer.Pin(results);
                         Type resultsType = results.GetType();
                         returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
                     }
@@ -1467,10 +1408,9 @@ namespace ScubaDiver
             {
                 object instance;
                 // Check if we have this objects in our pinned pool
-                if (TryGetPinnedObject(request.ObjAddress, out FrozenObjectInfo poi))
+                if (_freezer.TryGetPinnedObject(request.ObjAddress, out instance))
                 {
                     // Found pinned object!
-                    instance = poi.Object;
                     dumpedObjType = instance.GetType();
                 }
                 else
@@ -1511,8 +1451,7 @@ namespace ScubaDiver
                 else
                 {
                     // Pinning results
-                    FrozenObjectInfo resultsFoi = PinObject(results);
-                    ulong resultsAddress = resultsFoi.Address;
+                    ulong resultsAddress = _freezer.Pin(results);
                     Type resultsType = results.GetType();
                     returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
                 }
@@ -1557,10 +1496,9 @@ namespace ScubaDiver
             // In case of a static call the target instance stays null.
             object instance;
             // Check if we have this objects in our pinned pool
-            if (TryGetPinnedObject(request.ObjAddress, out FrozenObjectInfo poi))
+            if (_freezer.TryGetPinnedObject(request.ObjAddress, out instance))
             {
                 // Found pinned object!
-                instance = poi.Object;
                 dumpedObjType = instance.GetType();
             }
             else
@@ -1634,8 +1572,7 @@ namespace ScubaDiver
                 else
                 {
                     // Pinning results
-                    FrozenObjectInfo resultsFoi = PinObject(results);
-                    ulong resultsAddress = resultsFoi.Address;
+                    ulong resultsAddress = _freezer.Pin(results);
                     Type resultsType = results.GetType();
                     returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
                 }
@@ -1668,16 +1605,16 @@ namespace ScubaDiver
             bool pinningRequested = request.PinRequest;
 
             // Check if we have this objects in our pinned pool
-            if (!TryGetPinnedObject(objAddr, out FrozenObjectInfo arrayFoi))
+            if (!_freezer.TryGetPinnedObject(objAddr, out object pinnedObj))
             {
                 // Object not pinned, try get it the hard way
                 return QuickError("Object at given address wasn't pinned");
             }
 
             object item = null;
-            if (arrayFoi.Object.GetType().IsArray)
+            if (pinnedObj.GetType().IsArray)
             {
-                Array asArray = (Array)arrayFoi.Object;
+                Array asArray = (Array)pinnedObj;
                 if (index is not int intIndex)
                     return QuickError("Tried to access an Array with a non-int index");
 
@@ -1687,7 +1624,7 @@ namespace ScubaDiver
 
                 item = asArray.GetValue(intIndex);
             }
-            else if (arrayFoi.Object is IList asList)
+            else if (pinnedObj is IList asList)
             {
                 object[] asArray = asList?.Cast<object>().ToArray();
                 if (asArray == null)
@@ -1703,12 +1640,12 @@ namespace ScubaDiver
                 // Get the item
                 item = asArray[intIndex];
             }
-            else if (arrayFoi.Object is IDictionary dict)
+            else if (pinnedObj is IDictionary dict)
             {
                 Logger.Debug("[Diver] Array access: Object is an IDICTIONARY!");
                 item = dict[index];
             }
-            else if (arrayFoi.Object is IEnumerable enumerable)
+            else if (pinnedObj is IEnumerable enumerable)
             {
                 // Last result - generic IEnumerables can be enumerated into arrays.
                 // BEWARE: This could lead to "runining" of the IEnumerable if it's a not "resetable"
@@ -1746,22 +1683,13 @@ namespace ScubaDiver
             {
                 // Non-primitive results must be pinned before returning their remote address
                 // TODO: If a RemoteObject is not created for this object later and the item is not automaticlly unfreezed it might leak.
-                if (IsPinned(item, out FrozenObjectInfo itemFoi))
-                {
-                    // Sanity: Make sure the pinned item is the same as the one we are looking for
-                    if (itemFoi.Object != item)
-                    {
-                        return $"{{\"error\":\"An object was pinned at that address but it's {nameof(FrozenObjectInfo)} " +
-                            $"object pointer at a different object\"}}";
-                    }
-                }
-                else
+                if (!_freezer.TryGetPinningAddress(item, out ulong addr))
                 {
                     // Item not pinned yet, let's do it.
-                    itemFoi = PinObject(item);
+                    addr = _freezer.Pin(item);
                 }
 
-                res = ObjectOrRemoteAddress.FromToken(itemFoi.Address, item.GetType().FullName);
+                res = ObjectOrRemoteAddress.FromToken(addr, item.GetType().FullName);
             }
 
 
@@ -1781,13 +1709,13 @@ namespace ScubaDiver
             {
                 return QuickError("Missing parameter 'address'");
             }
-            Logger.Debug($"[Diver][Debug](UnpinObject) objAddrStr={objAddr:X16}");
+            Logger.Debug($"[Diver][Debug](Unpin) objAddrStr={objAddr:X16}");
 
             // Check if we have this objects in our pinned pool
-            if (TryGetPinnedObject(objAddr, out _))
+            if (_freezer.TryGetPinnedObject(objAddr, out _))
             {
                 // Found pinned object!
-                UnpinObject(objAddr);
+                _freezer.Unpin(objAddr);
                 return "{\"status\":\"OK\"}";
             }
             else
