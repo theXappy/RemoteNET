@@ -12,9 +12,9 @@
 		<PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
-		<Version>1.0.1.21</Version>
-		<AssemblyVersion>1.0.1.21</AssemblyVersion>
-		<FileVersion>1.0.1.21</FileVersion>
+		<Version>1.0.1.23</Version>
+		<AssemblyVersion>1.0.1.23</AssemblyVersion>
+		<FileVersion>1.0.1.23</FileVersion>
 		<LangVersion>8</LangVersion>
 	</PropertyGroup>
 
