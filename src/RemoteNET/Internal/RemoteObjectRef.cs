@@ -46,7 +46,7 @@ namespace RemoteNET.Internal
             ThrowIfReleased();
             if (refresh)
             {
-                _remoteObjectInfo = _creatingCommunicator.DumpObject(_remoteObjectInfo.PinnedAddress);
+                _remoteObjectInfo = _creatingCommunicator.DumpObject(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type);
             }
 
             var field = _remoteObjectInfo.Fields.Single(fld => fld.Name == name);

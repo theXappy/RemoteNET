@@ -34,13 +34,13 @@ namespace RemoteNET
                 _pinnedAddressesToRemoteObjects = new Dictionary<ulong, WeakReference<RemoteObject>>();
             }
 
-            private RemoteObject GetRemoteObjectUncached(ulong remoteAddress, int? hashCode = null)
+            private RemoteObject GetRemoteObjectUncached(ulong remoteAddress, string typeName, int? hashCode = null)
             {
                 ObjectDump od;
                 TypeDump td;
                 try
                 {
-                    od = _app._communicator.DumpObject(remoteAddress, true, hashCode);
+                    od = _app._communicator.DumpObject(remoteAddress, typeName, true, hashCode);
                     td = _app._communicator.DumpType(od.Type);
                 }
                 catch (Exception e)
@@ -53,7 +53,7 @@ namespace RemoteNET
                 return remoteObject;
             }
 
-            public RemoteObject GetRemoteObject(ulong address, int? hashcode = null)
+            public RemoteObject GetRemoteObject(ulong address, string typeName, int? hashcode = null)
             {
                 RemoteObject ro;
                 WeakReference<RemoteObject> weakRef;
@@ -89,7 +89,7 @@ namespace RemoteNET
                     }
 
                     // Get remote
-                    ro = this.GetRemoteObjectUncached(address, hashcode);
+                    ro = this.GetRemoteObjectUncached(address, typeName, hashcode);
                     // Add to cache
                     weakRef = new WeakReference<RemoteObject>(ro);
                     _pinnedAddressesToRemoteObjects[ro.RemoteToken] = weakRef;
@@ -444,7 +444,17 @@ namespace RemoteNET
         /// <summary>
         /// Loads an assembly into the remote process
         /// </summary>
-        public bool LoadAssembly(string path) => _communicator.InjectDll(path);
+        public bool LoadAssembly(string path)
+        {
+            bool res = _communicator.InjectDll(path);
+            if (res)
+            {
+                // Re-setting the cached domains because otherwise we won't
+                // see our newly injected module
+                _domains = null;
+            }
+            return res;
+        }
 
         public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
         {
@@ -460,10 +470,10 @@ namespace RemoteNET
         // Getting Remote Objects
         //
 
-        public RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.HashCode);
-        public RemoteObject GetRemoteObject(ulong remoteAddress, int? hashCode = null)
+        public RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.TypeFullName, candidate.HashCode);
+        public RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
         {
-            return _remoteObjects.GetRemoteObject(remoteAddress, hashCode);
+            return _remoteObjects.GetRemoteObject(remoteAddress, typeName, hashCode);
         }
 
         //

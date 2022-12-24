@@ -102,7 +102,7 @@ namespace ScubaDiver
 
                 // Generate temporary IntPtr
                 // `int_ptr_local = new IntPtr((void*)addr_local_i)`
-                il.Emit(OpCodes.Ldloca_S, locals[2 * numArguments]);
+                il.Emit(OpCodes.Ldloca, locals[2 * numArguments]);
                 il.Emit(OpCodes.Ldloc, i);
                 il.Emit(OpCodes.Call, typeof(IntPtr).GetConstructor(new[] { typeof(void*) }));
 
@@ -124,7 +124,7 @@ namespace ScubaDiver
                 // `addr_param[i] = int_ptr_local.ToInt64 - IntPtr.Size;
                 il.Emit(OpCodes.Ldarg_1);
                 il.Emit(OpCodes.Ldc_I4, i);
-                il.Emit(OpCodes.Ldloca_S, locals[2 * numArguments]);
+                il.Emit(OpCodes.Ldloca, locals[2 * numArguments]);
                 il.Emit(OpCodes.Call, typeof(IntPtr).GetMethod("ToInt64"));
                 il.Emit(OpCodes.Call, typeof(IntPtr).GetMethod("get_Size"));
                 il.Emit(OpCodes.Conv_I8);

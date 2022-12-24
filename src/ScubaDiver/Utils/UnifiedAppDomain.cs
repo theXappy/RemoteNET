@@ -36,7 +36,9 @@ namespace ScubaDiver.Utils
                         throw new Exception("GetHeapObjects returned anyErrors: True");
                     }
 
-                    _domains = candidates.Select(cand => _parentDiver.GetObject(cand.Address, false, cand.HashCode).instance).Cast<AppDomain>().ToArray();
+                    _domains = candidates
+                        .Select(cand => _parentDiver.GetObject(cand.Address, false, cand.Type, cand.HashCode).instance)
+                        .Cast<AppDomain>().ToArray();
                     Logger.Debug("[Diver][UnifiedAppDomain] All assemblies were retrieved from all AppDomains :)");
                 }
                 catch (Exception ex)

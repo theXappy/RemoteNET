@@ -532,7 +532,7 @@ namespace RemoteNET.Internal
                 }
                 else if (item.IsRemoteAddress)
                 {
-                    return this.__ra.GetRemoteObject(item.RemoteAddress).Dynamify();
+                    return this.__ra.GetRemoteObject(item.RemoteAddress, item.Type).Dynamify();
                 }
                 else
                 {

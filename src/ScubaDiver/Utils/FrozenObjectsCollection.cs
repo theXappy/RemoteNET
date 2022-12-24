@@ -33,23 +33,23 @@ public class FrozenObjectsCollection
         }
     }
 
-    private void PinInternal(object[] objs)
+    private void PinInternal(object[] newfrozenObjects)
     {
         lock (_lock)
         {
-            if (objs.Length == 0)
+            if (newfrozenObjects.Length == 0)
             {
                 UnpinAll();
                 return;
             }
 
-            ulong[] addresses = new ulong[objs.Length];
+            ulong[] addresses = new ulong[newfrozenObjects.Length];
             ManualResetEvent frozenFeedback = new ManualResetEvent(false);
             ManualResetEvent unfreezeRequested = new ManualResetEvent(false);
 
             // Call freeze
-            var func = FreezeFuncsFactory.Generate(objs.Length);
-            Task freezerTask = Task.Run(() => func(objs, addresses, frozenFeedback, unfreezeRequested));
+            var func = FreezeFuncsFactory.Generate(newfrozenObjects.Length);
+            Task freezerTask = Task.Run(() => func(newfrozenObjects, addresses, frozenFeedback, unfreezeRequested));
 
             // Wait for the freezer task to signal to us
             frozenFeedback.WaitOne();
@@ -64,9 +64,10 @@ public class FrozenObjectsCollection
             _freezerTask = freezerTask;
 
             // Now all addresses are set in the array. Re-create dict
-            for (int i = 0; i < objs.Length; i++)
+            _frozenObjects.Clear();
+            for (int i = 0; i < newfrozenObjects.Length; i++)
             {
-                _frozenObjects[objs[i]] = addresses[i];
+                _frozenObjects[newfrozenObjects[i]] = addresses[i];
             }
         }
     }
@@ -81,6 +82,8 @@ public class FrozenObjectsCollection
             // Prepare parameters
             object[] objs = _frozenObjects.Keys.Concat(new object[] { o }).ToArray();
             PinInternal(objs);
+
+            Logger.Debug($"[{nameof(FrozenObjectsCollection)}] Pinned another object. Num Pinned: {_frozenObjects.Count}");
 
             return _frozenObjects[o];
         }
@@ -119,10 +122,13 @@ public class FrozenObjectsCollection
 
             // Making sure that adress was even in the dictionary.
             // Otherwise, we don't need to re-pin all objects.
+            Logger.Debug($"[{nameof(FrozenObjectsCollection)}] Unpinning another object. New Num Pinned: {objs.Length}");
             if (objs.Length == _frozenObjects.Count)
                 return false;
 
             PinInternal(objs);
+
+            Logger.Debug($"[{nameof(FrozenObjectsCollection)}] Unpinned another object. Final Num Pinned: {_frozenObjects.Count}");
             return true;
         }
     }

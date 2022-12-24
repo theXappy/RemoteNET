@@ -153,11 +153,12 @@ namespace ScubaDiver.API
             return results;
         }
 
-        public ObjectDump DumpObject(ulong address, bool pinObject = false, int? hashcode = null)
+        public ObjectDump DumpObject(ulong address, string typeName, bool pinObject = false, int? hashcode = null)
         {
             Dictionary<string, string> queryParams = new()
             {
                 { "address", address.ToString() },
+                { "type_name", typeName },
                 { "pinRequest", pinObject.ToString() },
                 { "hashcode_fallback", "false" }
             };

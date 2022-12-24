@@ -88,7 +88,7 @@ namespace ScubaDiver.Hooking
             _locksDict.SetSpecialThreadState(id, SmartLocksDict<MethodBase>.SmartLockThreadState.AllowAllLocks);
         }
 
-        public delegate void HookCallback(object instance, object[] args);
+        public delegate bool HookCallback(object instance, object[] args);
 
         public void AddHook(MethodBase target, HarmonyPatchPosition pos, HookCallback patch)
         {
@@ -141,7 +141,16 @@ namespace ScubaDiver.Hooking
             Console.WriteLine("");
             Logger.Debug($"[HarmonyWrapper][AddHook] Constructed this binaryParamsString: {binaryParamsString} for method {target.Name}");
 
-            MethodInfo myPrefixHook = _psHooks[binaryParamsString];
+            MethodInfo myPrefixHook;
+            if (target.IsConstructor)
+            {
+                myPrefixHook = typeof(HarmonyWrapper).GetMethod("UnifiedHook_ctor", (BindingFlags)0xffff);
+            }
+            else
+            {
+                myPrefixHook = _psHooks[binaryParamsString];
+            }
+
             // Document the `single prefix hook` used so we can remove later
             _singlePrefixHooks[uniqueId] = myPrefixHook;
             _locksDict.Add(target);
@@ -162,7 +171,7 @@ namespace ScubaDiver.Hooking
                     finalizer = new HarmonyMethod(myPrefixHook);
                     break;
                 default:
-                    throw new ArgumentException("Invalid value for the `HarmonyPatchPosition pos` arg");
+                    throw new ArgumentException("Invalid value for the 'HarmonyPatchPosition pos' arg");
             }
             _harmony.Patch(target,
                 prefix,
@@ -183,9 +192,7 @@ namespace ScubaDiver.Hooking
             _locksDict.Remove(target);
         }
 
-        
-
-        private static void SinglePrefixHook(MethodBase __originalMethod, object __instance, params object[] args)
+        private static bool SinglePrefixHook(MethodBase __originalMethod, object __instance, params object[] args)
         {
             SmartLocksDict<MethodBase>.AcquireResults res = _locksDict.Acquire(__originalMethod);
             if(res == SmartLocksDict<MethodBase>.AcquireResults.AlreadyAcquireByCurrentThread ||
@@ -194,7 +201,8 @@ namespace ScubaDiver.Hooking
             {
                 // Whoops looks like we patched a method used in the 'ScubaDvier framework code'
                 // Luckily, this if clause allows us to avoid recursion
-                return;
+                
+                return true; // Don't skip original
             }
 
             try
@@ -202,11 +210,13 @@ namespace ScubaDiver.Hooking
                 string uniqueId = __originalMethod.DeclaringType.FullName + ":" + __originalMethod.Name;
                 if (_actualHooks.TryGetValue(uniqueId, out HookCallback funcHook))
                 {
-                    funcHook(__instance, args);
+                    // Return value will determine wether the original method will be called or not.
+                    return funcHook(__instance, args);
                 }
                 else
                 {
                     Console.WriteLine("!ERROR! No such hooked func");
+                    return true; // Don't skip original
                 }
             }
             finally
@@ -217,21 +227,22 @@ namespace ScubaDiver.Hooking
 
 #pragma warning disable IDE0051 // Remove unused private members
         // ReSharper disable UnusedMember.Local
-        private static void UnifiedHook_0000000000(MethodBase __originalMethod, object __instance) => SinglePrefixHook(__originalMethod, __instance);
-        private static void UnifiedHook_1000000000(MethodBase __originalMethod, object __instance, object __0) => SinglePrefixHook(__originalMethod, __instance, __0);
-        private static void UnifiedHook_1100000000(MethodBase __originalMethod, object __instance, object __0, object __1) => SinglePrefixHook(__originalMethod, __instance, __0, __1);
-        private static void UnifiedHook_0100000000(MethodBase __originalMethod, object __instance, object __1) => SinglePrefixHook(__originalMethod, __instance, DummyParameterReplacement.Instance, __1);
-        private static void UnifiedHook_1110000000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2);
-        private static void UnifiedHook_0110000000(MethodBase __originalMethod, object __instance, object __1, object __2) => SinglePrefixHook(__originalMethod, __instance, DummyParameterReplacement.Instance, __1, __2);
-        private static void UnifiedHook_1010000000(MethodBase __originalMethod, object __instance, object __0, object __2) => SinglePrefixHook(__originalMethod, __instance, __0, DummyParameterReplacement.Instance, __2);
-        private static void UnifiedHook_0010000000(MethodBase __originalMethod, object __instance, object __2) => SinglePrefixHook(__originalMethod, __instance, DummyParameterReplacement.Instance, DummyParameterReplacement.Instance, __2);
-        private static void UnifiedHook_1111000000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3);
-        private static void UnifiedHook_1111100000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4);
-        private static void UnifiedHook_1111110000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5);
-        private static void UnifiedHook_1111111000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5, object __6) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5, __6);
-        private static void UnifiedHook_1111111100(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5, object __6, object __7) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5, __6, __7);
-        private static void UnifiedHook_1111111110(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5, object __6, object __7, object __8) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5, __6, __7, __8);
-        private static void UnifiedHook_1111111111(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5, object __6, object __7, object __8, object __9) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5, __6, __7, __8, __9);
+        private static bool UnifiedHook_ctor(MethodBase __originalMethod) => SinglePrefixHook(__originalMethod, new object());
+        private static bool UnifiedHook_0000000000(MethodBase __originalMethod, object __instance) => SinglePrefixHook(__originalMethod, __instance);
+        private static bool UnifiedHook_1000000000(MethodBase __originalMethod, object __instance, object __0) => SinglePrefixHook(__originalMethod, __instance, __0);
+        private static bool UnifiedHook_1100000000(MethodBase __originalMethod, object __instance, object __0, object __1) => SinglePrefixHook(__originalMethod, __instance, __0, __1);
+        private static bool UnifiedHook_0100000000(MethodBase __originalMethod, object __instance, object __1) => SinglePrefixHook(__originalMethod, __instance, DummyParameterReplacement.Instance, __1);
+        private static bool UnifiedHook_1110000000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2);
+        private static bool UnifiedHook_0110000000(MethodBase __originalMethod, object __instance, object __1, object __2) => SinglePrefixHook(__originalMethod, __instance, DummyParameterReplacement.Instance, __1, __2);
+        private static bool UnifiedHook_1010000000(MethodBase __originalMethod, object __instance, object __0, object __2) => SinglePrefixHook(__originalMethod, __instance, __0, DummyParameterReplacement.Instance, __2);
+        private static bool UnifiedHook_0010000000(MethodBase __originalMethod, object __instance, object __2) => SinglePrefixHook(__originalMethod, __instance, DummyParameterReplacement.Instance, DummyParameterReplacement.Instance, __2);
+        private static bool UnifiedHook_1111000000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3);
+        private static bool UnifiedHook_1111100000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4);
+        private static bool UnifiedHook_1111110000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5);
+        private static bool UnifiedHook_1111111000(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5, object __6) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5, __6);
+        private static bool UnifiedHook_1111111100(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5, object __6, object __7) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5, __6, __7);
+        private static bool UnifiedHook_1111111110(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5, object __6, object __7, object __8) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5, __6, __7, __8);
+        private static bool UnifiedHook_1111111111(MethodBase __originalMethod, object __instance, object __0, object __1, object __2, object __3, object __4, object __5, object __6, object __7, object __8, object __9) => SinglePrefixHook(__originalMethod, __instance, __0, __1, __2, __3, __4, __5, __6, __7, __8, __9);
         // ReSharper restore UnusedMember.Local
 #pragma warning restore IDE0051 // Remove unused private members
     }

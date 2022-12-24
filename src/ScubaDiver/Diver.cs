@@ -270,7 +270,7 @@ namespace ScubaDiver
             response.ContentLength64 = buffer.Length;
             response.ContentType = "application/json";
             Stream output = response.OutputStream;
-            output.Write(buffer, 0, buffer.Length);
+                output.Write(buffer, 0, buffer.Length);
             // You must close the output stream.
             output.Close();
         }
@@ -361,7 +361,7 @@ namespace ScubaDiver
         #endregion
 
         #region Object Pinning
-        public (object instance, ulong pinnedAddress) GetObject(ulong objAddr, bool pinningRequested, int? hashcode = null)
+        public (object instance, ulong pinnedAddress) GetObject(ulong objAddr, bool pinningRequested, string typeName, int? hashcode = null)
         {
             bool hashCodeFallback = hashcode.HasValue;
 
@@ -399,7 +399,7 @@ namespace ScubaDiver
             //
             ulong methodTable;
             ulong finalObjAddress;
-            if (clrObj.Type != null)
+            if (clrObj.Type != null && clrObj.Type.Name == typeName)
             {
                 methodTable = clrObj.Type.MethodTable;
                 finalObjAddress = clrObj.Address;
@@ -450,6 +450,29 @@ namespace ScubaDiver
             {
                 throw new Exception("Method Table value mismatched");
             }
+
+            //
+            // A GC collect might still happen between checking
+            // the CLR MD object and the retrival of the object
+            // So we check the final object's type name one last time 
+            // (It's better to crash here then return bas objects)
+            //
+            string finalTypeName;
+            try
+            {
+                finalTypeName = instance.GetType().FullName;
+            }
+            catch (Exception ex)
+            {
+                throw new AggregateException(
+                    "The final object we got from the addres (after checking CLR MD twice) was" +
+                    "broken and we couldn't read it's Type's full name.", ex);
+            }
+
+            if (finalTypeName != typeName)
+                throw new Exception("A GC occurened between checking the CLR MD (twice) and the object retrival." +
+                                    "A different object was retrieved and its type is not the one we expected." +
+                                    $"Expected Type: {typeName}, Actual Type: {finalTypeName}");
 
 
             // Pin the result object if requested
@@ -893,7 +916,18 @@ namespace ScubaDiver
             Logger.Debug($"[Diver] Hook Method - Assigned Token: {token}");
 
             // Preparing a proxy method that Harmony will invoke
-            HarmonyWrapper.HookCallback patchCallback = (obj, args) => InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), obj, args);
+            HarmonyWrapper.HookCallback patchCallback = (obj, args) =>
+            {
+                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), obj, args);
+                bool skipOriginal = false;
+                if (res != null && !res.IsRemoteAddress)
+                {
+                    object decodedRes = PrimitivesEncoder.Decode(res);
+                    if(decodedRes is bool boolRes)
+                        skipOriginal = boolRes;
+                }
+                return skipOriginal;
+            };
 
             Logger.Debug($"[Diver] Hooking function {methodName}...");
             try
@@ -1018,7 +1052,16 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(erResults);
         }
         public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvailableCallbackToken);
-        public void InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="callbacksEndpoint"></param>
+        /// <param name="token"></param>
+        /// <param name="stackTrace"></param>
+        /// <param name="parameters"></param>
+        /// <returns>Any results returned from the</returns>
+        public ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
         {
             ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
@@ -1048,13 +1091,17 @@ namespace ScubaDiver
             }
 
             // Call callback at controller
-            reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
+            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
+
+            return hookCallbackResults.ReturnedObjectOrAddress;
+
         }
 
         #endregion
         private string MakeObjectResponse(HttpListenerRequest arg)
         {
             string objAddrStr = arg.QueryString.Get("address");
+            string typeName = arg.QueryString.Get("type_name");
             bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
             bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
             string hashCodeStr = arg.QueryString.Get("hashcode");
@@ -1077,7 +1124,7 @@ namespace ScubaDiver
 
             try
             {
-                (object instance, ulong pinnedAddress) = GetObject(objAddr, pinningRequested, hashCodeFallback ? userHashcode : null);
+                (object instance, ulong pinnedAddress) = GetObject(objAddr, pinningRequested, typeName, hashCodeFallback ? userHashcode : null);
                 ObjectDump od = ObjectDumpFactory.Create(instance, objAddr, pinnedAddress);
                 return JsonConvert.SerializeObject(od);
             }
