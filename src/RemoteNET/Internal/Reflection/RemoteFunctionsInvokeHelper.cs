@@ -116,7 +116,7 @@ namespace RemoteNET.Internal.Reflection
             }
             else
             {
-                RemoteObject ro = app.GetRemoteObject(oora.RemoteAddress);
+                RemoteObject ro = app.GetRemoteObject(oora.RemoteAddress, oora.Type);
                 return ro.Dynamify();
             }
         }

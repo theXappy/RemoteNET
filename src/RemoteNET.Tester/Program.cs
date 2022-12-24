@@ -98,11 +98,13 @@ namespace ScubaDiver.Tester
                             // Getting object
                             Console.WriteLine("Enter address (decimal):");
                             input = Console.ReadLine();
+                            Console.WriteLine("Enter Full Type Name:");
+                            string typeName = Console.ReadLine();
                             if (ulong.TryParse(input, out ulong addr))
                             {
                                 try
                                 {
-                                    RemoteObject remoteObject = remoteApp.GetRemoteObject(addr);
+                                    RemoteObject remoteObject = remoteApp.GetRemoteObject(addr, typeName);
                                     remoteObjects.Add(remoteObject);
                                     Console.WriteLine($"Get back this object: {remoteObject}");
                                     Console.WriteLine($"This object's local index is {remoteObjects.IndexOf(remoteObject)}");

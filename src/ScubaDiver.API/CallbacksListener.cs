@@ -186,9 +186,11 @@ namespace ScubaDiver.API
                     // Run hook. No results expected directly (it might alter variabels inside the hook)
                     hook(hookContext, res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
 
+                    // Report back whether to call the original function or no (Harmony wants this as the return value)
                     InvocationResults ir = new()
                     {
-                        VoidReturnType = true,
+                        VoidReturnType = false,
+                        ReturnedObjectOrAddress = ObjectOrRemoteAddress.FromObj(hookContext.CallOriginal)
                     };
 
                     body = JsonConvert.SerializeObject(ir);

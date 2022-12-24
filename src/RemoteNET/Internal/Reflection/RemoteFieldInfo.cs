@@ -87,7 +87,7 @@ namespace RemoteNET.Internal.Reflection
             {
                 if (oora.IsRemoteAddress)
                 {
-                    var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress);
+                    var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress, oora.Type);
                     return remoteObject.Dynamify();
                 }
                 else if (oora.IsNull)
