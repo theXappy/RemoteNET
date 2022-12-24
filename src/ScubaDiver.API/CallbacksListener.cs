@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using ScubaDiver.API.Hooking;
@@ -33,10 +34,20 @@ namespace ScubaDiver.API
 
         DiverCommunicator _communicator;
 
-        public CallbacksListener(DiverCommunicator communicator, int callbacksPort)
+        public CallbacksListener(DiverCommunicator communicator)
         {
             _communicator = communicator;
-            Port = callbacksPort;
+            // Generate a random port with a temporary TcpListener
+            int GetRandomUnusedPort()
+            {
+                var listener = new TcpListener(IPAddress.Any, 0);
+                listener.Start();
+                var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                listener.Stop();
+                return port;
+            }
+
+            Port = GetRandomUnusedPort();
             IP = IPAddress.Parse("127.0.0.1");
         }
 
