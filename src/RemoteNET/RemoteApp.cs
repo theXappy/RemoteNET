@@ -369,7 +369,7 @@ namespace RemoteNET
                     {
                         // TODO: Filtering should probably be done in the Diver's side
                         if (matchesFilter(type.TypeName))
-                            yield return new CandidateType(type.TypeName, assembly, type.MethodTable, type.Token);
+                            yield return new CandidateType(type.TypeName, assembly);
                     }
                 }
             }
