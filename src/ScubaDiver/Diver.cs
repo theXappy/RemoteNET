@@ -678,12 +678,8 @@ namespace ScubaDiver
             string assembly = req.QueryString.Get("assembly");
 
             // Try exact match assembly 
-            IEnumerable<ClrModule> allAssembliesInApp = null;
-            lock (_clrMdLock)
-            {
-                allAssembliesInApp = _runtime.AppDomains.SelectMany(appDom => appDom.Modules);
-            }
-            List<ClrModule> matchingAssemblies = allAssembliesInApp.Where(module => Path.GetFileNameWithoutExtension(module.Name) == assembly).ToList();
+            var allAssembliesInApp = _unifiedAppDomain.GetAssemblies();
+            List<Assembly> matchingAssemblies = allAssembliesInApp.Where(assm => assm.GetName().Name == assembly).ToList();
             if (matchingAssemblies.Count == 0)
             {
                 // No exact matches, widen search to any assembly *containing* the query
@@ -691,11 +687,9 @@ namespace ScubaDiver
                 {
                     try
                     {
-                        return Path.GetFileNameWithoutExtension(module.Name).Contains(assembly);
+                        return module?.GetName()?.Name?.Contains(assembly) == true;
                     }
-                    catch
-                    {
-                    }
+                    catch { }
 
                     return false;
                 }).ToList();
@@ -704,27 +698,30 @@ namespace ScubaDiver
             if (!matchingAssemblies.Any())
             {
                 // No matching assemblies found
-                return QuickError("No assemblies found matching the query");
+                return QuickError($"No assemblies found matching the query '{assembly}'");
             }
             else if (matchingAssemblies.Count > 1)
             {
-                return $"{{\"error\":\"Too many assemblies found matching the query. Expected: 1, Got: {matchingAssemblies.Count}\"}}";
+                return $"{{\"error\":\"Too many assemblies found matching the query '{assembly}'. Expected: 1, Got: {matchingAssemblies.Count}\"}}";
             }
 
             // Got here - we have a single matching assembly.
-            ClrModule matchingAssembly = matchingAssemblies.Single();
+            Assembly matchingAssembly = matchingAssemblies.Single();
 
-            var typeNames = from tuple in matchingAssembly.OldSchoolEnumerateTypeDefToMethodTableMap()
-                            let token = tuple.Token
-                            let typeName = matchingAssembly.ResolveToken(token)?.Name ?? "Unknown"
-                            select new TypesDump.TypeIdentifiers()
-                            { MethodTable = tuple.MethodTable, Token = token, TypeName = typeName };
 
+            List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
+            foreach (Type type in matchingAssembly.GetTypes())
+            {
+                types.Add(new TypesDump.TypeIdentifiers()
+                {
+                    TypeName = type.FullName
+                });
+            }
 
             TypesDump dump = new()
             {
                 AssemblyName = assembly,
-                Types = typeNames.ToList()
+                Types = types
             };
 
             return JsonConvert.SerializeObject(dump);
