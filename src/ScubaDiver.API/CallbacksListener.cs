@@ -91,7 +91,7 @@ namespace ScubaDiver.API
 
         private void Dispatcher(HttpListener listener)
         {
-            while (!_src.IsCancellationRequested)
+            while (_src != null && !_src.IsCancellationRequested)
             {
                 void ListenerCallback(IAsyncResult result)
                 {
