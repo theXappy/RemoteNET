@@ -59,14 +59,23 @@ namespace ScubaDiver.Utils
 
         public Type ResolveType(string typeFullName, string assembly = null)
         {
+            // TODO: Nullable gets a special case but in general we should switch to a recursive type-resolution.
+            // So stuff like: Dictionary<FirstAssembly.FirstType, SecondAssembly.SecondType> will always work
+            if (typeFullName.StartsWith("System.Nullable`1[["))
+            {
+                return ResolveNullableType(typeFullName, assembly);
+            }
+
             if (typeFullName.Contains('<') && typeFullName.EndsWith(">"))
             {
                 string genericParams = typeFullName.Substring(typeFullName.LastIndexOf('<'));
                 int numOfParams = genericParams.Split(',').Length;
 
                 string nonGenericPart = typeFullName.Substring(0,typeFullName.LastIndexOf('<'));
+                // TODO: Does this event work? it turns List<int> and List<string> both to List`1?
                 typeFullName = $"{nonGenericPart}`{numOfParams}";
             }
+
 
             foreach (Assembly assm in GetAssemblies())
             {
@@ -76,7 +85,22 @@ namespace ScubaDiver.Utils
                     return t;
                 }
             }
-            throw new Exception("Could not find type in any of the known assemblies");
+            throw new Exception($"Could not find type '{typeFullName}' in any of the known assemblies");
+        }
+
+        private Type ResolveNullableType(string typeFullName, string assembly)
+        {
+            // Remove prefix: "System.Nullable`1[["
+            string innerTypeName = typeFullName.Substring("System.Nullable`1[[".Length);
+            // Remove suffix: "]]"
+            innerTypeName = innerTypeName.Substring(0, innerTypeName.Length - 2);
+
+            Type innerType = ResolveType(innerTypeName);
+            if(innerType == null)
+                return null;
+
+            Type nullable = typeof(Nullable<>);
+            return nullable.MakeGenericType(innerType);
         }
     }
 }
