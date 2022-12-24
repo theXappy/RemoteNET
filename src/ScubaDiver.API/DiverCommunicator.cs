@@ -35,7 +35,7 @@ namespace ScubaDiver.API
         {
             _hostname = hostname;
             _diverPort = diverPort;
-            _listener = new CallbacksListener(this, _diverPort + 1);
+            _listener = new CallbacksListener(this);
         }
         public DiverCommunicator(IPAddress ipa, int diverPort) : this(ipa.ToString(), diverPort) { }
         public DiverCommunicator(IPEndPoint ipe) : this(ipe.Address, ipe.Port) { }
@@ -353,11 +353,13 @@ namespace ScubaDiver.API
 
             }
 
-            queryParams = new() { };
-            queryParams["address"] = targetAddr.ToString();
-            queryParams["event"] = eventName;
-            queryParams["ip"] = _listener.IP.ToString();
-            queryParams["port"] = _listener.Port.ToString();
+            queryParams = new()
+            {
+                ["address"] = targetAddr.ToString(),
+                ["event"] = eventName,
+                ["ip"] = _listener.IP.ToString(),
+                ["port"] = _listener.Port.ToString()
+            };
             body = SendRequest("event_subscribe", queryParams);
             EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(body);
             _listener.EventSubscribe(callback, regRes.Token);
