@@ -654,14 +654,16 @@ namespace ScubaDiver
             {
                 foreach (ClrAppDomain clrAppDomain in _runtime.AppDomains)
                 {
-                    available.Add(new DomainsDump.AvailableDomain()
+                    var modules = clrAppDomain.Modules
+                        .Select(m => Path.GetFileNameWithoutExtension(m.Name))
+                        .Where(m => !string.IsNullOrWhiteSpace(m))
+                        .ToList();
+                    var dom = new DomainsDump.AvailableDomain()
                     {
                         Name = clrAppDomain.Name,
-                        AvailableModules = clrAppDomain.Modules
-                            .Select(m => Path.GetFileNameWithoutExtension(m.Name))
-                            .Where(m => !string.IsNullOrWhiteSpace(m))
-                            .ToList()
-                    });
+                        AvailableModules = modules
+                    };
+                    available.Add(dom);
                 }
             }
 
