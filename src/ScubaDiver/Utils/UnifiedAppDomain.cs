@@ -94,6 +94,8 @@ namespace ScubaDiver.Utils
             string innerTypeName = typeFullName.Substring("System.Nullable`1[[".Length);
             // Remove suffix: "]]"
             innerTypeName = innerTypeName.Substring(0, innerTypeName.Length - 2);
+            // Type name is everything before the first comma (affter that we have some assembly info)
+            innerTypeName = innerTypeName.Substring(0, innerTypeName.IndexOf(',')).Trim();
 
             Type innerType = ResolveType(innerTypeName);
             if(innerType == null)
