@@ -5,10 +5,12 @@ But in case the internal structure interests you (or you want to contribute/fix 
 
 ### Projects descriptions
 1. **Injector** (C++) - A good ol' DLL injector. Can be compiled to x32 & x64. Supports a single parameter PID but hard-coded to inject the "Bootstrap" dll and nothing else.
-2. **BootstrapDLL** (C++) - The unmanaged injected DLL that loads the CLR in the target and injects the managed dll (ScubaDiver).
+2. **UnmanagedAdapterDLL** (C++) - The unmanaged injected DLL that locates the CLR in the target and injects the managed dll (ScubaDiver).
 3. **ScubaDiver** (C#) - The managed implant for our target app. It starts an HTTP server to communicate back. Uses ClrMD to inspect it's host process and other tricks to work with "borrowed" objects.
-4. **ScubaDiver.Tester** (C#) - A CLI application to inject ScubaDiver into a process and interact with it. It's mostly used for testing while developing.
-5. **RemoteNET** (C#) - The one to rule them all. This library handles both injecting the Diver into the target and further communication with it (querying objects, examining them, creating new ones...).
+4. **ScubaDiver.API** (C#) - Common objects between ScubaDiver and RemoteNET.
+5. **RemoteNET.Tester** (C#) - A CLI application to inject ScubaDiver into a process and interact with it. It's mostly used for testing while developing.
+6. **RemoteNET** (C#) - The one to rule them all. This library handles both injecting the Diver into the target and further communication with it (querying objects, examining them, creating new ones...).
+7. **DebuggableDummy** (C#) - A short program that runs a Diver in itself. Used for debugging.
 
 
 ### Diver communication
@@ -17,7 +19,7 @@ It's mostly idle, waiting for HTTP commands so it can send back resutls.
 Most of the Diver's power comes from the [ClrMD](https://github.com/microsoft/clrmd) library by Microsoft.  
 
 #### Protocol
-The Diver's class contains mostly HTTP handlers which reflect the entire protocol. These are the currently supported functions:
+The Diver's class contains mostly HTTP handlers which reflect the entire protocol. Here are some supported function:
 * /type - Dumps a specific type (fields, properties, methods).
 * /heap - Dumps objects of the heap. Can be narrowed down using a filter on the objects' types.
 * /create_object - Constructs a new remote object.
@@ -27,6 +29,7 @@ The Diver's class contains mostly HTTP handlers which reflect the entire protoco
 * /domains - Returns a list of domains in the remote app.
 * /types - Returns a list of all types within a specific remote assembly.
 * /die - Signal to the Diver to exit.
+The full list can be found in the construor of `ScubaDiver.Diver`.
 
 
 #### Interaction with objects
