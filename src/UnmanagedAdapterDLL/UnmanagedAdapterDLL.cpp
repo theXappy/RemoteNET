@@ -28,7 +28,9 @@ enum FrameworkType ParseFrameworkType(const std::wstring& framework)
 	if (icase_cmp(framework, L"netcoreapp3.0")
 		|| icase_cmp(framework, L"netcoreapp3.1")
 		|| icase_cmp(framework, L"net5.0-windows")
-		|| icase_cmp(framework, L"net6.0-windows"))
+		|| icase_cmp(framework, L"net6.0-windows")
+		|| icase_cmp(framework, L"net7.0-windows")
+		)
 	{
 		return FrameworkType::NET_CORE;
 	}
@@ -94,13 +96,13 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 
 	if (frameworkType == FrameworkType::NET_CORE)
 	{
-		DebugOut(L"[UnmanagedAdapter] Secure a handle to the Core (3/5/6) CLR \n");
+		DebugOut(L"[UnmanagedAdapter] Securing a handle to the Core (3/5/6/7) CLR \n");
 		// Secure a handle to the Core (3/5/6) CLR 
 		pClr = StartCLRCore();
 	}
 	else if (frameworkType == FrameworkType::NET_FRAMEWORK)
 	{
-		DebugOut(L"[UnmanagedAdapter] Secure a handle to the CLR v4.0 \n");
+		DebugOut(L"[UnmanagedAdapter] Securing a handle to the CLR v4.0 \n");
 		// Secure a handle to the CLR v4.0
 		pClr = StartCLR(L"v4.0.30319");
 	}

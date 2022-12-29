@@ -235,7 +235,9 @@ namespace RemoteNET
         private static void GetInjectionToolkit(Process target, string targetDotNetVer, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath)
         {
             bool isNetCore = targetDotNetVer != "net451";
-            bool isNet5 = targetDotNetVer == "net5.0-windows";
+            bool isNet5orUp = targetDotNetVer == "net5.0-windows" ||
+                              targetDotNetVer == "net6.0-windows" ||
+                              targetDotNetVer == "net7.0-windows";
 
             // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
             remoteNetAppDataDir = Path.Combine(
@@ -279,7 +281,7 @@ namespace RemoteNET
             }
 
             // Unzip scuba diver and dependencies into their own directory
-            string targetDiver = isNet5 ? "ScubaDiver_Net5" :
+            string targetDiver = isNet5orUp ? "ScubaDiver_Net5" :
                                     (isNetCore ? "ScubaDiver_NetCore" : "ScubaDiver_NetFramework");
             var scubaDestDirInfo = new DirectoryInfo(
                                             Path.Combine(
@@ -365,12 +367,24 @@ namespace RemoteNET
             {
                 foreach (string assembly in domain.AvailableModules)
                 {
-                    foreach (TypesDump.TypeIdentifiers type in _communicator.DumpTypes(assembly).Types)
+                    List<TypesDump.TypeIdentifiers> typeIdentifiers;
+                    try
+                    {
+                        typeIdentifiers = _communicator.DumpTypes(assembly).Types;
+                    }
+                    catch
+                    {
+                        // TODO:
+                        Debug.WriteLine($"[{nameof(RemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Dumping/Iterating assembly: {assembly}");
+                        continue;
+                    }
+                    foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
                     {
                         // TODO: Filtering should probably be done in the Diver's side
                         if (matchesFilter(type.TypeName))
                             yield return new CandidateType(type.TypeName, assembly);
                     }
+
                 }
             }
 
