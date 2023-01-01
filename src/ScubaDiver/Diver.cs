@@ -295,8 +295,17 @@ namespace ScubaDiver
                         }
                         catch (ObjectDisposedException)
                         {
-                            Logger.Debug("[Diver][ListenerCallback] Listener is disposed. Exiting.");
+                            Logger.Debug("[Diver][ListenerCallback] Listener was disposed. Exiting.");
                             return;
+                        }
+                        catch (HttpListenerException e)
+                        {
+                            if (e.Message.StartsWith("The I/O operation has been aborted"))
+                            {
+                                Logger.Debug($"[Diver][ListenerCallback] Listener was aborted. Exiting.");
+                                return;
+                            }
+                            throw;
                         }
 
                         try
