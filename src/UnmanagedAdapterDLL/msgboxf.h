@@ -1,19 +1,23 @@
 #pragma once
 #include <stdio.h>
+#include <stdlib.h>
 #include <Windows.h>
 
 // A macro to allow invocation with a format string
-// Beware of overflows! Keep your prints short or expand the buffer.
-#define msgboxf(format, ...)  \
+#define msgboxf(format, ...) \
     { \
-        char msg[500]; \
-        sprintf_s(msg, 500, format, __VA_ARGS__); \
-        MessageBoxA(NULL, msg, NULL, 0); \
+        int _msgboxf_len = snprintf(NULL, 0, format, __VA_ARGS__); \
+        char* _msgboxf_buf = (char*)malloc(_msgboxf_len + 1); \
+        snprintf(_msgboxf_buf, _msgboxf_len + 1, format, __VA_ARGS__); \
+        MessageBoxA(NULL, _msgboxf_buf, NULL, 0); \
+        free(_msgboxf_buf); \
     }
 
-#define debugf(format, ...)  \
+#define debugf(format, ...) \
     { \
-        char msg[500]; \
-        sprintf_s(msg, 500, format, __VA_ARGS__); \
-        OutputDebugStringA(msg); \
+        int _debugf_len = snprintf(NULL, 0, format, __VA_ARGS__); \
+        char* _debugf_buf = (char*)malloc(_debugf_len + 1); \
+        snprintf(_debugf_buf, _debugf_len + 1, format, __VA_ARGS__); \
+        OutputDebugStringA(_debugf_buf); \
+        free(_debugf_buf); \
     }
