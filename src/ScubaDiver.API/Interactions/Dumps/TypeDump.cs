@@ -15,7 +15,8 @@ namespace ScubaDiver.API.Interactions.Dumps
             {
                 public bool IsGenericType { get; set; }
                 public bool IsGenericParameter { get; set; }
-                public string Type { get; set; }
+                public string FullTypeName { get; set; }
+                public string TypeName { get; set; }
                 public string Name { get; set; }
                 public string Assembly { get; set; }
 
@@ -31,15 +32,16 @@ namespace ScubaDiver.API.Interactions.Dumps
                     Name = pi.Name;
                     // For generic type parameters we need the 'Name' property - it returns something like "T"
                     // For non-generic we want the full name like "System.Text.StringBuilder"
-                    Type = IsGenericParameter ? pi.ParameterType.Name : pi.ParameterType.FullName;
+                    TypeName = pi.ParameterType.Name;
+                    FullTypeName = pi.ParameterType.FullName;
                     if (IsGenericParameter &&
                         pi.ParameterType.GenericTypeArguments.Any() &&
-                        Type.Contains('`'))
+                        FullTypeName.Contains('`'))
                     {
-                        Type = Type.Substring(0, Type.IndexOf('`'));
-                        Type += '<';
-                        Type += String.Join(", ", (object[])pi.ParameterType.GenericTypeArguments);
-                        Type += '>';
+                        FullTypeName = FullTypeName.Substring(0, FullTypeName.IndexOf('`'));
+                        FullTypeName += '<';
+                        FullTypeName += String.Join(", ", (object[])pi.ParameterType.GenericTypeArguments);
+                        FullTypeName += '>';
                     }
                     Assembly = pi.ParameterType.Assembly.GetName().Name;
                 }
@@ -48,7 +50,7 @@ namespace ScubaDiver.API.Interactions.Dumps
                 {
                     return
                         (string.IsNullOrEmpty(Assembly) ? string.Empty : Assembly + ".") +
-                        (string.IsNullOrEmpty(Type) ? "UNKNOWN_TYPE" : Type) + " " +
+                        (string.IsNullOrEmpty(FullTypeName) ? "UNKNOWN_TYPE" : FullTypeName) + " " +
                            (string.IsNullOrEmpty(Name) ? "MISSING_NAME" : Name);
 
                 }
@@ -64,6 +66,7 @@ namespace ScubaDiver.API.Interactions.Dumps
             public List<string> GenericArgs { get; set; }
             public List<MethodParameter> Parameters { get; set; }
             public string ReturnTypeAssembly { get; set; }
+            public string ReturnTypeName { get; set; }
 
             public TypeMethod()
             {
@@ -88,6 +91,7 @@ namespace ScubaDiver.API.Interactions.Dumps
                 Parameters = methodBase.GetParameters().Select(paramInfo => new MethodParameter(paramInfo)).ToList();
                 if (methodBase is MethodInfo methodInfo)
                 {
+                    ReturnTypeName = methodInfo.ReturnType.Name;
                     ReturnTypeFullName = methodInfo.ReturnType.FullName;
                     if (ReturnTypeFullName == null)
                     {
@@ -121,7 +125,7 @@ namespace ScubaDiver.API.Interactions.Dumps
                 var paramMatches = Parameters.Zip(other.Parameters, (param1, param2) =>
                 {
                     return param1.Name == param2.Name &&
-                           param1.Type == param2.Type;
+                           param1.FullTypeName == param2.FullTypeName;
                 });
                 return paramMatches.All(match => match == true);
             }

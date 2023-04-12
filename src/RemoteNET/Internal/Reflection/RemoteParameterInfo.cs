@@ -22,6 +22,6 @@ namespace RemoteNET.Internal.Reflection
             _paramType = paramType;
         }
 
-        public override string ToString() => $"{_paramType.TypeFullName} {Name}";
+        public override string ToString() => $"{_paramType.TypeFullName ?? _paramType.TypeName} {Name}";
     }
 }

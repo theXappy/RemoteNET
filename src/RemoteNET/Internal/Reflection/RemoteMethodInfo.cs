@@ -93,7 +93,7 @@ namespace RemoteNET.Internal.Reflection
             try
             {
                 string args = string.Join(", ", _paramInfos.Select(pi => pi.ToString()));
-                return $"{_retType.TypeFullName} {Name}({args})";
+                return $"{_retType.TypeFullName ?? _retType.TypeName} {Name}({args})";
             }
             catch (Exception)
             {

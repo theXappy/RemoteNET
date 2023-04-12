@@ -316,12 +316,12 @@ namespace RemoteNET.Internal.Reflection
                             try
                             {
                                 Type paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
-                                   methodParameter.Type);
+                                   methodParameter.FullTypeName);
                                 if (paramType == null)
                                 {
                                     // TODO: Add stub method to indicate this error to the users?
                                     Debug.WriteLine(
-                                        $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
+                                        $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.FullTypeName} using the function {nameof(ResolveTypeWhileCreating)} " +
                                         $"and it did not throw any exceptions (returned NULL).");
                                     return null;
                                 }
@@ -331,7 +331,7 @@ namespace RemoteNET.Internal.Reflection
                             {
                                 // TODO: Add stub method to indicate this error to the users?
                                 Debug.WriteLine(
-                                    $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.Type} using the function {nameof(ResolveTypeWhileCreating)} " +
+                                    $"[RemoteTypesFactory] Could not resolve method {func.Name} of {methodParameter.FullTypeName} using the function {nameof(ResolveTypeWhileCreating)} " +
                                     $"and it threw this exception: " + e);
                                 return null;
                             }
@@ -339,7 +339,9 @@ namespace RemoteNET.Internal.Reflection
                     });
                     LazyRemoteTypeResolver paramTypeResolver = new LazyRemoteTypeResolver(paramFactory,
                                    methodParameter.Assembly,
-                                   methodParameter.Type);
+                                   methodParameter.FullTypeName,
+                                   methodParameter.TypeName
+                                   );
                     RemoteParameterInfo rpi = new RemoteParameterInfo(methodParameter.Name, paramTypeResolver);
                     parameters.Add(rpi);
                 }
@@ -360,7 +362,7 @@ namespace RemoteNET.Internal.Reflection
                         return null;
                     }
                 });
-                LazyRemoteTypeResolver resolver = new LazyRemoteTypeResolver(factory, func.ReturnTypeAssembly, func.ReturnTypeFullName);
+                LazyRemoteTypeResolver resolver = new LazyRemoteTypeResolver(factory, func.ReturnTypeAssembly, func.ReturnTypeFullName, func.ReturnTypeName);
 
                 if (areConstructors)
                 {

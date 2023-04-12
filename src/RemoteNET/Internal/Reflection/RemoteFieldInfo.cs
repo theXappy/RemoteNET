@@ -149,7 +149,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override string ToString()
         {
-            return $"{FieldType.FullName} {Name}";
+            return $"{FieldType.FullName ?? FieldType.Name} {Name}";
         }
     }
 }
