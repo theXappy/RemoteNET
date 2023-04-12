@@ -11,7 +11,8 @@ namespace RemoteNET.Utils
             if (!ParametersEqual(a.GetParameters(), b.GetParameters()))
                 return false;
 
-            if((a is MethodInfo aInfo) && (b is MethodInfo bInfo))
+            if((a is MethodInfo aInfo) && (b is MethodInfo bInfo)
+               && aInfo.ReturnType != null && bInfo.ReturnType != null)
             {
                 return aInfo.ReturnType.FullName == bInfo.ReturnType.FullName;
             }
