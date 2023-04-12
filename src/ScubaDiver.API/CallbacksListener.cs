@@ -107,7 +107,7 @@ namespace ScubaDiver.API
                     }
                     catch (System.Net.HttpListenerException)
                     {
-                        // Sometimes happe at teardown. Maybe there's a race condition here and waiting on something
+                        // Sometimes happen at teardown. Maybe there's a race condition here and waiting on something
                         // can prevent this but I don't really care
                         return;
                     }
