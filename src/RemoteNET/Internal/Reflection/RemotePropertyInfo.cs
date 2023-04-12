@@ -100,7 +100,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override string ToString()
         {
-            return $"{PropertyType.FullName} {Name}";
+            return $"{PropertyType.FullName ?? PropertyType.Name} {Name}";
         }
     }
 }
