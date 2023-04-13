@@ -29,22 +29,27 @@ The Diver's class contains mostly HTTP handlers which reflect the entire protoco
 * /domains - Returns a list of domains in the remote app.
 * /types - Returns a list of all types within a specific remote assembly.
 * /die - Signal to the Diver to exit.
-The full list can be found in the construor of `ScubaDiver.Diver`.
 
+The full list can be found in the construor of `ScubaDiver.Diver`.
 
 #### Interaction with objects
 A notable feature missing from ClrMD (but not from ScubaDiver) is the ability to invoke methods (including "getters" of properties).  
 This comes from ClrMD's approach to inspect memory dumps and not interact with live objects.  
-To overcome this the Diver first needs to get a reference to the manipulated object and then use reflection to invoke methods/read properties.  
+To overcome this, the Diver first needs to get a reference to the manipulated object and then use reflection to invoke methods/read properties.  
 If you play with ClrMD for a while you'll find out that getting the object's address is quite easy but turning that `IntPtr` back into an object is a near impossible task in raw C#.  
 Luckily, [KeeFarce](https://github.com/denandz/KeeFarce) had this figured out. Its ["Converter" Class](https://github.com/denandz/KeeFarce/blob/master/src/KeeFarceDLL/Converter.cs) is a very unique piece of code.  
-It uses a trick of compiling a function directly from IL to return the `IntPtr` it recieves as the "result's address". Luckily the runtime auto-magiclly converts this to an `object` when returned.  
+It uses a trick of compiling a function directly from IL to return the `IntPtr` it recieves as the "result's address".  
+ Luckily the runtime auto-magiclly converts this to an `object` when returned.  
 Getting that `object` gives us a lot of power - We can now use `.GetType()` on it, explore it's `MethodInfo`s and `PropertyInfos` and invoke them :)  
 Unfortunatly this power comes with a cost. Converting `IntPtr`s back to objects without the runtime to hold our hands is a very risky task.  
-.NET's GC just turned from our best friend into our enemy. If GC happens between retrival of the `IntPtr` address to actually making it into a reference the object might move around the program memory.  
-That menas the address we are not going to "dereference" might be just about anything! De-allocated, Zeroed - hell it might even contain a completely other type of object!
+.NET's GC just turned from our best friend into our enemy.  
+If GC happens between retrival of the `IntPtr` address to actually making it into a reference the object might move around the program memory.  
+That means the address we are now going to "dereference" might be just about anything!  
+De-allocated? Zeroed? hell, it might even contain a completely valid object of a differenmt type!
 
-There is some things that can be done to reduce this risk. Currently 2 are in place in the Diver:
-1. When handling a "Get Object" request the Diver "refreshes" it's state (Creates another dump of the process) to see if there's still an object at that address.
+There is some things that can be done to reduce this risk.  
+Currently 2 are in place in the Diver:  
+1. When handling a "Get Object" request, the Diver "refreshes" it's state (Creates another dump of the process) to see if there's still an object at that address.
 2. Right before calling the "IntPtr to Object" function it checks that the Method Table (MT) address stored at the address has the expected MT value.
-This narrows down the possibily of "bad deref" to only the cases where a GC occures right between the last check and the function's invocation. It's not perfect but it seems good enough for now.
+This narrows down the possibily of "bad deref" to only the cases where a GC occures right between the last check and the function's invocation.  
+It's not perfect but it seems good enough for now.
