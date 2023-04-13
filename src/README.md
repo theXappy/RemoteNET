@@ -4,7 +4,7 @@ Knowing the API (Usage of `RemoteApp`, `RemoteObject` and the `RemoteActivator`)
 But in case the internal structure interests you (or you want to contribute/fix bugs) here's a short summary.
 
 ### Projects descriptions
-1. **Injector** (C++) - A good ol' DLL injector. Can be compiled to x32 & x64. Supports a single parameter PID but hard-coded to inject the "Bootstrap" dll and nothing else.
+1. **Injector** (C++) - A good ol' DLL injector. Can be compiled to x32 & x64. Supports a single parameter PID but hard-coded to inject the "Adapter" dll and nothing else.
 2. **UnmanagedAdapterDLL** (C++) - The unmanaged injected DLL that locates the CLR in the target and injects the managed dll (ScubaDiver).
 3. **ScubaDiver** (C#) - The managed implant for our target app. It starts an HTTP server to communicate back. Uses ClrMD to inspect it's host process and other tricks to work with "borrowed" objects.
 4. **ScubaDiver.API** (C#) - Common objects between ScubaDiver and RemoteNET.
