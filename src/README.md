@@ -5,7 +5,7 @@ But in case the internal structure interests you (or you want to contribute/fix 
 
 ### Projects descriptions
 1. **Injector** (C++) - A good ol' DLL injector. Can be compiled to x32 & x64. Supports a single parameter PID but hard-coded to inject the "Adapter" dll and nothing else.
-2. **UnmanagedAdapterDLL** (C++) - The unmanaged injected DLL that locates the CLR in the target and injects the managed dll (ScubaDiver).
+2. **UnmanagedAdapterDLL** (C++) - The unmanaged injected dll that locates the CLR in the target and injects the managed dll (ScubaDiver).
 3. **ScubaDiver** (C#) - The managed implant for our target app. It starts an HTTP server to communicate back. Uses ClrMD to inspect it's host process and other tricks to work with "borrowed" objects.
 4. **ScubaDiver.API** (C#) - Common objects between ScubaDiver and RemoteNET.
 5. **RemoteNET.Tester** (C#) - A CLI application to inject ScubaDiver into a process and interact with it. It's mostly used for testing while developing.
