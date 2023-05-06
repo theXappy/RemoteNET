@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using InjectableDotNetHost.Injector;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Extensions;
 using RemoteNET.Internal.Reflection;
@@ -175,7 +176,22 @@ namespace RemoteNET
 
                 // Not injected yet, Injecting adapter now (which should load the Diver)
                 // Get different injection kit (for .NET framework or .NET core & x86 or x64)
-                GetInjectionToolkit(target, targetDotNetVer, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath);
+                var res = GetInjectionToolkit(target, targetDotNetVer);
+                string remoteNetAppDataDir = res.RemoteNetAppDataDir;
+                string injectorPath = res.InjectorPath;
+                string scubaDiverDllPath = res.ScubaDiverDllPath;
+                string injectableDummy = res.InjectableDummyPath;
+
+                // If we have a native target, We try to host a .NET Core runtime inside.
+                if (targetDotNetVer == "native")
+                {
+                    DotNetHostInjector hostInjector = new DotNetHostInjector(new DotNetHostInjectorOptions());
+                    var results = hostInjector.Inject(target, injectableDummy, "InjectableDummy.DllMain, InjectableDummy");
+                    Debug.WriteLine("hostInjector.Inject RESULTS: " + results);
+                }
+
+
+
                 string adapterExecutionArg = string.Join("*", scubaDiverDllPath,
                     "ScubaDiver.DllEntry",
                     "EntryPoint",
@@ -227,8 +243,18 @@ namespace RemoteNET
             }
         }
 
-        private static void GetInjectionToolkit(Process target, string targetDotNetVer, out string remoteNetAppDataDir, out string injectorPath, out string scubaDiverDllPath)
+        public class InjectionToolKit
         {
+            public string RemoteNetAppDataDir { get; set; }
+            public string InjectorPath { get; set; }
+            public string ScubaDiverDllPath { get; set; }
+            public string InjectableDummyPath { get; set; }
+        }
+
+        private static InjectionToolKit GetInjectionToolkit(Process target, string targetDotNetVer)
+        {
+            InjectionToolKit output = new InjectionToolKit();
+
             bool isNetCore = targetDotNetVer != "net451";
             bool isNet5orUp = targetDotNetVer == "net5.0-windows" ||
                               targetDotNetVer == "net6.0-windows" ||
@@ -236,27 +262,27 @@ namespace RemoteNET
             bool isNative = targetDotNetVer == "native";
 
             // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
-            remoteNetAppDataDir = Path.Combine(
+            output.RemoteNetAppDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 typeof(RemoteApp).Assembly.GetName().Name);
-            DirectoryInfo remoteNetAppDataDirInfo = new DirectoryInfo(remoteNetAppDataDir);
+            DirectoryInfo remoteNetAppDataDirInfo = new DirectoryInfo(output.RemoteNetAppDataDir);
             if (!remoteNetAppDataDirInfo.Exists)
             {
                 remoteNetAppDataDirInfo.Create();
             }
 
             // Decide which injection toolkit to use x32 or x64
-            injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector) + ".exe");
-            string adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL) + ".dll");
-            string adapterPdbPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL) + ".pdb");
+            output.InjectorPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.Injector) + ".exe");
+            string adapterPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL) + ".dll");
+            string adapterPdbPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL) + ".pdb");
             byte[] injectorResource = Resources.Injector;
             byte[] adapterResource = Resources.UnmanagedAdapterDLL;
             byte[] adapterPdbResource = Resources.UnmanagedAdapterDLL_pdb;
             if (target.Is64Bit())
             {
-                injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector_x64) + ".exe");
-                adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64) + ".dll");
-                adapterPdbPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64) + ".pdb");
+                output.InjectorPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.Injector_x64) + ".exe");
+                adapterPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64) + ".dll");
+                adapterPdbPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64) + ".pdb");
                 injectorResource = Resources.Injector_x64;
                 adapterResource = Resources.UnmanagedAdapterDLL_x64;
                 adapterPdbResource = Resources.UnmanagedAdapterDLL_x64_pdb;
@@ -264,23 +290,31 @@ namespace RemoteNET
 
             // Check if injector or bootstrap resources differ from copies on disk
             string injectorResourceHash = HashUtils.BufferSHA256(injectorResource);
-            string injectorFileHash = File.Exists(injectorPath) ? HashUtils.FileSHA256(injectorPath) : String.Empty;
+            string injectorFileHash = File.Exists(output.InjectorPath) ? HashUtils.FileSHA256(output.InjectorPath) : String.Empty;
             if (injectorResourceHash != injectorFileHash)
             {
-                File.WriteAllBytes(injectorPath, injectorResource);
+                File.WriteAllBytes(output.InjectorPath, injectorResource);
             }
             string adapterResourceHash = HashUtils.BufferSHA256(adapterResource);
             string adapterFileHash = File.Exists(adapterPath) ? HashUtils.FileSHA256(adapterPath) : String.Empty;
             if (adapterResourceHash != adapterFileHash)
             {
                 File.WriteAllBytes(adapterPath, adapterResource);
-                File.WriteAllBytes(Path.ChangeExtension(adapterPath,"pdb"), adapterPdbResource);
+                File.WriteAllBytes(adapterPdbPath, adapterPdbResource);
                 // Also set the copy's permissions so we can inject it into UWP apps
                 FilePermissions.AddFileSecurity(adapterPath, "ALL APPLICATION PACKAGES",
                     System.Security.AccessControl.FileSystemRights.ReadAndExecute,
                     System.Security.AccessControl.AccessControlType.Allow);
             }
 
+            // Check if InjectableDummyPath resources differ from copies on disk
+            output.InjectableDummyPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.InjectableDummy) + ".dll");
+            string injectableDummyPdbPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.InjectableDummy) + ".pdb");
+            string injectableDummyRuntimeConfigPath = Path.Combine(output.RemoteNetAppDataDir, nameof(Resources.InjectableDummy) + ".runtimeconfig.json");
+            File.WriteAllBytes(output.InjectableDummyPath, Resources.InjectableDummy);
+            File.WriteAllBytes(injectableDummyPdbPath, Resources.InjectableDummyPdb);
+            File.WriteAllBytes(injectableDummyRuntimeConfigPath, Resources.InjectableDummy_runtimeconfig);
+            
             // Unzip scuba diver and dependencies into their own directory
             string targetDiver = "ScubaDiver_NetFramework";
             if (isNetCore)
@@ -289,7 +323,7 @@ namespace RemoteNET
                 targetDiver = "ScubaDiver_Net5";
             var scubaDestDirInfo = new DirectoryInfo(
                                             Path.Combine(
-                                                remoteNetAppDataDir,
+                                                output.RemoteNetAppDataDir,
                                                 targetDiver
                                             ));
             if (!scubaDestDirInfo.Exists)
@@ -355,7 +389,9 @@ namespace RemoteNET
                     );
             }
 
-            scubaDiverDllPath = matches.Single().FullName;
+            output.ScubaDiverDllPath = matches.Single().FullName;
+
+            return output;
         }
 
         //
