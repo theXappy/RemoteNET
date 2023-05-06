@@ -19,6 +19,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="InjectableDotNetHost.Injector" Version="1.0.2" />
 		<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
 		<PackageReference Include="System.IO.FileSystem.AccessControl" Version="5.0.0" />
 		<PackageReference Include="System.Security.AccessControl" Version="6.0.0" />
@@ -57,7 +58,7 @@
 	</ItemGroup>
 
 	<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-		<Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\ScubaDiver*' '$(ProjectDir)\Resources\ScubaDivers.zip' -Force&quot;" />
+		<Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\InjectableDummy\bin\$(Configuration)\net5.0&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\ScubaDiver*' '$(ProjectDir)\Resources\ScubaDivers.zip' -Force&quot;" />
 	</Target>
 
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">

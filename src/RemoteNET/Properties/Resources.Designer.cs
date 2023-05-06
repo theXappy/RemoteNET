@@ -63,6 +63,36 @@ namespace RemoteNET.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] InjectableDummy {
+            get {
+                object obj = ResourceManager.GetObject("InjectableDummy", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] InjectableDummy_runtimeconfig {
+            get {
+                object obj = ResourceManager.GetObject("InjectableDummy_runtimeconfig", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] InjectableDummyPdb {
+            get {
+                object obj = ResourceManager.GetObject("InjectableDummyPdb", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] Injector {
             get {
                 object obj = ResourceManager.GetObject("Injector", resourceCulture);

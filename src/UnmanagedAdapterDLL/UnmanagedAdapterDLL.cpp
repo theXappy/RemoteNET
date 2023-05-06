@@ -30,6 +30,7 @@ enum FrameworkType ParseFrameworkType(const std::wstring& framework)
 		|| icase_cmp(framework, L"net5.0-windows")
 		|| icase_cmp(framework, L"net6.0-windows")
 		|| icase_cmp(framework, L"net7.0-windows")
+		|| icase_cmp(framework, L"native")
 		)
 	{
 		return FrameworkType::NET_CORE;
