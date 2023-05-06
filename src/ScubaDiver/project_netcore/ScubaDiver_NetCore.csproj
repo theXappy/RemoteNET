@@ -9,21 +9,22 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Compile Include="..\Diver.cs" />
+		<Compile Include="..\DotNetDiver.cs" />
+		<Compile Include="..\DiverBase.cs" />
 		<Compile Include="..\DllEntry.cs" />
 		<Compile Include="..\Hooking\HarmonyWrapper.cs" />
 		<Compile Include="..\Logger.cs" />
 		<Compile Include="..\RegisteredEventHandlerInfo.cs" />
 		<Compile Include="..\RegisteredMethodHookInfo.cs" />
-		<Compile Include="..\Utils\ClrExt.cs" />
-		<Compile Include="..\Utils\Converter.cs" />
-		<Compile Include="..\Utils\FreezeFuncsFactory.cs" />
-		<Compile Include="..\Utils\FrozenObjectsCollection.cs" />
-		<Compile Include="..\Utils\ObjectDumpFactory.cs" />
-		<Compile Include="..\Utils\Pinnable.cs" />
-		<Compile Include="..\Utils\SmartLocksDict.cs" />
-		<Compile Include="..\Utils\TypesResolver.cs" />
-		<Compile Include="..\Utils\UnifiedAppDomain.cs" />
+		<Compile Include="..\Utils\ClrExt.cs" Link="Utils\ClrExt.cs" />
+		<Compile Include="..\Utils\Converter.cs" Link="Utils\Converter.cs" />
+		<Compile Include="..\Utils\FreezeFuncsFactory.cs" Link="Utils\FreezeFuncsFactory.cs" />
+		<Compile Include="..\Utils\FrozenObjectsCollection.cs" Link="Utils\FrozenObjectsCollection.cs" />
+		<Compile Include="..\Utils\ObjectDumpFactory.cs" Link="Utils\ObjectDumpFactory.cs" />
+		<Compile Include="..\Utils\Pinnable.cs" Link="Utils\Pinnable.cs" />
+		<Compile Include="..\Utils\SmartLocksDict.cs" Link="Utils\SmartLocksDict.cs" />
+		<Compile Include="..\Utils\TypesResolver.cs" Link="Utils\TypesResolver.cs" />
+		<Compile Include="..\Utils\UnifiedAppDomain.cs" Link="Utils\UnifiedAppDomain.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -34,6 +35,10 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Utils\" />
 	</ItemGroup>
 
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">

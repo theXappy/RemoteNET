@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -52,12 +52,12 @@ namespace ScubaDiver
         {
             try
             {
-                Diver _instance = new();
+                DotNetDiver _instance = new();
                 ushort port = ushort.Parse((string)pwzArgument);
                 _instance.Start(port);
 
-                // Diver killed (politely)
-                Logger.Debug("[DiverHost] Diver finished gracefully, returning");
+                // DotNetDiver killed (politely)
+                Logger.Debug("[DiverHost] DotNetDiver finished gracefully, returning");
             }
             catch (Exception e)
             {
@@ -79,8 +79,8 @@ namespace ScubaDiver
             // UnmanagedAdapterDLL needs to call a C# function with exactly this signature.
             // So we use it to just create a diver, and run the Start func (blocking)
 
-            // Diver needs some assemblies which might not be loaded in the target process
-            // so starting off with registering an assembly resolver to the Diver's dll's directory
+            // DotNetDiver needs some assemblies which might not be loaded in the target process
+            // so starting off with registering an assembly resolver to the DotNetDiver's dll's directory
             if (!_assembliesResolverRegistered)
             {
                 AppDomain.CurrentDomain.AssemblyResolve += AssembliesResolverFunc;

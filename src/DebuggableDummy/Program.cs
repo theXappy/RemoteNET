@@ -14,7 +14,7 @@ namespace DebuggableDummy
             Task diverTask = Task.Run(() =>
             {
                 Console.WriteLine("[+] Diver Task: Started");
-                Diver dive = new();
+                DotNetDiver dive = new();
                 ushort port = (ushort)Process.GetCurrentProcess().Id;
                 dive.Start(port);
                 Console.WriteLine("[+] Diver Task: Diver Exited");
