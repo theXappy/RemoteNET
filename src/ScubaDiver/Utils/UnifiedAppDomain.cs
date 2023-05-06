@@ -9,13 +9,13 @@ namespace ScubaDiver.Utils
     /// </summary>
     public class UnifiedAppDomain
     {
-        private readonly Diver _parentDiver;
+        private readonly DotNetDiver _parentDiver;
 
         /// <summary>
         /// Parent diver, which is currently running in the app
         /// </summary>
         /// <param name="parentDiver"></param>
-        public UnifiedAppDomain(Diver parentDiver)
+        public UnifiedAppDomain(DotNetDiver parentDiver)
         {
             _parentDiver = parentDiver;
         }
@@ -26,7 +26,7 @@ namespace ScubaDiver.Utils
         {
             if (_domains == null)
             {
-                // Using Diver's heap searching abilities to locate all 'System.AppDomain'
+                // Using DotNetDiver's heap searching abilities to locate all 'System.AppDomain'
                 try
                 {
                     (bool anyErrors, var candidates) = _parentDiver.GetHeapObjects(heapObjType => heapObjType == typeof(AppDomain).FullName, true);
@@ -39,11 +39,11 @@ namespace ScubaDiver.Utils
                     _domains = candidates
                         .Select(cand => _parentDiver.GetObject(cand.Address, false, cand.Type, cand.HashCode).instance)
                         .Cast<AppDomain>().ToArray();
-                    Logger.Debug("[Diver][UnifiedAppDomain] All assemblies were retrieved from all AppDomains :)");
+                    Logger.Debug("[DotNetDiver][UnifiedAppDomain] All assemblies were retrieved from all AppDomains :)");
                 }
                 catch (Exception ex)
                 {
-                    Logger.Debug("[Diver][UnifiedAppDomain] Failed to search heap for Runtime Assemblies. Error: " + ex.Message);
+                    Logger.Debug("[DotNetDiver][UnifiedAppDomain] Failed to search heap for Runtime Assemblies. Error: " + ex.Message);
 
                     // Fallback - Just return all assemblies in the current AppDomain. Obviously, it's not ALL of them but sometimes it's good enough.
                     _domains = new[] { AppDomain.CurrentDomain };

@@ -103,9 +103,29 @@ namespace RemoteNET.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] UnmanagedAdapterDLL_pdb {
+            get {
+                object obj = ResourceManager.GetObject("UnmanagedAdapterDLL_pdb", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] UnmanagedAdapterDLL_x64 {
             get {
                 object obj = ResourceManager.GetObject("UnmanagedAdapterDLL_x64", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] UnmanagedAdapterDLL_x64_pdb {
+            get {
+                object obj = ResourceManager.GetObject("UnmanagedAdapterDLL_x64_pdb", resourceCulture);
                 return ((byte[])(obj));
             }
         }

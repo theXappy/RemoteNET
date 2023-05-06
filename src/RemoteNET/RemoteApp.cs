@@ -172,11 +172,6 @@ namespace RemoteNET
 
                 // Determine if we are dealing with .NET Framework or .NET Core
                 string targetDotNetVer = target.GetSupportedTargetFramework();
-                if (targetDotNetVer == "native")
-                {
-                    throw new ArgumentException($"Process {target.ProcessName} does not seem to be a .NET Framework or .NET Core app. Can't inject to native apps.");
-                }
-
 
                 // Not injected yet, Injecting adapter now (which should load the Diver)
                 // Get different injection kit (for .NET framework or .NET core & x86 or x64)
@@ -238,6 +233,7 @@ namespace RemoteNET
             bool isNet5orUp = targetDotNetVer == "net5.0-windows" ||
                               targetDotNetVer == "net6.0-windows" ||
                               targetDotNetVer == "net7.0-windows";
+            bool isNative = targetDotNetVer == "native";
 
             // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
             remoteNetAppDataDir = Path.Combine(
@@ -252,14 +248,18 @@ namespace RemoteNET
             // Decide which injection toolkit to use x32 or x64
             injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector) + ".exe");
             string adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL) + ".dll");
+            string adapterPdbPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL) + ".pdb");
             byte[] injectorResource = Resources.Injector;
             byte[] adapterResource = Resources.UnmanagedAdapterDLL;
+            byte[] adapterPdbResource = Resources.UnmanagedAdapterDLL_pdb;
             if (target.Is64Bit())
             {
                 injectorPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.Injector_x64) + ".exe");
                 adapterPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64) + ".dll");
+                adapterPdbPath = Path.Combine(remoteNetAppDataDir, nameof(Resources.UnmanagedAdapterDLL_x64) + ".pdb");
                 injectorResource = Resources.Injector_x64;
                 adapterResource = Resources.UnmanagedAdapterDLL_x64;
+                adapterPdbResource = Resources.UnmanagedAdapterDLL_x64_pdb;
             }
 
             // Check if injector or bootstrap resources differ from copies on disk
@@ -274,6 +274,7 @@ namespace RemoteNET
             if (adapterResourceHash != adapterFileHash)
             {
                 File.WriteAllBytes(adapterPath, adapterResource);
+                File.WriteAllBytes(Path.ChangeExtension(adapterPath,"pdb"), adapterPdbResource);
                 // Also set the copy's permissions so we can inject it into UWP apps
                 FilePermissions.AddFileSecurity(adapterPath, "ALL APPLICATION PACKAGES",
                     System.Security.AccessControl.FileSystemRights.ReadAndExecute,
@@ -281,8 +282,11 @@ namespace RemoteNET
             }
 
             // Unzip scuba diver and dependencies into their own directory
-            string targetDiver = isNet5orUp ? "ScubaDiver_Net5" :
-                                    (isNetCore ? "ScubaDiver_NetCore" : "ScubaDiver_NetFramework");
+            string targetDiver = "ScubaDiver_NetFramework";
+            if (isNetCore)
+                targetDiver = "ScubaDiver_NetCore";
+            if (isNet5orUp || isNative)
+                targetDiver = "ScubaDiver_Net5";
             var scubaDestDirInfo = new DirectoryInfo(
                                             Path.Combine(
                                                 remoteNetAppDataDir,
