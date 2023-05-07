@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0-windows</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ScubaDiver\project_net5\ScubaDiver_Net5.csproj" />
+    <ProjectReference Include="..\ScubaDiver\project_net6_x64\ScubaDiver_Net6_x64.csproj" />
   </ItemGroup>
 
 </Project>

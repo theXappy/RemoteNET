@@ -45,7 +45,8 @@ namespace TheLeftExit.Trickster.Memory {
 
         public (string, TypeInfo[]) GetTypes() {
             Trickster.ScanTypes();
-            return ($"Types found: {Trickster.ScannedTypes.Length}", Trickster.ScannedTypes);
+            var allTypes = Trickster.ScannedTypes.SelectMany(x => x.Value).ToArray();
+            return ($"Types found: {allTypes.Length}", allTypes);
         }
 
         public string Read() {

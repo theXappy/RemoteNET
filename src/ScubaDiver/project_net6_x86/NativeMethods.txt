@@ -1,0 +1,6 @@
+﻿VirtualQueryEx
+IsWow64Process
+PROCESS_ACCESS_RIGHTS
+UnDecorateSymbolName
+ReadProcessMemory
+OpenProcess

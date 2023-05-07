@@ -1,11 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>netcoreapp3.1</TargetFramework>
+		<TargetFramework>net6.0</TargetFramework>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 		<RootNamespace>ScubaDiver</RootNamespace>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<LangVersion>latest</LangVersion>
+		<Platforms>AnyCPU;x86</Platforms>
+		<GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -25,6 +27,10 @@
 		<Compile Include="..\Utils\SmartLocksDict.cs" Link="Utils\SmartLocksDict.cs" />
 		<Compile Include="..\Utils\TypesResolver.cs" Link="Utils\TypesResolver.cs" />
 		<Compile Include="..\Utils\UnifiedAppDomain.cs" Link="Utils\UnifiedAppDomain.cs" />
+		<Compile Include="..\Rtti\RttiScanner.cs" Link="Rtti\RttiScanner.cs" />
+		<Compile Include="..\Rtti\Trickster.cs" Link="Rtti\Trickster.cs" />
+		<Compile Include="..\Rtti\TricksterUI.cs" Link="Rtti\TricksterUI.cs" />
+		<Compile Include="..\MsvcDiver.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -39,10 +45,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Utils\" />
 	</ItemGroup>
 
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
