@@ -6,8 +6,8 @@ using System.Reflection;
 
 namespace ScubaDiver.API.Interactions.Dumps
 {
-    [DebuggerDisplay("TypeDump of {" + nameof(Type) + "} (Assembly: {" + nameof(Assembly) + "})")]
-    public class TypeDump
+    [DebuggerDisplay("ManagedTypeDump of {" + nameof(Type) + "} (Assembly: {" + nameof(Assembly) + "})")]
+    public class ManagedTypeDump
     {
         public class TypeMethod
         {
@@ -171,7 +171,6 @@ namespace ScubaDiver.API.Interactions.Dumps
                 Assembly = ei.EventHandlerType.Assembly.GetName().Name;
             }
         }
-
         public class TypeProperty
         {
             public string GetVisibility { get; set; }

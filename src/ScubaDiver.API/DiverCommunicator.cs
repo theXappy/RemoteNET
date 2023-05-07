@@ -135,7 +135,7 @@ namespace ScubaDiver.API
             return results;
         }
 
-        public TypeDump DumpType(string type, string assembly = null)
+        public ManagedTypeDump DumpType(string type, string assembly = null)
         {
             TypeDumpRequest dumpRequest = new()
             {
@@ -148,7 +148,7 @@ namespace ScubaDiver.API
             var requestJsonBody = JsonConvert.SerializeObject(dumpRequest);
 
             string body = SendRequest("type", null, requestJsonBody);
-            TypeDump? results = JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
+            ManagedTypeDump? results = JsonConvert.DeserializeObject<ManagedTypeDump>(body, _withErrors);
 
             return results;
         }

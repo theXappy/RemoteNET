@@ -18,7 +18,7 @@ namespace RemoteNET.Internal.Reflection
         {
             // NOTE: This is breaking the "RemoteX"/"DynamicX" paradigm because we are effectivly returning a DRO here
             // How did that happen?
-            // Well, Unlike RemoteObject which uses directly a remote token + TypeDump to read/write fields/props/methods
+            // Well, Unlike RemoteObject which uses directly a remote token + ManagedTypeDump to read/write fields/props/methods
             // RemoteEnum was created after RemoteType was defined and it felt much easier to utilize it.
             // RemoteType itself, as part of the reflection API, returns DROs when invoked.
             RemoteFieldInfo verboseField = _remoteType.GetField(valueName) as RemoteFieldInfo;
