@@ -68,7 +68,10 @@ namespace ScubaDiver.Tester
             Console.WriteLine("8. Hook Method");
             Console.WriteLine("9. Get Remote Object");
             Console.WriteLine("10. Enumerate Remote Collection");
-            Console.WriteLine("11. Exit");
+            Console.WriteLine("11. Dump Types");
+            Console.WriteLine("12. Dump Managed Types");
+            Console.WriteLine("13. Dump Unmanaged Types");
+            Console.WriteLine("14. Exit");
             string input = Console.ReadLine();
             uint index;
             if (int.TryParse(input, out int userChoice))
@@ -368,12 +371,52 @@ namespace ScubaDiver.Tester
                         }
                         break;
                     case 11:
+                        var types = remoteApp.QueryTypes("*");
+                        foreach (CandidateType candidateType in types)
+                        {
+                            Console.WriteLine($"[{candidateType.Runtime}][{candidateType.Assembly}] {candidateType.TypeFullName}");
+                        }
+                        break;
+                    case 12:
+                        var types2 = remoteApp.QueryTypes("*");
+                        foreach (CandidateType candidateType in types2)
+                        {
+                            if(candidateType.Runtime == RuntimeType.Managed)
+                                Console.WriteLine($"[{candidateType.Runtime}][{candidateType.Assembly}] {candidateType.TypeFullName}");
+                        }
+                        break;
+                    case 13:
+                        var types3 = remoteApp.QueryTypes("*");
+                        foreach (CandidateType candidateType in types3)
+                        {
+                            if(candidateType.Runtime == RuntimeType.Unmanaged && IsReasonableUnmanagedTypeName(candidateType.TypeFullName))
+                                Console.WriteLine($"[{candidateType.Runtime}][{candidateType.Assembly}] {candidateType.TypeFullName}");
+                        }
+                        break;
+                    case 14:
                         // Exiting
                         return true;
                 }
             }
 
             return false;
+        }
+
+        private static bool IsReasonableUnmanagedTypeName(string str)
+        {
+            if (str.Length < 2)
+                return false;
+            bool valid = !str.Any(Char.IsControl);
+            if (!valid)
+                return false;
+            valid = !str.Any(c => c > 0xff);
+            if (!valid)
+                return false;
+            valid = !str.Contains('"');
+            if (!valid)
+                return false;
+            return valid;
+
         }
 
         private static void LocalDive()

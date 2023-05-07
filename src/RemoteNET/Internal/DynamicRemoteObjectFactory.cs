@@ -12,7 +12,7 @@ namespace RemoteNET.Internal
     {
         private RemoteApp _app;
 
-        public DynamicRemoteObject Create(RemoteApp rApp, RemoteObject remoteObj, TypeDump typeDump)
+        public DynamicRemoteObject Create(RemoteApp rApp, RemoteObject remoteObj, ManagedTypeDump managedTypeDump)
         {
             _app = rApp;
             return new DynamicRemoteObject(rApp, remoteObj);

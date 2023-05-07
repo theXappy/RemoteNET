@@ -60,7 +60,7 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                oora = this.App.Communicator.GetField(0, DeclaringType.FullName, this.Name).ReturnedObjectOrAddress;
+                oora = this.App.ManagedCommunicator.GetField(0, DeclaringType.FullName, this.Name).ReturnedObjectOrAddress;
             }
             else
             {
@@ -87,7 +87,9 @@ namespace RemoteNET.Internal.Reflection
             {
                 if (oora.IsRemoteAddress)
                 {
-                    var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress, oora.Type);
+                    // I only support managed here because I don't think I'll implement "Field Infos" for unmanaged
+                    // objects any time soon.
+                    var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress, oora.Type, runtime: RuntimeType.Managed);
                     return remoteObject.Dynamify();
                 }
                 else if (oora.IsNull)
@@ -127,7 +129,7 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                this.App.Communicator.SetField(0, DeclaringType.FullName, this.Name, remoteNewValue);
+                this.App.ManagedCommunicator.SetField(0, DeclaringType.FullName, this.Name, remoteNewValue);
                 return;
             }
 

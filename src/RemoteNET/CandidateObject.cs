@@ -6,12 +6,14 @@
     /// </summary>
     public class CandidateObject
     {
+        public RuntimeType Runtime { get; set; }
         public ulong Address { get; set; }
         public string TypeFullName { get; set; }
         public int HashCode { get; private set; }
 
-        public CandidateObject(ulong address, string typeFullName, int hashCode)
+        public CandidateObject(RuntimeType runtime, ulong address, string typeFullName, int hashCode)
         {
+            Runtime = runtime;
             Address = address;
             TypeFullName = typeFullName;
             HashCode = hashCode;

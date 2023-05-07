@@ -71,7 +71,7 @@ namespace RemoteNET
             }
 
             var parametersTypeFullNames = methodToHook.GetParameters().Select(prm => prm.ParameterType.FullName).ToList();
-            return _app.Communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappdHook, parametersTypeFullNames);
+            return _app.ManagedCommunicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappdHook, parametersTypeFullNames);
         }
 
         private LocalHookCallback WrapCallback(HookAction callback)
@@ -166,7 +166,7 @@ namespace RemoteNET
                 return false;
             }
 
-            _app.Communicator.UnhookMethod(positionedHookWrapper.WrappedHookActio);
+            _app.ManagedCommunicator.UnhookMethod(positionedHookWrapper.WrappedHookActio);
             hooks.Remove(callback);
             if (hooks.Count == 0)
             {

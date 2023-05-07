@@ -38,11 +38,11 @@ namespace RemoteNET
             private RemoteObject GetRemoteObjectUncached(ulong remoteAddress, string typeName, int? hashCode = null)
             {
                 ObjectDump od;
-                TypeDump td;
+                ManagedTypeDump td;
                 try
                 {
-                    od = _app._communicator.DumpObject(remoteAddress, typeName, true, hashCode);
-                    td = _app._communicator.DumpType(od.Type);
+                    od = _app._managedCommunicator.DumpObject(remoteAddress, typeName, true, hashCode);
+                    td = _app._managedCommunicator.DumpType(od.Type);
                 }
                 catch (Exception e)
                 {
@@ -50,7 +50,7 @@ namespace RemoteNET
                 }
 
 
-                var remoteObject = new RemoteObject(new RemoteObjectRef(od, td, _app._communicator), _app);
+                var remoteObject = new RemoteObject(new RemoteObjectRef(od, td, _app._managedCommunicator), _app);
                 return remoteObject;
             }
 
@@ -101,23 +101,29 @@ namespace RemoteNET
         }
 
         private Process _procWithDiver;
-        private DiverCommunicator _communicator;
-        private DomainsDump _domains;
+        private DiverCommunicator _managedCommunicator;
+        private DomainsDump _managedDomains;
         private readonly RemoteObjectsCollection _remoteObjects;
+
+        private DiverCommunicator _unmanagedCommunicator;
+        private List<string> _unmanagedModulesList;
 
         public Process Process => _procWithDiver;
         public RemoteActivator Activator { get; private set; }
         public RemoteHarmony Harmony { get; private set; }
 
-        public DiverCommunicator Communicator => _communicator;
+        public DiverCommunicator ManagedCommunicator => _managedCommunicator;
+        public DiverCommunicator UnanagedCommunicator => _managedCommunicator;
 
-        private RemoteApp(Process procWithDiver, DiverCommunicator communicator)
+        private RemoteApp(Process procWithDiver, DiverCommunicator managedCommunicator, DiverCommunicator unmanagedCommunicator)
         {
             _procWithDiver = procWithDiver;
-            _communicator = communicator;
-            Activator = new RemoteActivator(communicator, this);
+            _managedCommunicator = managedCommunicator;
+            _unmanagedCommunicator = unmanagedCommunicator;
+            Activator = new RemoteActivator(managedCommunicator, this);
             Harmony = new RemoteHarmony(this);
             _remoteObjects = new RemoteObjectsCollection(this);
+            _unmanagedCommunicator = unmanagedCommunicator;
         }
 
         //
@@ -231,11 +237,23 @@ namespace RemoteNET
 
             // Now register our program as a "client" of the diver
             string diverAddr = "127.0.0.1";
-            DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
-            bool registered = com.RegisterClient();
-            if (registered)
+            DiverCommunicator managedCom = new DiverCommunicator(diverAddr, diverPort);
+            DiverCommunicator unmanagedCom = new DiverCommunicator(diverAddr, diverPort + 2);
+
+
+            bool registeredManaged = managedCom.RegisterClient();
+            if (registeredManaged)
             {
-                return new RemoteApp(target, com);
+                // Unmanaged Communicator talks to the MsvcDiver, which is optional in the target.
+                // Check if we got one or not.
+                bool registeredUnmanaged = unmanagedCom.RegisterClient();
+                if (!registeredUnmanaged)
+                {
+                    // We'll continue without unmanaged capabilities
+                    unmanagedCom = null;
+                }
+
+                return new RemoteApp(target, managedCom, unmanagedCom);
             }
             else
             {
@@ -314,7 +332,7 @@ namespace RemoteNET
             File.WriteAllBytes(output.InjectableDummyPath, Resources.InjectableDummy);
             File.WriteAllBytes(injectableDummyPdbPath, Resources.InjectableDummyPdb);
             File.WriteAllBytes(injectableDummyRuntimeConfigPath, Resources.InjectableDummy_runtimeconfig);
-            
+
             // Unzip scuba diver and dependencies into their own directory
             string targetDiver = "ScubaDiver_NetFramework";
             if (isNetCore)
@@ -405,35 +423,63 @@ namespace RemoteNET
         {
             Predicate<string> matchesFilter = Filter.CreatePredicate(typeFullNameFilter);
 
-            _domains ??= _communicator.DumpDomains();
-            foreach (DomainsDump.AvailableDomain domain in _domains.AvailableDomains)
+            _managedDomains ??= _managedCommunicator.DumpDomains();
+            foreach (DomainsDump.AvailableDomain domain in _managedDomains.AvailableDomains)
             {
                 foreach (string assembly in domain.AvailableModules)
                 {
                     List<TypesDump.TypeIdentifiers> typeIdentifiers;
                     try
                     {
-                        typeIdentifiers = _communicator.DumpTypes(assembly).Types;
+                        typeIdentifiers = _managedCommunicator.DumpTypes(assembly).Types;
                     }
                     catch
                     {
                         // TODO:
-                        Debug.WriteLine($"[{nameof(RemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Dumping/Iterating assembly: {assembly}");
+                        Debug.WriteLine($"[{nameof(RemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Dumping/Iterating managed assembly: {assembly}");
                         continue;
                     }
                     foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
                     {
                         // TODO: Filtering should probably be done in the Diver's side
                         if (matchesFilter(type.TypeName))
-                            yield return new CandidateType(type.TypeName, assembly);
+                            yield return new CandidateType(RuntimeType.Managed, type.TypeName, assembly);
                     }
 
                 }
             }
 
+            if (_unmanagedCommunicator != null)
+            {
+                _unmanagedModulesList ??=
+                    _unmanagedCommunicator.DumpDomains().AvailableDomains.Single().AvailableModules;
+                foreach (string module in _unmanagedModulesList)
+                {
+                    List<TypesDump.TypeIdentifiers> typeIdentifiers;
+                    try
+                    {
+                        typeIdentifiers = _unmanagedCommunicator.DumpTypes(module).Types;
+                    }
+                    catch
+                    {
+                        // TODO:
+                        Debug.WriteLine(
+                            $"[{nameof(RemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Dumping/Iterating unmanaged module: {module}");
+                        continue;
+                    }
+
+                    foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
+                    {
+                        // TODO: Filtering should probably be done in the Diver's side
+                        if (matchesFilter(type.TypeName))
+                            yield return new CandidateType(RuntimeType.Unmanaged, type.TypeName, module);
+                    }
+                }
+            }
         }
 
-        public IEnumerable<CandidateObject> QueryInstances(Type typeFilter, bool dumpHashcodes = true) => QueryInstances(typeFilter.FullName, dumpHashcodes);
+        public IEnumerable<CandidateObject> QueryInstances(CandidateType typeFilter, bool dumpHashcodes = true) => QueryInstances(typeFilter.TypeFullName, typeFilter.Runtime, dumpHashcodes);
+        public IEnumerable<CandidateObject> QueryInstances(Type typeFilter, RuntimeType runtime = RuntimeType.Managed, bool dumpHashcodes = true) => QueryInstances(typeFilter.FullName, runtime, dumpHashcodes);
 
         /// <summary>
         /// Gets all object candidates for a specific filter
@@ -442,9 +488,14 @@ namespace RemoteNET
         /// <param name="dumpHashcodes">Whether to also dump hashcodes of every matching object.
         /// This makes resolving the candidates later more reliable but for wide queries (e.g. "*") this might fail the entire search since it causes instabilities in the heap when examining it.
         /// </param>
-        public IEnumerable<CandidateObject> QueryInstances(string typeFullNameFilter, bool dumpHashcodes = true)
+        public IEnumerable<CandidateObject> QueryInstances(string typeFullNameFilter, RuntimeType runtime = RuntimeType.Managed, bool dumpHashcodes = true)
         {
-            return _communicator.DumpHeap(typeFullNameFilter, dumpHashcodes).Objects.Select(heapObj => new CandidateObject(heapObj.Address, heapObj.Type, heapObj.HashCode));
+            DiverCommunicator communicator =
+                runtime == RuntimeType.Managed ? ManagedCommunicator : UnanagedCommunicator;
+
+            var managedHeapDump = communicator.DumpHeap(typeFullNameFilter, dumpHashcodes);
+            var managedCandidates = managedHeapDump.Objects.Select(heapObj => new CandidateObject(runtime, heapObj.Address, heapObj.Type, heapObj.HashCode));
+            return managedCandidates;
         }
 
         //
@@ -457,62 +508,76 @@ namespace RemoteNET
         /// <param name="typeFullName">Full name of the type to get. For example 'System.Xml.XmlDocument'</param>
         /// <param name="assembly">Optional short name of the assembly containing the type. For example 'System.Xml.ReaderWriter.dll'</param>
         /// <returns></returns>
-        public Type GetRemoteType(string typeFullName, string assembly = null)
+        public Type GetRemoteType(string typeFullName, string assembly = null, RuntimeType runtime = RuntimeType.Managed)
         {
-            // Easy case: Trying to resolve from cache or from local assemblies
-            var resolver = TypesResolver.Instance;
-            Type res = resolver.Resolve(assembly, typeFullName);
-            if (res != null)
+            if (runtime == RuntimeType.Managed)
             {
-                // Either found in cache or found locally.
-
-                // If it's a local type we need to wrap it in a "fake" RemoteType (So method invocations will actually 
-                // happend in the remote app, for example)
-                // (But not for primitives...)
-                if (!(res is RemoteType) && !res.IsPrimitive)
+                // Easy case: Trying to resolve from cache or from local assemblies
+                var resolver = TypesResolver.Instance;
+                Type res = resolver.Resolve(assembly, typeFullName);
+                if (res != null)
                 {
-                    res = new RemoteType(this, res);
-                    // TODO: Registring here in the cache is a hack but we couldn't register within "TypesResolver.Resolve"
-                    // because we don't have the RemoteApp to associate the fake remote type with.
-                    // Maybe this should move somewhere else...
-                    resolver.RegisterType(res);
+                    // Either found in cache or found locally.
+
+                    // If it's a local type we need to wrap it in a "fake" RemoteType (So method invocations will actually 
+                    // happend in the remote app, for example)
+                    // (But not for primitives...)
+                    if (!(res is RemoteType) && !res.IsPrimitive)
+                    {
+                        res = new RemoteType(this, res);
+                        // TODO: Registring here in the cache is a hack but we couldn't register within "TypesResolver.Resolve"
+                        // because we don't have the RemoteApp to associate the fake remote type with.
+                        // Maybe this should move somewhere else...
+                        resolver.RegisterType(res);
+                    }
+
+                    return res;
                 }
-                return res;
+
+                // Harder case: Dump the remote type. This takes much more time (includes dumping of depedent
+                // types) and should be avoided as much as possible.
+                RemoteTypesFactory rtf =
+                    new RemoteTypesFactory(resolver, _managedCommunicator, avoidGenericsRecursion: true);
+                var dumpedType = _managedCommunicator.DumpType(typeFullName, assembly);
+                return rtf.Create(this, dumpedType);
+            }
+            else if (runtime == RuntimeType.Unmanaged)
+            {
+                throw new NotImplementedException();
             }
 
-            // Harder case: Dump the remote type. This takes much more time (includes dumping of depedent
-            // types) and should be avoided as much as possible.
-            RemoteTypesFactory rtf = new RemoteTypesFactory(resolver, _communicator, avoidGenericsRecursion: true);
-            var dumpedType = _communicator.DumpType(typeFullName, assembly);
-            return rtf.Create(this, dumpedType);
+            throw new ArgumentException($"Runtime should only be {RuntimeType.Managed} or {RuntimeType.Unmanaged}");
         }
         /// <summary>
         /// Returns a handle to a remote type based on a given local type.
         /// </summary>
-        public Type GetRemoteType(Type localType) => GetRemoteType(localType.FullName, localType.Assembly.GetName().Name);
-        public Type GetRemoteType(CandidateType candidate) => GetRemoteType(candidate.TypeFullName, candidate.Assembly);
-        internal Type GetRemoteType(TypeDump typeDump) => GetRemoteType(typeDump.Type, typeDump.Assembly);
+        public Type GetRemoteType(Type localType, RuntimeType runtime = RuntimeType.Managed) => GetRemoteType(localType.FullName, localType.Assembly.GetName().Name, runtime);
+        public Type GetRemoteType(CandidateType candidate) => GetRemoteType(candidate.TypeFullName, candidate.Assembly, candidate.Runtime);
+        internal Type GetRemoteType(ManagedTypeDump managedTypeDump) => GetRemoteType(managedTypeDump.Type, managedTypeDump.Assembly);
 
         /// <summary>
         /// Loads an assembly into the remote process
         /// </summary>
-        public bool LoadAssembly(Assembly assembly) => LoadAssembly(assembly.Location);
+        public bool LoadManagedAssembly(Assembly assembly) => LoadManagedAssembly(assembly.Location);
 
         /// <summary>
         /// Loads an assembly into the remote process
         /// </summary>
-        public bool LoadAssembly(string path)
+        public bool LoadManagedAssembly(string path)
         {
-            bool res = _communicator.InjectDll(path);
+            bool res = _managedCommunicator.InjectDll(path);
             if (res)
             {
                 // Re-setting the cached domains because otherwise we won't
                 // see our newly injected module
-                _domains = null;
+                _managedDomains = null;
             }
             return res;
         }
 
+        /// <summary>
+        /// Get a managed remote Enum
+        /// </summary>
         public RemoteEnum GetRemoteEnum(string typeFullName, string assembly = null)
         {
             RemoteType remoteType = GetRemoteType(typeFullName, assembly) as RemoteType;
@@ -527,10 +592,14 @@ namespace RemoteNET
         // Getting Remote Objects
         //
 
-        public RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.TypeFullName, candidate.HashCode);
-        public RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
+        public RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.TypeFullName, candidate.HashCode, candidate.Runtime);
+        public RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null, RuntimeType runtime = RuntimeType.Managed)
         {
-            return _remoteObjects.GetRemoteObject(remoteAddress, typeName, hashCode);
+            if(runtime == RuntimeType.Managed)
+                return _remoteObjects.GetRemoteObject(remoteAddress, typeName, hashCode);
+            if (runtime == RuntimeType.Unmanaged)
+                throw new NotImplementedException();
+            throw new ArgumentException($"Runtime should only be {RuntimeType.Managed} or {RuntimeType.Unmanaged}");
         }
 
         //
@@ -538,8 +607,8 @@ namespace RemoteNET
         //
         public void Dispose()
         {
-            Communicator?.KillDiver();
-            _communicator = null;
+            ManagedCommunicator?.KillDiver();
+            _managedCommunicator = null;
             _procWithDiver = null;
         }
 
