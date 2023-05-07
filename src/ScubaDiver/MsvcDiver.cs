@@ -20,11 +20,11 @@ namespace ScubaDiver
 
         public override void Start(ushort listenPort)
         {
-            Logger.Debug("[DotNetDiver] Is logging debugs in release? " + Logger.DebugInRelease.Value);
+            Logger.Debug("[MsvcDiver] Is logging debugs in release? " + Logger.DebugInRelease.Value);
 
             // Load or Hijack Newtonsoft.Json
             var nsJson = InitNewtonsoftJson();
-            Logger.Debug("[DotNetDiver] Newtonsoft.Json's module path: " + nsJson.Location);
+            Logger.Debug("[MsvcDiver] Newtonsoft.Json's module path: " + nsJson.Location);
 
             // Start session
             HttpListener listener = new();
@@ -34,19 +34,19 @@ namespace ScubaDiver
             var manager = listener.TimeoutManager;
             manager.IdleConnection = TimeSpan.FromSeconds(5);
             listener.Start();
-            Logger.Debug($"[DotNetDiver] Listening on {listeningUrl}...");
+            Logger.Debug($"[MsvcDiver] Listening on {listeningUrl}...");
 
             Dispatcher(listener);
 
-            Logger.Debug("[DotNetDiver] Closing listener");
+            Logger.Debug("[MsvcDiver] Closing listener");
             listener.Stop();
             listener.Close();
 
-            Logger.Debug("[DotNetDiver] Unpinning objects");
+            Logger.Debug("[MsvcDiver] Unpinning objects");
             // TODO:
-            Logger.Debug("[DotNetDiver] Unpinning finished");
+            Logger.Debug("[MsvcDiver] Unpinning finished");
 
-            Logger.Debug("[DotNetDiver] Dispatcher returned, Start is complete.");
+            Logger.Debug("[MsvcDiver] Dispatcher returned, Start is complete.");
         }
 
         protected override void DispatcherCleanUp()

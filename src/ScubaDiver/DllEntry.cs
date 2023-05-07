@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
 namespace ScubaDiver
@@ -52,12 +53,25 @@ namespace ScubaDiver
         {
             try
             {
-                DotNetDiver _instance = new();
                 ushort port = ushort.Parse((string)pwzArgument);
-                _instance.Start(port);
+
+                // Run Divers
+#if NET_6
+                MsvcDiver _msvcInstance = new();
+                Task t = Task.Run(()=>_msvcInstance.Start((ushort)(port + 2)));
+#endif
+                DotNetDiver _instance = new();
+                _instance.Start(port); // block
 
                 // DotNetDiver killed (politely)
+
+#if NET_6
+                Logger.Debug("[DiverHost] DotNetDiver finished gracefully, waiting for MSVC diver");
+                t.Wait();
+                Logger.Debug("[DiverHost] MsvcDiver finished gracefully, returning");
+#else
                 Logger.Debug("[DiverHost] DotNetDiver finished gracefully, returning");
+#endif
             }
             catch (Exception e)
             {

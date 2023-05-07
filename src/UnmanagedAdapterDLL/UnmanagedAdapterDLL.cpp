@@ -100,6 +100,7 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 		DebugOut(L"[UnmanagedAdapter] Securing a handle to the Core (3/5/6/7) CLR \n");
 		// Secure a handle to the Core (3/5/6) CLR 
 		pClr = StartCLRCore();
+		DebugOut(L"[UnmanagedAdapter] StartCLRCore ended with res: %p\n", pClr);
 	}
 	else if (frameworkType == FrameworkType::NET_FRAMEWORK)
 	{
@@ -120,12 +121,20 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 			FreeConsole();
 		}
 		DWORD result;
+		DebugOut(L"[UnmanagedAdapter] ExecuteInDefaultAppDomain(%s, %s, %s, %s)\n",
+			managedDllLocation.c_str(),
+			managedDllClass.c_str(),
+			managedDllFunction.c_str(),
+			scubaDiverArg.c_str());
+
 		hr = pClr->ExecuteInDefaultAppDomain(
 			managedDllLocation.c_str(),
 			managedDllClass.c_str(),
 			managedDllFunction.c_str(),
 			scubaDiverArg.c_str(),
 			&result);
+
+		DebugOut(L"[UnmanagedAdapter] ExecuteInDefaultAppDomain(...) returned %d\n", hr);
 	}
 	else {
 		msgboxf("[UnmanagedAdapter] could not spawn CLR\n");
