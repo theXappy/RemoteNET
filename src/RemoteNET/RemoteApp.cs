@@ -211,8 +211,8 @@ namespace RemoteNET
                 startInfo.UseShellExecute = false;
                 startInfo.RedirectStandardOutput = true;
                 var injectorProc = Process.Start(startInfo);
-                // TODO: Currently I allow 500ms for the injector to fail (indicated by exiting)
-                if (injectorProc != null && injectorProc.WaitForExit(500))
+                // TODO: Currently I allow 5 sec for the injector to fail (indicated by exiting)
+                if (injectorProc != null && injectorProc.WaitForExit(5000))
                 {
                     // Injector finished early, there's probably an error.
                     var stdout = injectorProc.StandardOutput.ReadToEnd();
@@ -220,7 +220,7 @@ namespace RemoteNET
                 }
                 else
                 {
-                    // TODO: There's a bug I can't explain where the injector doesnt finish injecting
+                    // TODO: There's a bug I can't explain where the injector doesn't finish injecting
                     // if it's STDOUT isn't read.
                     // This is a hack, it should be solved in another way.
                     // CliWrap? Make injector not block on output writes?
