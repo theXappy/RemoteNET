@@ -48,7 +48,7 @@ namespace RemoteNET.Internal.Reflection
             new Dictionary<Tuple<string, string>, Type>();
 
 
-        public Type ResolveTypeWhileCreating(RemoteApp app, string typeInProgress, string methodName, string assembly, string type)
+        public Type ResolveTypeWhileCreating(ManagedRemoteApp app, string typeInProgress, string methodName, string assembly, string type)
         {
             if (type.Length > 200)
             {
@@ -81,7 +81,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     paramType = new RemoteType(app, paramType);
                     // TODO: Registring here in the cache is a hack but we couldn't register within "TypesResolver.Resolve"
-                    // because we don't have the RemoteApp to associate the fake remote type with.
+                    // because we don't have the ManagedRemoteApp to associate the fake remote type with.
                     // Maybe this should move somewhere else...
                     _resolver.RegisterType(paramType);
                 }
@@ -117,7 +117,7 @@ namespace RemoteNET.Internal.Reflection
         }
 
 
-        private Type Create(RemoteApp app, string fullTypeName, string assembly)
+        private Type Create(ManagedRemoteApp app, string fullTypeName, string assembly)
         {
             Type shortOutput = _resolver.Resolve(assembly, fullTypeName);
             if (shortOutput != null)
@@ -135,7 +135,7 @@ namespace RemoteNET.Internal.Reflection
             return Create(app, parentDump);
         }
 
-        public Type Create(RemoteApp app, ManagedTypeDump managedTypeDump)
+        public Type Create(ManagedRemoteApp app, ManagedTypeDump managedTypeDump)
         {
             Type shortOutput = _resolver.Resolve(managedTypeDump.Assembly, managedTypeDump.Type);
             if (shortOutput != null)
@@ -178,7 +178,7 @@ namespace RemoteNET.Internal.Reflection
             return output;
         }
 
-        private void AddMembers(RemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
+        private void AddMembers(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
         {
             AddGroupOfFunctions(app, managedTypeDump, managedTypeDump.Methods, output, areConstructors: false);
             AddGroupOfFunctions(app, managedTypeDump, managedTypeDump.Constructors, output, areConstructors: true);
@@ -206,7 +206,7 @@ namespace RemoteNET.Internal.Reflection
             }
         }
 
-        private void AddProperties(RemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
+        private void AddProperties(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
         {
             foreach (ManagedTypeDump.TypeProperty propDump in managedTypeDump.Properties)
             {
@@ -243,7 +243,7 @@ namespace RemoteNET.Internal.Reflection
             }
         }
 
-        private void AddEvents(RemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
+        private void AddEvents(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
         {
             foreach (ManagedTypeDump.TypeEvent eventType in managedTypeDump.Events)
             {
@@ -266,7 +266,7 @@ namespace RemoteNET.Internal.Reflection
             }
         }
 
-        private void AddFields(RemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
+        private void AddFields(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
         {
             foreach (ManagedTypeDump.TypeField fieldDump in managedTypeDump.Fields)
             {
@@ -290,7 +290,7 @@ namespace RemoteNET.Internal.Reflection
             }
         }
 
-        private void AddGroupOfFunctions(RemoteApp app, ManagedTypeDump managedTypeDump, List<ManagedTypeDump.TypeMethod> functions, RemoteType declaringType, bool areConstructors)
+        private void AddGroupOfFunctions(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, List<ManagedTypeDump.TypeMethod> functions, RemoteType declaringType, bool areConstructors)
         {
             foreach (ManagedTypeDump.TypeMethod func in functions)
             {

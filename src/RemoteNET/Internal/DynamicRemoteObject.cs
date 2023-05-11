@@ -141,7 +141,7 @@ namespace RemoteNET.Internal
             public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4, Type t5] => this[t1, t2, t3, t4][t5];
         }
 
-        public RemoteApp __ra;
+        public ManagedRemoteApp __ra;
         public RemoteObject __ro;
         public RemoteType __type;
 
@@ -151,7 +151,7 @@ namespace RemoteNET.Internal
         private List<MemberInfo> __membersInner = null;
         public IEnumerable<MemberInfo> __members => MindFuck();
 
-        public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
+        public DynamicRemoteObject(ManagedRemoteApp ra, RemoteObject ro)
         {
             __ra = ra;
             __ro = ro;

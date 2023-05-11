@@ -18,7 +18,7 @@ namespace RemoteNET.Internal.Reflection
         public override Type ReflectedType => throw new NotImplementedException();
 
         private readonly ParameterInfo[] _paramInfos;
-        private RemoteApp App => (DeclaringType as RemoteType)?.App;
+        private ManagedRemoteApp App => (DeclaringType as RemoteType)?.App;
 
         public RemoteConstructorInfo(Type declaringType, ParameterInfo[] paramInfos)
         {

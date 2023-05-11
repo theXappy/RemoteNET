@@ -2,7 +2,7 @@
 {
     /// <summary>
     /// A candidate for a remote object.
-    /// Holding this item does not mean having a meaningful hold of the remote object. To gain one use <see cref="RemoteApp"/>
+    /// Holding this item does not mean having a meaningful hold of the remote object. To gain one use <see cref="ManagedRemoteApp"/>
     /// </summary>
     public class CandidateObject
     {

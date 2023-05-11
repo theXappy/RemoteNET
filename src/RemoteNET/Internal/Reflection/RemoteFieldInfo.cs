@@ -8,7 +8,7 @@ namespace RemoteNET.Internal.Reflection
 {
     public class RemoteFieldInfo : FieldInfo
     {
-        private RemoteApp App => (DeclaringType as RemoteType)?.App;
+        private ManagedRemoteApp App => (DeclaringType as RemoteType)?.App;
         public override object[] GetCustomAttributes(bool inherit)
         {
             throw new NotImplementedException();
@@ -56,7 +56,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     throw new InvalidOperationException($"Trying to get a static field (null target object) " +
                                                         $"on a {nameof(RemoteFieldInfo)} but it's associated " +
-                                                        $"Declaring Type ({this.DeclaringType}) does not have a RemoteApp associated. " +
+                                                        $"Declaring Type ({this.DeclaringType}) does not have a ManagedRemoteApp associated. " +
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
@@ -89,7 +89,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     // I only support managed here because I don't think I'll implement "Field Infos" for unmanaged
                     // objects any time soon.
-                    var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress, oora.Type, runtime: RuntimeType.Managed);
+                    var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress, oora.Type);
                     return remoteObject.Dynamify();
                 }
                 else if (oora.IsNull)
@@ -125,7 +125,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     throw new InvalidOperationException($"Trying to get a static field (null target object) " +
                                                         $"on a {nameof(RemoteFieldInfo)} but it's associated " +
-                                                        $"Declaring Type ({this.DeclaringType}) does not have a RemoteApp associated. " +
+                                                        $"Declaring Type ({this.DeclaringType}) does not have a ManagedRemoteApp associated. " +
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 

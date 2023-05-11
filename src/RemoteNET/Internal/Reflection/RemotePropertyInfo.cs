@@ -8,7 +8,7 @@ namespace RemoteNET.Internal.Reflection
     {
         private Lazy<Type> _propType;
 
-        private RemoteApp App => (DeclaringType as RemoteType)?.App;
+        private ManagedRemoteApp App => (DeclaringType as RemoteType)?.App;
         public override PropertyAttributes Attributes => throw new NotImplementedException();
 
         public override bool CanRead => GetMethod != null;
