@@ -9,10 +9,10 @@ namespace RemoteNET
 {
     public class RemoteActivator
     {
-        private readonly RemoteApp _app;
+        private readonly ManagedRemoteApp _app;
         private readonly DiverCommunicator _communicator;
 
-        internal RemoteActivator(DiverCommunicator communicator, RemoteApp app)
+        internal RemoteActivator(DiverCommunicator communicator, ManagedRemoteApp app)
         {
             _communicator = communicator;
             _app = app;

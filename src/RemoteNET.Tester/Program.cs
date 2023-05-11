@@ -23,14 +23,14 @@ namespace ScubaDiver.Tester
 
         private static void RemoteDive()
         {
-            RemoteApp remoteApp = null;
+            ManagedRemoteApp remoteApp = null;
             while (true)
             {
                 Console.WriteLine("Enter process name (or substring)");
                 string procName = Console.ReadLine();
                 try
                 {
-                    remoteApp = RemoteApp.Connect(procName);
+                    remoteApp = (ManagedRemoteApp)RemoteAppFactory.Connect(procName, RuntimeType.Managed);
                     if (remoteApp == null)
                     {
                         Console.WriteLine("Something went wrong, try again.");
@@ -55,7 +55,7 @@ namespace ScubaDiver.Tester
             remoteApp.Dispose();
         }
 
-        private static bool DoSingleMenu(RemoteApp remoteApp, List<RemoteObject> remoteObjects)
+        private static bool DoSingleMenu(ManagedRemoteApp remoteApp, List<RemoteObject> remoteObjects)
         {
             Console.WriteLine("Menu:");
             Console.WriteLine("1. Query Remote Instances");
@@ -416,7 +416,6 @@ namespace ScubaDiver.Tester
             if (!valid)
                 return false;
             return valid;
-
         }
 
         private static void LocalDive()

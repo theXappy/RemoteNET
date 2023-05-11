@@ -12,7 +12,7 @@ namespace RemoteNET
         private static int NextIndex = 1;
         public int Index;
 
-        private readonly RemoteApp _app;
+        private readonly ManagedRemoteApp _app;
         private RemoteObjectRef _ref;
         private Type _type = null;
 
@@ -20,7 +20,7 @@ namespace RemoteNET
 
         public ulong RemoteToken => _ref.Token;
 
-        internal RemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
+        internal RemoteObject(RemoteObjectRef reference, ManagedRemoteApp remoteApp)
         {
             Index = NextIndex++;
             _app = remoteApp;

@@ -29,14 +29,14 @@ namespace RemoteNET.Internal.Reflection
         private readonly bool _isArray;
         private readonly bool _isGenericParameter;
 
-        public RemoteApp App { get; set; }
+        public ManagedRemoteApp App { get; set; }
 
         public override bool IsGenericParameter => _isGenericParameter;
 
         private Lazy<Type> _parent;
         public override Type BaseType => _parent?.Value;
 
-        public RemoteType(RemoteApp app, Type localType) : this(app, localType.FullName, localType.Assembly.GetName().Name, localType.IsArray, localType.IsGenericParameter)
+        public RemoteType(ManagedRemoteApp app, Type localType) : this(app, localType.FullName, localType.Assembly.GetName().Name, localType.IsArray, localType.IsGenericParameter)
         {
             if (localType is RemoteType)
             {
@@ -64,7 +64,7 @@ namespace RemoteNET.Internal.Reflection
                 AddEvent(new RemoteEventInfo(this, ei));
         }
 
-        public RemoteType(RemoteApp app, string fullName, string assemblyName, bool isArray, bool isGenericParameter = false)
+        public RemoteType(ManagedRemoteApp app, string fullName, string assemblyName, bool isArray, bool isGenericParameter = false)
         {
             App = app;
             FullName = fullName;

@@ -12,9 +12,9 @@
 		<PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
-		<Version>1.0.1.28</Version>
-		<AssemblyVersion>1.0.1.28</AssemblyVersion>
-		<FileVersion>1.0.1.28</FileVersion>
+		<Version>1.0.1.32</Version>
+		<AssemblyVersion>1.0.1.32</AssemblyVersion>
+		<FileVersion>1.0.1.32</FileVersion>
 		<LangVersion>8</LangVersion>
 	</PropertyGroup>
 
@@ -64,5 +64,13 @@
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
 		<Exec Command="powershell &quot;Get-ChildItem -Path '$(ProjectDir)\Resources' -Exclude '*READ_ME*' | Set-Content -Value 'dummy'&quot;" />
 	</Target>
+
+	<ItemGroup>
+	  <NativeLibs Remove="RemoteAppFactory.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <NativeLibs Remove="ManagedRemoteApp.cs" />
+	</ItemGroup>
 
 </Project>

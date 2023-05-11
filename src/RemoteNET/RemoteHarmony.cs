@@ -12,7 +12,7 @@ namespace RemoteNET
 
     public class RemoteHarmony
     {
-        private readonly RemoteApp _app;
+        private readonly ManagedRemoteApp _app;
 
         private readonly Dictionary<MethodBase, MethodHooks> _callbacksToProxies;
 
@@ -35,7 +35,7 @@ namespace RemoteNET
         }
 
 
-        internal RemoteHarmony(RemoteApp app)
+        internal RemoteHarmony(ManagedRemoteApp app)
         {
             _app = app;
             _callbacksToProxies = new Dictionary<MethodBase, MethodHooks>();

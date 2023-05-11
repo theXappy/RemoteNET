@@ -25,7 +25,7 @@ namespace RemoteNET.Internal.Reflection
         public Type[] AssignedGenericArgs { get; }
         private readonly ParameterInfo[] _paramInfos;
 
-        private RemoteApp App => (DeclaringType as RemoteType)?.App;
+        private ManagedRemoteApp App => (DeclaringType as RemoteType)?.App;
 
         public RemoteMethodInfo(RemoteType declaringType, MethodInfo mi) :
             this(declaringType,

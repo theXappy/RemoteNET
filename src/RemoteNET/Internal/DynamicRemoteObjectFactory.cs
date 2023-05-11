@@ -10,9 +10,9 @@ namespace RemoteNET.Internal
 {
     public class DynamicRemoteObjectFactory
     {
-        private RemoteApp _app;
+        private ManagedRemoteApp _app;
 
-        public DynamicRemoteObject Create(RemoteApp rApp, RemoteObject remoteObj, ManagedTypeDump managedTypeDump)
+        public DynamicRemoteObject Create(ManagedRemoteApp rApp, RemoteObject remoteObj, ManagedTypeDump managedTypeDump)
         {
             _app = rApp;
             return new DynamicRemoteObject(rApp, remoteObj);

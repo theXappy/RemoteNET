@@ -7,7 +7,7 @@ namespace RemoteNET.Internal.Reflection
     public class RemoteEnum
     {
         private readonly RemoteType _remoteType;
-        public RemoteApp App => (_remoteType as RemoteType)?.App;
+        public ManagedRemoteApp App => (_remoteType as RemoteType)?.App;
 
         public RemoteEnum(RemoteType remoteType)
         {
