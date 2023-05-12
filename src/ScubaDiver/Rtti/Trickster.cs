@@ -90,6 +90,11 @@ namespace TheLeftExit.Trickster.Memory
         {
             List<TypeInfo> list = new();
 
+            // Whether the "type_info" type was seen.
+            // This is a sanity check for RTTI existence. If "type_info"
+            // is missing all our "findings" are actually false positives
+            bool typeInfoSeen = false;
+
             using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize))
             {
                 nuint inc = (nuint)(_is32Bit ? 4 : 8);
@@ -99,12 +104,14 @@ namespace TheLeftExit.Trickster.Memory
                     nuint address = moduleBaseAddress + offset;
                     if (getClassName(address) is string className)
                     {
+                        if (className == "type_info")
+                            typeInfoSeen = true;
                         list.Add(new TypeInfo(className, address, offset));
                     }
                 }
             }
 
-            return list.ToArray();
+            return typeInfoSeen ? list.ToArray() : Array.Empty<TypeInfo>();
         }
 
         private Dictionary<ModuleInfo, TypeInfo[]> ScanTypesCore()
