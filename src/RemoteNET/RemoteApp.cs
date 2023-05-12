@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 
 namespace RemoteNET
 {
     public abstract class RemoteApp : IDisposable
     {
+        public abstract DiverCommunicator Communicator { get; }
+
+
         public abstract IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter);
 
         /// <summary>

@@ -16,7 +16,7 @@ namespace RemoteNET
         public RemoteActivator Activator => throw new NotImplementedException("Not yet");
 
         private DiverCommunicator _unmanagedCommunicator;
-        public DiverCommunicator UnanagedCommunicator => _unmanagedCommunicator;
+        public override DiverCommunicator Communicator => _unmanagedCommunicator;
 
         private List<string> _unmanagedModulesList;
 
@@ -77,9 +77,7 @@ namespace RemoteNET
         /// </param>
         public override IEnumerable<CandidateObject> QueryInstances(string typeFullNameFilter, bool dumpHashcodes = true)
         {
-            DiverCommunicator communicator = UnanagedCommunicator;
-
-            var managedHeapDump = communicator.DumpHeap(typeFullNameFilter, dumpHashcodes);
+            var managedHeapDump = Communicator.DumpHeap(typeFullNameFilter, dumpHashcodes);
             var managedCandidates = managedHeapDump.Objects.Select(heapObj => new CandidateObject(RuntimeType.Unmanaged, heapObj.Address, heapObj.Type, heapObj.HashCode));
             return managedCandidates;
         }
