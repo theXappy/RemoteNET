@@ -101,7 +101,7 @@ namespace RemoteNET
         public RemoteActivator Activator { get; private set; }
         public RemoteHarmony Harmony { get; private set; }
 
-        public DiverCommunicator ManagedCommunicator => _managedCommunicator;
+        public override DiverCommunicator Communicator => _managedCommunicator;
 
         public ManagedRemoteApp(Process procWithDiver, DiverCommunicator managedCommunicator)
         {
@@ -256,7 +256,7 @@ namespace RemoteNET
         //
         public override void Dispose()
         {
-            ManagedCommunicator?.KillDiver();
+            _managedCommunicator?.KillDiver();
             _managedCommunicator = null;
             _procWithDiver = null;
         }

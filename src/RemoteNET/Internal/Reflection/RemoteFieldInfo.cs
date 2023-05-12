@@ -60,7 +60,7 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                oora = this.App.ManagedCommunicator.GetField(0, DeclaringType.FullName, this.Name).ReturnedObjectOrAddress;
+                oora = this.App.Communicator.GetField(0, DeclaringType.FullName, this.Name).ReturnedObjectOrAddress;
             }
             else
             {
@@ -129,7 +129,7 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                this.App.ManagedCommunicator.SetField(0, DeclaringType.FullName, this.Name, remoteNewValue);
+                this.App.Communicator.SetField(0, DeclaringType.FullName, this.Name, remoteNewValue);
                 return;
             }
 

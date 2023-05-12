@@ -81,7 +81,7 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                InvocationResults invokeRes = app.ManagedCommunicator.InvokeStaticMethod(declaringType.FullName, funcName, genericArgsFullNames, remoteParams);
+                InvocationResults invokeRes = app.Communicator.InvokeStaticMethod(declaringType.FullName, funcName, genericArgsFullNames, remoteParams);
                 if (invokeRes.VoidReturnType)
                 {
                     hasResults = false;
