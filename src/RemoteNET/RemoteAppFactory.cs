@@ -69,14 +69,12 @@ namespace RemoteNET
             {
                 case RuntimeType.Managed:
                     DiverCommunicator managedCom = new DiverCommunicator(diverAddr, diverPort);
-                    bool registeredManaged = managedCom.RegisterClient();
-                    if (registeredManaged)
+                    if (managedCom.RegisterClient())
                         return new ManagedRemoteApp(target, managedCom);
                     break;
                 case RuntimeType.Unmanaged:
                     DiverCommunicator unmanagedCom = new DiverCommunicator(diverAddr, diverPort + 2);
-                    bool registeredUnmanaged = unmanagedCom.RegisterClient();
-                    if (!registeredUnmanaged)
+                    if (unmanagedCom.RegisterClient())
                         return new UnmanagedRemoteApp(target, unmanagedCom);
                     break;
                 case RuntimeType.Unknown:
@@ -249,7 +247,6 @@ namespace RemoteNET
                 AllowUwpInjection(destPath);
             }
 
-
             // We are done with our temp directory
             tempDirInfo.Delete(recursive: true);
 
@@ -291,22 +288,10 @@ namespace RemoteNET
             }
 
             // Check if injector or bootstrap resources differ from copies on disk
-            string injectorResourceHash = HashUtils.BufferSHA256(injectorResource);
-            string injectorFileHash = File.Exists(kit.InjectorPath) ? HashUtils.FileSHA256(kit.InjectorPath) : String.Empty;
-            if (injectorResourceHash != injectorFileHash)
-            {
-                File.WriteAllBytes(kit.InjectorPath, injectorResource);
-            }
-
-            string adapterResourceHash = HashUtils.BufferSHA256(adapterResource);
-            string adapterFileHash = File.Exists(adapterPath) ? HashUtils.FileSHA256(adapterPath) : String.Empty;
-            if (adapterResourceHash != adapterFileHash)
-            {
-                File.WriteAllBytes(adapterPath, adapterResource);
-                File.WriteAllBytes(adapterPdbPath, adapterPdbResource);
-                // Also set the copy's permissions so we can inject it into UWP apps
-                AllowUwpInjection(adapterPath);
-            }
+            OverrideFileIfChanged(kit.InjectorPath, injectorResource);
+            OverrideFileIfChanged(adapterPath, adapterResource);
+            OverrideFileIfChanged(adapterPdbPath, adapterPdbResource);
+            AllowUwpInjection(adapterPath);
 
             // Check if InjectableDummyPath resources differ from copies on disk
             kit.InjectableDummyPath = Path.Combine(kit.RemoteNetAppDataDir, nameof(Resources.InjectableDummy) + ".dll");
@@ -314,13 +299,23 @@ namespace RemoteNET
             string injectableDummyRuntimeConfigPath = Path.Combine(kit.RemoteNetAppDataDir,
                 nameof(Resources.InjectableDummy) + ".runtimeconfig.json");
             // Write to disk
-            File.WriteAllBytes(kit.InjectableDummyPath, Resources.InjectableDummy);
-            File.WriteAllBytes(injectableDummyPdbPath, Resources.InjectableDummyPdb);
-            File.WriteAllBytes(injectableDummyRuntimeConfigPath, Resources.InjectableDummy_runtimeconfig);
+            OverrideFileIfChanged(kit.InjectableDummyPath, Resources.InjectableDummy);
+            OverrideFileIfChanged(injectableDummyPdbPath, Resources.InjectableDummyPdb);
+            OverrideFileIfChanged(injectableDummyRuntimeConfigPath, Resources.InjectableDummy_runtimeconfig);
             // Change permissions
             AllowUwpInjection(kit.InjectableDummyPath);
             AllowUwpInjection(injectableDummyPdbPath);
             AllowUwpInjection(injectableDummyRuntimeConfigPath);
+        }
+
+        private static void OverrideFileIfChanged(string path, byte[] data)
+        {
+            string newDataHash = HashUtils.BufferSHA256(data);
+            string existingDataHash = File.Exists(path) ? HashUtils.FileSHA256(path) : String.Empty;
+            if (newDataHash != existingDataHash)
+            {
+                File.WriteAllBytes(path, data);
+            }
         }
 
         private static void AllowUwpInjection(string destPath)
