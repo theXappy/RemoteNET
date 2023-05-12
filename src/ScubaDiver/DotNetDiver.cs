@@ -6,11 +6,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Diagnostics.Runtime;
+using MonoMod.Utils;
 using ScubaDiver.API;
 using ScubaDiver.API.Extensions;
 using ScubaDiver.API.Hooking;
@@ -45,7 +47,7 @@ namespace ScubaDiver
         // Object freezing (pinning)
         FrozenObjectsCollection _freezer = new FrozenObjectsCollection();
 
-        public DotNetDiver()
+        public DotNetDiver(IRequestsListener listener) : base(listener)
         {
             _responseBodyCreators.Add("/event_subscribe", MakeEventSubscribeResponse);
             _responseBodyCreators.Add("/event_unsubscribe", MakeEventUnsubscribeResponse);
@@ -57,8 +59,9 @@ namespace ScubaDiver
             _unifiedAppDomain = new UnifiedAppDomain(this);
         }
 
+        private Task endpointsMonitor;
 
-        public override void Start(ushort listenPort)
+        public override void Start()
         {
             Logger.Debug("[DotNetDiver] Is logging debugs in release? " + Logger.DebugInRelease.Value);
 
@@ -68,45 +71,11 @@ namespace ScubaDiver
 
             // Start session
             RefreshRuntime();
-            HttpListener listener = new();
-            string listeningUrl = $"http://127.0.0.1:{listenPort}/";
-            listener.Prefixes.Add(listeningUrl);
-            // Set timeout
-            var manager = listener.TimeoutManager;
-            manager.IdleConnection = TimeSpan.FromSeconds(5);
-            listener.Start();
-            Logger.Debug($"[DotNetDiver] Listening on {listeningUrl}...");
 
-            Task endpointsMonitor = Task.Run(CallbacksEndpointsMonitor);
-            Dispatcher(listener);
-            Logger.Debug("[DotNetDiver] Stopping Callback Endpoints Monitor");
-            _monitorEndpoints = false;
-            try
-            {
-                endpointsMonitor.Wait();
-            }
-            catch
-            {
-                // IDC
-            }
+            endpointsMonitor = Task.Run(CallbacksEndpointsMonitor);
 
-            Logger.Debug("[DotNetDiver] Closing listener");
-            listener.Stop();
-            listener.Close();
-            Logger.Debug("[DotNetDiver] Closing ClrMD runtime and snapshot");
-            lock (_clrMdLock)
-            {
-                _runtime?.Dispose();
-                _runtime = null;
-                _dt?.Dispose();
-                _dt = null;
-            }
-
-            Logger.Debug("[DotNetDiver] Unpinning objects");
-            _freezer.UnpinAll();
-            Logger.Debug("[DotNetDiver] Unpinning finished");
-
-            Logger.Debug("[DotNetDiver] Dispatcher returned, Start is complete.");
+            // This will runt the requests listener
+            base.Start();
         }
 
         private void CallbacksEndpointsMonitor()
@@ -189,56 +158,6 @@ namespace ScubaDiver
                 $"Don't know how to parse this parameter into an object of type `{param.Type}`");
         }
 
-        #endregion
-
-        #region HTTP Dispatching
-        private void HandleDispatchedRequest(HttpListenerContext requestContext)
-        {
-            HttpListenerRequest request = requestContext.Request;
-
-            var response = requestContext.Response;
-            string body;
-            if (_responseBodyCreators.TryGetValue(request.Url.AbsolutePath, out var respBodyGenerator))
-            {
-                try
-                {
-                    body = respBodyGenerator(request);
-                }
-                catch (Exception ex)
-                {
-                    body = QuickError(ex.Message, ex.StackTrace);
-                }
-            }
-            else
-            {
-                body = QuickError("Unknown Command");
-            }
-
-            byte[] buffer = Encoding.UTF8.GetBytes(body);
-            // Get a response stream and write the response to it.
-            response.ContentLength64 = buffer.Length;
-            response.ContentType = "application/json";
-            Stream output = response.OutputStream;
-                output.Write(buffer, 0, buffer.Length);
-            // You must close the output stream.
-            output.Close();
-        }
-
-        protected override void DispatcherCleanUp()
-        {
-            Logger.Debug("[DotNetDiver] Removing all event subscriptions & hooks");
-            foreach (RegisteredEventHandlerInfo rehi in _remoteEventHandler.Values)
-            {
-                rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
-            }
-            foreach (RegisteredMethodHookInfo rmhi in _remoteHooks.Values)
-            {
-                HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
-            }
-            _remoteEventHandler.Clear();
-            _remoteHooks.Clear();
-            Logger.Debug("[DotNetDiver] Removed all event subscriptions & hooks");
-        }
         #endregion
 
         #region Object Pinning
@@ -451,9 +370,9 @@ namespace ScubaDiver
 
         #region DLL Injecion Handler
 
-        protected override string MakeInjectResponse(HttpListenerRequest req)
+        protected override string MakeInjectResponse(ScubaDiverMessage req)
         {
-            string dllPath = req.QueryString.Get("dll_path");
+            string dllPath = req.QueryString["dll_path"];
             try
             {
                 var asm = Assembly.LoadFile(dllPath);
@@ -479,14 +398,14 @@ namespace ScubaDiver
 
         #region Ping Handler
 
-        private string MakePingResponse(HttpListenerRequest arg)
+        private string MakePingResponse(ScubaDiverMessage arg)
         {
             return "{\"status\":\"pong\"}";
         }
 
         #endregion
 
-        protected override string MakeDomainsResponse(HttpListenerRequest req)
+        protected override string MakeDomainsResponse(ScubaDiverMessage req)
         {
             List<DomainsDump.AvailableDomain> available = new();
             lock (_clrMdLock)
@@ -514,9 +433,9 @@ namespace ScubaDiver
 
             return JsonConvert.SerializeObject(dd);
         }
-        protected override string MakeTypesResponse(HttpListenerRequest req)
+        protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
-            string assembly = req.QueryString.Get("assembly");
+            string assembly = req.QueryString["assembly"];
 
             // Try exact match assembly 
             var allAssembliesInApp = _unifiedAppDomain.GetAssemblies();
@@ -634,13 +553,10 @@ namespace ScubaDiver
 
             return QuickError("Failed to find type in searched assemblies");
         }
-        protected override string MakeTypeResponse(HttpListenerRequest req)
+        protected override string MakeTypeResponse(ScubaDiverMessage req)
         {
-            string body = null;
-            using (StreamReader sr = new(req.InputStream))
-            {
-                body = sr.ReadToEnd();
-            }
+            string body = req.Body;
+            
             if (string.IsNullOrEmpty(body))
             {
                 return QuickError("Missing body");
@@ -655,10 +571,10 @@ namespace ScubaDiver
 
             return MakeTypeResponse(request);
         }
-        protected override string MakeHeapResponse(HttpListenerRequest arg)
+        protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
-            string filter = arg.QueryString.Get("type_filter");
-            string dumpHashcodesStr = arg.QueryString.Get("dump_hashcodes");
+            string filter = arg.QueryString["type_filter"];
+            string dumpHashcodesStr = arg.QueryString["dump_hashcodes"];
             bool dumpHashcodes = dumpHashcodesStr?.ToLower() == "true";
 
                                  // Default filter - no filter. Just return everything.
@@ -678,9 +594,9 @@ namespace ScubaDiver
         }
         #region Hooks & Events Handlers
 
-        private string MakeUnhookMethodResponse(HttpListenerRequest arg)
+        private string MakeUnhookMethodResponse(ScubaDiverMessage arg)
         {
-            string tokenStr = arg.QueryString.Get("token");
+            string tokenStr = arg.QueryString["token"];
             if (tokenStr == null || !int.TryParse(tokenStr, out int token))
             {
                 return QuickError("Missing parameter 'address'");
@@ -696,14 +612,10 @@ namespace ScubaDiver
             Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Unknown token for event callback subscription. Token: {token}");
             return QuickError("Unknown token for event callback subscription");
         }
-        private string MakeHookMethodResponse(HttpListenerRequest arg)
+        private string MakeHookMethodResponse(ScubaDiverMessage arg)
         {
             Logger.Debug("[DotNetDiver] Got Hook Method request!");
-            string body;
-            using (StreamReader sr = new(arg.InputStream))
-            {
-                body = sr.ReadToEnd();
-            }
+            string body = arg.Body;
 
             if (string.IsNullOrEmpty(body))
                 return QuickError("Missing body");
@@ -794,9 +706,9 @@ namespace ScubaDiver
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
-        private string MakeEventUnsubscribeResponse(HttpListenerRequest arg)
+        private string MakeEventUnsubscribeResponse(ScubaDiverMessage arg)
         {
-            string tokenStr = arg.QueryString.Get("token");
+            string tokenStr = arg.QueryString["token"];
             if (tokenStr == null || !int.TryParse(tokenStr, out int token))
             {
                 return QuickError("Missing parameter 'address'");
@@ -810,11 +722,11 @@ namespace ScubaDiver
             }
             return QuickError("Unknown token for event callback subscription");
         }
-        protected string MakeEventSubscribeResponse(HttpListenerRequest arg)
+        protected string MakeEventSubscribeResponse(ScubaDiverMessage arg)
         {
-            string objAddrStr = arg.QueryString.Get("address");
-            string ipAddrStr = arg.QueryString.Get("ip");
-            string portStr = arg.QueryString.Get("port");
+            string objAddrStr = arg.QueryString["address"];
+            string ipAddrStr = arg.QueryString["ip"];
+            string portStr = arg.QueryString["port"];
             if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
             {
                 return QuickError("Missing parameter 'address' (object address)");
@@ -835,7 +747,7 @@ namespace ScubaDiver
 
             Type resolvedType = target.GetType();
 
-            string eventName = arg.QueryString.Get("event");
+            string eventName = arg.QueryString["event"];
             if (eventName == null)
             {
                 return QuickError("Missing parameter 'event'");
@@ -936,13 +848,13 @@ namespace ScubaDiver
         }
 
         #endregion
-        protected override string MakeObjectResponse(HttpListenerRequest arg)
+        protected override string MakeObjectResponse(ScubaDiverMessage arg)
         {
-            string objAddrStr = arg.QueryString.Get("address");
-            string typeName = arg.QueryString.Get("type_name");
-            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
-            bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
-            string hashCodeStr = arg.QueryString.Get("hashcode");
+            string objAddrStr = arg.QueryString["address"];
+            string typeName = arg.QueryString["type_name"];
+            bool pinningRequested = arg.QueryString["pinRequest"].ToUpper() == "TRUE";
+            bool hashCodeFallback = arg.QueryString["hashcode_fallback"].ToUpper() == "TRUE";
+            string hashCodeStr = arg.QueryString["hashcode"];
             int userHashcode = 0;
             if (objAddrStr == null)
             {
@@ -971,14 +883,10 @@ namespace ScubaDiver
                 return QuickError("Failed Getting the object for the user. Error: " + e.Message);
             }
         }
-        protected override string MakeCreateObjectResponse(HttpListenerRequest arg)
+        protected override string MakeCreateObjectResponse(ScubaDiverMessage arg)
         {
             Logger.Debug("[DotNetDiver] Got /create_object request!");
-            string body = null;
-            using (StreamReader sr = new(arg.InputStream))
-            {
-                body = sr.ReadToEnd();
-            }
+            string body = arg.Body;
 
             if (string.IsNullOrEmpty(body))
             {
@@ -1063,14 +971,10 @@ namespace ScubaDiver
 
         }
 
-        protected override string MakeInvokeResponse(HttpListenerRequest arg)
+        protected override string MakeInvokeResponse(ScubaDiverMessage arg)
         {
             Logger.Debug("[DotNetDiver] Got /Invoke request!");
-            string body = null;
-            using (StreamReader sr = new(arg.InputStream))
-            {
-                body = sr.ReadToEnd();
-            }
+            string body = arg.Body;
 
             if (string.IsNullOrEmpty(body))
             {
@@ -1249,14 +1153,10 @@ namespace ScubaDiver
             }
             return JsonConvert.SerializeObject(invocResults);
         }
-        protected override string MakeGetFieldResponse(HttpListenerRequest arg)
+        protected override string MakeGetFieldResponse(ScubaDiverMessage arg)
         {
             Logger.Debug("[DotNetDiver] Got /get_field request!");
-            string body = null;
-            using (StreamReader sr = new(arg.InputStream))
-            {
-                body = sr.ReadToEnd();
-            }
+            string body = arg.Body;
 
             if (string.IsNullOrEmpty(body))
             {
@@ -1350,14 +1250,10 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(invocResults);
 
         }
-        protected override string MakeSetFieldResponse(HttpListenerRequest arg)
+        protected override string MakeSetFieldResponse(ScubaDiverMessage arg)
         {
             Logger.Debug("[DotNetDiver] Got /set_field request!");
-            string body = null;
-            using (StreamReader sr = new(arg.InputStream))
-            {
-                body = sr.ReadToEnd();
-            }
+            string body = arg.Body;
 
             if (string.IsNullOrEmpty(body))
             {
@@ -1470,13 +1366,9 @@ namespace ScubaDiver
             }
             return JsonConvert.SerializeObject(invocResults);
         }
-        protected override string MakeArrayItemResponse(HttpListenerRequest arg)
+        protected override string MakeArrayItemResponse(ScubaDiverMessage arg)
         {
-            string body = null;
-            using (StreamReader sr = new(arg.InputStream))
-            {
-                body = sr.ReadToEnd();
-            }
+            string body = arg.Body;
 
             if (string.IsNullOrEmpty(body))
                 return QuickError("Missing body");
@@ -1587,9 +1479,9 @@ namespace ScubaDiver
 
             return JsonConvert.SerializeObject(invokeRes);
         }
-        protected override string MakeUnpinResponse(HttpListenerRequest arg)
+        protected override string MakeUnpinResponse(ScubaDiverMessage arg)
         {
-            string objAddrStr = arg.QueryString.Get("address");
+            string objAddrStr = arg.QueryString["address"];
             if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
             {
                 return QuickError("Missing parameter 'address'");
@@ -1613,11 +1505,46 @@ namespace ScubaDiver
         // IDisposable
         public override void Dispose()
         {
+            base.Dispose();
+
+            Logger.Debug("[DotNetDiver] Stopping Callback Endpoints Monitor");
+            _monitorEndpoints = false;
+            try
+            {
+                endpointsMonitor.Wait();
+            }
+            catch
+            {
+                // IDC
+            }
+
+            Logger.Debug("[DotNetDiver] Closing ClrMD runtime and snapshot");
             lock (_clrMdLock)
             {
                 _runtime?.Dispose();
+                _runtime = null;
                 _dt?.Dispose();
+                _dt = null;
             }
+
+            Logger.Debug("[DotNetDiver] Unpinning objects");
+            _freezer.UnpinAll();
+            Logger.Debug("[DotNetDiver] Unpinning finished");
+
+            Logger.Debug("[DotNetDiver] Dispatcher returned, Start is complete.");
+
+            Logger.Debug("[DotNetDiver] Removing all event subscriptions & hooks");
+            foreach (RegisteredEventHandlerInfo rehi in _remoteEventHandler.Values)
+            {
+                rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
+            }
+            foreach (RegisteredMethodHookInfo rmhi in _remoteHooks.Values)
+            {
+                HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
+            }
+            _remoteEventHandler.Clear();
+            _remoteHooks.Clear();
+            Logger.Debug("[DotNetDiver] Removed all event subscriptions & hooks");
         }
 
     }

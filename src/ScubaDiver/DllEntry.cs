@@ -56,19 +56,30 @@ namespace ScubaDiver
                 ushort port = ushort.Parse((string)pwzArgument);
 
                 // Run Divers
+                Task[] tasks = new Task[1];
 #if NET_6
-                MsvcDiver _msvcInstance = new();
-                Task t = Task.Run(()=>_msvcInstance.Start((ushort)(port + 2)));
+                tasks = new Task[2];
+                RnetRequestsListener msvcListener = new(port + 2);
+                MsvcDiver _msvcInstance = new(msvcListener);
+                tasks[1] = Task.Run(() =>
+                {
+                    _msvcInstance.Start();
+                    _msvcInstance.WaitForExit();
+                });
 #endif
-                DotNetDiver _instance = new();
-                _instance.Start(port); // block
+                RnetRequestsListener listener = new(port);
+                DotNetDiver _instance = new(listener);
+                tasks[0] = Task.Run(() =>
+                {
+                    _instance.Start();
+                    _instance.WaitForExit();
+                });
 
-                // DotNetDiver killed (politely)
 
+                Task.WaitAll(tasks);
+                // Diver(s) killed (politely)
 #if NET_6
-                Logger.Debug("[DiverHost] DotNetDiver finished gracefully, waiting for MSVC diver");
-                t.Wait();
-                Logger.Debug("[DiverHost] MsvcDiver finished gracefully, returning");
+                Logger.Debug("[DiverHost] DotNetDiver and MsvcDiver both finished gracefully, returning");
 #else
                 Logger.Debug("[DiverHost] DotNetDiver finished gracefully, returning");
 #endif

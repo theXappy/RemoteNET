@@ -5,7 +5,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using ScubaDiver.API.Exceptions;
@@ -14,6 +16,7 @@ using ScubaDiver.API.Interactions;
 using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.API.Interactions.Object;
+using ScubaDiver.API.Protocol;
 using ScubaDiver.API.Utils;
 
 namespace ScubaDiver.API
@@ -40,42 +43,30 @@ namespace ScubaDiver.API
         public DiverCommunicator(IPAddress ipa, int diverPort) : this(ipa.ToString(), diverPort) { }
         public DiverCommunicator(IPEndPoint ipe) : this(ipe.Address, ipe.Port) { }
 
+        private int _requestId = 1;
         private string SendRequest(string path, Dictionary<string, string> queryParams = null, string jsonBody = null)
         {
             queryParams ??= new();
 
-            HttpClient httpClient = new();
-            NameValueCollection queryString = HttpUtility.ParseQueryString(string.Empty);
-            foreach (KeyValuePair<string, string> kvp in queryParams)
-            {
-                queryString.Add(kvp.Key, kvp.Value);
-            }
 
-            string url = $"http://{_hostname}:{DiverPort}/{path}?{queryString}";
-            HttpRequestMessage msg;
-            if (jsonBody == null)
+            TcpClient client = new TcpClient(_hostname, DiverPort);
+            OverTheWireRequest request = new OverTheWireRequest()
             {
-                msg = new HttpRequestMessage(HttpMethod.Get, url);
-            }
-            else
+                RequestId = Interlocked.Increment(ref _requestId),
+                UrlAbsolutePath = path,
+                QueryString = queryParams,
+                Body = jsonBody
+            };
+            RnetProtocolParser.Write(client, request);
+            OverTheWireRequest response = RnetProtocolParser.Parse(client);
+            // TODO: If we end up supporting multiple requsts at the same time we need to add some component
+            // to sort responses and requests by their IDs
+            if (response.RequestId != request.RequestId)
             {
-                msg = new HttpRequestMessage(HttpMethod.Post, url);
-                msg.Content = new StringContent(jsonBody, Encoding.UTF8,
-                                    "application/json");
+                throw new Exception(
+                    $"Mismatch of rNET protocol request and response IDs. Req: {request.RequestId}, Resp: {response.RequestId}");
             }
-
-            HttpResponseMessage res = httpClient.SendAsync(msg).Result;
-            string body = res.Content.ReadAsStringAsync().Result;
-            httpClient.Dispose();
-
-            if (body.StartsWith("{\"error\":", StringComparison.InvariantCultureIgnoreCase))
-            {
-                // Diver sent back an error. We parse it here and throwing a 'proxied' exception
-                var errMessage = JsonConvert.DeserializeObject<DiverError>(body, _withErrors);
-                if (errMessage != null)
-                    throw new RemoteException(errMessage.Error, errMessage.StackTrace);
-            }
-            return body;
+            return response.Body;
         }
 
         public bool KillDiver()
