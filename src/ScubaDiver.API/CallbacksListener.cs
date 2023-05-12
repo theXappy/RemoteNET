@@ -64,7 +64,6 @@ namespace ScubaDiver.API
                 _listener.Prefixes.Add(listeningUrl);
                 _listener.Start();
                 _src = new CancellationTokenSource();
-                _listenTask = Task.Run(() => Dispatcher(_listener), _src.Token);
                 _listenTask = Task.Factory.StartNew(() => Dispatcher(_listener), _src.Token, TaskCreationOptions.AttachedToParent, TaskScheduler.Default);
                 IsOpen = true;
             }

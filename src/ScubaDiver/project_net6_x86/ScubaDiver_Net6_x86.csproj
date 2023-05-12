@@ -31,6 +31,10 @@
 		<Compile Include="..\Rtti\Trickster.cs" Link="Rtti\Trickster.cs" />
 		<Compile Include="..\Rtti\TricksterUI.cs" Link="Rtti\TricksterUI.cs" />
 		<Compile Include="..\MsvcDiver.cs" />
+		<Compile Include="..\HttpRequestsListener.cs" />
+		<Compile Include="..\IRequestsListener.cs" />
+		<Compile Include="..\ScubaDiverMessage.cs" />
+
 	</ItemGroup>
 
 	<ItemGroup>

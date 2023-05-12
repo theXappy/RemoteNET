@@ -25,6 +25,10 @@
 		<Compile Include="..\Utils\SmartLocksDict.cs" Link="Utils\SmartLocksDict.cs" />
 		<Compile Include="..\Utils\TypesResolver.cs" Link="Utils\TypesResolver.cs" />
 		<Compile Include="..\Utils\UnifiedAppDomain.cs" Link="Utils\UnifiedAppDomain.cs" />
+		<Compile Include="..\HttpRequestsListener.cs" />
+		<Compile Include="..\IRequestsListener.cs" />
+		<Compile Include="..\ScubaDiverMessage.cs" />
+
 	</ItemGroup>
 
 	<ItemGroup>

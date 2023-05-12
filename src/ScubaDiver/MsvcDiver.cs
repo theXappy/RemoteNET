@@ -4,13 +4,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using ScubaDiver.API.Utils;
 using TheLeftExit.Trickster.Memory;
 using ModuleInfo = Microsoft.Diagnostics.Runtime.ModuleInfo;
 using TypeInfo = System.Reflection.TypeInfo;
-using Microsoft.Diagnostics.Runtime;
-using System.IO;
+using System.Net.Sockets;
 
 namespace ScubaDiver
 {
@@ -18,7 +16,11 @@ namespace ScubaDiver
     {
         private Dictionary<ModuleInfo, TypeInfo[]> scannedModules = new Dictionary<ModuleInfo, TypeInfo[]>();
 
-        public override void Start(ushort listenPort)
+        public MsvcDiver(IRequestsListener listener) : base(listener)
+        {
+        }
+
+        public override void Start()
         {
             Logger.Debug("[MsvcDiver] Is logging debugs in release? " + Logger.DebugInRelease.Value);
 
@@ -26,40 +28,44 @@ namespace ScubaDiver
             var nsJson = InitNewtonsoftJson();
             Logger.Debug("[MsvcDiver] Newtonsoft.Json's module path: " + nsJson.Location);
 
-            // Start session
-            HttpListener listener = new();
-            string listeningUrl = $"http://127.0.0.1:{listenPort}/";
-            listener.Prefixes.Add(listeningUrl);
-            // Set timeout
-            var manager = listener.TimeoutManager;
-            manager.IdleConnection = TimeSpan.FromSeconds(5);
-            listener.Start();
-            Logger.Debug($"[MsvcDiver] Listening on {listeningUrl}...");
+            int lol = (new Random()).Next();
+            if (lol == 0)
+            {
+                Console.WriteLine("Ports Test!");
+                for (int port = 0; port <= 65535; port++)
+                {
+                    try
+                    {
+                        Console.WriteLine($"trying port {port} at 0.0.0.0");
+                        IPAddress addr = IPAddress.Any;
+                        var listener2 = new TcpListener(addr, port);
+                        listener2.Start();
+                        Console.WriteLine($"Successfully opened port {port} at 0.0.0.0");
+                        listener2.Stop();
 
-            Dispatcher(listener);
-
-            Logger.Debug("[MsvcDiver] Closing listener");
-            listener.Stop();
-            listener.Close();
-
-            Logger.Debug("[MsvcDiver] Unpinning objects");
-            // TODO:
-            Logger.Debug("[MsvcDiver] Unpinning finished");
-
-            Logger.Debug("[MsvcDiver] Dispatcher returned, Start is complete.");
+                        Console.WriteLine($"trying port {port} at 127.0.0.1");
+                        addr = IPAddress.Parse("127.0.0.1");
+                        listener2 = new TcpListener(addr, port);
+                        listener2.Start();
+                        Console.WriteLine($"Successfully opened port {port} at 127.0.0.1");
+                        listener2.Stop();
+                    }
+                    catch
+                    {
+                        // Uncomment the following line to print the error message for failed ports
+                        // Debug.WriteLine($"Failed to open port {port}: {e.Message}");
+                    }
+                }
+                Console.WriteLine("Ports Test -- done!");
+            }
         }
 
-        protected override void DispatcherCleanUp()
-        {
-            // Nothing here for now
-        }
-
-        protected override string MakeInjectResponse(HttpListenerRequest req)
+        protected override string MakeInjectResponse(ScubaDiverMessage req)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeDomainsResponse(HttpListenerRequest req)
+        protected override string MakeDomainsResponse(ScubaDiverMessage req)
         {
             RefreshTrickster();
 
@@ -92,11 +98,11 @@ namespace ScubaDiver
             _trickster.ScanTypes();
         }
 
-        protected override string MakeTypesResponse(HttpListenerRequest req)
+        protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
             RefreshTrickster();
 
-            string assembly = req.QueryString.Get("assembly");
+            string assembly = req.QueryString["assembly"];
             List<TheLeftExit.Trickster.Memory.ModuleInfo> matchingAssemblies = _trickster.ScannedTypes.Keys.Where(assm => assm.Name == assembly).ToList();
             if (matchingAssemblies.Count == 0)
             {
@@ -132,47 +138,47 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(dump);
         }
 
-        protected override string MakeTypeResponse(HttpListenerRequest req)
+        protected override string MakeTypeResponse(ScubaDiverMessage req)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeHeapResponse(HttpListenerRequest arg)
+        protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeObjectResponse(HttpListenerRequest arg)
+        protected override string MakeObjectResponse(ScubaDiverMessage arg)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeCreateObjectResponse(HttpListenerRequest arg)
+        protected override string MakeCreateObjectResponse(ScubaDiverMessage arg)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeInvokeResponse(HttpListenerRequest arg)
+        protected override string MakeInvokeResponse(ScubaDiverMessage arg)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeGetFieldResponse(HttpListenerRequest arg)
+        protected override string MakeGetFieldResponse(ScubaDiverMessage arg)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeSetFieldResponse(HttpListenerRequest arg)
+        protected override string MakeSetFieldResponse(ScubaDiverMessage arg)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeArrayItemResponse(HttpListenerRequest arg)
+        protected override string MakeArrayItemResponse(ScubaDiverMessage arg)
         {
             return QuickError("Not Implemented");
         }
 
-        protected override string MakeUnpinResponse(HttpListenerRequest arg)
+        protected override string MakeUnpinResponse(ScubaDiverMessage arg)
         {
             return QuickError("Not Implemented");
         }
@@ -180,5 +186,6 @@ namespace ScubaDiver
         public override void Dispose()
         {
         }
+
     }
 }

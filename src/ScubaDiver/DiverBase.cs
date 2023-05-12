@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
-using System.IO;
 using System.Net;
 using System.Reflection;
-using System.Text;
-using System.Threading;
 using ScubaDiver.API.Interactions;
 using ScubaDiver.API.Interactions.Client;
 using ScubaDiver.API.Utils;
-using ScubaDiver.Hooking;
 using Exception = System.Exception;
 
 namespace ScubaDiver
@@ -21,13 +18,13 @@ namespace ScubaDiver
         public List<int> _registeredPids = new();
 
         // HTTP Responses fields
-        protected readonly Dictionary<string, Func<HttpListenerRequest, string>> _responseBodyCreators;
+        protected readonly Dictionary<string, Func<ScubaDiverMessage, string>> _responseBodyCreators;
+        private IRequestsListener _listener;
 
-        private readonly ManualResetEvent _stayAlive = new(true);
-
-        public DiverBase()
+        public DiverBase(IRequestsListener listener)
         {
-            _responseBodyCreators = new Dictionary<string, Func<HttpListenerRequest, string>>()
+            _listener = listener;
+            _responseBodyCreators = new Dictionary<string, Func<ScubaDiverMessage, string>>()
             {
                 // Divert maintenance
                 {"/ping", MakePingResponse},
@@ -52,8 +49,11 @@ namespace ScubaDiver
             };
         }
 
-
-        public abstract void Start(ushort listenPort);
+        public virtual void Start()
+        {
+            _listener.RequestReceived += HandleDispatchedRequest;
+            _listener.Start();
+        }
 
         #region Helpers
         protected Assembly InitNewtonsoftJson()
@@ -64,7 +64,7 @@ namespace ScubaDiver
             NewtonsoftProxy.Init(ass);
             return ass;
         }
-        
+
         public string QuickError(string error, string stackTrace = null)
         {
             if (stackTrace == null)
@@ -78,13 +78,11 @@ namespace ScubaDiver
         #endregion
 
         #region HTTP Dispatching
-        private void HandleDispatchedRequest(HttpListenerContext requestContext)
-        {
-            HttpListenerRequest request = requestContext.Request;
 
-            var response = requestContext.Response;
+        private void HandleDispatchedRequest(object obj, ScubaDiverMessage request)
+        {
             string body;
-            if (_responseBodyCreators.TryGetValue(request.Url.AbsolutePath, out var respBodyGenerator))
+            if (_responseBodyCreators.TryGetValue(request.UrlAbsolutePath, out var respBodyGenerator))
             {
                 try
                 {
@@ -100,105 +98,15 @@ namespace ScubaDiver
                 body = QuickError("Unknown Command");
             }
 
-            byte[] buffer = Encoding.UTF8.GetBytes(body);
-            // Get a response stream and write the response to it.
-            response.ContentLength64 = buffer.Length;
-            response.ContentType = "application/json";
-            Stream output = response.OutputStream;
-                output.Write(buffer, 0, buffer.Length);
-            // You must close the output stream.
-            output.Close();
+            request.ResponseSender(body);
         }
-
-        protected void Dispatcher(HttpListener listener)
-        {
-            // Using a timeout we can make sure not to block if the
-            // 'stayAlive' state changes to "reset" (which means we should die)
-            while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))
-            {
-                void ListenerCallback(IAsyncResult result)
-                {
-                    try
-                    {
-                        HarmonyWrapper.Instance.RegisterFrameworkThread(Thread.CurrentThread.ManagedThreadId);
-
-                        HttpListener listener = (HttpListener)result.AsyncState;
-                        HttpListenerContext context;
-                        try
-                        {
-                            context = listener.EndGetContext(result);
-                        }
-                        catch (ObjectDisposedException)
-                        {
-                            Logger.Debug("[DotNetDiver][ListenerCallback] Listener was disposed. Exiting.");
-                            return;
-                        }
-                        catch (HttpListenerException e)
-                        {
-                            if (e.Message.StartsWith("The I/O operation has been aborted"))
-                            {
-                                Logger.Debug($"[DotNetDiver][ListenerCallback] Listener was aborted. Exiting.");
-                                return;
-                            }
-                            throw;
-                        }
-
-                        try
-                        {
-                            HandleDispatchedRequest(context);
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine("[DotNetDiver] Task faulted! Exception:");
-                            Console.WriteLine(e);
-                        }
-                    }
-                    finally
-                    {
-                        HarmonyWrapper.Instance.UnregisterFrameworkThread(Thread.CurrentThread.ManagedThreadId);
-                    }
-                }
-                IAsyncResult asyncOperation = listener.BeginGetContext(ListenerCallback, listener);
-
-                while (true)
-                {
-                    if (asyncOperation.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(100)))
-                    {
-                        // Async operation started! We can mov on to next request
-                        break;
-                    }
-                    else
-                    {
-                        // Async event still awaiting new HTTP requests... It's a good time to check
-                        // if we were signaled to die
-                        if (!_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))
-                        {
-                            // Time to die.
-                            // Leaving the inner loop will get us to the outter loop where _stayAlive is checked (again)
-                            // and then it that loop will stop as well.
-                            break;
-                        }
-                        else
-                        {
-                            // No singal of die command. We can continue waiting
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            Logger.Debug("[DotNetDiver] HTTP Loop ended. Cleaning up");
-            this.DispatcherCleanUp();
-        }
-
-        protected abstract void DispatcherCleanUp();
         #endregion
 
-        protected abstract string MakeInjectResponse(HttpListenerRequest req);
+        protected abstract string MakeInjectResponse(ScubaDiverMessage req);
 
         #region Ping Handler
 
-        private string MakePingResponse(HttpListenerRequest arg)
+        private string MakePingResponse(ScubaDiverMessage arg)
         {
             return "{\"status\":\"pong\"}";
         }
@@ -206,9 +114,9 @@ namespace ScubaDiver
         #endregion
 
         #region Client Registration Handlers
-        private string MakeRegisterClientResponse(HttpListenerRequest arg)
+        private string MakeRegisterClientResponse(ScubaDiverMessage arg)
         {
-            string pidString = arg.QueryString.Get("process_id");
+            string pidString = arg.QueryString["process_id"];
             if (pidString == null || !int.TryParse(pidString, out int pid))
             {
                 return QuickError("Missing parameter 'process_id'");
@@ -217,12 +125,12 @@ namespace ScubaDiver
             {
                 _registeredPids.Add(pid);
             }
-            Logger.Debug("[DotNetDiver] New client registered. ID = " + pid);
+            Logger.Debug("[DiverBase] New client registered. ID = " + pid);
             return "{\"status\":\"OK'\"}";
         }
-        private string MakeUnregisterClientResponse(HttpListenerRequest arg)
+        private string MakeUnregisterClientResponse(ScubaDiverMessage arg)
         {
-            string pidString = arg.QueryString.Get("process_id");
+            string pidString = arg.QueryString["process_id"];
             if (pidString == null || !int.TryParse(pidString, out int pid))
             {
                 return QuickError("Missing parameter 'process_id'");
@@ -234,7 +142,7 @@ namespace ScubaDiver
                 removed = _registeredPids.Remove(pid);
                 remaining = _registeredPids.Count;
             }
-            Logger.Debug("[DotNetDiver] Client unregistered. ID = " + pid);
+            Logger.Debug("[DiverBase] Client unregistered. ID = " + pid);
 
             UnregisterClientResponse ucResponse = new()
             {
@@ -247,35 +155,46 @@ namespace ScubaDiver
 
         #endregion
 
-        protected abstract string MakeDomainsResponse(HttpListenerRequest req);
-        protected abstract string MakeTypesResponse(HttpListenerRequest req);
-        protected abstract string MakeTypeResponse(HttpListenerRequest req);
-        protected abstract string MakeHeapResponse(HttpListenerRequest arg);
-        protected abstract string MakeObjectResponse(HttpListenerRequest arg);
-        protected abstract string MakeCreateObjectResponse(HttpListenerRequest arg);
-        protected abstract string MakeInvokeResponse(HttpListenerRequest arg);
-        protected abstract string MakeGetFieldResponse(HttpListenerRequest arg);
-        protected abstract string MakeSetFieldResponse(HttpListenerRequest arg);
-        protected abstract string MakeArrayItemResponse(HttpListenerRequest arg);
-        protected abstract string MakeUnpinResponse(HttpListenerRequest arg);
-        
-        private string MakeDieResponse(HttpListenerRequest req)
+        protected abstract string MakeDomainsResponse(ScubaDiverMessage req);
+        protected abstract string MakeTypesResponse(ScubaDiverMessage req);
+        protected abstract string MakeTypeResponse(ScubaDiverMessage req);
+        protected abstract string MakeHeapResponse(ScubaDiverMessage arg);
+        protected abstract string MakeObjectResponse(ScubaDiverMessage arg);
+        protected abstract string MakeCreateObjectResponse(ScubaDiverMessage arg);
+        protected abstract string MakeInvokeResponse(ScubaDiverMessage arg);
+        protected abstract string MakeGetFieldResponse(ScubaDiverMessage arg);
+        protected abstract string MakeSetFieldResponse(ScubaDiverMessage arg);
+        protected abstract string MakeArrayItemResponse(ScubaDiverMessage arg);
+        protected abstract string MakeUnpinResponse(ScubaDiverMessage arg);
+
+        private string MakeDieResponse(ScubaDiverMessage req)
         {
-            Logger.Debug("[DotNetDiver] Die command received");
-            bool forceKill = req.QueryString.Get("force")?.ToUpper() == "TRUE";
+            Logger.Debug("[DiverBase] Die command received");
+            bool forceKill = req.QueryString["force"].ToUpper() == "TRUE";
             lock (_registeredPidsLock)
             {
                 if (_registeredPids.Count > 0 && !forceKill)
                 {
-                    Logger.Debug("[DotNetDiver] Die command failed - More clients exist.");
+                    Logger.Debug("[DiverBase] Die command failed - More clients exist.");
                     return "{\"status\":\"Error more clients remaining. You can use the force=true argument to ignore this check.\"}";
                 }
             }
 
-            Logger.Debug("[DotNetDiver] Die command accepted.");
-            _stayAlive.Reset();
+            Logger.Debug("[DiverBase] Die command accepted.");
+            _listener.Stop();
             return "{\"status\":\"Goodbye\"}";
         }
-        public abstract void Dispose();
+
+
+        public virtual void Dispose()
+        {
+            _listener.Stop();
+            _listener.RequestReceived -= HandleDispatchedRequest;
+            _listener.Dispose();
+        }
+
+        public void WaitForExit() => _listener.WaitForExit();
     }
+
+
 }
