@@ -48,8 +48,7 @@ namespace ScubaDiver.API
         {
             queryParams ??= new();
 
-
-            TcpClient client = new TcpClient(_hostname, DiverPort);
+            using TcpClient client = new TcpClient(_hostname, DiverPort);
             OverTheWireRequest request = new OverTheWireRequest()
             {
                 RequestId = Interlocked.Increment(ref _requestId),
@@ -66,7 +65,17 @@ namespace ScubaDiver.API
                 throw new Exception(
                     $"Mismatch of rNET protocol request and response IDs. Req: {request.RequestId}, Resp: {response.RequestId}");
             }
-            return response.Body;
+
+            string body = response.Body;
+            if (body.StartsWith("{\"error\":", StringComparison.InvariantCultureIgnoreCase))
+            {
+                // Diver sent back an error. We parse it here and throwing a 'proxied' exception
+                var errMessage = JsonConvert.DeserializeObject<DiverError>(body, _withErrors);
+                if (errMessage != null)
+                    throw new RemoteException(errMessage.Error, errMessage.StackTrace);
+            }
+
+            return body;
         }
 
         public bool KillDiver()
@@ -218,8 +227,32 @@ namespace ScubaDiver.API
 
             try
             {
-                string body = SendRequest("register_client", new Dictionary<string, string> { { "process_id", _process_id.Value.ToString() } });
-                return body.Contains("{\"status\":\"OK'\"}");
+                for (int i = 0; i < 5; i++)
+                {
+                    Console.WriteLine($"@@@ Trying to register try #{i + 1}");
+                    string body = SendRequest("register_client",
+                        new Dictionary<string, string> { { "process_id", _process_id.Value.ToString() } });
+                    if (body.Contains("{\"status\":\"OK\"}"))
+                    {
+                        // Success
+                        return true;
+                    }
+                    else if (body.Contains("{\"status\":\"reject"))
+                    {
+                        Console.WriteLine($"@@@ Trying to register try #{i + 1} -- rejected (too early)");
+                        // We're probably too early and the Diver didn't communicate with Lifeboat yet.
+                        // sleep and re-try
+                        Thread.Sleep(TimeSpan.FromSeconds(1));
+                        continue;
+                    }
+                    else
+                    {
+                        // Something weird with the respond
+                        Console.WriteLine("Unexpected response from Diver/Lifeboat when registering: " + body);
+                        return false;
+                    }
+                }
+                return false;
             }
             catch
             {

@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -53,13 +55,16 @@ namespace ScubaDiver
         {
             try
             {
-                ushort port = ushort.Parse((string)pwzArgument);
+                string config = (string)pwzArgument;
+                string[] args = config.Split('~');
+                ushort port = ushort.Parse(args[0]);
+                bool reverseProxy = args.Any(arg => arg == "reverse");
 
                 // Run Divers
                 Task[] tasks = new Task[1];
 #if NET_6
                 tasks = new Task[2];
-                RnetRequestsListener msvcListener = new(port + 2);
+                IRequestsListener msvcListener = RnetRequestsListenerFactory.Create((ushort)(port + 2), reverseProxy);
                 MsvcDiver _msvcInstance = new(msvcListener);
                 tasks[1] = Task.Run(() =>
                 {
@@ -67,7 +72,7 @@ namespace ScubaDiver
                     _msvcInstance.WaitForExit();
                 });
 #endif
-                RnetRequestsListener listener = new(port);
+                IRequestsListener listener = RnetRequestsListenerFactory.Create(port, reverseProxy);
                 DotNetDiver _instance = new(listener);
                 tasks[0] = Task.Run(() =>
                 {

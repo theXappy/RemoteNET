@@ -372,7 +372,7 @@ namespace ScubaDiver
 
         protected override string MakeInjectResponse(ScubaDiverMessage req)
         {
-            string dllPath = req.QueryString["dll_path"];
+            string dllPath = req.QueryString.Get("dll_path");
             try
             {
                 var asm = Assembly.LoadFile(dllPath);
@@ -435,7 +435,7 @@ namespace ScubaDiver
         }
         protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
-            string assembly = req.QueryString["assembly"];
+            string assembly = req.QueryString.Get("assembly");
 
             // Try exact match assembly 
             var allAssembliesInApp = _unifiedAppDomain.GetAssemblies();
@@ -573,8 +573,8 @@ namespace ScubaDiver
         }
         protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
-            string filter = arg.QueryString["type_filter"];
-            string dumpHashcodesStr = arg.QueryString["dump_hashcodes"];
+            string filter = arg.QueryString.Get("type_filter");
+            string dumpHashcodesStr = arg.QueryString.Get("dump_hashcodes");
             bool dumpHashcodes = dumpHashcodesStr?.ToLower() == "true";
 
                                  // Default filter - no filter. Just return everything.
@@ -596,7 +596,7 @@ namespace ScubaDiver
 
         private string MakeUnhookMethodResponse(ScubaDiverMessage arg)
         {
-            string tokenStr = arg.QueryString["token"];
+            string tokenStr = arg.QueryString.Get("token");
             if (tokenStr == null || !int.TryParse(tokenStr, out int token))
             {
                 return QuickError("Missing parameter 'address'");
@@ -708,7 +708,7 @@ namespace ScubaDiver
         }
         private string MakeEventUnsubscribeResponse(ScubaDiverMessage arg)
         {
-            string tokenStr = arg.QueryString["token"];
+            string tokenStr = arg.QueryString.Get("token");
             if (tokenStr == null || !int.TryParse(tokenStr, out int token))
             {
                 return QuickError("Missing parameter 'address'");
@@ -724,9 +724,9 @@ namespace ScubaDiver
         }
         protected string MakeEventSubscribeResponse(ScubaDiverMessage arg)
         {
-            string objAddrStr = arg.QueryString["address"];
-            string ipAddrStr = arg.QueryString["ip"];
-            string portStr = arg.QueryString["port"];
+            string objAddrStr = arg.QueryString.Get("address");
+            string ipAddrStr = arg.QueryString.Get("ip");
+            string portStr = arg.QueryString.Get("port");
             if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
             {
                 return QuickError("Missing parameter 'address' (object address)");
@@ -747,7 +747,7 @@ namespace ScubaDiver
 
             Type resolvedType = target.GetType();
 
-            string eventName = arg.QueryString["event"];
+            string eventName = arg.QueryString.Get("event");
             if (eventName == null)
             {
                 return QuickError("Missing parameter 'event'");
@@ -850,11 +850,11 @@ namespace ScubaDiver
         #endregion
         protected override string MakeObjectResponse(ScubaDiverMessage arg)
         {
-            string objAddrStr = arg.QueryString["address"];
-            string typeName = arg.QueryString["type_name"];
-            bool pinningRequested = arg.QueryString["pinRequest"].ToUpper() == "TRUE";
-            bool hashCodeFallback = arg.QueryString["hashcode_fallback"].ToUpper() == "TRUE";
-            string hashCodeStr = arg.QueryString["hashcode"];
+            string objAddrStr = arg.QueryString.Get("address");
+            string typeName = arg.QueryString.Get("type_name");
+            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
+            bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
+            string hashCodeStr = arg.QueryString.Get("hashcode");
             int userHashcode = 0;
             if (objAddrStr == null)
             {
@@ -1481,7 +1481,7 @@ namespace ScubaDiver
         }
         protected override string MakeUnpinResponse(ScubaDiverMessage arg)
         {
-            string objAddrStr = arg.QueryString["address"];
+            string objAddrStr = arg.QueryString.Get("address");
             if (objAddrStr == null || !ulong.TryParse(objAddrStr, out var objAddr))
             {
                 return QuickError("Missing parameter 'address'");

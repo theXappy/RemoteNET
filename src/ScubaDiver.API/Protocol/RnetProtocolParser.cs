@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using ScubaDiver.API.Protocol;
 using ScubaDiver.API.Utils;
 
@@ -10,14 +11,17 @@ public static class RnetProtocolParser
     private const int MagicValueLength = 4;
     private const int PayloadLengthFieldLength = 4;
 
-    public static OverTheWireRequest Parse(TcpClient tcpClient)
+    public static OverTheWireRequest Parse(TcpClient tcpClient, CancellationToken token = default)
     {
+        if (token == default)
+            token = CancellationToken.None;
+
         OverTheWireRequest request = null;
         var stream = tcpClient.GetStream();
         while (tcpClient.Connected)
         {
             var magicValueBytes = new byte[MagicValueLength];
-            ReadBytesFromStream(stream, magicValueBytes);
+            ReadBytesFromStream(stream, magicValueBytes, token);
 
             if (!CheckMagicValue(magicValueBytes))
             {
@@ -26,7 +30,7 @@ public static class RnetProtocolParser
             }
 
             var payloadLengthBytes = new byte[PayloadLengthFieldLength];
-            ReadBytesFromStream(stream, payloadLengthBytes);
+            ReadBytesFromStream(stream, payloadLengthBytes, token);
 
             var payloadLength = BitConverter.ToInt32(payloadLengthBytes, 0);
             if (payloadLength <= 0)
@@ -36,7 +40,7 @@ public static class RnetProtocolParser
             }
 
             var payloadBytes = new byte[payloadLength];
-            ReadBytesFromStream(stream, payloadBytes);
+            ReadBytesFromStream(stream, payloadBytes, token);
 
             // Handle the payload bytes here...
             request = JsonConvert.DeserializeObject<OverTheWireRequest>(Encoding.UTF8.GetString(payloadBytes));
@@ -54,14 +58,14 @@ public static class RnetProtocolParser
                bytes[3] == 'T';
     }
 
-    private static void ReadBytesFromStream(Stream stream, byte[] buffer)
+    private static void ReadBytesFromStream(Stream stream, byte[] buffer, CancellationToken token)
     {
         var bytesRead = 0;
         var bytesToRead = buffer.Length;
 
         while (bytesToRead > 0)
         {
-            var n = stream.Read(buffer, bytesRead, bytesToRead);
+            var n =  stream.ReadAsync(buffer, bytesRead, bytesToRead, token).Result;
             if (n == 0)
             {
                 // The connection was closed by the remote endpoint, terminate the loop
@@ -99,11 +103,14 @@ public static class RnetProtocolParser
         return messageBytes;
     }
 
-    public static void Write(TcpClient client, OverTheWireRequest resp)
+    public static void Write(TcpClient client, OverTheWireRequest resp, CancellationToken token = default)
     {
+        if (token == default)
+            token = CancellationToken.None;
+
         var respJson = JsonConvert.SerializeObject(resp);
         byte[] encdoded = RnetProtocolParser.Encode(respJson);
 
-        client.GetStream().Write(encdoded, 0, encdoded.Length);
+        client.GetStream().WriteAsync(encdoded, 0, encdoded.Length, token).Wait(token);
     }
 }
