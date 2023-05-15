@@ -41,7 +41,7 @@ namespace TheLeftExit.Trickster.Memory {
                 return TryRead(address, buffer.Length * sizeof(T), ptr);
         }
 
-        private const int BUFFER_SIZE = 60;
+        private const int BUFFER_SIZE = 256;
 
         public string GetClassName64(ulong address) {
             if (!TryRead(address - 0x08, out ulong object_locator)) return null;
