@@ -8,9 +8,12 @@ using Windows.Win32.Foundation;
 using Windows.Win32.System.Threading;
 using Windows.Win32.System.Memory;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Runtime.InteropServices;
+using System.Text;
+using ScubaDiver.Utils;
 
 namespace TheLeftExit.Trickster.Memory
 {
@@ -86,7 +89,7 @@ namespace TheLeftExit.Trickster.Memory
             _is32Bit = is32Bit;
         }
 
-        private TypeInfo[] ScanTypesCore(nuint moduleBaseAddress, nuint moduleSize)
+        private TypeInfo[] ScanTypesCore(nuint moduleBaseAddress, nuint moduleSize, nuint segmentBaseAddress, nuint segmentBSize)
         {
             List<TypeInfo> list = new();
 
@@ -99,9 +102,9 @@ namespace TheLeftExit.Trickster.Memory
             {
                 nuint inc = (nuint)(_is32Bit ? 4 : 8);
                 Func<ulong, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
-                for (nuint offset = inc; offset < moduleSize; offset += inc)
+                for (nuint offset = inc; offset < segmentBSize; offset += inc)
                 {
-                    nuint address = moduleBaseAddress + offset;
+                    nuint address = segmentBaseAddress + offset;
                     if (getClassName(address) is string className)
                     {
                         if (className == "type_info")
@@ -118,21 +121,44 @@ namespace TheLeftExit.Trickster.Memory
         {
             Dictionary<ModuleInfo, TypeInfo[]> res = new Dictionary<ModuleInfo, TypeInfo[]>();
 
-            TypeInfo[] mainBaseDict = ScanTypesCore(_mainModule.BaseAddress, _mainModule.Size);
-            res[_mainModule] = mainBaseDict;
-
-
-            foreach (ModuleInfo modInfo in ModulesParsed)
+            Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
+            foreach (ModuleInfo modInfo in ModulesParsed.Prepend(_mainModule))
             {
-                //if (modInfo.Name.Contains("libSpen"))
+                List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
+                foreach (ModuleSegment moduleSegment in sections)
+                {
+                    var name = moduleSegment.Name.ToUpperInvariant();
+                    // It's probably only ever in ".rdata" but I'm a coward
+                    if (name.Contains("DATA") || name.Contains("RTTI"))
+                    {
+                        if (!dataSegments.ContainsKey(modInfo))
+                            dataSegments.Add(modInfo, new List<ModuleSegment>());
+
+                        dataSegments[modInfo].Add(moduleSegment);
+                    }
+                }
+            }
+
+            foreach (var kvp in dataSegments)
+            {
+                var module = kvp.Key;
+                var segments = kvp.Value;
+
+                foreach (ModuleSegment segment in segments)
                 {
                     try
                     {
-                        res[modInfo] = ScanTypesCore(modInfo.BaseAddress, modInfo.Size);
+                        var types = ScanTypesCore(module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
+                        if (types.Length > 0)
+                        {
+                            if (!res.ContainsKey(module))
+                                res[module] = Array.Empty<TypeInfo>();
+                            res[module] = res[module].Concat(types).ToArray();
+                        }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        Debug.WriteLine($"[Error] Couldn't scan for RTTI info in {modInfo.Name}");
+                        Console.WriteLine($"[Error] Couldn't scan for RTTI info in {module.Name}, EX: " + ex.GetType().Name);
                     }
                 }
             }
@@ -259,5 +285,167 @@ namespace TheLeftExit.Trickster.Memory
                 FreeRegionsCore(Regions);
             }
         }
+    }
+
+
+    public class ModuleSegment
+    {
+        public string Name { get; private set; }
+        public ulong BaseAddress { get; private set; }
+        public ulong Size { get; private set; }
+
+        public ModuleSegment(string name, ulong baseAddress, ulong size)
+        {
+            Name = name;
+            BaseAddress = baseAddress;
+            Size = size;
+        }
+
+        public override string ToString()
+        {
+            return string.Format("{0,-8}: 0x{1:X8} - 0x{2:X8} ({3} bytes)",
+                Name,
+                BaseAddress,
+                BaseAddress + Size,
+                Size);
+        }
+    }
+
+
+    static class ProcessModuleExtensions
+    {
+        public static List<ModuleSegment> ListSections(this ModuleInfo module)
+        {
+            // Get a pointer to the base address of the module
+            IntPtr moduleHandle = new IntPtr((long)module.BaseAddress);
+
+            // Read the DOS header from the module
+            IMAGE_DOS_HEADER dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(moduleHandle);
+
+            // Read the PE header from the module
+            IntPtr peHeader = new IntPtr(moduleHandle.ToInt64() + dosHeader.e_lfanew);
+            IMAGE_NT_HEADERS ntHeaders = Marshal.PtrToStructure<IMAGE_NT_HEADERS>(peHeader);
+
+            // Get a pointer to the section headers in the module
+            IntPtr sectionHeaders = new IntPtr(peHeader.ToInt64() + Marshal.SizeOf(typeof(IMAGE_NT_HEADERS))) + 16;
+
+            // Print the details of each section
+            List<ModuleSegment> output = new List<ModuleSegment>();
+            for (int i = 0; i < ntHeaders.FileHeader.NumberOfSections; i++)
+            {
+                // Read the section header from the module
+                IntPtr sectionHeader = new IntPtr(sectionHeaders.ToInt64() + i * Marshal.SizeOf(typeof(IMAGE_SECTION_HEADER)));
+                IMAGE_SECTION_HEADER section = Marshal.PtrToStructure<IMAGE_SECTION_HEADER>(sectionHeader);
+
+                // Print the section details
+
+                output.Add(
+                    new ModuleSegment(Encoding.ASCII.GetString(section.Name).TrimEnd('\0'),
+                                      (ulong)module.BaseAddress + section.VirtualAddress,
+                                      section.VirtualSize));
+            }
+
+            return output;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct IMAGE_DOS_HEADER
+    {
+        public short e_magic;
+        public short e_cblp;
+        public short e_cp;
+        public short e_crlc;
+        public short e_cparhdr;
+        public short e_minalloc;
+        public short e_maxalloc;
+        public short e_ss;
+        public short e_sp;
+        public short e_csum;
+        public short e_ip;
+        public short e_cs;
+        public short e_lfarlc;
+        public short e_ovno;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+        public short[] e_res1;
+        public short e_oemid;
+        public short e_oeminfo;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 10)]
+        public short[] e_res2;
+        public int e_lfanew;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct IMAGE_NT_HEADERS
+    {
+        public int Signature;
+        public IMAGE_FILE_HEADER FileHeader;
+        public IMAGE_OPTIONAL_HEADER32 OptionalHeader;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct IMAGE_FILE_HEADER
+    {
+        public short Machine;
+        public short NumberOfSections;
+        public int TimeDateStamp;
+        public int PointerToSymbolTable;
+        public int NumberOfSymbols;
+        public short SizeOfOptionalHeader;
+        public short Characteristics;
+    }
+    struct IMAGE_OPTIONAL_HEADER32
+    {
+        public short Magic;
+        public byte MajorLinkerVersion;
+        public byte MinorLinkerVersion;
+        public int SizeOfCode;
+        public int SizeOfInitializedData;
+        public int SizeOfUninitializedData;
+        public int AddressOfEntryPoint;
+        public int BaseOfCode;
+        public int BaseOfData;
+        public int ImageBase;
+        public int SectionAlignment;
+        public int FileAlignment;
+        public short MajorOperatingSystemVersion;
+        public short MinorOperatingSystemVersion;
+        public short MajorImageVersion;
+        public short MinorImageVersion;
+        public short MajorSubsystemVersion;
+        public short MinorSubsystemVersion;
+        public int Win32VersionValue;
+        public int SizeOfImage;
+        public int SizeOfHeaders;
+        public int CheckSum;
+        public short Subsystem;
+        public short DllCharacteristics;
+        public int SizeOfStackReserve;
+        public int SizeOfStackCommit;
+        public int SizeOfHeapReserve;
+        public int SizeOfHeapCommit;
+        public int LoaderFlags;
+        public int NumberOfRvaAndSizes;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+        public IMAGE_DATA_DIRECTORY[] DataDirectory;
+    }
+    struct IMAGE_DATA_DIRECTORY
+    {
+        public uint VirtualAddress;
+        public uint Size;
+    }
+    struct IMAGE_SECTION_HEADER
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+        public byte[] Name;
+        public uint VirtualSize;
+        public uint VirtualAddress;
+        public uint SizeOfRawData;
+        public uint PointerToRawData;
+        public uint PointerToRelocations;
+        public uint PointerToLinenumbers;
+        public ushort NumberOfRelocations;
+        public ushort NumberOfLinenumbers;
+        public uint Characteristics;
     }
 }
