@@ -12,6 +12,104 @@ using ScubaDiver.Hooking;
 
 namespace ScubaDiver;
 
+public static class RnetRequestsListenerFactory
+{
+    public static IRequestsListener Create(ushort port, bool reverse)
+    {
+        if (reverse)
+            return new RnetReverseRequestsListener(port);
+        return new RnetRequestsListener(port);
+    }
+}
+
+public class RnetReverseRequestsListener : IRequestsListener
+{
+    private readonly ManualResetEvent _stayAlive = new(true);
+    private int _port;
+    private TcpClient _client;
+    private Task _task = null;
+
+    public event EventHandler<ScubaDiverMessage> RequestReceived;
+
+    public RnetReverseRequestsListener(int reverseProxyPort)
+    {
+        _port = reverseProxyPort;
+    }
+
+    public void Start()
+    {
+        _stayAlive.Set();
+        _client = new TcpClient("localhost", _port);
+        _task = Task.Run(Dispatcher);
+    }
+
+    public void Stop()
+    {
+        _client.Close();
+        _stayAlive.Reset();
+    }
+
+    private void Dispatcher()
+    {
+        // Introduce ourselves to the proxy
+        OverTheWireRequest intro = new OverTheWireRequest
+        {
+            UrlAbsolutePath = "/proxy_intro",
+            RequestId = 1,
+            Body = "{\"role\":\"diver\"}"
+        };
+        var client = _client;
+        var stream = _client.GetStream();
+
+        RnetProtocolParser.Write(client, intro);
+        var introResp = RnetProtocolParser.Parse(client);
+        if (!introResp.Body.Contains("\"status\":\"OK\""))
+            throw new Exception("Diver couldn't register at Lifeboat");
+
+        while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
+        {
+            var request = RnetProtocolParser.Parse(client);
+
+            void RespondFunc(string body)
+            {
+                var resp = new OverTheWireRequest()
+                {
+                    RequestId = request.RequestId,
+                    UrlAbsolutePath = request.UrlAbsolutePath,
+                    Body = body
+                };
+                RnetProtocolParser.Write(client, resp);
+            }
+
+            ScubaDiverMessage req =
+                new ScubaDiverMessage(request.QueryString, request.UrlAbsolutePath, request.Body, RespondFunc);
+
+            RequestReceived?.Invoke(this, req);
+        }
+
+        Logger.Debug("[DiverBase] Reverse TCP Loop ended. Cleaning up");
+    }
+
+    public void WaitForExit()
+    {
+        try
+        {
+            _task.Wait();
+        }
+        catch
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        _stayAlive?.Dispose();
+        RequestReceived = null;
+    }
+
+}
+
+
 public class RnetRequestsListener : IRequestsListener
 {
     private readonly ManualResetEvent _stayAlive = new(true);
@@ -29,11 +127,13 @@ public class RnetRequestsListener : IRequestsListener
     public void Start()
     {
         _stayAlive.Set();
+        _listener.Start();
         _task = Task.Run(Dispatcher);
     }
 
     public void Stop()
     {
+        _listener.Stop();
         _stayAlive.Reset();
     }
     private void Dispatcher()
@@ -46,12 +146,12 @@ public class RnetRequestsListener : IRequestsListener
             Task.Run(() => HandleTcpClient(client));
         }
 
-        Logger.Debug("[DiverBase] HTTP Loop ended. Cleaning up");
+        Logger.Debug("[DiverBase] TCP Loop ended. Cleaning up");
     }
 
     private void HandleTcpClient(TcpClient client)
     {
-        while (client.Connected)
+        while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
             var request = RnetProtocolParser.Parse(client);
 

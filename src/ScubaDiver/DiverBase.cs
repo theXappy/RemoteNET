@@ -116,7 +116,7 @@ namespace ScubaDiver
         #region Client Registration Handlers
         private string MakeRegisterClientResponse(ScubaDiverMessage arg)
         {
-            string pidString = arg.QueryString["process_id"];
+            string pidString = arg.QueryString.Get("process_id");
             if (pidString == null || !int.TryParse(pidString, out int pid))
             {
                 return QuickError("Missing parameter 'process_id'");
@@ -126,11 +126,11 @@ namespace ScubaDiver
                 _registeredPids.Add(pid);
             }
             Logger.Debug("[DiverBase] New client registered. ID = " + pid);
-            return "{\"status\":\"OK'\"}";
+            return "{\"status\":\"OK\"}";
         }
         private string MakeUnregisterClientResponse(ScubaDiverMessage arg)
         {
-            string pidString = arg.QueryString["process_id"];
+            string pidString = arg.QueryString.Get("process_id");
             if (pidString == null || !int.TryParse(pidString, out int pid))
             {
                 return QuickError("Missing parameter 'process_id'");
@@ -170,7 +170,7 @@ namespace ScubaDiver
         private string MakeDieResponse(ScubaDiverMessage req)
         {
             Logger.Debug("[DiverBase] Die command received");
-            bool forceKill = req.QueryString["force"].ToUpper() == "TRUE";
+            bool forceKill = req.QueryString.Get("force")?.ToUpper() == "TRUE";
             lock (_registeredPidsLock)
             {
                 if (_registeredPids.Count > 0 && !forceKill)
