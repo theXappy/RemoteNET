@@ -23,11 +23,12 @@ namespace ScubaDiver.Tester
 
         private static void RemoteDive()
         {
+            string procName;
             ManagedRemoteApp remoteApp = null;
             while (true)
             {
                 Console.WriteLine("Enter process name (or substring)");
-                string procName = Console.ReadLine();
+                procName = Console.ReadLine();
                 try
                 {
                     remoteApp = (ManagedRemoteApp)RemoteAppFactory.Connect(procName, RuntimeType.Managed);
@@ -44,18 +45,37 @@ namespace ScubaDiver.Tester
                 }
                 break;
             }
+            UnmanagedRemoteApp unmanRemoteApp = null;
+            while (true)
+            {
+                try
+                {
+                    unmanRemoteApp =  (UnmanagedRemoteApp)RemoteAppFactory.Connect(procName, RuntimeType.Unmanaged);
+                    if (unmanRemoteApp == null)
+                    {
+                        Console.WriteLine("Something went wrong, try again.");
+                        continue;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("ERROR: " + ex);
+                    continue;
+                }
+                break;
+            }
 
             List<RemoteObject> remoteObjects = new();
             while (true)
             {
-                if (DoSingleMenu(remoteApp, remoteObjects))
+                if (DoSingleMenu(remoteApp, unmanRemoteApp, remoteObjects))
                     break;
             }
 
             remoteApp.Dispose();
         }
 
-        private static bool DoSingleMenu(ManagedRemoteApp remoteApp, List<RemoteObject> remoteObjects)
+        private static bool DoSingleMenu(ManagedRemoteApp remoteApp, UnmanagedRemoteApp unmanRemoteApp, List<RemoteObject> remoteObjects)
         {
             Console.WriteLine("Menu:");
             Console.WriteLine("1. Query Remote Instances");
@@ -386,7 +406,7 @@ namespace ScubaDiver.Tester
                         }
                         break;
                     case 13:
-                        var types3 = remoteApp.QueryTypes("*");
+                        var types3 = unmanRemoteApp.QueryTypes("*");
                         foreach (CandidateType candidateType in types3)
                         {
                             if(candidateType.Runtime == RuntimeType.Unmanaged && IsReasonableUnmanagedTypeName(candidateType.TypeFullName))
