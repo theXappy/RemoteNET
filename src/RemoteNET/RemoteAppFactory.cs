@@ -47,14 +47,16 @@ namespace RemoteNET
             ushort diverPort = (ushort)target.Id;
             // TODO: Make it configurable
 
-            DiverState status = DiverDiscovery.QueryStatus(target);
+            DiverDiscovery.QueryStatus(target, out DiverState managedState, out DiverState unmanagedState);
 
-            switch (status)
+            switch (managedState)
             {
                 case DiverState.Alive:
                     // Everything's fine, we can continue with the existing diver
                     break;
                 case DiverState.Corpse:
+                    if(unmanagedState == DiverState.Alive)
+                        break;
                     throw new Exception("Failed to connect to remote app. It seems like the diver had already been injected but it is not responding to HTTP requests.\n" +
                                         "It's suggested to restart the target app and retry.");
                 case DiverState.NoDiver:
@@ -96,11 +98,11 @@ namespace RemoteNET
 
             // Not injected yet, Injecting adapter now (which should load the Diver)
             // Get different injection kit (for .NET framework or .NET core & x86 or x64)
-            var res = GetInjectionToolkit(target, targetDotNetVer);
-            string remoteNetAppDataDir = res.RemoteNetAppDataDir;
-            string injectorPath = res.InjectorPath;
-            string scubaDiverDllPath = res.ScubaDiverDllPath;
-            string injectableDummy = res.InjectableDummyPath;
+            var kit = GetInjectionToolkit(target, targetDotNetVer);
+            string remoteNetAppDataDir = kit.RemoteNetAppDataDir;
+            string injectorPath = kit.InjectorPath;
+            string scubaDiverDllPath = kit.ScubaDiverDllPath;
+            string injectableDummy = kit.InjectableDummyPath;
 
             // If we have a native target, We try to host a .NET Core runtime inside.
             if (targetDotNetVer == "native")
@@ -110,10 +112,27 @@ namespace RemoteNET
                 Debug.WriteLine("hostInjector.Inject RESULTS: " + results);
             }
 
+            string scubaDiverArgs = $"{diverPort}";
+            if (target.IsUwpApp())
+            {
+                scubaDiverArgs += "~";
+                scubaDiverArgs += "reverse";
+
+                // AFAIK, UWP apps run in network isolation. This means they'll have a hard time running a TCP/HTTP listener.
+                // So for those cases we're running Lifeboar, a reverse proxy, and interacting with the diver through it.
+                ProcessStartInfo psi = new ProcessStartInfo(kit.LifeboatExePath, diverPort.ToString());
+                psi.UseShellExecute = true;
+                Process.Start(psi);
+                psi = new ProcessStartInfo(kit.LifeboatExePath, (diverPort + 2).ToString());
+                psi.UseShellExecute = true;
+                Process.Start(psi);
+            }
+
+
             string adapterExecutionArg = string.Join("*", scubaDiverDllPath,
                 "ScubaDiver.DllEntry",
                 "EntryPoint",
-                diverPort.ToString(),
+                scubaDiverArgs,
                 targetDotNetVer.ToString()
             );
 
@@ -153,14 +172,14 @@ namespace RemoteNET
             public string InjectorPath { get; set; }
             public string ScubaDiverDllPath { get; set; }
             public string InjectableDummyPath { get; set; }
+            public string LifeboatExePath { get; set; }
         }
 
         private static InjectionToolKit GetInjectionToolkit(Process target, string targetDotNetVer)
         {
             var kit = new InjectionToolKit();
 
-
-            // Dumping injector + adapter DLL to a %localappdata%\RemoteNET
+            // Creating main directory: %localappdata%\RemoteNET
             kit.RemoteNetAppDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 typeof(ManagedRemoteApp).Assembly.GetName().Name);
@@ -172,8 +191,21 @@ namespace RemoteNET
 
             GetNativeTools(target, kit);
             GetScubaDiver(target, targetDotNetVer, kit);
+            GetLifeboat(target, kit);
 
             return kit;
+        }
+
+        private static void GetLifeboat(Process target, InjectionToolKit kit)
+        {
+            // Dumping Lifeboat
+            var lifeboatDestDirInfo = new DirectoryInfo(Path.Combine(kit.RemoteNetAppDataDir, "Lifeboat"));
+            if (!lifeboatDestDirInfo.Exists)
+            {
+                lifeboatDestDirInfo.Create();
+            }
+            DumpZip(Resources.Lifeboat, lifeboatDestDirInfo);
+            kit.LifeboatExePath = Path.Combine(lifeboatDestDirInfo.FullName, "Lifeboat.exe");
         }
 
         private static void GetScubaDiver(Process target, string targetDotNetVer, InjectionToolKit kit)
@@ -194,22 +226,37 @@ namespace RemoteNET
             if (isNet6orUp || isNative)
                 targetDiver = target.Is64Bit() ? "ScubaDiver_Net6_x64" : "ScubaDiver_Net6_x86";
 
-            var scubaDestDirInfo = new DirectoryInfo(
-                Path.Combine(
-                    kit.RemoteNetAppDataDir,
-                    targetDiver
-                ));
+            // Dumping Scuba Diver
+            var scubaDestDirInfo = new DirectoryInfo(Path.Combine(kit.RemoteNetAppDataDir, targetDiver));
             if (!scubaDestDirInfo.Exists)
             {
                 scubaDestDirInfo.Create();
             }
+            DumpZip(Resources.ScubaDivers, scubaDestDirInfo, targetDiver);
 
+            // Look for the specific scuba diver according to the target's .NET version
+            var matches = scubaDestDirInfo.EnumerateFiles().Where(scubaFile => scubaFile.Name.EndsWith($"{targetDiver}.dll"));
+            if (matches.Count() != 1)
+            {
+                Debugger.Launch();
+                throw new Exception($"Expected exactly 1 ScubaDiver dll to match '{targetDiver}' but found: " +
+                                    matches.Count() + "\n" +
+                                    "Results: \n" +
+                                    String.Join("\n", matches.Select(m => m.FullName)) +
+                                    "Target Framework Parameter: " +
+                                    targetDotNetVer
+                );
+            }
+
+            kit.ScubaDiverDllPath = matches.Single().FullName;
+        }
+
+        private static void DumpZip(byte[] zip, DirectoryInfo scubaDestDirInfo, string subFolderInZip = null)
+        {
             // Temp dir to dump to before moving to app data (where it might have previously deployed files
             // AND they might be in use by some application so they can't be overwritten)
             Random rand = new Random();
-            var tempDir = Path.Combine(
-                Path.GetTempPath(),
-                rand.Next(100000).ToString());
+            var tempDir = Path.Combine(Path.GetTempPath(), rand.Next(100000).ToString());
             DirectoryInfo tempDirInfo = new DirectoryInfo(tempDir);
             if (tempDirInfo.Exists)
             {
@@ -217,7 +264,7 @@ namespace RemoteNET
             }
 
             tempDirInfo.Create();
-            using (var diverZipMemoryStream = new MemoryStream(Resources.ScubaDivers))
+            using (var diverZipMemoryStream = new MemoryStream(zip))
             {
                 ZipArchive diverZip = new ZipArchive(diverZipMemoryStream);
                 // This extracts the "Scuba" directory from the zip to *tempDir*
@@ -225,7 +272,11 @@ namespace RemoteNET
             }
 
             // Going over unzipped files and checking which of those we need to copy to our AppData directory
-            tempDirInfo = new DirectoryInfo(Path.Combine(tempDir, targetDiver));
+            if (subFolderInZip != null)
+            {
+                tempDirInfo = new DirectoryInfo(Path.Combine(tempDir, subFolderInZip));
+            }
+
             foreach (FileInfo fileInfo in tempDirInfo.GetFiles())
             {
                 string destPath = Path.Combine(scubaDestDirInfo.FullName, fileInfo.Name);
@@ -249,22 +300,6 @@ namespace RemoteNET
 
             // We are done with our temp directory
             tempDirInfo.Delete(recursive: true);
-
-            // Look for the specific scuba diver according to the target's .NET version
-            var matches = scubaDestDirInfo.EnumerateFiles().Where(scubaFile => scubaFile.Name.EndsWith($"{targetDiver}.dll"));
-            if (matches.Count() != 1)
-            {
-                Debugger.Launch();
-                throw new Exception($"Expected exactly 1 ScubaDiver dll to match '{targetDiver}' but found: " +
-                                    matches.Count() + "\n" +
-                                    "Results: \n" +
-                                    String.Join("\n", matches.Select(m => m.FullName)) +
-                                    "Target Framework Parameter: " +
-                                    targetDotNetVer
-                );
-            }
-
-            kit.ScubaDiverDllPath = matches.Single().FullName;
         }
 
 
