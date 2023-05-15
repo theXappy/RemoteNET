@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace RemoteNET.Internal.Extensions
@@ -218,6 +219,21 @@ namespace RemoteNET.Internal.Extensions
                     return "native";
             }
 
+        }
+
+        public static bool IsUwpApp(this Process process)
+        {
+            try
+            {
+                // That's a heuristic.
+                return process.Modules.Cast<ProcessModule>()
+                    .Any(m => m.ModuleName.ToLower() == "windows.ui.dll");
+            }
+            catch (Exception)
+            {
+                // Ignore any processes that we can't access (e.g. System processes).
+                return false;
+            }
         }
     }
 }
