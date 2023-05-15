@@ -113,6 +113,16 @@ namespace RemoteNET.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] Lifeboat {
+            get {
+                object obj = ResourceManager.GetObject("Lifeboat", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] ScubaDivers {
             get {
                 object obj = ResourceManager.GetObject("ScubaDivers", resourceCulture);

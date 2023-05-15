@@ -136,6 +136,9 @@
   <data name="ScubaDivers" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\ScubaDivers.zip;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="Lifeboat" type="System.Resources.ResXFileRef, System.Windows.Forms">
+	  <value>..\Resources\Lifeboat.zip;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="UnmanagedAdapterDLL" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\UnmanagedAdapterDLL.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
