@@ -5,6 +5,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoteNET", "RemoteNET\RemoteNET.csproj", "{D1ACBDEC-184B-4F5B-85CD-E02B5F712121}"
 	ProjectSection(ProjectDependencies) = postProject
 		{0C3EB2F7-92BA-4895-99FC-7098A16FFE8C} = {0C3EB2F7-92BA-4895-99FC-7098A16FFE8C}
+		{150D1E84-A740-44FA-A245-719C88297524} = {150D1E84-A740-44FA-A245-719C88297524}
 		{2ADCC09E-E6B0-4D3F-9789-69B257DC77A5} = {2ADCC09E-E6B0-4D3F-9789-69B257DC77A5}
 		{5DE7F97C-B97B-489F-A1E4-9F9656317F94} = {5DE7F97C-B97B-489F-A1E4-9F9656317F94}
 		{6A7830BB-A9C9-4375-8419-72E28F96FDEA} = {6A7830BB-A9C9-4375-8419-72E28F96FDEA}
@@ -36,11 +37,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnmanagedAdapterDLL_x64", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DebuggableDummy", "DebuggableDummy\DebuggableDummy.csproj", "{BFD7273C-97B4-428F-BB5E-C1299B2EBA41}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InjectableDummy", "InjectableDummy\InjectableDummy.csproj", "{D46A9A80-9DFA-4CBA-9FA3-4CFFDC5A142D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "InjectableDummy", "InjectableDummy\InjectableDummy.csproj", "{D46A9A80-9DFA-4CBA-9FA3-4CFFDC5A142D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScubaDiver_Net6_x86", "ScubaDiver\project_net6_x86\ScubaDiver_Net6_x86.csproj", "{2ADCC09E-E6B0-4D3F-9789-69B257DC77A5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScubaDiver_Net6_x64", "ScubaDiver\project_net6_x64\ScubaDiver_Net6_x64.csproj", "{6A7830BB-A9C9-4375-8419-72E28F96FDEA}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lifeboat", "Lifeboat\Lifeboat.csproj", "{150D1E84-A740-44FA-A245-719C88297524}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -104,6 +107,10 @@ Global
 		{6A7830BB-A9C9-4375-8419-72E28F96FDEA}.Debug|Mixed.Build.0 = Debug|x64
 		{6A7830BB-A9C9-4375-8419-72E28F96FDEA}.Release|Mixed.ActiveCfg = Release|x64
 		{6A7830BB-A9C9-4375-8419-72E28F96FDEA}.Release|Mixed.Build.0 = Release|x64
+		{150D1E84-A740-44FA-A245-719C88297524}.Debug|Mixed.ActiveCfg = Debug|Any CPU
+		{150D1E84-A740-44FA-A245-719C88297524}.Debug|Mixed.Build.0 = Debug|Any CPU
+		{150D1E84-A740-44FA-A245-719C88297524}.Release|Mixed.ActiveCfg = Release|Any CPU
+		{150D1E84-A740-44FA-A245-719C88297524}.Release|Mixed.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
