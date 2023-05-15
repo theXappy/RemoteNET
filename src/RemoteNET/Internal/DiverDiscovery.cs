@@ -1,12 +1,10 @@
 ﻿using RemoteNET.Internal.Extensions;
 using ScubaDiver.API;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Net.Sockets;
-using System.Text;
+using System.Net.NetworkInformation;
 
 namespace RemoteNET.Internal
 {
@@ -19,33 +17,36 @@ namespace RemoteNET.Internal
     }
     public static class DiverDiscovery
     {
-        public static DiverState QueryStatus(Process target)
+        public static void QueryStatus(Process target, out DiverState managedDiverState, out DiverState unmanagedDiverState)
         {
-            ushort diverPort = (ushort)target.Id;
+            ushort managedDiverPort = (ushort)target.Id;
+            ushort unmanagedDiverPort = (ushort)(target.Id + 2);
 
             // TODO: Make it configurable
             string diverAddr = "127.0.0.1";
+            managedDiverState = QueryStatus(target, diverAddr, managedDiverPort);
+            unmanagedDiverState = QueryStatus(target, diverAddr, unmanagedDiverPort);
+        }
+
+        public static DiverState QueryStatus(Process target, string diverAddr, int diverPort)
+        {
             DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
 
-            // We WANT to check liveness of the diver using HTTP but this might take a LOT of time if it is dead
-            // (Trying to TCP SYN several times, with timeout between each)
-            // So a simple circut-breaker is implemented before that: If we manage to bind to the expected diver endpoint, we assume it's not alive
-
-            bool diverPortIsFree = false;
+            bool diverPortIsUse = false;
             try
             {
-                IPAddress localAddr = IPAddress.Parse(diverAddr);
-                TcpListener server = new TcpListener(localAddr, diverPort);
-                server.Start();
-                diverPortIsFree = true;
-                server.Stop();
+                IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+                IPEndPoint[] tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
+                List<int> usedPorts = tcpConnInfoArray.Select(conInfo => conInfo.Port).ToList();
+
+                diverPortIsUse = usedPorts.Contains(diverPort);
             }
             catch
             {
                 // Had some issues, perhapse it's the diver holding that port.
             }
 
-            if (!diverPortIsFree)
+            if (diverPortIsUse)
             {
                 if (com.CheckAliveness())
                 {
