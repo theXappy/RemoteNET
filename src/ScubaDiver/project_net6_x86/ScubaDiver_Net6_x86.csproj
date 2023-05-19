@@ -45,6 +45,7 @@
 		</PackageReference>
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
 		<PackageReference Include="Lib.Harmony" Version="2.2.2" />
+		<PackageReference Include="NtApiDotNet" Version="1.1.33" />
 	</ItemGroup>
 
 	<ItemGroup>

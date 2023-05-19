@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
+using System.Reflection;
+using System.Xml.Linq;
+using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.API.Utils;
@@ -94,7 +98,26 @@ namespace RemoteNET
         /// <returns></returns>
         public override Type GetRemoteType(string typeFullName, string assembly = null)
         {
-            throw new NotImplementedException();
+            // Easy case: Trying to resolve from cache or from local assemblies
+            var resolver = TypesResolver.Instance;
+            Type res = resolver.Resolve(assembly, typeFullName);
+            if (res != null)
+            {
+                // Found in cache.
+                return res;
+            }
+
+            // Harder case: Dump the remote type. This takes much more time (includes dumping of depedent
+            // types) and should be avoided as much as possible.
+            var dumpedType = _unmanagedCommunicator.DumpType(typeFullName, assembly);
+
+            RemoteUnmanagedType rut = new RemoteUnmanagedType(typeFullName);
+            foreach (ManagedTypeDump.TypeMethod method in dumpedType.Methods)
+            {
+                rut.AddMethod(new RemoteUnmanagedMethodInfo(method.Name, rut));
+            }
+
+            return rut;
         }
 
         //
