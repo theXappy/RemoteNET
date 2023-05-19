@@ -78,7 +78,6 @@ namespace ScubaDiver.Tester
         private static bool DoSingleMenu(ManagedRemoteApp remoteApp, UnmanagedRemoteApp unmanRemoteApp, List<RemoteObject> remoteObjects)
         {
             Console.WriteLine("Menu:");
-            Console.WriteLine("1. Query Remote Instances");
             Console.WriteLine("2. Get Remote Object");
             Console.WriteLine("3. Call `ToString` of Remote Object");
             Console.WriteLine("4. Print methods of Remote Object");
@@ -91,31 +90,16 @@ namespace ScubaDiver.Tester
             Console.WriteLine("11. Dump Types");
             Console.WriteLine("12. Dump Managed Types");
             Console.WriteLine("13. Dump Unmanaged Types");
-            Console.WriteLine("14. Exit");
+            Console.WriteLine("14. Dump Managed Heap");
+            Console.WriteLine("15. Dump Unmanage Heap");
+            Console.WriteLine("16. Dump Unmanaged Type Info");
+            Console.WriteLine("17. Exit");
             string input = Console.ReadLine();
             uint index;
             if (int.TryParse(input, out int userChoice))
             {
                 switch (userChoice)
                 {
-                    case 1:
-                        {
-                            Console.WriteLine("Enter type name to query");
-                            string typeName = Console.ReadLine().Trim();
-                            if (string.IsNullOrWhiteSpace(typeName))
-                            {
-                                // Assuming user wants all types
-                                typeName = null;
-                            }
-
-                            var res = remoteApp.QueryInstances(typeName).ToList();
-                            Console.WriteLine("Instances:");
-                            for (int i = 0; i < res.Count; i++)
-                            {
-                                Console.WriteLine($"{i + 1}. {res[i].Address}, TypeFullName: {res[i].TypeFullName}");
-                            }
-                        }
-                        break;
                     case 2:
                         {
                             // Getting object
@@ -413,7 +397,66 @@ namespace ScubaDiver.Tester
                                 Console.WriteLine($"[{candidateType.Runtime}][{candidateType.Assembly}] {candidateType.TypeFullName}");
                         }
                         break;
+
                     case 14:
+                    {
+                        Console.WriteLine("Enter managed type name to query");
+                        string typeName = Console.ReadLine().Trim();
+                        if (string.IsNullOrWhiteSpace(typeName))
+                        {
+                            // Assuming user wants all types
+                            typeName = null;
+                        }
+
+                        var res = remoteApp.QueryInstances(typeName).ToList();
+                        Console.WriteLine("Instances:");
+                        for (int i = 0; i < res.Count; i++)
+                        {
+                            Console.WriteLine($"{i + 1}. {res[i].Address}, TypeFullName: {res[i].TypeFullName}");
+                        }
+                    }
+                        break;
+
+                    case 15:
+                    {
+                        Console.WriteLine("Enter unmanaged type name to query");
+                        string typeName = Console.ReadLine().Trim();
+                        if (string.IsNullOrWhiteSpace(typeName))
+                        {
+                            // Assuming user wants all types
+                            typeName = null;
+                        }
+
+                        var res = unmanRemoteApp.QueryInstances(typeName).ToList();
+                        Console.WriteLine("Instances:");
+                        for (int i = 0; i < res.Count; i++)
+                        {
+                            Console.WriteLine($"{i + 1}. {res[i].Address}, Full Symbol Name: {res[i].TypeFullName}");
+                        }
+                    }
+                        break;
+                    case 16:
+                        {
+                            Console.WriteLine("Enter unmanaged type name:");
+                            string typeName = Console.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(typeName))
+                            {
+                                // Assuming user wants all types
+                                Console.WriteLine("Can't be null or empty.");
+                                break;
+                            }
+
+                            var res = unmanRemoteApp.GetRemoteType(typeName);
+                            Console.WriteLine($"Name: " + res.Name);
+                            Console.WriteLine($"Full Name: " + res.FullName);
+                            Console.WriteLine($"Methods");
+                            foreach (var method in res.GetMethods())
+                            {
+                                Console.WriteLine("Method: " + method.Name);
+                            }
+                        }
+                        break;
+                    case 17:
                         // Exiting
                         return true;
                 }
