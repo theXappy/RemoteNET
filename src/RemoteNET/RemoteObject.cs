@@ -7,7 +7,7 @@ using ScubaDiver.API.Interactions.Dumps;
 
 namespace RemoteNET
 {
-    public class RemoteObject
+    public class RemoteObject : IRemoteObject
     {
         private static int NextIndex = 1;
         public int Index;

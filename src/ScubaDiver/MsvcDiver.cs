@@ -167,6 +167,7 @@ namespace ScubaDiver
                     if (!typeFilter(typeInfo.Name))
                         continue;
                     string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
+                    string membersPrefix = $"{typeInfo.Name}::";
                     string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
 
                     List<DllExport> exports = GetExports(module.Name);
@@ -176,7 +177,7 @@ namespace ScubaDiver
                     foreach (DllExport dllExport in exports)
                     {
                         string undecorated = dllExport.UndecorateName();
-                        if (!undecorated.StartsWith(typeInfo.Name))
+                        if (!undecorated.StartsWith(membersPrefix))
                             continue;
 
                         ManagedTypeDump.TypeMethod method = new()

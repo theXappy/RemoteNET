@@ -45,6 +45,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScubaDiver_Net6_x64", "Scub
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lifeboat", "Lifeboat\Lifeboat.csproj", "{150D1E84-A740-44FA-A245-719C88297524}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemoteNET.RttiReflection", "RemoteNET.RttiReflection\RemoteNET.RttiReflection.csproj", "{A91F8C77-7439-423E-AED7-9935D87838E9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemoteNET.RttiReflectionTests", "RemoteNET.RttiReflectionTests\RemoteNET.RttiReflectionTests.csproj", "{9A9DFE83-1C05-48CF-A938-D16A74F0EB1C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemoteNET.Common", "RemoteNET.Common\RemoteNET.Common.csproj", "{022107D8-0318-43FA-A183-7E3279131308}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed = Debug|Mixed
@@ -111,6 +117,18 @@ Global
 		{150D1E84-A740-44FA-A245-719C88297524}.Debug|Mixed.Build.0 = Debug|Any CPU
 		{150D1E84-A740-44FA-A245-719C88297524}.Release|Mixed.ActiveCfg = Release|Any CPU
 		{150D1E84-A740-44FA-A245-719C88297524}.Release|Mixed.Build.0 = Release|Any CPU
+		{A91F8C77-7439-423E-AED7-9935D87838E9}.Debug|Mixed.ActiveCfg = Debug|Any CPU
+		{A91F8C77-7439-423E-AED7-9935D87838E9}.Debug|Mixed.Build.0 = Debug|Any CPU
+		{A91F8C77-7439-423E-AED7-9935D87838E9}.Release|Mixed.ActiveCfg = Release|Any CPU
+		{A91F8C77-7439-423E-AED7-9935D87838E9}.Release|Mixed.Build.0 = Release|Any CPU
+		{9A9DFE83-1C05-48CF-A938-D16A74F0EB1C}.Debug|Mixed.ActiveCfg = Debug|Any CPU
+		{9A9DFE83-1C05-48CF-A938-D16A74F0EB1C}.Debug|Mixed.Build.0 = Debug|Any CPU
+		{9A9DFE83-1C05-48CF-A938-D16A74F0EB1C}.Release|Mixed.ActiveCfg = Release|Any CPU
+		{9A9DFE83-1C05-48CF-A938-D16A74F0EB1C}.Release|Mixed.Build.0 = Release|Any CPU
+		{022107D8-0318-43FA-A183-7E3279131308}.Debug|Mixed.ActiveCfg = Debug|Any CPU
+		{022107D8-0318-43FA-A183-7E3279131308}.Debug|Mixed.Build.0 = Debug|Any CPU
+		{022107D8-0318-43FA-A183-7E3279131308}.Release|Mixed.ActiveCfg = Release|Any CPU
+		{022107D8-0318-43FA-A183-7E3279131308}.Release|Mixed.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

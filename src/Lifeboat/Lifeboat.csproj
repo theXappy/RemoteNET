@@ -4,7 +4,12 @@
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net6.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<ApplicationIcon>lifeboat.ico</ApplicationIcon>
 	</PropertyGroup>
+
+	<ItemGroup>
+	  <Content Include="lifeboat.ico" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
