@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using RemoteNET.Common;
 using RemoteNET.Internal.Reflection;
 
 namespace RemoteNET.Internal.ProxiedReflection

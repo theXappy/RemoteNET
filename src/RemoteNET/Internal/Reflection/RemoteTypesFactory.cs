@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using RemoteNET.Common;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 

@@ -180,7 +180,7 @@ namespace ScubaDiver.Tester
                             var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
                             foreach (CandidateObject candidateRsa in rsaProviderCandidates)
                             {
-                                RemoteObject rsaProv = remoteApp.GetRemoteObject(candidateRsa);
+                                RemoteObject rsaProv = (RemoteObject)remoteApp.GetRemoteObject(candidateRsa);
                                 dynamic dynamicRsaProv = rsaProv.Dynamify();
                                 // Calling remote `ExportParameters`.
                                 // First parameter (true) indicates we want the private key.

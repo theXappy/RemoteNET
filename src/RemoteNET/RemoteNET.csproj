@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFramework>net7.0</TargetFramework>
 		<NoWin32Manifest>true</NoWin32Manifest>
 		<Company>theXappy</Company>
 		<Description>Examine, create and interact with remote objects in other .NET processes.</Description>
@@ -12,10 +12,10 @@
 		<PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
-		<Version>1.0.1.77</Version>
-		<AssemblyVersion>1.0.1.77</AssemblyVersion>
-		<FileVersion>1.0.1.77</FileVersion>
-		<LangVersion>8</LangVersion>
+		<Version>1.0.1.98</Version>
+		<AssemblyVersion>1.0.1.98</AssemblyVersion>
+		<FileVersion>1.0.1.98</FileVersion>
+		<LangVersion>Latest</LangVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -26,6 +26,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\RemoteNET.Common\RemoteNET.Common.csproj" />
+		<ProjectReference Include="..\RemoteNET.RttiReflection\RemoteNET.RttiReflection.csproj" />
 		<ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
 	</ItemGroup>
 

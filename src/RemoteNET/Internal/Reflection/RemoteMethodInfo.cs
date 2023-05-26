@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using RemoteNET.Common;
 
 namespace RemoteNET.Internal.Reflection
 {
