@@ -20,7 +20,7 @@
         <projectUrl>https://github.com/theXappy/RemoteNET</projectUrl>
 
          <!-- License information is displayed on the gallery -->
-        <license type="expression">MIT</license>
+        <license type="expression">GPL-2.0-only</license>
         
 
         <!-- Icon is used in Visual Studio's package manager UI -->
