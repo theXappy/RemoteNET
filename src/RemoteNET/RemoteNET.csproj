@@ -10,7 +10,7 @@
 		<PackageIcon>nuget_icon.png</PackageIcon>
 		<RepositoryUrl>https://github.com/theXappy/RemoteNET</RepositoryUrl>
 		<PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
 		<Version>1.0.1.98</Version>
 		<AssemblyVersion>1.0.1.98</AssemblyVersion>
