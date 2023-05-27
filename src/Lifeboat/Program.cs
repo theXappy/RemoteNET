@@ -100,11 +100,11 @@ public class Program
             // Wait for the first client to connect
             Log($"Waiting for diver...");
             TcpClient diverConnection = listener.AcceptTcpClient();
-            Log($"DIVER SUSPECT: {diverConnection.Client.RemoteEndPoint} >>>>>");
+            Log($"Diver Suspect: {diverConnection.Client.RemoteEndPoint}");
             var msg = RnetProtocolParser.Parse(diverConnection);
             if (msg.UrlAbsolutePath != "/proxy_intro" || msg.Body != "{\"role\":\"diver\"}")
             {
-                Log($"NOT A DIVER: {diverConnection.Client.RemoteEndPoint} >>>>>>");
+                Log($"NOT a Diver: {diverConnection.Client.RemoteEndPoint}");
                 SendRejectRole(diverConnection, msg.RequestId, "No diver");
                 diverConnection.Close();
                 continue;
@@ -112,7 +112,7 @@ public class Program
 
             SendAcceptRole(msg.RequestId, diverConnection);
             stage++;
-            Log($"FOUND DIVER: {diverConnection.Client.RemoteEndPoint} >>>>>");
+            Log($"Diver Found: {diverConnection.Client.RemoteEndPoint}");
 
             // Start the data transfer on the diver connection
             var diverIn = new BlockingCollection<OverTheWireRequest>();
@@ -134,8 +134,8 @@ public class Program
                 var clientOut = diverIn;
 
                 CancellationTokenSource src = new CancellationTokenSource();
-                var t1 = Task.Run(() => Reader(clientConnection, clientOut, src.Token)).ContinueWith(t => Log("CONSUMER READER DIED :((((((((((((((((((("));
-                var t2 = Task.Run(() => Writer(clientConnection, clientIn, src.Token)).ContinueWith(t => Log("CONSUMER WRITER DIED :((((((((((((((((((("));
+                var t1 = Task.Run(() => Reader(clientConnection, clientOut, src.Token)).ContinueWith(t => Log("Consumer Reader Died."));
+                var t2 = Task.Run(() => Writer(clientConnection, clientIn, src.Token)).ContinueWith(t => Log("Consumer Reader Died."));
 
                 Log("Waiting for client to disconnect...");
                 try
@@ -154,7 +154,7 @@ public class Program
                 catch (Exception e)
                 {
                 }
-                Log("Client disconnected!!!");
+                Log("Client disconnected!");
 
                 try
                 {
