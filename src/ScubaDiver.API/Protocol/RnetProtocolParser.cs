@@ -13,41 +13,53 @@ public static class RnetProtocolParser
 
     public static OverTheWireRequest Parse(TcpClient tcpClient, CancellationToken token = default)
     {
-        if (token == default)
-            token = CancellationToken.None;
-
-        OverTheWireRequest request = null;
-        var stream = tcpClient.GetStream();
-        while (tcpClient.Connected)
+        try
         {
-            var magicValueBytes = new byte[MagicValueLength];
-            ReadBytesFromStream(stream, magicValueBytes, token);
+            Console.Error.WriteLine($"[@@@][{DateTime.Now}][RnetProtocolParser] Parse started");
+            if (token == default)
+                token = CancellationToken.None;
 
-            if (!CheckMagicValue(magicValueBytes))
+            OverTheWireRequest request = null;
+            var stream = tcpClient.GetStream();
+            while (tcpClient.Connected)
             {
-                // The magic value doesn't match, this is an invalid message
-                continue;
+                var magicValueBytes = new byte[MagicValueLength];
+                ReadBytesFromStream(stream, magicValueBytes, token);
+
+                if (!CheckMagicValue(magicValueBytes))
+                {
+                    // The magic value doesn't match, this is an invalid message
+                    continue;
+                }
+
+                var payloadLengthBytes = new byte[PayloadLengthFieldLength];
+                ReadBytesFromStream(stream, payloadLengthBytes, token);
+
+                var payloadLength = BitConverter.ToInt32(payloadLengthBytes, 0);
+                if (payloadLength <= 0)
+                {
+                    // The payload length is invalid, this is an invalid message
+                    continue;
+                }
+
+                var payloadBytes = new byte[payloadLength];
+                ReadBytesFromStream(stream, payloadBytes, token);
+
+                // Handle the payload bytes here...
+                request = JsonConvert.DeserializeObject<OverTheWireRequest>(Encoding.UTF8.GetString(payloadBytes));
+                break;
             }
 
-            var payloadLengthBytes = new byte[PayloadLengthFieldLength];
-            ReadBytesFromStream(stream, payloadLengthBytes, token);
-
-            var payloadLength = BitConverter.ToInt32(payloadLengthBytes, 0);
-            if (payloadLength <= 0)
-            {
-                // The payload length is invalid, this is an invalid message
-                continue;
-            }
-
-            var payloadBytes = new byte[payloadLength];
-            ReadBytesFromStream(stream, payloadBytes, token);
-
-            // Handle the payload bytes here...
-            request = JsonConvert.DeserializeObject<OverTheWireRequest>(Encoding.UTF8.GetString(payloadBytes));
-            break;
+            Console.Error.WriteLine(
+                $"[@@@][{DateTime.Now}][RnetProtocolParser] Parse finished. OverTheWireRequest message's path: {request.UrlAbsolutePath}");
+            return request;
         }
-
-        return request;
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(
+                $"[@@@][{DateTime.Now}][RnetProtocolParser] Parse had an exception!. Exception: {ex}");
+            throw;
+        }
     }
 
     private static bool CheckMagicValue(byte[] bytes)
