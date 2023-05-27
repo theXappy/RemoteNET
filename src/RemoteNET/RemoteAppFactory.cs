@@ -146,8 +146,11 @@ namespace RemoteNET
             if (injectorProc != null && injectorProc.WaitForExit(5000))
             {
                 // Injector finished early, there's probably an error.
-                var stdout = injectorProc.StandardOutput.ReadToEnd();
-                throw new Exception("Injector returned error. Raw STDOUT: " + stdout);
+                if (injectorProc.ExitCode != 0)
+                {
+                    var stdout = injectorProc.StandardOutput.ReadToEnd();
+                    throw new Exception("Injector returned error. Raw STDOUT: " + stdout);
+                }
             }
             else
             {
