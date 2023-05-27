@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
 using Windows.Win32;
@@ -126,7 +127,7 @@ public unsafe class Trickster : IDisposable
         Dictionary<ModuleInfo, TypeInfo[]> res = new Dictionary<ModuleInfo, TypeInfo[]>();
 
         Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
-        foreach (ModuleInfo modInfo in ModulesParsed.Prepend(_mainModule))
+        foreach (ModuleInfo modInfo in ModulesParsed)
         {
             List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
             foreach (ModuleSegment moduleSegment in sections)
@@ -250,6 +251,51 @@ public unsafe class Trickster : IDisposable
         return list.ToArray();
     }
 
+    private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegion[] regionArray, IEnumerable<nuint> types)
+    {
+        ConcurrentDictionary<ulong, ConcurrentBag<ulong>> results = new();
+
+        foreach (nuint mt in types)
+        {
+            results[(ulong)mt] = new ConcurrentBag<ulong>();
+        }
+
+        Parallel.For(0, regionArray.Length, i =>
+        {
+            MemoryRegion region = regionArray[i];
+            byte* start = (byte*)region.Pointer;
+            byte* end = start + region.Size;
+            if (_is32Bit)
+            {
+                for (byte* a = start; a < end; a += 4)
+                {
+                    ulong suspect = *(uint*)a;
+                    if (!results.TryGetValue(suspect, out var bag))
+                        continue;
+                    ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
+                    bag.Add(result);
+                }
+            }
+            else
+            {
+                for (byte* a = start; a < end; a += 8)
+                {
+                    ulong suspect = *(ulong*)a;
+                    if (!results.TryGetValue(suspect, out var bag))
+                        continue;
+                    ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
+                    bag.Add(result);
+                }
+            }
+        });
+
+        Dictionary<ulong, IReadOnlyCollection<ulong>> results2 = 
+            results.ToDictionary(
+                kvp => kvp.Key, 
+                kvp => (IReadOnlyCollection<ulong>)kvp.Value);
+        return results2;
+    }
+
     public void ScanTypes()
     {
         ScannedTypes = ScanTypesCore();
@@ -269,6 +315,10 @@ public unsafe class Trickster : IDisposable
     public ulong[] ScanRegions(ulong value)
     {
         return ScanRegionsCore(Regions, value);
+    }
+    public IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegions(IEnumerable<nuint> types)
+    {
+        return ScanRegionsCore2(Regions, types);
     }
 
     public void Dispose()
