@@ -152,7 +152,7 @@ namespace ScubaDiver.Tester
                             else
                             {
                                 var remoteObj = remoteObjects[(int)index];
-                                var type = remoteObj.GetType();
+                                var type = remoteObj.GetRemoteType();
                                 Console.WriteLine($"Methods of {type.FullName}:");
                                 int i = 1;
                                 foreach (MethodInfo methodInfo in type.GetMethods())
