@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
@@ -54,6 +55,19 @@ public class TricksterUI {
 
     public static ulong[] Scan(Trickster trickster, TypeInfo typeInfo) {
         return trickster.ScanRegions(typeInfo.Address);
+    }
+    public static Dictionary<TypeInfo, IReadOnlyCollection<ulong>> Scan(Trickster trickster, IEnumerable<TypeInfo> typeInfo)
+    {
+        Dictionary<nuint, TypeInfo> mtToType = typeInfo.ToDictionary(ti => ti.Address);
+        IDictionary<ulong, IReadOnlyCollection<ulong>> matches = trickster.ScanRegions(mtToType.Keys);
+
+        Dictionary<TypeInfo, IReadOnlyCollection<ulong>> res = new();
+        foreach (var kvp in matches)
+        {
+            res[mtToType[(nuint)kvp.Key]] = kvp.Value;
+        }
+
+        return res;
     }
 
     public string[] Scan(TypeInfo typeInfo) 

@@ -186,7 +186,7 @@ namespace ScubaDiver
                             Visibility = "Public" // Because it's exported
                         };
 
-                        if(undecorated == ctorName)
+                        if (undecorated == ctorName)
                             constructors.Add(method);
                         else
                             methods.Add(method);
@@ -241,20 +241,24 @@ namespace ScubaDiver
             {
                 Objects = new List<HeapDump.HeapObject>()
             };
-            foreach (var kvp in _trickster.ScannedTypes)
+            foreach (var moduleTypesKvp in _trickster.ScannedTypes)
             {
-                var module = kvp.Key;
+                var module = moduleTypesKvp.Key;
                 if (!assmFilter(module.Name))
                     continue;
 
-                Rtti.TypeInfo[] typeInfos = kvp.Value;
-                foreach (Rtti.TypeInfo typeInfo in typeInfos)
-                {
-                    if (!typeFilter(typeInfo.Name))
-                        continue;
+                IEnumerable<Rtti.TypeInfo> typeInfos = moduleTypesKvp.Value;
+                if (!string.IsNullOrEmpty(rawTypeFilter) && rawTypeFilter != "*")
+                    typeInfos = typeInfos.Where(ti => typeFilter(ti.Name));
 
-                    ulong[] addresses = TricksterUI.Scan(_trickster, typeInfo);
-                    foreach (ulong addr in addresses)
+
+                Logger.Debug($"[{DateTime.Now}] Starting Trickster Scan for {typeInfos.Count()} types");
+                Dictionary<Rtti.TypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, typeInfos);
+                Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {addresses.SelectMany(kvp => kvp.Value).Count()} results");
+                foreach (var typeInstancesKvp in addresses)
+                {
+                    Rtti.TypeInfo typeInfo = typeInstancesKvp.Key;
+                    foreach (nuint addr in typeInstancesKvp.Value)
                     {
                         HeapDump.HeapObject ho = new HeapDump.HeapObject()
                         {
