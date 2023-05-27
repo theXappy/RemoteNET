@@ -12,7 +12,7 @@ namespace RemoteNET
         private static int NextIndex = 1;
         public int Index;
 
-        private readonly ManagedRemoteApp _app;
+        private readonly RemoteApp _app;
         private RemoteObjectRef _ref;
         private Type _type = null;
 
@@ -20,7 +20,7 @@ namespace RemoteNET
 
         public ulong RemoteToken => _ref.Token;
 
-        internal RemoteObject(RemoteObjectRef reference, ManagedRemoteApp remoteApp)
+        internal RemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
         {
             Index = NextIndex++;
             _app = remoteApp;
@@ -31,7 +31,8 @@ namespace RemoteNET
         /// <summary>
         /// Gets the type of the proxied remote object, in the remote app. (This does not reutrn `typeof(RemoteObject)`)
         /// </summary>
-        public new Type GetType()
+        public new Type GetType() => GetRemoteType();
+        public Type GetRemoteType()
         {
             return _type ??= _app.GetRemoteType(_ref.GetTypeDump());
         }
@@ -94,7 +95,7 @@ namespace RemoteNET
                 DynamicRemoteObject[] droParameters = new DynamicRemoteObject[args.Length];
                 for (int i = 0; i < args.Length; i++)
                 {
-                    RemoteObject ro = _app.GetRemoteObject(args[i].RemoteAddress, args[i].Type);
+                    IRemoteObject ro = _app.GetRemoteObject(args[i].RemoteAddress, args[i].Type);
                     DynamicRemoteObject dro = ro.Dynamify() as DynamicRemoteObject;
 
                     droParameters[i] = dro;
@@ -121,7 +122,7 @@ namespace RemoteNET
             }
         }
 
-        internal ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
+        public ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
         {
             return  _ref.GetItem(key);
         }
