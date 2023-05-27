@@ -19,7 +19,7 @@ namespace ScubaDiver.Rtti;
 
 public class TricksterException : Exception { }
 
-public record struct TypeInfo(string Name, nuint Address, nuint Offset)
+public record struct TypeInfo(string Module, string Name, nuint Address, nuint Offset)
 {
     public override string ToString()
     {
@@ -94,7 +94,7 @@ public unsafe class Trickster : IDisposable
         _is32Bit = is32Bit;
     }
 
-    private TypeInfo[] ScanTypesCore(nuint moduleBaseAddress, nuint moduleSize, nuint segmentBaseAddress, nuint segmentBSize)
+    private TypeInfo[] ScanTypesCore(string moduleName, nuint moduleBaseAddress, nuint moduleSize, nuint segmentBaseAddress, nuint segmentBSize)
     {
         List<TypeInfo> list = new();
 
@@ -114,7 +114,7 @@ public unsafe class Trickster : IDisposable
                 {
                     if (className == "type_info")
                         typeInfoSeen = true;
-                    list.Add(new TypeInfo(className, address, offset));
+                    list.Add(new TypeInfo(moduleName, className, address, offset));
                 }
             }
         }
@@ -153,7 +153,7 @@ public unsafe class Trickster : IDisposable
             {
                 try
                 {
-                    var types = ScanTypesCore(module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
+                    var types = ScanTypesCore(module.Name, module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
                     if (types.Length > 0)
                     {
                         if (!res.ContainsKey(module))

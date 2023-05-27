@@ -152,6 +152,60 @@ namespace ScubaDiver
             {
                 rawAssemblyFilter = assembly;
             }
+
+            ManagedTypeDump dump = GetManagedTypeDump(rawAssemblyFilter, rawTypeFilter);
+            if (dump != null)
+                return JsonConvert.SerializeObject(dump);
+
+            return QuickError("Failed to find type in searched assemblies");
+        }
+
+        private ManagedTypeDump GetManagedTypeDump(string rawAssemblyFilter, string rawTypeFilter)
+        {
+            IEnumerable<Rtti.TypeInfo> typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
+            foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
+            {
+                string moduleName = typeInfo.ModuleName;
+                string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
+                string membersPrefix = $"{typeInfo.Name}::";
+                string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
+
+                List<DllExport> exports = GetExports(moduleName);
+
+                List<ManagedTypeDump.TypeMethod> methods = new();
+                List<ManagedTypeDump.TypeMethod> constructors = new();
+                foreach (DllExport dllExport in exports)
+                {
+                    string undecorated = dllExport.UndecorateName();
+                    if (!undecorated.StartsWith(membersPrefix))
+                        continue;
+
+                    ManagedTypeDump.TypeMethod method = new()
+                    {
+                        Name = dllExport.Name,
+                        Visibility = "Public" // Because it's exported
+                    };
+
+                    if (undecorated == ctorName)
+                        constructors.Add(method);
+                    else
+                        methods.Add(method);
+                }
+
+                ManagedTypeDump recusiveManagedTypeDump = new ManagedTypeDump()
+                {
+                    Assembly = moduleName,
+                    Type = typeInfo.Name,
+                    Methods = methods,
+                    Constructors = constructors
+                };
+                return recusiveManagedTypeDump;
+            }
+            return null;
+        }
+
+        private IEnumerable<ScubaDiver.Rtti.TypeInfo> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
+        {
             Predicate<string> assmFilter = Filter.CreatePredicate(rawAssemblyFilter);
             Predicate<string> typeFilter = Filter.CreatePredicate(rawTypeFilter);
 
@@ -166,43 +220,9 @@ namespace ScubaDiver
                 {
                     if (!typeFilter(typeInfo.Name))
                         continue;
-                    string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
-                    string membersPrefix = $"{typeInfo.Name}::";
-                    string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
-
-                    List<DllExport> exports = GetExports(module.Name);
-
-                    List<ManagedTypeDump.TypeMethod> methods = new();
-                    List<ManagedTypeDump.TypeMethod> constructors = new();
-                    foreach (DllExport dllExport in exports)
-                    {
-                        string undecorated = dllExport.UndecorateName();
-                        if (!undecorated.StartsWith(membersPrefix))
-                            continue;
-
-                        ManagedTypeDump.TypeMethod method = new()
-                        {
-                            Name = dllExport.Name,
-                            Visibility = "Public" // Because it's exported
-                        };
-
-                        if (undecorated == ctorName)
-                            constructors.Add(method);
-                        else
-                            methods.Add(method);
-                    }
-
-                    ManagedTypeDump recusiveManagedTypeDump = new ManagedTypeDump()
-                    {
-                        Assembly = module.Name,
-                        Type = typeInfo.Name,
-                        Methods = methods,
-                        Constructors = constructors
-                    };
-                    return JsonConvert.SerializeObject(recusiveManagedTypeDump);
+                    yield return typeInfo;
                 }
             }
-            return QuickError("Failed to find type in searched assemblies");
         }
 
         private Dictionary<string, List<DllExport>> _cache = new Dictionary<string, List<DllExport>>();
@@ -289,7 +309,50 @@ namespace ScubaDiver
 
         protected override string MakeObjectResponse(ScubaDiverMessage arg)
         {
-            return QuickError("Not Implemented");
+            string objAddrStr = arg.QueryString.Get("address");
+            string typeName = arg.QueryString.Get("type_name");
+            bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
+            bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
+            string hashCodeStr = arg.QueryString.Get("hashcode");
+            int userHashcode = 0;
+            if (objAddrStr == null)
+            {
+                return QuickError("Missing parameter 'address'");
+            }
+            if (!ulong.TryParse(objAddrStr, out var objAddr))
+            {
+                return QuickError("Parameter 'address' could not be parsed as ulong");
+            }
+            if (hashCodeFallback)
+            {
+                if (!int.TryParse(hashCodeStr, out userHashcode))
+                {
+                    return QuickError("Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int");
+                }
+            }
+            
+            ParseFullTypeName(typeName, out var rawAssemblyFilter, out var rawTypeFilter);
+
+            try
+            {
+                Rtti.TypeInfo typeInfo = GetTypeInfos(rawAssemblyFilter, rawTypeFilter).Single();
+
+                // TODO: Actual Pin
+                ulong pinAddr = 0x0;
+
+                ObjectDump od = new ObjectDump()
+                {
+                    Type = $"{typeInfo.ModuleName}!{typeInfo.Name}",
+                    RetrivalAddress = objAddr,
+                    PinnedAddress = pinAddr,
+                    HashCode = 0x0bad0bad
+                };
+                return JsonConvert.SerializeObject(od);
+            }
+            catch (Exception e)
+            {
+                return QuickError("Failed Getting the object for the user. Error: " + e.Message);
+            }
         }
 
         protected override string MakeCreateObjectResponse(ScubaDiverMessage arg)
