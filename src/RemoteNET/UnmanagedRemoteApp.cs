@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Reko.Core;
+using RemoteNET.Internal;
 using RemoteNET.RttiReflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
@@ -9,6 +11,48 @@ using ScubaDiver.API.Utils;
 
 namespace RemoteNET
 {
+    public class UnmanagedRemoteObject : IRemoteObject
+    {
+        private static int NextIndex = 1;
+        public int Index;
+
+        private readonly RemoteApp _app;
+        private RemoteObjectRef _ref;
+        private Type _type = null;
+
+        private readonly Dictionary<Delegate, DiverCommunicator.LocalEventCallback> _eventCallbacksAndProxies;
+
+        public ulong RemoteToken => _ref.Token;
+
+        internal UnmanagedRemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
+        {
+            Index = NextIndex++;
+            _app = remoteApp;
+            _ref = reference;
+            _eventCallbacksAndProxies = new Dictionary<Delegate, DiverCommunicator.LocalEventCallback>();
+        }
+
+        public Type GetRemoteType()
+        {
+            return _type ??= _app.GetRemoteType(_ref.GetTypeDump());
+        }
+
+        public dynamic Dynamify()
+        {
+            // Adding fields 
+            ManagedTypeDump managedTypeDump = _ref.GetTypeDump();
+
+            var factory = new DynamicRemoteObjectFactory();
+            return factory.Create(_app, this, managedTypeDump);
+        }
+
+        public ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+
     public class UnmanagedRemoteApp : RemoteApp
     {
         private Process _procWithDiver;
@@ -116,9 +160,23 @@ namespace RemoteNET
         // Getting Remote Objects
         //
 
-        public override RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
+        public override UnmanagedRemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
         {
-            throw new NotImplementedException();
+            ObjectDump od;
+            ManagedTypeDump td;
+            try
+            {
+                od = _unmanagedCommunicator.DumpObject(remoteAddress, typeName, true, hashCode);
+                td = _unmanagedCommunicator.DumpType(od.Type);
+            }
+            catch (Exception e)
+            {
+                throw new Exception("Could not dump remote object/type.", e);
+            }
+
+
+            var remoteObject = new UnmanagedRemoteObject(new RemoteObjectRef(od, td, _unmanagedCommunicator), this);
+            return remoteObject;
         }
 
         //

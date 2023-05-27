@@ -99,7 +99,7 @@ namespace RemoteNET
                 // into several (Dynamic) Remote Objects in a LOCAL array of objects.
                 RemoteObject ro = _app.GetRemoteObject(args[0].RemoteAddress, args[0].Type);
                 dynamic dro = ro.Dynamify();
-                if (!ro.GetType().IsArray)
+                if (!ro.GetRemoteType().IsArray)
                 {
                     throw new NotImplementedException("Unexpected arguments forwarded to callback from the diver -- single arg but not an array.");
                 }

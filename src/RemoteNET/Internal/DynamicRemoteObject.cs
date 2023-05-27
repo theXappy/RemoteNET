@@ -141,8 +141,8 @@ namespace RemoteNET.Internal
             public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4, Type t5] => this[t1, t2, t3, t4][t5];
         }
 
-        public ManagedRemoteApp __ra;
-        public RemoteObject __ro;
+        public RemoteApp __ra;
+        public IRemoteObject __ro;
         public RemoteType __type;
 
 
@@ -151,12 +151,12 @@ namespace RemoteNET.Internal
         private List<MemberInfo> __membersInner = null;
         public IEnumerable<MemberInfo> __members => MindFuck();
 
-        public DynamicRemoteObject(ManagedRemoteApp ra, RemoteObject ro)
+        public DynamicRemoteObject(RemoteApp ra, IRemoteObject ro)
         {
             __ra = ra;
             __ro = ro;
-            __type = ro.GetType() as RemoteType;
-            if (__type == null && ro.GetType() != null)
+            __type = ro.GetRemoteType() as RemoteType;
+            if (__type == null && ro.GetRemoteType() != null)
             {
                 throw new ArgumentException("Can only create DynamicRemoteObjects of RemoteObjects with Remote Types. (As returned from GetType())");
             }
@@ -532,7 +532,7 @@ namespace RemoteNET.Internal
                 }
                 else if (item.IsRemoteAddress)
                 {
-                    return this.__ra.GetRemoteObject(item.RemoteAddress, item.Type).Dynamify();
+                    return __ra.GetRemoteObject(item.RemoteAddress, item.Type).Dynamify();
                 }
                 else
                 {

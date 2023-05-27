@@ -24,12 +24,12 @@ namespace RemoteNET.Internal.Reflection
             }
             else if (parameter is RemoteObject remoteArg)
             {
-                return ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetType().FullName);
+                return ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetRemoteType().FullName);
             }
             else if (parameter is DynamicRemoteObject dro)
             {
-                RemoteObject originRemoteObject = dro.__ro;
-                return ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetType().FullName);
+                IRemoteObject originRemoteObject = dro.__ro;
+                return ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetRemoteType().FullName);
             }
             else if (parameter is Type t)
             {
