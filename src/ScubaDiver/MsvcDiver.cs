@@ -37,14 +37,30 @@ namespace ScubaDiver
             base.Start();
         }
 
-        protected override string MakeInjectResponse(ScubaDiverMessage req)
+        protected override string MakeInjectDllResponse(ScubaDiverMessage req)
         {
-            return QuickError("Not Implemented");
+            string dllPath = req.QueryString.Get("dll_path");
+            try
+            {
+                var handle = Windows.Win32.Kernel32.LoadLibrary(dllPath);
+
+                if(handle.IsInvalid)
+                    return "{\"status\":\"dll load failed\"}";
+
+                // Must take a new snapshot to see our new module
+                RefreshRuntime();
+                return "{\"status\":\"dll loaded\"}";
+            }
+            catch (Exception ex)
+            {
+                return QuickError(ex.Message, ex.StackTrace);
+            }
         }
+
 
         protected override string MakeDomainsResponse(ScubaDiverMessage req)
         {
-            RefreshTrickster();
+            RefreshRuntime();
 
             List<DomainsDump.AvailableDomain> available = new();
             var modules = _trickster.ModulesParsed
@@ -69,7 +85,7 @@ namespace ScubaDiver
 
         private Trickster _trickster = null;
 
-        private void RefreshTrickster()
+        private void RefreshRuntime()
         {
             _trickster ??= new Trickster(Process.GetCurrentProcess());
             _trickster.ScanTypes();
@@ -79,7 +95,7 @@ namespace ScubaDiver
         {
             if (_trickster == null || !_trickster.ScannedTypes.Any())
             {
-                RefreshTrickster();
+                RefreshRuntime();
             }
 
             string assembly = req.QueryString.Get("assembly");
@@ -241,7 +257,7 @@ namespace ScubaDiver
         {
             if (_trickster == null || !_trickster.ScannedTypes.Any())
             {
-                RefreshTrickster();
+                RefreshRuntime();
             }
 
             if (_trickster.Regions == null || !_trickster.Regions.Any())
