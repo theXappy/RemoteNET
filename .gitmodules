@@ -1,0 +1,3 @@
+[submodule "src/detours.net"]
+	path = src/detours.net
+	url = https://github.com/citronneur/detours.net.git
