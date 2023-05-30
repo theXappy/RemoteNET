@@ -19,7 +19,7 @@ namespace ScubaDiver.Rtti;
 
 public class TricksterException : Exception { }
 
-public record struct TypeInfo(string Module, string Name, nuint Address, nuint Offset)
+public record struct TypeInfo(string ModuleName, string Name, nuint Address, nuint Offset)
 {
     public override string ToString()
     {
