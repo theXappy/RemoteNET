@@ -66,7 +66,7 @@ namespace RemoteNET.Internal.Reflection
             {
                 // obj is NOT null. Make sure it's a RemoteObject or DynamicRemoteObject.
                 RemoteObject ro = obj as RemoteObject;
-                ro ??= (obj as DynamicRemoteObject)?.__ro;
+                ro ??= (obj as DynamicRemoteObject)?.__ro as RemoteObject;
                 if (ro != null)
                 {
                     oora = ro.GetField(this.Name);
@@ -135,7 +135,7 @@ namespace RemoteNET.Internal.Reflection
 
             // obj is NOT null. Make sure it's a RemoteObject or DynamicRemoteObject.
             RemoteObject ro = obj as RemoteObject;
-            ro ??= (obj as DynamicRemoteObject)?.__ro;
+            ro ??= (obj as DynamicRemoteObject)?.__ro as RemoteObject;
             if (ro != null)
             {
                 ro.SetField(this.Name, remoteNewValue);
