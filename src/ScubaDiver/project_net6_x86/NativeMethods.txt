@@ -4,3 +4,4 @@ PROCESS_ACCESS_RIGHTS
 UnDecorateSymbolName
 ReadProcessMemory
 OpenProcess
+LoadLibrary
