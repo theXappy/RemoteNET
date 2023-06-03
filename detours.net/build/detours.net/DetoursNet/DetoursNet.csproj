@@ -1,0 +1,138 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5B02A3F7-2AC6-31D9-889C-2D8374A2812B}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>DetoursNet</ProjectName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+    <ManagedAssembly>true</ManagedAssembly>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+  </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <DebugSymbols>true</DebugSymbols>
+    <DefineDebug>true</DefineDebug>
+    <OutputPath>C:\git\RemoteNET\detours.net\build\bin\Debug\</OutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <PlatformToolset>v143</PlatformToolset>
+    <AssemblyName>DetoursNet</AssemblyName>
+    <DebugType>full</DebugType>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <Optimize>false</Optimize>
+    <WarningLevel>3</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <OutputPath>C:\git\RemoteNET\detours.net\build\bin\Release\</OutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <PlatformToolset>v143</PlatformToolset>
+    <AssemblyName>DetoursNet</AssemblyName>
+    <DebugType>none</DebugType>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>queue</ErrorReport>
+    <Optimize>true</Optimize>
+    <WarningLevel>1</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <OutputPath>C:\git\RemoteNET\detours.net\build\bin\MinSizeRel\</OutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <PlatformToolset>v143</PlatformToolset>
+    <AssemblyName>DetoursNet</AssemblyName>
+    <DebugType>none</DebugType>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <DebugSymbols>true</DebugSymbols>
+    <DefineDebug>true</DefineDebug>
+    <OutputPath>C:\git\RemoteNET\detours.net\build\bin\RelWithDebInfo\</OutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <PlatformToolset>v143</PlatformToolset>
+    <AssemblyName>DetoursNet</AssemblyName>
+    <DebugType>full</DebugType>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.CSharp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.CSharp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemGroup>
+    <None Include="C:\git\RemoteNET\src\detours.net\detours.net\DetoursNet\CMakeLists.txt">
+      <Link>CMakeLists.txt</Link>
+    </None>
+  </ItemGroup>
+  <Target Condition="'$(Configuration)|$(Platform)'=='Debug|x64'"
+    Name="CustomCommand_Debug_7d07afc8246554769e9d3630c5809109"
+    Inputs="C:/git/RemoteNET/src/detours.net/detours.net/DetoursNet/CMakeLists.txt"
+    Outputs="C:\git\RemoteNET\detours.net\build\detours.net\DetoursNet\CMakeFiles\generate.stamp">
+    <Exec Command="echo Building Custom Rule C:/git/RemoteNET/src/detours.net/detours.net/DetoursNet/CMakeLists.txt" />
+    <Exec Command="setlocal&#10;&quot;C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe&quot; -SC:/git/RemoteNET/src/detours.net -BC:/git/RemoteNET/detours.net/build --check-stamp-file C:/git/RemoteNET/detours.net/build/detours.net/DetoursNet/CMakeFiles/generate.stamp&#10;if %errorlevel% neq 0 goto :cmEnd&#10;:cmEnd&#10;endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone&#10;:cmErrorLevel&#10;exit /b %1&#10;:cmDone&#10;if %errorlevel% neq 0 goto :VCEnd&#10;:VCEnd" />
+  </Target>
+  <Target Condition="'$(Configuration)|$(Platform)'=='Release|x64'"
+    Name="CustomCommand_Release_7d07afc8246554769e9d3630c5809109"
+    Inputs="C:/git/RemoteNET/src/detours.net/detours.net/DetoursNet/CMakeLists.txt"
+    Outputs="C:\git\RemoteNET\detours.net\build\detours.net\DetoursNet\CMakeFiles\generate.stamp">
+    <Exec Command="echo Building Custom Rule C:/git/RemoteNET/src/detours.net/detours.net/DetoursNet/CMakeLists.txt" />
+    <Exec Command="setlocal&#10;&quot;C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe&quot; -SC:/git/RemoteNET/src/detours.net -BC:/git/RemoteNET/detours.net/build --check-stamp-file C:/git/RemoteNET/detours.net/build/detours.net/DetoursNet/CMakeFiles/generate.stamp&#10;if %errorlevel% neq 0 goto :cmEnd&#10;:cmEnd&#10;endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone&#10;:cmErrorLevel&#10;exit /b %1&#10;:cmDone&#10;if %errorlevel% neq 0 goto :VCEnd&#10;:VCEnd" />
+  </Target>
+  <Target Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'"
+    Name="CustomCommand_MinSizeRel_7d07afc8246554769e9d3630c5809109"
+    Inputs="C:/git/RemoteNET/src/detours.net/detours.net/DetoursNet/CMakeLists.txt"
+    Outputs="C:\git\RemoteNET\detours.net\build\detours.net\DetoursNet\CMakeFiles\generate.stamp">
+    <Exec Command="echo Building Custom Rule C:/git/RemoteNET/src/detours.net/detours.net/DetoursNet/CMakeLists.txt" />
+    <Exec Command="setlocal&#10;&quot;C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe&quot; -SC:/git/RemoteNET/src/detours.net -BC:/git/RemoteNET/detours.net/build --check-stamp-file C:/git/RemoteNET/detours.net/build/detours.net/DetoursNet/CMakeFiles/generate.stamp&#10;if %errorlevel% neq 0 goto :cmEnd&#10;:cmEnd&#10;endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone&#10;:cmErrorLevel&#10;exit /b %1&#10;:cmDone&#10;if %errorlevel% neq 0 goto :VCEnd&#10;:VCEnd" />
+  </Target>
+  <Target Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'"
+    Name="CustomCommand_RelWithDebInfo_7d07afc8246554769e9d3630c5809109"
+    Inputs="C:/git/RemoteNET/src/detours.net/detours.net/DetoursNet/CMakeLists.txt"
+    Outputs="C:\git\RemoteNET\detours.net\build\detours.net\DetoursNet\CMakeFiles\generate.stamp">
+    <Exec Command="echo Building Custom Rule C:/git/RemoteNET/src/detours.net/detours.net/DetoursNet/CMakeLists.txt" />
+    <Exec Command="setlocal&#10;&quot;C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe&quot; -SC:/git/RemoteNET/src/detours.net -BC:/git/RemoteNET/detours.net/build --check-stamp-file C:/git/RemoteNET/detours.net/build/detours.net/DetoursNet/CMakeFiles/generate.stamp&#10;if %errorlevel% neq 0 goto :cmEnd&#10;:cmEnd&#10;endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone&#10;:cmErrorLevel&#10;exit /b %1&#10;:cmDone&#10;if %errorlevel% neq 0 goto :VCEnd&#10;:VCEnd" />
+  </Target>
+  <ItemGroup>
+    <Compile Include="C:\git\RemoteNET\src\detours.net\detours.net\DetoursNet\src\DetoursNet.cs">
+      <Link>src\DetoursNet.cs</Link>
+    </Compile>
+    <Compile Include="C:\git\RemoteNET\src\detours.net\detours.net\DetoursNet\src\DetoursNetLoader.cs">
+      <Link>src\DetoursNetLoader.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="C:\git\RemoteNET\detours.net\build\ZERO_CHECK.vcxproj">
+      <Project>{DFAF47D5-CA9D-3B72-9068-E448062DCDA1}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'MinSizeRel'">
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'RelWithDebInfo'">
+  </PropertyGroup>
+  <PropertyGroup>
+    <BuildDependsOn>
+      CustomCommand_Debug_7d07afc8246554769e9d3630c5809109;
+      CustomCommand_MinSizeRel_7d07afc8246554769e9d3630c5809109;
+      CustomCommand_RelWithDebInfo_7d07afc8246554769e9d3630c5809109;
+      CustomCommand_Release_7d07afc8246554769e9d3630c5809109;
+      $(BuildDependsOn)
+</BuildDependsOn>
+  </PropertyGroup>
+</Project>
