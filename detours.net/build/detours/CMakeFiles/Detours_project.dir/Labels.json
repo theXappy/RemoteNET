@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/detours/CMakeFiles/Detours_project"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/b49c917695dff1bf1eb6c5162ef3420d/Detours_project.rule"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/c4f8ca72303b92d66ad2a803b41f2fd6/Detours_project-complete.rule"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/cca8d56f2b5c8d25344ebdb7c082c679/Detours_project-build.rule"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/cca8d56f2b5c8d25344ebdb7c082c679/Detours_project-configure.rule"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/cca8d56f2b5c8d25344ebdb7c082c679/Detours_project-download.rule"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/cca8d56f2b5c8d25344ebdb7c082c679/Detours_project-install.rule"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/cca8d56f2b5c8d25344ebdb7c082c679/Detours_project-mkdir.rule"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/cca8d56f2b5c8d25344ebdb7c082c679/Detours_project-patch.rule"
+		},
+		{
+			"file" : "C:/git/RemoteNET/detours.net/build/CMakeFiles/cca8d56f2b5c8d25344ebdb7c082c679/Detours_project-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"Detours_project"
+		],
+		"name" : "Detours_project"
+	}
+}

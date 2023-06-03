@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\cca8d56f2b5c8d25344ebdb7c082c679\Detours_project-mkdir.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\cca8d56f2b5c8d25344ebdb7c082c679\Detours_project-download.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\cca8d56f2b5c8d25344ebdb7c082c679\Detours_project-update.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\cca8d56f2b5c8d25344ebdb7c082c679\Detours_project-patch.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\cca8d56f2b5c8d25344ebdb7c082c679\Detours_project-configure.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\cca8d56f2b5c8d25344ebdb7c082c679\Detours_project-build.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\cca8d56f2b5c8d25344ebdb7c082c679\Detours_project-install.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\c4f8ca72303b92d66ad2a803b41f2fd6\Detours_project-complete.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\detours.net\build\CMakeFiles\b49c917695dff1bf1eb6c5162ef3420d\Detours_project.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\git\RemoteNET\src\detours.net\detours\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\git\RemoteNET\detours.net\build\detours\CMakeFiles\Detours_project" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{3F996F97-0CFC-3C28-8BD8-5F084EB8AA8B}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
