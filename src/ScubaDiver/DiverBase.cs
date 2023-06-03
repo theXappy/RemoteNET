@@ -47,6 +47,9 @@ namespace ScubaDiver
                 {"/set_field", MakeSetFieldResponse},
                 {"/unpin", MakeUnpinResponse},
                 {"/get_item", MakeArrayItemResponse},
+                // Hooking
+                {"/hook_method", MakeHookMethodResponse},
+                {"/unhook_method", MakeUnhookMethodResponse},
             };
         }
 
@@ -133,6 +136,8 @@ namespace ScubaDiver
 
         #endregion
 
+        protected abstract string MakeUnhookMethodResponse(ScubaDiverMessage arg);
+        protected abstract string MakeHookMethodResponse(ScubaDiverMessage arg);
 
         #region Ping Handler
 

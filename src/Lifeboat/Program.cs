@@ -101,7 +101,13 @@ public class Program
             Log($"Waiting for diver...");
             TcpClient diverConnection = listener.AcceptTcpClient();
             Log($"Diver Suspect: {diverConnection.Client.RemoteEndPoint}");
-            var msg = RnetProtocolParser.Parse(diverConnection);
+            OverTheWireRequest msg = RnetProtocolParser.Parse(diverConnection);
+            if (msg == null)
+            {
+                Log($"NOT a Diver: Connection close prematurely");
+                diverConnection.Close();
+                continue;
+            }
             if (msg.UrlAbsolutePath != "/proxy_intro" || msg.Body != "{\"role\":\"diver\"}")
             {
                 Log($"NOT a Diver: {diverConnection.Client.RemoteEndPoint}");
@@ -177,8 +183,16 @@ public class Program
         {
             Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] waiting for more...");
             OverTheWireRequest recv = RnetProtocolParser.Parse(client, token);
-            Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] New RECV message! ID: {recv?.RequestId}, PATH: {(recv.UrlAbsolutePath ?? "null")}");
-            outQueue.Add(recv, token);
+            Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] New RECV message! ID: {recv?.RequestId}, PATH: {(recv?.UrlAbsolutePath ?? "null")}");
+            if (recv != null)
+            {
+                outQueue.Add(recv, token);
+            }
+            else
+            {
+                // Client disconnected
+                break;
+            }
         }
         Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] TransferData == OUT ?!?!?!?!?! ==");
     }

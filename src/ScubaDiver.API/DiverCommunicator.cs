@@ -58,6 +58,11 @@ namespace ScubaDiver.API
             };
             RnetProtocolParser.Write(client, request);
             OverTheWireRequest response = RnetProtocolParser.Parse(client);
+            if (response == null)
+            {
+                throw new Exception(
+                    $"Failed to read response, connection closed prematurely");
+            }
             // TODO: If we end up supporting multiple requsts at the same time we need to add some component
             // to sort responses and requests by their IDs
             if (response.RequestId != request.RequestId)
@@ -89,9 +94,18 @@ namespace ScubaDiver.API
             return body?.Contains("Goodbye") ?? false;
         }
 
+        public bool InjectAssembly(string path)
+        {
+            var res = SendRequest("inject_assembly", new Dictionary<string, string>()
+            {
+                { "dll_path", path }
+            });
+
+            return res.Contains("dll loaded");
+        }
         public bool InjectDll(string path)
         {
-            var res = SendRequest("inject", new Dictionary<string, string>()
+            var res = SendRequest("inject_dll", new Dictionary<string, string>()
             {
                 { "dll_path", path }
             });
@@ -332,6 +346,12 @@ namespace ScubaDiver.API
             var resJson = SendRequest("create_object", null, requestJsonBody);
             InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
             return res;
+        }
+
+        public bool StartOffensiveGC()
+        {
+            var resJson = SendRequest("gc");
+            return resJson.Contains("\"ok\"");
         }
 
         public InvocationResults SetField(ulong targetAddr, string targetTypeFullName, string fieldName, ObjectOrRemoteAddress newValue)

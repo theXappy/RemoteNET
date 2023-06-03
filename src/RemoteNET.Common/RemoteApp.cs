@@ -46,6 +46,8 @@ namespace RemoteNET
         /// </summary>
         public abstract bool InjectAssembly(string path);
 
+        public abstract bool InjectDll(string path);
+
         public abstract void Dispose();
     }
 }

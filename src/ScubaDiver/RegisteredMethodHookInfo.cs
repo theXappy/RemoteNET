@@ -4,7 +4,7 @@ using System.Reflection;
 
 namespace ScubaDiver
 {
-    public class RegisteredMethodHookInfo
+    public class RegisteredManagedMethodHookInfo
     {
         /// <summary>
         /// The patch callback that was registered on the method

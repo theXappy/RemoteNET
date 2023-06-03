@@ -40,7 +40,7 @@ namespace ScubaDiver.Tester
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("ERROR: "+ex);
+                    Console.WriteLine("ERROR: " + ex);
                     continue;
                 }
                 break;
@@ -50,7 +50,7 @@ namespace ScubaDiver.Tester
             {
                 try
                 {
-                    unmanRemoteApp =  (UnmanagedRemoteApp)RemoteAppFactory.Connect(procName, RuntimeType.Unmanaged);
+                    unmanRemoteApp = (UnmanagedRemoteApp)RemoteAppFactory.Connect(procName, RuntimeType.Unmanaged);
                     if (unmanRemoteApp == null)
                     {
                         Console.WriteLine("Something went wrong, try again.");
@@ -93,7 +93,9 @@ namespace ScubaDiver.Tester
             Console.WriteLine("14. Dump Managed Heap");
             Console.WriteLine("15. Dump Unmanage Heap");
             Console.WriteLine("16. Dump Unmanaged Type Info");
-            Console.WriteLine("17. Exit");
+            Console.WriteLine("17. Inject dll");
+            Console.WriteLine("18. Offensive GC");
+            Console.WriteLine("19. Exit");
             string input = Console.ReadLine();
             uint index;
             if (int.TryParse(input, out int userChoice))
@@ -240,8 +242,8 @@ namespace ScubaDiver.Tester
                                 Console.WriteLine("Method name:");
                                 methodName = Console.ReadLine();
 
-                                var methods = t.GetMethods((BindingFlags)0xffff).Where(mInfo=>mInfo.Name == methodName).ToArray();
-                                if(methodName.Length < 0 )
+                                var methods = t.GetMethods((BindingFlags)0xffff).Where(mInfo => mInfo.Name == methodName).ToArray();
+                                if (methodName.Length < 0)
                                 {
                                     throw new Exception("No such function");
                                 }
@@ -250,11 +252,11 @@ namespace ScubaDiver.Tester
                                     Console.WriteLine("More than one overload found:");
                                     for (int i = 0; i < methods.Length; i++)
                                     {
-                                        string paramsList = string.Join(",", methods[i].GetParameters().Select(prm => prm.ParameterType.FullName+ " " + prm.Name));
+                                        string paramsList = string.Join(",", methods[i].GetParameters().Select(prm => prm.ParameterType.FullName + " " + prm.Name));
                                         Console.WriteLine($"{i + 1}. {methods[i].ReturnType.Name} {methodName}({paramsList})");
                                     }
                                     Console.WriteLine("Which overload?");
-                                    int res = int.Parse(Console.ReadLine())-1;
+                                    int res = int.Parse(Console.ReadLine()) - 1;
                                     mi = methods[res];
                                 }
                                 else
@@ -276,7 +278,7 @@ namespace ScubaDiver.Tester
                             BlockingCollection<string> pcCollection = new();
                             Task printerTask = Task.Run(() =>
                             {
-                                while(pcCollection.IsCompleted)
+                                while (pcCollection.IsCompleted)
                                 {
                                     if (pcCollection.TryTake(out string item))
                                     {
@@ -295,7 +297,7 @@ namespace ScubaDiver.Tester
                                 foreach (dynamic d in args)
                                 {
                                     Console.WriteLine($"ARG: {d.ToString()}");
-                                    if(d is string str)
+                                    if (d is string str)
                                     {
                                         pcCollection.Add(str);
                                     }
@@ -315,7 +317,7 @@ namespace ScubaDiver.Tester
                                 Console.WriteLine("Bad input.");
                                 break;
                             }
-                            switch(selection)
+                            switch (selection)
                             {
                                 case 1:
                                     remoteApp.Harmony.Patch(mi, prefix: callback);
@@ -385,7 +387,7 @@ namespace ScubaDiver.Tester
                         var types2 = remoteApp.QueryTypes("*");
                         foreach (CandidateType candidateType in types2)
                         {
-                            if(candidateType.Runtime == RuntimeType.Managed)
+                            if (candidateType.Runtime == RuntimeType.Managed)
                                 Console.WriteLine($"[{candidateType.Runtime}][{candidateType.Assembly}] {candidateType.TypeFullName}");
                         }
                         break;
@@ -393,47 +395,47 @@ namespace ScubaDiver.Tester
                         var types3 = unmanRemoteApp.QueryTypes("*");
                         foreach (CandidateType candidateType in types3)
                         {
-                            if(candidateType.Runtime == RuntimeType.Unmanaged && IsReasonableUnmanagedTypeName(candidateType.TypeFullName))
+                            if (candidateType.Runtime == RuntimeType.Unmanaged && IsReasonableUnmanagedTypeName(candidateType.TypeFullName))
                                 Console.WriteLine($"[{candidateType.Runtime}][{candidateType.Assembly}] {candidateType.TypeFullName}");
                         }
                         break;
 
                     case 14:
-                    {
-                        Console.WriteLine("Enter managed type name to query");
-                        string typeName = Console.ReadLine().Trim();
-                        if (string.IsNullOrWhiteSpace(typeName))
                         {
-                            // Assuming user wants all types
-                            typeName = null;
-                        }
+                            Console.WriteLine("Enter managed type name to query");
+                            string typeName = Console.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(typeName))
+                            {
+                                // Assuming user wants all types
+                                typeName = null;
+                            }
 
-                        var res = remoteApp.QueryInstances(typeName).ToList();
-                        Console.WriteLine("Instances:");
-                        for (int i = 0; i < res.Count; i++)
-                        {
-                            Console.WriteLine($"{i + 1}. {res[i].Address}, TypeFullName: {res[i].TypeFullName}");
+                            var res = remoteApp.QueryInstances(typeName).ToList();
+                            Console.WriteLine("Instances:");
+                            for (int i = 0; i < res.Count; i++)
+                            {
+                                Console.WriteLine($"{i + 1}. {res[i].Address}, TypeFullName: {res[i].TypeFullName}");
+                            }
                         }
-                    }
                         break;
 
                     case 15:
-                    {
-                        Console.WriteLine("Enter unmanaged type name to query");
-                        string typeName = Console.ReadLine().Trim();
-                        if (string.IsNullOrWhiteSpace(typeName))
                         {
-                            // Assuming user wants all types
-                            typeName = null;
-                        }
+                            Console.WriteLine("Enter unmanaged type name to query");
+                            string typeName = Console.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(typeName))
+                            {
+                                // Assuming user wants all types
+                                typeName = null;
+                            }
 
-                        var res = unmanRemoteApp.QueryInstances(typeName).ToList();
-                        Console.WriteLine("Instances:");
-                        for (int i = 0; i < res.Count; i++)
-                        {
-                            Console.WriteLine($"{i + 1}. {res[i].Address}, Full Symbol Name: {res[i].TypeFullName}");
+                            var res = unmanRemoteApp.QueryInstances(typeName).ToList();
+                            Console.WriteLine("Instances:");
+                            for (int i = 0; i < res.Count; i++)
+                            {
+                                Console.WriteLine($"{i + 1}. {res[i].Address}, Full Symbol Name: {res[i].TypeFullName}");
+                            }
                         }
-                    }
                         break;
                     case 16:
                         {
@@ -457,6 +459,25 @@ namespace ScubaDiver.Tester
                         }
                         break;
                     case 17:
+                        Console.WriteLine("DLL path (or paths seperated with '$'):");
+                        string assemblyPath = Console.ReadLine().Trim();
+                        string[] dllsArray = assemblyPath.Split("$");
+                        foreach (string dllPath in dllsArray)
+                        {
+                            string normalizedDllPath = dllPath.Trim('"');
+                            Console.WriteLine($"Injecting {normalizedDllPath}");
+                            var res = unmanRemoteApp.InjectDll(normalizedDllPath);
+                            Console.WriteLine($"Result: {res}");
+                            Thread.Sleep(200);
+                        }
+                        break;
+                    case 18:
+                        {
+                            bool res = unmanRemoteApp.Communicator.StartOffensiveGC();
+                            Console.WriteLine("RES: " + res);
+                            break;
+                        }
+                    case 19:
                         // Exiting
                         return true;
                 }
