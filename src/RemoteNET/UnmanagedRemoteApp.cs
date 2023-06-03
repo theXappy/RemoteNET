@@ -188,6 +188,18 @@ namespace RemoteNET
         /// </summary>
         public override bool InjectAssembly(string path)
         {
+            bool res = _unmanagedCommunicator.InjectAssembly(path);
+            if (res)
+            {
+                // Re-setting the cached modules list because otherwise we won't
+                // see our newly injected module
+                _unmanagedModulesList = null;
+            }
+            return res;
+        }
+
+        public override bool InjectDll(string path)
+        {
             bool res = _unmanagedCommunicator.InjectDll(path);
             if (res)
             {

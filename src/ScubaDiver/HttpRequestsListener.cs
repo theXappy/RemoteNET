@@ -63,12 +63,14 @@ public class RnetReverseRequestsListener : IRequestsListener
 
         RnetProtocolParser.Write(client, intro);
         var introResp = RnetProtocolParser.Parse(client);
-        if (!introResp.Body.Contains("\"status\":\"OK\""))
+        if (introResp == null || !introResp.Body.Contains("\"status\":\"OK\""))
             throw new Exception("Diver couldn't register at Lifeboat");
 
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
             var request = RnetProtocolParser.Parse(client);
+            if(request == null)
+                continue;
 
             void RespondFunc(string body)
             {
@@ -154,6 +156,11 @@ public class RnetRequestsListener : IRequestsListener
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
             var request = RnetProtocolParser.Parse(client);
+            if (request == null)
+            {
+                // Connection closed
+                return;
+            }
 
             void RespondFunc(string body)
             {

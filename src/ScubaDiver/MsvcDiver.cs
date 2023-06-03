@@ -5,16 +5,19 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using ScubaDiver.API.Utils;
-using ModuleInfo = Microsoft.Diagnostics.Runtime.ModuleInfo;
-using TypeInfo = System.Reflection.TypeInfo;
-using System.Net.Sockets;
-using System.Reflection;
 using NtApiDotNet.Win32;
 using System.IO;
-using NtApiDotNet;
-using System.Drawing;
 using ScubaDiver.Rtti;
-using Newtonsoft.Json.Linq;
+using ScubaDiver.API.Hooking;
+using ScubaDiver.API.Interactions.Callbacks;
+using ScubaDiver.Hooking;
+using System.Threading;
+using ScubaDiver.API.Interactions;
+using ScubaDiver.API;
+using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
+using ModuleInfo = Microsoft.Diagnostics.Runtime.ModuleInfo;
+using TypeInfo = System.Reflection.TypeInfo;
 
 namespace ScubaDiver
 {
@@ -24,6 +27,9 @@ namespace ScubaDiver
 
         public MsvcDiver(IRequestsListener listener) : base(listener)
         {
+            _remoteHooks = new ConcurrentDictionary<int, RegisteredUnmanagedMethodHookInfo>();
+
+            base._responseBodyCreators["/gc"] = MakeGcResponse;
         }
 
         public override void Start()
@@ -37,6 +43,37 @@ namespace ScubaDiver
             base.Start();
         }
 
+        protected string MakeGcResponse(ScubaDiverMessage req)
+        {
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
+
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Dumping types and undecorating methods...");
+            var typeInfos = GetTypeInfos("*", "*");
+            Dictionary<string, IEnumerable<UndecoratedExport>> typeToMethods = new Dictionary<string, IEnumerable<UndecoratedExport>>();
+            foreach (var typeInfo in typeInfos)
+            {
+                var methods = GetExportedTypeMethod(typeInfo.ModuleName, typeInfo.Name);
+                typeToMethods[typeInfo.Name] = methods;
+            }
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Dumping types and undecorating methods... DONE! Found: {typeToMethods.Count}");
+
+
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} creating GC and init'ing");
+            try
+            {
+                MsvcOffensiveGC gc = new MsvcOffensiveGC();
+                gc.Init(typeToMethods);
+            }
+            catch (Exception e)
+            {
+                Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Exception: " + e);
+            }
+
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} OTU!");
+            return "{\"status\":\"ok\"}";
+        }
+
+        private List<SafeHandle> _injectedDlls = new List<SafeHandle>();
         protected override string MakeInjectDllResponse(ScubaDiverMessage req)
         {
             string dllPath = req.QueryString.Get("dll_path");
@@ -44,11 +81,15 @@ namespace ScubaDiver
             {
                 var handle = Windows.Win32.Kernel32.LoadLibrary(dllPath);
 
-                if(handle.IsInvalid)
+                if (handle.IsInvalid)
                     return "{\"status\":\"dll load failed\"}";
+
+                // We must keep a reference or FreeLibrary will automatically be called the the handle object is destructed
+                _injectedDlls.Add(handle as SafeHandle);
 
                 // Must take a new snapshot to see our new module
                 RefreshRuntime();
+
                 return "{\"status\":\"dll loaded\"}";
             }
             catch (Exception ex)
@@ -85,11 +126,170 @@ namespace ScubaDiver
 
         private Trickster _trickster = null;
 
-        private void RefreshRuntime()
+        protected override void RefreshRuntime()
         {
-            _trickster ??= new Trickster(Process.GetCurrentProcess());
+            Logger.Debug("[MsvcDiver][Trickster] Refreshing runtime!");
+            _trickster = new Trickster(Process.GetCurrentProcess());
             _trickster.ScanTypes();
+            Logger.Debug($"[MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
+            foreach (Rtti.ModuleInfo moduleInfo in _trickster.ScannedTypes.Keys)
+            {
+                Logger.Debug(
+                    $"[MsvcDiver][Trickster]  → Module: {moduleInfo.Name}");
+            }
         }
+
+        protected override string MakeUnhookMethodResponse(ScubaDiverMessage arg)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override string MakeHookMethodResponse(ScubaDiverMessage arg)
+        {
+            Logger.Debug("[MsvcDiver] Got Hook Method request!");
+            string body = arg.Body;
+
+            if (string.IsNullOrEmpty(body))
+                return QuickError("Missing body");
+
+            var request = JsonConvert.DeserializeObject<FunctionHookRequest>(body);
+            if (request == null)
+                return QuickError("Failed to deserialize body");
+
+            if (!IPAddress.TryParse(request.IP, out IPAddress ipAddress))
+            {
+                return QuickError("Failed to parse IP address. Input: " + request.IP);
+            }
+            int port = request.Port;
+            IPEndPoint endpoint = new IPEndPoint(ipAddress, port);
+            string rawTypeFilter = request.TypeFullName;
+            string methodName = request.MethodName;
+            string hookPosition = request.HookPosition;
+            HarmonyPatchPosition pos = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPosition);
+            if (pos != HarmonyPatchPosition.Prefix)
+                return QuickError($"hook_position in native apps can only be {HarmonyPatchPosition.Prefix}");
+
+            ParseFullTypeName(rawTypeFilter, out var rawAssemblyFilter, out rawTypeFilter);
+            Rtti.TypeInfo[] typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter).ToArray();
+            if (typeInfos.Length != 1)
+                QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
+
+            var typeInfo = typeInfos[0];
+
+            var methods = GetExportedTypeMethod(typeInfo.ModuleName, typeInfo.Name);
+
+            UndecoratedExport methodToHook = null;
+            foreach (var method in methods)
+            {
+                if (method.UndecoratedName != methodName)
+                    continue;
+
+                if (methodToHook != null)
+                    return QuickError($"Too many matches for {methodName}");
+
+                methodToHook = method;
+            }
+
+
+            if (methodToHook == null)
+                return QuickError($"No matches for {methodName}");
+
+
+
+            Logger.Debug("[MsvcDiver] Hook Method - Resolved Method");
+
+            // We're all good regarding the signature!
+            // assign subscriber unique id
+            int token = AssignCallbackToken();
+            Logger.Debug($"[MsvcDiver] Hook Method - Assigned Token: {token}");
+
+            // Preparing a proxy method that Harmony will invoke
+            HarmonyWrapper.HookCallback patchCallback = (obj, args) =>
+            {
+                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), obj, args);
+                bool skipOriginal = false;
+                if (res != null && !res.IsRemoteAddress)
+                {
+                    object decodedRes = PrimitivesEncoder.Decode(res);
+                    if (decodedRes is bool boolRes)
+                        skipOriginal = boolRes;
+                }
+                return skipOriginal;
+            };
+
+            Logger.Debug($"[MsvcDiver] Hooking function {methodName}...");
+            try
+            {
+                //DetoursNetWrapper.Instance.AddHook(methodToHook, pos, patchCallback);
+                throw new NotImplementedException("LOL");
+            }
+            catch (Exception ex)
+            {
+                // Hooking filed so we cleanup the Hook Info we inserted beforehand 
+                _remoteHooks.TryRemove(token, out _);
+
+                Logger.Debug($"[DotNetDiver] Failed to hook func {methodName}. Exception: {ex}");
+                return QuickError("Failed insert the hook for the function. HarmonyWrapper.AddHook failed.");
+            }
+            Logger.Debug($"[DotNetDiver] Hooked func {methodName}!");
+
+            // Keeping all hooking information aside so we can unhook later.
+            _remoteHooks[token] = new RegisteredUnmanagedMethodHookInfo()
+            {
+                Endpoint = endpoint,
+                OriginalHookedMethod = methodToHook,
+                RegisteredProxy = patchCallback
+            };
+
+
+            EventRegistrationResults erResults = new() { Token = token };
+            return JsonConvert.SerializeObject(erResults);
+        }
+        private readonly ConcurrentDictionary<int, RegisteredUnmanagedMethodHookInfo> _remoteHooks;
+        private int _nextAvailableCallbackToken;
+        public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvailableCallbackToken);
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="callbacksEndpoint"></param>
+        /// <param name="token"></param>
+        /// <param name="stackTrace"></param>
+        /// <param name="parameters"></param>
+        /// <returns>Any results returned from the</returns>
+        public ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
+        {
+            ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
+
+            ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                object parameter = parameters[i];
+                if (parameter == null)
+                {
+                    remoteParams[i] = ObjectOrRemoteAddress.Null;
+                }
+                else if (parameter.GetType().IsPrimitiveEtc())
+                {
+                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
+                }
+                else // Not primitive
+                {
+                    Console.WriteLine($"Unexpected non native argument to hooked method. Type: {remoteParams[i].GetType().FullName}");
+                    throw new Exception($"Unexpected non native argument to hooked method. Type: {remoteParams[i].GetType().FullName}");
+                }
+            }
+
+            // Call callback at controller
+            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
+
+            return hookCallbackResults.ReturnedObjectOrAddress;
+        }
+
+
+
+
+
+
 
         protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
@@ -183,26 +383,19 @@ namespace ScubaDiver
             {
                 string moduleName = typeInfo.ModuleName;
                 string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
-                string membersPrefix = $"{typeInfo.Name}::";
                 string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
-
-                List<DllExport> exports = GetExports(moduleName);
 
                 List<ManagedTypeDump.TypeMethod> methods = new();
                 List<ManagedTypeDump.TypeMethod> constructors = new();
-                foreach (DllExport dllExport in exports)
+                foreach (UndecoratedExport dllExport in GetExportedTypeMethod(moduleName, typeInfo.Name))
                 {
-                    string undecorated = dllExport.UndecorateName();
-                    if (!undecorated.StartsWith(membersPrefix))
-                        continue;
-
                     ManagedTypeDump.TypeMethod method = new()
                     {
-                        Name = dllExport.Name,
+                        Name = dllExport.Export.Name,
                         Visibility = "Public" // Because it's exported
                     };
 
-                    if (undecorated == ctorName)
+                    if (dllExport.UndecoratedName == ctorName)
                         constructors.Add(method);
                     else
                         methods.Add(method);
@@ -220,8 +413,42 @@ namespace ScubaDiver
             return null;
         }
 
+        public class UndecoratedExport
+        {
+            public string UndecoratedName { get; set; }
+            public DllExport Export { get; set; }
+
+            public UndecoratedExport(string name, DllExport export)
+            {
+                UndecoratedName = name;
+                Export = export;
+            }
+
+            public override string ToString() => UndecoratedName;
+        }
+
+        protected IEnumerable<UndecoratedExport> GetExportedTypeMethod(string moduleName, string typeFullName)
+        {
+            string membersPrefix = $"{typeFullName}::";
+            List<DllExport> exports = GetExports(moduleName);
+
+            foreach (DllExport dllExport in exports)
+            {
+                string undecorated = dllExport.UndecorateName();
+                if (!undecorated.StartsWith(membersPrefix))
+                    continue;
+                yield return new UndecoratedExport(undecorated, dllExport);
+            }
+        }
+
+
         private IEnumerable<ScubaDiver.Rtti.TypeInfo> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
         {
+            if (_trickster == null || !_trickster.ScannedTypes.Any())
+            {
+                RefreshRuntime();
+            }
+
             Predicate<string> assmFilter = Filter.CreatePredicate(rawAssemblyFilter);
             Predicate<string> typeFilter = Filter.CreatePredicate(rawTypeFilter);
 
@@ -346,7 +573,7 @@ namespace ScubaDiver
                     return QuickError("Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int");
                 }
             }
-            
+
             ParseFullTypeName(typeName, out var rawAssemblyFilter, out var rawTypeFilter);
 
             try

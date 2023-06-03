@@ -11,7 +11,7 @@ public static class RnetProtocolParser
     private const int MagicValueLength = 4;
     private const int PayloadLengthFieldLength = 4;
 
-    public static OverTheWireRequest Parse(TcpClient tcpClient, CancellationToken token = default)
+    public static OverTheWireRequest? Parse(TcpClient tcpClient, CancellationToken token = default)
     {
         try
         {
@@ -24,16 +24,18 @@ public static class RnetProtocolParser
             while (tcpClient.Connected)
             {
                 var magicValueBytes = new byte[MagicValueLength];
-                ReadBytesFromStream(stream, magicValueBytes, token);
+                if (!TryReadBytesFromStream(stream, magicValueBytes, token))
+                    return null;
 
                 if (!CheckMagicValue(magicValueBytes))
                 {
                     // The magic value doesn't match, this is an invalid message
-                    continue;
+                    throw new Exception("Magic Mismatch");
                 }
 
                 var payloadLengthBytes = new byte[PayloadLengthFieldLength];
-                ReadBytesFromStream(stream, payloadLengthBytes, token);
+                if(!TryReadBytesFromStream(stream, payloadLengthBytes, token))
+                    return null;
 
                 var payloadLength = BitConverter.ToInt32(payloadLengthBytes, 0);
                 if (payloadLength <= 0)
@@ -43,7 +45,8 @@ public static class RnetProtocolParser
                 }
 
                 var payloadBytes = new byte[payloadLength];
-                ReadBytesFromStream(stream, payloadBytes, token);
+                if(!TryReadBytesFromStream(stream, payloadBytes, token))
+                    return null;
 
                 // Handle the payload bytes here...
                 request = JsonConvert.DeserializeObject<OverTheWireRequest>(Encoding.UTF8.GetString(payloadBytes));
@@ -70,7 +73,7 @@ public static class RnetProtocolParser
                bytes[3] == 'T';
     }
 
-    private static void ReadBytesFromStream(Stream stream, byte[] buffer, CancellationToken token)
+    private static bool TryReadBytesFromStream(Stream stream, byte[] buffer, CancellationToken token)
     {
         var bytesRead = 0;
         var bytesToRead = buffer.Length;
@@ -80,19 +83,15 @@ public static class RnetProtocolParser
             var n =  stream.ReadAsync(buffer, bytesRead, bytesToRead, token).Result;
             if (n == 0)
             {
-                // The connection was closed by the remote endpoint, terminate the loop
-                break;
+                // The connection was closed by the remote endpoint, terminate 
+                return false;
             }
 
             bytesRead += n;
             bytesToRead -= n;
         }
 
-        if (bytesToRead > 0)
-        {
-            // We didn't read all the expected bytes, this is an invalid message
-            throw new IOException($"Expected {buffer.Length} bytes, but only read {bytesRead} bytes");
-        }
+        return true;
     }
 
     private static byte[] Encode(string body)

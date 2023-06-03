@@ -14,10 +14,12 @@
 		<Compile Include="..\DotNetDiver.cs" />
 		<Compile Include="..\DiverBase.cs" />
 		<Compile Include="..\DllEntry.cs" />
-		<Compile Include="..\Hooking\HarmonyWrapper.cs" />
+		<Compile Include="..\Hooking\HarmonyWrapper.cs" Link="Hooking\HarmonyWrapper.cs"/>
+		<Compile Include="..\Hooking\DetoursNetWrapper.cs" Link="Hooking\DetoursNetWrapper.cs"/>
 		<Compile Include="..\Logger.cs" />
 		<Compile Include="..\RegisteredEventHandlerInfo.cs" />
 		<Compile Include="..\RegisteredMethodHookInfo.cs" />
+		<Compile Include="..\RegisteredUnmanagedMethodHookInfo.cs" />
 		<Compile Include="..\Utils\ClrExt.cs" Link="Utils\ClrExt.cs" />
 		<Compile Include="..\Utils\Converter.cs" Link="Utils\Converter.cs" />
 		<Compile Include="..\Utils\FreezeFuncsFactory.cs" Link="Utils\FreezeFuncsFactory.cs" />
@@ -31,6 +33,7 @@
 		<Compile Include="..\Rtti\Trickster.cs" Link="Rtti\Trickster.cs" />
 		<Compile Include="..\Rtti\TricksterUI.cs" Link="Rtti\TricksterUI.cs" />
 		<Compile Include="..\MsvcDiver.cs" />
+		<Compile Include="..\MsvcOffensiveGC.cs" />
 		<Compile Include="..\HttpRequestsListener.cs" />
 		<Compile Include="..\IRequestsListener.cs" />
 		<Compile Include="..\ScubaDiverMessage.cs" />
@@ -49,6 +52,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\detours.net\build\DetoursNet\DetoursNet.csproj" />
 		<ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj" />
 	</ItemGroup>
 

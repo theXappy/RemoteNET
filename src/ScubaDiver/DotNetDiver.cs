@@ -42,7 +42,7 @@ namespace ScubaDiver
         private int _nextAvailableCallbackToken;
         private readonly UnifiedAppDomain _unifiedAppDomain;
         private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
-        private readonly ConcurrentDictionary<int, RegisteredMethodHookInfo> _remoteHooks;
+        private readonly ConcurrentDictionary<int, RegisteredManagedMethodHookInfo> _remoteHooks;
 
         // Object freezing (pinning)
         FrozenObjectsCollection _freezer = new FrozenObjectsCollection();
@@ -51,11 +51,9 @@ namespace ScubaDiver
         {
             _responseBodyCreators.Add("/event_subscribe", MakeEventSubscribeResponse);
             _responseBodyCreators.Add("/event_unsubscribe", MakeEventUnsubscribeResponse);
-            _responseBodyCreators.Add("/hook_method", MakeHookMethodResponse);
-            _responseBodyCreators.Add("/unhook_method", MakeUnhookMethodResponse);
 
             _remoteEventHandler = new ConcurrentDictionary<int, RegisteredEventHandlerInfo>();
-            _remoteHooks = new ConcurrentDictionary<int, RegisteredMethodHookInfo>();
+            _remoteHooks = new ConcurrentDictionary<int, RegisteredManagedMethodHookInfo>();
             _unifiedAppDomain = new UnifiedAppDomain(this);
         }
 
@@ -116,7 +114,7 @@ namespace ScubaDiver
         }
 
         #region Helpers
-        void RefreshRuntime()
+        protected override void RefreshRuntime()
         {
             lock (_clrMdLock)
             {
@@ -573,7 +571,7 @@ namespace ScubaDiver
         }
         #region Hooks & Events Handlers
 
-        private string MakeUnhookMethodResponse(ScubaDiverMessage arg)
+        protected override string MakeUnhookMethodResponse(ScubaDiverMessage arg)
         {
             string tokenStr = arg.QueryString.Get("token");
             if (tokenStr == null || !int.TryParse(tokenStr, out int token))
@@ -582,7 +580,7 @@ namespace ScubaDiver
             }
             Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Called! Token: {token}");
 
-            if (_remoteHooks.TryRemove(token, out RegisteredMethodHookInfo rmhi))
+            if (_remoteHooks.TryRemove(token, out RegisteredManagedMethodHookInfo rmhi))
             {
                 HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
                 return "{\"status\":\"OK\"}";
@@ -591,7 +589,7 @@ namespace ScubaDiver
             Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Unknown token for event callback subscription. Token: {token}");
             return QuickError("Unknown token for event callback subscription");
         }
-        private string MakeHookMethodResponse(ScubaDiverMessage arg)
+        protected override string MakeHookMethodResponse(ScubaDiverMessage arg)
         {
             Logger.Debug("[DotNetDiver] Got Hook Method request!");
             string body = arg.Body;
@@ -674,7 +672,7 @@ namespace ScubaDiver
             Logger.Debug($"[DotNetDiver] Hooked func {methodName}!");
 
             // Keeping all hooking information aside so we can unhook later.
-            _remoteHooks[token] = new RegisteredMethodHookInfo()
+            _remoteHooks[token] = new RegisteredManagedMethodHookInfo()
             {
                 Endpoint = endpoint,
                 OriginalHookedMethod = methodInfo,
@@ -823,7 +821,6 @@ namespace ScubaDiver
             InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
 
             return hookCallbackResults.ReturnedObjectOrAddress;
-
         }
 
         #endregion
@@ -1517,7 +1514,7 @@ namespace ScubaDiver
             {
                 rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
             }
-            foreach (RegisteredMethodHookInfo rmhi in _remoteHooks.Values)
+            foreach (RegisteredManagedMethodHookInfo rmhi in _remoteHooks.Values)
             {
                 HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
             }
