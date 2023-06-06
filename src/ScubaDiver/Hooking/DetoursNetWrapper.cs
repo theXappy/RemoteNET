@@ -14,7 +14,7 @@ public class DetoursNetWrapper
 
     private static readonly ConcurrentDictionary<string, HarmonyWrapper.HookCallback> _actualHooks = new();
 
-    public void AddHook(MsvcDiver.UndecoratedExport target, HarmonyPatchPosition pos, MethodInfo mi, Type dlgt)
+    public void AddHook(MsvcDiver.UndecoratedExport target, HarmonyPatchPosition pos, Type delegateType, MethodInfo mi, Delegate delegateValue = null)
     {
         //
         // Save a side the patch callback to invoke when the target is called
@@ -23,6 +23,9 @@ public class DetoursNetWrapper
         //_actualHooks[uniqueId] = patch;
 
         string moduleName = Path.GetFileNameWithoutExtension(target.Export.ModulePath);
-        DetoursNet.Loader.HookMethod(moduleName, target.Export.Name, dlgt, mi);
+        if(delegateValue == null)
+            DetoursNet.Loader.HookMethod(moduleName, target.Export.Name, delegateType, mi);
+        else
+            DetoursNet.Loader.HookMethod(moduleName, target.Export.Name, delegateType, mi, delegateValue);
     }
 }

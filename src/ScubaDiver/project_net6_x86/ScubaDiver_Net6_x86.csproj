@@ -14,8 +14,8 @@
 		<Compile Include="..\DotNetDiver.cs" />
 		<Compile Include="..\DiverBase.cs" />
 		<Compile Include="..\DllEntry.cs" />
-		<Compile Include="..\Hooking\HarmonyWrapper.cs" Link="Hooking\HarmonyWrapper.cs"/>
-		<Compile Include="..\Hooking\DetoursNetWrapper.cs" Link="Hooking\DetoursNetWrapper.cs"/>
+		<Compile Include="..\Hooking\HarmonyWrapper.cs" Link="Hooking\HarmonyWrapper.cs" />
+		<Compile Include="..\Hooking\DetoursNetWrapper.cs" Link="Hooking\DetoursNetWrapper.cs" />
 		<Compile Include="..\Logger.cs" />
 		<Compile Include="..\RegisteredEventHandlerInfo.cs" />
 		<Compile Include="..\RegisteredMethodHookInfo.cs" />
@@ -54,6 +54,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\detours.net\build\DetoursNet\DetoursNet.csproj" />
 		<ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj" />
+		<ProjectReference Include="..\..\ScubaDiver.Demangle\ScubaDiver.Demangle.csproj" />
 	</ItemGroup>
 
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
