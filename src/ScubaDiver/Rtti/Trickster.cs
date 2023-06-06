@@ -112,6 +112,10 @@ public unsafe class Trickster : IDisposable
                 nuint address = segmentBaseAddress + offset;
                 if (getClassName(address) is string className)
                 {
+                    // Checking for the "BEL" control char
+                    if(className.Contains('\a'))
+                        continue;
+
                     if (className == "type_info")
                         typeInfoSeen = true;
                     list.Add(new TypeInfo(moduleName, className, address, offset));

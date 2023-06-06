@@ -54,6 +54,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\detours.net\build\DetoursNet\DetoursNet.csproj" />
 		<ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj" />
+		<ProjectReference Include="..\..\ScubaDiver.Demangle\ScubaDiver.Demangle.csproj" />
 	</ItemGroup>
 
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
