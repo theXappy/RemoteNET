@@ -365,7 +365,8 @@ public unsafe class Trickster : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[Error] Couldn't scan for 'operator new' in {module.Name}, EX: " + ex.GetType().Name);
+                    if(ex is not ApplicationException)
+                        Console.WriteLine($"[Error] Couldn't scan for 'operator new' in {module.Name}, EX: " + ex.GetType().Name);
                 }
             }
         }
