@@ -1,4 +1,4 @@
-﻿using ScubaDiver.API.Interactions.Dumps;
+using ScubaDiver.API.Interactions.Dumps;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +14,7 @@ using DetoursNet;
 using System.Threading;
 using ScubaDiver.Rtti;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
+using System.Net.Sockets;
 
 namespace ScubaDiver
 {
@@ -33,7 +34,7 @@ namespace ScubaDiver
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(Init)} IN");
 
             Dictionary<long, UndecoratedFunction> initMethods = GetAutoClassInit2Funcs(modules);
-            Dictionary<string, List<UndecoratedFunction>> ctors = GetCtors(modules);
+            Dictionary<TypeInfo, List<UndecoratedFunction>> ctors = GetCtors(modules);
             Dictionary<string, List<UndecoratedFunction>> newOperators = GetNewOperators(modules);
 
             HookAutoClassInit2Funcs(initMethods);
@@ -64,7 +65,7 @@ namespace ScubaDiver
             return res;
         }
 
-        private Dictionary<string, List<UndecoratedFunction>> GetCtors(List<UndecoratedModule> modules)
+        private Dictionary<TypeInfo, List<UndecoratedFunction>> GetCtors(List<UndecoratedModule> modules)
         {
             string GetCtorName(TypeInfo type)
             {
@@ -74,7 +75,7 @@ namespace ScubaDiver
             }
 
             void ProcessSingleModule(UndecoratedModule module,
-                Dictionary<string, List<UndecoratedFunction>> workingDict)
+                Dictionary<TypeInfo, List<UndecoratedFunction>> workingDict)
             {
                 foreach (TypeInfo type in module.Type)
                 {
@@ -83,11 +84,11 @@ namespace ScubaDiver
                         continue;
 
                     // Found the method group
-                    workingDict[type.Name] = ctors;
+                    workingDict[type] = ctors;
                 }
             }
 
-            Dictionary<string, List<UndecoratedFunction>> res = new();
+            Dictionary<TypeInfo, List<UndecoratedFunction>> res = new();
             foreach (UndecoratedModule module in modules)
             {
                 ProcessSingleModule(module, res);
@@ -153,13 +154,15 @@ namespace ScubaDiver
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new's.. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
 
-        private static void HookCtors(Dictionary<string, List<UndecoratedFunction>> ctors)
+        private static void HookCtors(Dictionary<TypeInfo, List<UndecoratedFunction>> ctors)
         {
             // Hook all ctors
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook ctors...");
             int attemptedHookedCtorsCount = 0;
             foreach (var kvp in ctors)
             {
+                TypeInfo type = kvp.Key;
+                string fullTypeName = $"{type.ModuleName}!{type.Name}";
                 foreach (var ctor in kvp.Value)
                 {
                     string basicName;
