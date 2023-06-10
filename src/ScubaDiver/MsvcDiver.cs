@@ -82,7 +82,7 @@ namespace ScubaDiver
                 UndecoratedModule module = new UndecoratedModule(moduleInfo.Name);
                 foreach (Rtti.TypeInfo typeInfo in types)
                 {
-                    IEnumerable<UndecoratedFunction> methods = GetExportedTypeMethod(typeInfo.ModuleName, typeInfo.Name);
+                    IEnumerable<UndecoratedFunction> methods = GetExportedTypeMethod(moduleInfo, typeInfo.Name);
                     foreach (var method in methods)
                     {
                         module.AddTypeFunction(typeInfo, method);
@@ -96,19 +96,22 @@ namespace ScubaDiver
                 // This list should now hold only typeless funcs
                 foreach (DllExport export in allExports)
                 {
-                    if(!export.TryUndecorate(out UndecoratedFunction output))
+                    if(!export.TryUndecorate(moduleInfo, out UndecoratedFunction output))
                         continue;
                     
                     module.AddTypelessFunction(export.Name, output);
                 }
 
                 // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
-                if(_trickster.OperatorNewFuncs.TryGetValue(moduleInfo, out nuint[] operatorNewAddresses))
-                foreach (nuint operatorNewAddr in operatorNewAddresses)
+                if (_trickster.OperatorNewFuncs.TryGetValue(moduleInfo, out nuint[] operatorNewAddresses))
                 {
-                    UndecoratedFunction undecFunction =
-                        new UndecoratedInternalFunction("operator new", "operator new", (long)operatorNewAddr);
-                    module.AddTypelessFunction("operator new", undecFunction);
+                    foreach (nuint operatorNewAddr in operatorNewAddresses)
+                    {
+                        UndecoratedFunction undecFunction =
+                            new UndecoratedInternalFunction("operator new", "operator new", (long)operatorNewAddr,
+                                moduleInfo);
+                        module.AddTypelessFunction("operator new", undecFunction);
+                    }
                 }
 
                 return module;
@@ -232,13 +235,18 @@ namespace ScubaDiver
                 return QuickError($"hook_position in native apps can only be {HarmonyPatchPosition.Prefix}");
 
             ParseFullTypeName(rawTypeFilter, out var rawAssemblyFilter, out rawTypeFilter);
-            Rtti.TypeInfo[] typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter).ToArray();
+            var modulesToTypes = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
+            if (modulesToTypes.Count != 1)
+                QuickError($"Expected exactly 1 match for module, got {modulesToTypes.Count}");
+
+            Rtti.ModuleInfo module = modulesToTypes.Keys.Single();
+            Rtti.TypeInfo[] typeInfos = modulesToTypes[module].ToArray();
             if (typeInfos.Length != 1)
-                QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
+                QuickError($"Expected exactly 1 match for module, got {typeInfos.Length}");
 
-            var typeInfo = typeInfos[0];
+            Rtti.TypeInfo typeInfo = typeInfos.Single();
 
-            var methods = GetExportedTypeMethod(typeInfo.ModuleName, typeInfo.Name);
+            var methods = GetExportedTypeMethod(module, typeInfo.Name);
 
             UndecoratedFunction methodToHook = null;
             foreach (var method in methods)
@@ -440,51 +448,56 @@ namespace ScubaDiver
 
         private ManagedTypeDump GetManagedTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
-            IEnumerable<Rtti.TypeInfo> typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
-            foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
+            var typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
+            foreach (KeyValuePair<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> moduleAndTypes in typeInfos)
             {
-                string moduleName = typeInfo.ModuleName;
-                string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
-                string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
-
-                List<ManagedTypeDump.TypeMethod> methods = new();
-                List<ManagedTypeDump.TypeMethod> constructors = new();
-                foreach (UndecoratedFunction dllExport in GetExportedTypeMethod(moduleName, typeInfo.Name))
+                Rtti.ModuleInfo module = moduleAndTypes.Key;
+                foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
                 {
-                    ManagedTypeDump.TypeMethod method = new()
+                    string moduleName = typeInfo.ModuleName;
+                    string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
+                    string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
+
+                    List<ManagedTypeDump.TypeMethod> methods = new();
+                    List<ManagedTypeDump.TypeMethod> constructors = new();
+                    foreach (UndecoratedFunction dllExport in GetExportedTypeMethod(module, typeInfo.Name))
                     {
-                        Name = dllExport.UndecoratedName,
-                        Visibility = "Public" // Because it's exported
+                        ManagedTypeDump.TypeMethod method = new()
+                        {
+                            Name = dllExport.UndecoratedName,
+                            Visibility = "Public" // Because it's exported
+                        };
+
+                        if (dllExport.UndecoratedName == ctorName)
+                            constructors.Add(method);
+                        else
+                            methods.Add(method);
+                    }
+
+                    ManagedTypeDump recusiveManagedTypeDump = new ManagedTypeDump()
+                    {
+                        Assembly = moduleName,
+                        Type = typeInfo.Name,
+                        Methods = methods,
+                        Constructors = constructors
                     };
-
-                    if (dllExport.UndecoratedName == ctorName)
-                        constructors.Add(method);
-                    else
-                        methods.Add(method);
+                    return recusiveManagedTypeDump;
                 }
-
-                ManagedTypeDump recusiveManagedTypeDump = new ManagedTypeDump()
-                {
-                    Assembly = moduleName,
-                    Type = typeInfo.Name,
-                    Methods = methods,
-                    Constructors = constructors
-                };
-                return recusiveManagedTypeDump;
             }
+
             return null;
         }
 
 
 
-        protected IEnumerable<UndecoratedFunction> GetExportedTypeMethod(string moduleName, string typeFullName)
+        protected IEnumerable<UndecoratedFunction> GetExportedTypeMethod(Rtti.ModuleInfo module, string typeFullName)
         {
             string membersPrefix = $"{typeFullName}::";
-            IReadOnlyList<DllExport> exports = GetExports(moduleName);
+            IReadOnlyList<DllExport> exports = GetExports(module.Name);
 
             foreach (DllExport dllExport in exports)
             {
-                if (dllExport.TryUndecorate(out UndecoratedFunction output) &&
+                if (dllExport.TryUndecorate(module, out UndecoratedFunction output) &&
                     output.UndecoratedName.StartsWith(membersPrefix))
                 {
                     yield return output;
@@ -492,7 +505,7 @@ namespace ScubaDiver
             }
         }
 
-        private IEnumerable<ScubaDiver.Rtti.TypeInfo> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
+        private IReadOnlyDictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
         {
             if (_trickster == null || !_trickster.ScannedTypes.Any())
             {
@@ -502,20 +515,28 @@ namespace ScubaDiver
             Predicate<string> assmFilter = Filter.CreatePredicate(rawAssemblyFilter);
             Predicate<string> typeFilter = Filter.CreatePredicate(rawTypeFilter);
 
+            Dictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> output = new();
             foreach (var kvp in _trickster.ScannedTypes)
             {
                 var module = kvp.Key;
                 if (!assmFilter(module.Name))
                     continue;
 
-                ScubaDiver.Rtti.TypeInfo[] typeInfos = kvp.Value;
-                foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
+                IEnumerable<ScubaDiver.Rtti.TypeInfo> TypesDumperForModule()
                 {
-                    if (!typeFilter(typeInfo.Name))
-                        continue;
-                    yield return typeInfo;
+                    ScubaDiver.Rtti.TypeInfo[] typeInfos = kvp.Value;
+
+                    foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
+                    {
+                        if (!typeFilter(typeInfo.Name))
+                            continue;
+                        yield return typeInfo;
+                    }
                 }
+                output[module] = TypesDumperForModule();
             }
+
+            return output;
         }
 
         private Dictionary<string, List<DllExport>> _cache = new Dictionary<string, List<DllExport>>();
@@ -628,7 +649,8 @@ namespace ScubaDiver
 
             try
             {
-                Rtti.TypeInfo typeInfo = GetTypeInfos(rawAssemblyFilter, rawTypeFilter).Single();
+                var moduleAndTypes = GetTypeInfos(rawAssemblyFilter, rawTypeFilter).Single();
+                Rtti.TypeInfo typeInfo = moduleAndTypes.Value.Single();
 
                 // TODO: Actual Pin
                 ulong pinAddr = 0x0;

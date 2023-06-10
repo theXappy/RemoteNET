@@ -313,13 +313,13 @@ public unsafe class Trickster : IDisposable
 
         using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize))
         {
-            nuint inc = (nuint)(_is32Bit ? 4 : 8);
+            nuint inc = 4;
             for (nuint offset = inc; offset < segmentBSize; offset += inc)
             {
                 nuint address = segmentBaseAddress + offset;
                 if (!processMemory.TryRead<byte>(address, tempData))
                     continue;
-                if (tempData.SequenceEqual(encodedFuncEpilouge))
+                if (!tempData.SequenceEqual(encodedFuncEpilouge))
                     continue;
 
                 list.Add(address);

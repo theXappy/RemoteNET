@@ -10,7 +10,7 @@ public static class DllExportExt
         return RttiScanner.UnDecorateSymbolNameWrapper(export.Name);
     }
 
-    public static bool TryUndecorate(this DllExport input, out UndecoratedFunction output)
+    public static bool TryUndecorate(this DllExport input, ModuleInfo module, out UndecoratedFunction output)
     {
         output = null;
         string undecoratedName;
@@ -23,7 +23,7 @@ public static class DllExportExt
             return false;
         }
 
-        output = new UndecoratedExport(undecoratedName, input);
+        output = new UndecoratedExport(undecoratedName, input, module);
         return true;
     }
 }

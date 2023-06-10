@@ -14,18 +14,21 @@ public class DetoursNetWrapper
 
     private static readonly ConcurrentDictionary<string, HarmonyWrapper.HookCallback> _actualHooks = new();
 
-    public void AddHook(UndecoratedFunction target, HarmonyPatchPosition pos, Type delegateType, MethodInfo mi, Delegate delegateValue = null)
+    public bool AddHook(UndecoratedFunction target, HarmonyPatchPosition pos, Type delegateType, MethodInfo mi, Delegate delegateValue = null)
     {
-        //
-        // Save a side the patch callback to invoke when the target is called
-        //
-        //string uniqueId = target.Export.ModulePath + ":" + target.Export.Name;
-        //_actualHooks[uniqueId] = patch;
+        string moduleName = Path.GetFileNameWithoutExtension(target.Module.Name);
 
-        string moduleName = Path.GetFileNameWithoutExtension(target.Export.ModulePath);
-        if(delegateValue == null)
-            DetoursNet.Loader.HookMethod(moduleName, target.Export.Name, delegateType, mi);
-        else
-            DetoursNet.Loader.HookMethod(moduleName, target.Export.Name, delegateType, mi, delegateValue);
+        // First try to hook with module name + export name (won't work for internal methods)
+        bool success = DetoursNet.Loader.HookMethod(moduleName, target.DecoratedName, delegateType, mi, delegateValue);
+        if (success)
+            return true;
+
+        Console.WriteLine($"[DetoursNetWrapper] Hooking with LoadLibrary + GetProcAddress failed, trying direct pointers. Target: {target.Module.Name}!{target.UndecoratedName}");
+        // Fallback, Try directly with pointers
+        IntPtr module = new IntPtr((long)target.Module.BaseAddress);
+        IntPtr targetFunc = new IntPtr(target.Address);
+        success = DetoursNet.Loader.HookMethod(module, targetFunc, delegateType, mi, delegateValue);
+
+        return success;
     }
 }
