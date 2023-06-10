@@ -197,11 +197,6 @@ namespace ScubaDiver
             _trickster = new Trickster(Process.GetCurrentProcess());
             _trickster.ScanTypes();
             Logger.Debug($"[MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
-            foreach (Rtti.ModuleInfo moduleInfo in _trickster.ScannedTypes.Keys)
-            {
-                Logger.Debug(
-                    $"[MsvcDiver][Trickster]  → Module: {moduleInfo.Name}");
-            }
         }
 
         protected override string MakeUnhookMethodResponse(ScubaDiverMessage arg)
