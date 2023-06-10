@@ -25,9 +25,8 @@ namespace ScubaDiver
         private string kMangledNew64 = "??2@YAPEAX_K@Z";
         // [x64] operator new(ulong size, struct std::nothrow_t const &obj)
         private string kMangledNewNothrow64 = "??2@YAPEAX_KAEBUnothrow_t@std@@@z";
-        // ucrtbase!malloc
-        private string ucrtbase_malloc = "malloc";
-        
+
+        private string operatorNewName = "operator new";
 
         public void Init(List<UndecoratedModule> modules)
         {
@@ -38,7 +37,7 @@ namespace ScubaDiver
             Dictionary<string, List<UndecoratedFunction>> newOperators = GetNewOperators(modules);
 
             HookAutoClassInit2Funcs(initMethods);
-            //HookCtors(ctors);
+            HookCtors(ctors);
             HookNewOperators(newOperators);
 
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(Init)} OUT");
@@ -46,26 +45,14 @@ namespace ScubaDiver
 
         private Dictionary<string, List<UndecoratedFunction>> GetNewOperators(List<UndecoratedModule> modules)
         {
-            
             void ProcessSingleModule(UndecoratedModule module,
                 Dictionary<string, List<UndecoratedFunction>> workingDict)
             {
-                List<UndecoratedFunction> newOperators = new();
-                foreach (TypeInfo type in module.Type)
+                if (module.TryGetTypelessFunc(operatorNewName, out var methodGroup))
                 {
-                    //if (module.TryGetTypelessFunc(kMangledNew64, out var methodGroup))
-                    //    newOperators.AddRange(methodGroup);
-
-                    //if (module.TryGetTypelessFunc(kMangledNewNothrow64, out methodGroup))
-                    //    newOperators.AddRange(methodGroup);
-
-                    if (module.TryGetTypelessFunc(ucrtbase_malloc, out var methodGroup))
-                    {
-                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] FOUND {ucrtbase_malloc} ");
-                        newOperators.AddRange(methodGroup);
-                    }
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] FOUND {operatorNewName} in {module.Name}");
+                    workingDict[module.Name] = methodGroup;
                 }
-                workingDict[module.Name] = newOperators;
             }
 
             Dictionary<string, List<UndecoratedFunction>> res = new();
@@ -143,7 +130,7 @@ namespace ScubaDiver
         private static void HookNewOperators(Dictionary<string, List<UndecoratedFunction>> newOperators)
         {
             // Hook all new operators
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook operator new(s)...");
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook 'operator new's...");
             int attemptedOperatorNews = 0;
             foreach (var moduleToFuncs in newOperators)
             {
@@ -151,20 +138,19 @@ namespace ScubaDiver
                 {
                     attemptedOperatorNews++;
                     Logger.Debug(
-                        $"[{nameof(MsvcOffensiveGC)}] Hooking operator new at 0x{newOperator.Address:x16}");
-                    DetoursNetWrapper.Instance.AddHook(
-                        newOperator,
-                        HarmonyPatchPosition.Prefix,
-                        typeof(OperatorNewType),
-                        OperatorNewTypeMethodInfo,
-                        (OperatorNewType)OperatorNew);
+                        $"[{nameof(MsvcOffensiveGC)}] Hooking 'operator new' at 0x{newOperator.Address:x16} ({newOperator.Module})");
+
+                    var (mi, delegateValue) = GenerateMethodsForSecret(UnifiedOperatorNewMethodInfo, typeof(OperatorNewType),
+                        $"{newOperator.Module.Name}!!{newOperator.UndecoratedName}");
+                    DetoursNetWrapper.Instance.AddHook(newOperator, HarmonyPatchPosition.Prefix, typeof(OperatorNewType),
+                        mi, delegateValue);
                 }
             }
 
             Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking operator news. attempted to hook: {attemptedOperatorNews} funcs");
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new's. attempted to hook: {attemptedOperatorNews} funcs");
             Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking operator news.. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new's.. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
 
         private static void HookCtors(Dictionary<string, List<UndecoratedFunction>> ctors)
@@ -185,7 +171,7 @@ namespace ScubaDiver
                     }
                     catch (Exception ex)
                     {
-                        Logger.Debug($"Failed to demangle ctor of {kvp.Key}, Raw: {ctor.DecoratedName}, Exception: " +  ex.Message);
+                        Logger.Debug($"Failed to demangle ctor of {kvp.Key}, Raw: {ctor.DecoratedName}, Exception: " + ex.Message);
                         continue;
                     }
 
@@ -294,10 +280,20 @@ namespace ScubaDiver
             ulong res = 0x0bad_c0de_dead_c0de;
             int hashcode = 0x00000000;
 
-            if (!_cached.ContainsKey(secret)) return res;
+            if (!_cached.ContainsKey(secret))
+            {
+                Console.WriteLine("[MsvcOffensiveGC] CAN'T FIND CTOR IN CACHE! Expect a crash! Offender in next line: ");
+                Console.WriteLine(secret);
+                return res;
+            }
             var (originalHookMethodInfo, _) = _cached[secret];
 
-            if (!DelegateStore.Real.ContainsKey(originalHookMethodInfo)) return res;
+            if (!DelegateStore.Real.ContainsKey(originalHookMethodInfo))
+            {
+                Console.WriteLine("[MsvcOffensiveGC] CAN'T FIND CTOR IN DelegateStore! Expect a crash! Offender in next line: ");
+                Console.WriteLine(secret);
+                return res;
+            }
             var originalMethod = (GenericCtorType)DelegateStore.Real[originalHookMethodInfo];
             // Invoking original ctor
             res = originalMethod(self);
@@ -314,7 +310,6 @@ namespace ScubaDiver
 
         public static void UnifiedAutoClassInit2(string secret, ulong self, ulong size)
         {
-            Logger.Debug($@"[UnifiedAutoClassInit2] In. Self: 0x{self:x16}, Size: {size}");
             // NOTE: Secret is not to be trusted here because __autoclassinit2 is often shared
             // between various classes in the same dll.
             RegisterSize(self, size);
@@ -326,8 +321,6 @@ namespace ScubaDiver
             var originalMethod = (AutoClassInit2Type)DelegateStore.Real[originalHookMethodInfo];
             // Invoking original ctor
             originalMethod(self, size);
-            Logger.Debug($@"[UnifiedAutoClassInit2] Out. Self: 0x{self:x16}, Size: {size}");
-            return;
         }
 
 
@@ -336,33 +329,31 @@ namespace ScubaDiver
         // +----------------------+
         public delegate ulong OperatorNewType(ulong size);
 
-        private static MethodInfo OperatorNewTypeMethodInfo =
-            typeof(MsvcOffensiveGC).GetMethod(nameof(OperatorNew));
+        private static MethodInfo UnifiedOperatorNewMethodInfo =
+            typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedOperatorNew));
 
-        public static ulong OperatorNew(ulong size)
+        public static ulong UnifiedOperatorNew(string secret, ulong size)
         {
-            Logger.Debug("[OperatorNew] In");
-            Logger.Debug(@"[OperatorNew] In. Size: {size}");
             ulong res = 0;
 
-            if (!DelegateStore.Real.ContainsKey(OperatorNewTypeMethodInfo)) return res;
-            var originalMethod = (OperatorNewType)DelegateStore.Real[OperatorNewTypeMethodInfo];
+            if (!_cached.ContainsKey(secret))
+                return res;
+            var (originalHookMethodInfo, _) = _cached[secret];
+
+            var originalMethod = (OperatorNewType)DelegateStore.Real[originalHookMethodInfo];
             // Invoking original ctor
             res = originalMethod(size);
-            Logger.Debug(@"[OperatorNew] In. Size: {size}, returned addr: {res}");
+            //Logger.Debug($"[OperatorNew] Invoked original. Size: {size}, returned addr: {res}");
 
             if (res != 0)
             {
-                Logger.Debug("[OperatorNew] Calling RegisterSize");
                 RegisterSize(res, size);
-                Logger.Debug("[OperatorNew] Calling RegisterSize -- done");
             }
             else
             {
                 Logger.Debug("[Error] Operator new failed (returned null).");
             }
 
-            Logger.Debug("[OperatorNew] Out (Happy)");
             return res;
         }
 
@@ -371,22 +362,37 @@ namespace ScubaDiver
         // | Class Sizes Match  Making |
         // +---------------------------+
         private static LRUCache<ulong, ulong> _addrToSize = new LRUCache<ulong, ulong>(100);
+        private static object _addrToSizeLock = new();
         private static Dictionary<string, ulong> ClassSizes = new Dictionary<string, ulong>();
+        private static object ClassSizesLock = new();
         public IReadOnlyDictionary<string, ulong> GetFindings() => ClassSizes;
 
         public static void RegisterSize(ulong addr, ulong size)
         {
-            _addrToSize.AddOrUpdate(addr, size);
+            lock (_addrToSizeLock)
+            {
+                _addrToSize.AddOrUpdate(addr, size);
+            }
         }
 
         public static void RegisterClassName(ulong addr, string className)
         {
             // Check if we already found the size of this class
-            if(ClassSizes.ContainsKey(className))
-                return;
+            lock (ClassSizesLock)
+            {
+                if (ClassSizes.ContainsKey(className))
+                    return;
+            }
 
             // Check recent "allocations"
-            if (_addrToSize.TryGetValue(addr, true, out ulong size))
+            bool res;
+            ulong size;
+            lock (_addrToSizeLock)
+            {
+                res = _addrToSize.TryGetValue(addr, true, out size);
+            }
+
+            if (res)
             {
                 // Found a match!
                 ClassSizes[className] = size;
