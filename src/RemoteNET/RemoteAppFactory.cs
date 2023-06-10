@@ -122,9 +122,13 @@ namespace RemoteNET
                 // So for those cases we're running Lifeboar, a reverse proxy, and interacting with the diver through it.
                 ProcessStartInfo psi = new ProcessStartInfo(kit.LifeboatExePath, diverPort.ToString());
                 psi.UseShellExecute = true;
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
+                psi.CreateNoWindow = true;
                 Process.Start(psi);
                 psi = new ProcessStartInfo(kit.LifeboatExePath, (diverPort + 2).ToString());
                 psi.UseShellExecute = true;
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
+                psi.CreateNoWindow = true;
                 Process.Start(psi);
             }
 
