@@ -66,6 +66,7 @@ public unsafe class Trickster : IDisposable
     private bool _is32Bit;
 
     public Dictionary<ModuleInfo, TypeInfo[]> ScannedTypes;
+    public Dictionary<ModuleInfo, nuint[]> OperatorNewFuncs;
     public MemoryRegion[] Regions;
     public List<ModuleInfo> ModulesParsed;
 
@@ -113,7 +114,7 @@ public unsafe class Trickster : IDisposable
                 if (getClassName(address) is string className)
                 {
                     // Checking for the "BEL" control char
-                    if(className.Contains('\a'))
+                    if (className.Contains('\a'))
                         continue;
 
                     if (className == "type_info")
@@ -293,16 +294,94 @@ public unsafe class Trickster : IDisposable
             }
         });
 
-        Dictionary<ulong, IReadOnlyCollection<ulong>> results2 = 
+        Dictionary<ulong, IReadOnlyCollection<ulong>> results2 =
             results.ToDictionary(
-                kvp => kvp.Key, 
+                kvp => kvp.Key,
                 kvp => (IReadOnlyCollection<ulong>)kvp.Value);
         return results2;
     }
 
+    private nuint[] ScanOperatorNewFuncsCore(string moduleName, nuint moduleBaseAddress, nuint moduleSize, nuint segmentBaseAddress, nuint segmentBSize)
+    {
+        List<nuint> list = new();
+
+        byte[] encodedFuncEpilouge = new byte[]
+        {
+            0x40, 0x53, 0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0xD9, 0xEB, 0x0F
+        };
+        byte[] tempData = new byte[encodedFuncEpilouge.Length];
+
+        using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize))
+        {
+            nuint inc = (nuint)(_is32Bit ? 4 : 8);
+            for (nuint offset = inc; offset < segmentBSize; offset += inc)
+            {
+                nuint address = segmentBaseAddress + offset;
+                if (!processMemory.TryRead<byte>(address, tempData))
+                    continue;
+                if (tempData.SequenceEqual(encodedFuncEpilouge))
+                    continue;
+
+                list.Add(address);
+            }
+        }
+
+        return list.ToArray();
+    }
+
+    private Dictionary<ModuleInfo, nuint[]> ScanOperatorNewFuncsCore()
+    {
+        Dictionary<ModuleInfo, nuint[]> res = new();
+
+        Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
+        foreach (ModuleInfo modInfo in ModulesParsed)
+        {
+            List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
+            foreach (ModuleSegment moduleSegment in sections)
+            {
+                if (!dataSegments.ContainsKey(modInfo))
+                    dataSegments.Add(modInfo, new List<ModuleSegment>());
+
+                dataSegments[modInfo].Add(moduleSegment);
+            }
+        }
+
+        foreach (var kvp in dataSegments)
+        {
+            var module = kvp.Key;
+            var segments = kvp.Value;
+
+            foreach (ModuleSegment segment in segments)
+            {
+                try
+                {
+                    var types = ScanOperatorNewFuncsCore(module.Name, module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
+                    if (types.Length > 0)
+                    {
+                        if (!res.ContainsKey(module))
+                            res[module] = Array.Empty<nuint>();
+                        res[module] = res[module].Concat(types).ToArray();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Error] Couldn't scan for 'operator new' in {module.Name}, EX: " + ex.GetType().Name);
+                }
+            }
+        }
+
+        return res;
+    }
+
+
     public void ScanTypes()
     {
         ScannedTypes = ScanTypesCore();
+    }
+
+    public void ScanOperatorNewFuncs()
+    {
+        OperatorNewFuncs = ScanOperatorNewFuncsCore();
     }
 
     public void ReadRegions()

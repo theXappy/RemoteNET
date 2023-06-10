@@ -77,13 +77,10 @@ public class Program
         if (!HandleCommandLineArgs(args, out int port))
             return;
 
-        DoTheThing(port);
+        HandleConnections(port);
     }
 
-
-
-
-    public static void DoTheThing(int port)
+    public static void HandleConnections(int port)
     {
         int stage = 0;
         void Log(string msg)
@@ -125,8 +122,17 @@ public class Program
             var diverOut = new BlockingCollection<OverTheWireRequest>();
             var diverReaderTask = Task.Run(() => Reader(diverConnection, diverOut));
             var diverWriterTask = Task.Run(() => Writer(diverConnection, diverIn));
-            diverReaderTask.ContinueWith(t => Log("DIVER READER DIED :((((((((((((((((((("));
-            diverWriterTask.ContinueWith(t => Log("DIVER WRITER DIED :((((((((((((((((((("));
+            ManualResetEvent diverDied = new ManualResetEvent(true);
+            diverReaderTask.ContinueWith(t =>
+            {
+                Log("DIVER READER DIED :(");
+                Environment.Exit(10);
+            });
+            diverWriterTask.ContinueWith(t =>
+            {
+                Log("DIVER WRITER DIED :(");
+                Environment.Exit(10);
+            });
 
             // Start accepting more clients
             while (true)

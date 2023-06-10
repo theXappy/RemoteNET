@@ -13,7 +13,7 @@ namespace ScubaDiver
         /// <summary>
         /// The method that was hooked
         /// </summary>
-        public MsvcDiver.UndecoratedExport OriginalHookedMethod { get; set; }
+        public UndecoratedFunction OriginalHookedMethod { get; set; }
 
         /// <summary>
         /// The IP Endpoint listening for invocations

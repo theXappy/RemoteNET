@@ -14,7 +14,7 @@ public class DetoursNetWrapper
 
     private static readonly ConcurrentDictionary<string, HarmonyWrapper.HookCallback> _actualHooks = new();
 
-    public void AddHook(MsvcDiver.UndecoratedExport target, HarmonyPatchPosition pos, Type delegateType, MethodInfo mi, Delegate delegateValue = null)
+    public void AddHook(UndecoratedFunction target, HarmonyPatchPosition pos, Type delegateType, MethodInfo mi, Delegate delegateValue = null)
     {
         //
         // Save a side the patch callback to invoke when the target is called
