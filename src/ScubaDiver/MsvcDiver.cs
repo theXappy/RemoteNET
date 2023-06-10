@@ -18,6 +18,8 @@ using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using ModuleInfo = Microsoft.Diagnostics.Runtime.ModuleInfo;
 using TypeInfo = System.Reflection.TypeInfo;
+using System.Reflection;
+using ScubaDiver.Demangle.Demangle.Core.NativeInterface;
 
 namespace ScubaDiver
 {
@@ -43,34 +45,94 @@ namespace ScubaDiver
             base.Start();
         }
 
+
+        private MsvcOffensiveGC gc;
+
         protected string MakeGcResponse(ScubaDiverMessage req)
         {
             Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
 
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Dumping types and undecorating methods...");
-            var typeInfos = GetTypeInfos("*", "*");
-            Dictionary<string, IEnumerable<UndecoratedExport>> typeToMethods = new Dictionary<string, IEnumerable<UndecoratedExport>>();
-            foreach (var typeInfo in typeInfos)
-            {
-                var methods = GetExportedTypeMethod(typeInfo.ModuleName, typeInfo.Name);
-                typeToMethods[typeInfo.Name] = methods;
-            }
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Dumping types and undecorating methods... DONE! Found: {typeToMethods.Count}");
+            List<UndecoratedModule> undecModules = GetUndecoratedModules();
 
 
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} creating GC and init'ing");
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Init'ing GC");
             try
             {
-                MsvcOffensiveGC gc = new MsvcOffensiveGC();
-                gc.Init(typeToMethods);
+                gc = new MsvcOffensiveGC();
+                gc.Init(undecModules);
             }
             catch (Exception e)
             {
                 Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Exception: " + e);
             }
 
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} OTU!");
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} OUT!");
             return "{\"status\":\"ok\"}";
+        }
+
+
+        private Dictionary<string, UndecoratedModule> _undecModeulesCache = new Dictionary<string, UndecoratedModule>();
+        private List<UndecoratedModule> GetUndecoratedModules()
+        {
+            UndecoratedModule GenerateUndecoratedModule(Rtti.ModuleInfo moduleInfo, Rtti.TypeInfo[] types)
+            {
+                // Getting all exports, type funcs and typeless
+                List<DllExport> allExports = new List<DllExport>(GetExports(moduleInfo.Name));
+
+                UndecoratedModule module = new UndecoratedModule(moduleInfo.Name);
+                foreach (Rtti.TypeInfo typeInfo in types)
+                {
+                    IEnumerable<UndecoratedFunction> methods = GetExportedTypeMethod(typeInfo.ModuleName, typeInfo.Name);
+                    foreach (var method in methods)
+                    {
+                        module.AddTypeFunction(typeInfo, method);
+
+                        // Removing type funcs from allExports
+                        if(method is UndecoratedExport undecExport)
+                            allExports.Remove(undecExport.Export);
+                    }
+                }
+                
+                // This list should now hold only typeless funcs
+                foreach (DllExport export in allExports)
+                {
+                    if(!export.TryUndecorate(out UndecoratedFunction output))
+                        continue;
+                    
+                    module.AddTypelessFunction(export.Name, output);
+                }
+
+                // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
+                if(_trickster.OperatorNewFuncs.TryGetValue(moduleInfo, out nuint[] operatorNewAddresses))
+                foreach (nuint operatorNewAddr in operatorNewAddresses)
+                {
+                    UndecoratedFunction undecFunction =
+                        new UndecoratedInternalFunction("operator new", "operator new", (long)operatorNewAddr);
+                    module.AddTypelessFunction("operator new", undecFunction);
+                }
+
+                return module;
+            }
+
+            RefreshRuntime();
+            _trickster.ScanOperatorNewFuncs();
+            Dictionary<Rtti.ModuleInfo, Rtti.TypeInfo[]> modulesAndTypes = _trickster.ScannedTypes;
+
+            List<UndecoratedModule> output = new();
+            foreach (KeyValuePair<Rtti.ModuleInfo, Rtti.TypeInfo[]> kvp in modulesAndTypes)
+            {
+                var module = kvp.Key;
+                if (!_undecModeulesCache.TryGetValue(module.Name, out UndecoratedModule undecModule))
+                {
+                    // Generate the undecorated module and save in cache
+                    undecModule = GenerateUndecoratedModule(module, kvp.Value);
+                    _undecModeulesCache[module.Name] = undecModule;
+                }
+                // store this module for the output
+                output.Add(undecModule);
+            }
+
+            return output;
         }
 
         private List<SafeHandle> _injectedDlls = new List<SafeHandle>();
@@ -178,7 +240,7 @@ namespace ScubaDiver
 
             var methods = GetExportedTypeMethod(typeInfo.ModuleName, typeInfo.Name);
 
-            UndecoratedExport methodToHook = null;
+            UndecoratedFunction methodToHook = null;
             foreach (var method in methods)
             {
                 if (method.UndecoratedName != methodName)
@@ -387,11 +449,11 @@ namespace ScubaDiver
 
                 List<ManagedTypeDump.TypeMethod> methods = new();
                 List<ManagedTypeDump.TypeMethod> constructors = new();
-                foreach (UndecoratedExport dllExport in GetExportedTypeMethod(moduleName, typeInfo.Name))
+                foreach (UndecoratedFunction dllExport in GetExportedTypeMethod(moduleName, typeInfo.Name))
                 {
                     ManagedTypeDump.TypeMethod method = new()
                     {
-                        Name = dllExport.Export.Name,
+                        Name = dllExport.UndecoratedName,
                         Visibility = "Public" // Because it's exported
                     };
 
@@ -413,34 +475,22 @@ namespace ScubaDiver
             return null;
         }
 
-        public class UndecoratedExport
-        {
-            public string UndecoratedName { get; set; }
-            public DllExport Export { get; set; }
 
-            public UndecoratedExport(string name, DllExport export)
-            {
-                UndecoratedName = name;
-                Export = export;
-            }
 
-            public override string ToString() => UndecoratedName;
-        }
-
-        protected IEnumerable<UndecoratedExport> GetExportedTypeMethod(string moduleName, string typeFullName)
+        protected IEnumerable<UndecoratedFunction> GetExportedTypeMethod(string moduleName, string typeFullName)
         {
             string membersPrefix = $"{typeFullName}::";
-            List<DllExport> exports = GetExports(moduleName);
+            IReadOnlyList<DllExport> exports = GetExports(moduleName);
 
             foreach (DllExport dllExport in exports)
             {
-                string undecorated = dllExport.UndecorateName();
-                if (!undecorated.StartsWith(membersPrefix))
-                    continue;
-                yield return new UndecoratedExport(undecorated, dllExport);
+                if (dllExport.TryUndecorate(out UndecoratedFunction output) &&
+                    output.UndecoratedName.StartsWith(membersPrefix))
+                {
+                    yield return output;
+                }
             }
         }
-
 
         private IEnumerable<ScubaDiver.Rtti.TypeInfo> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
         {
@@ -469,7 +519,7 @@ namespace ScubaDiver
         }
 
         private Dictionary<string, List<DllExport>> _cache = new Dictionary<string, List<DllExport>>();
-        private List<DllExport> GetExports(string moduleName)
+        private IReadOnlyList<DllExport> GetExports(string moduleName)
         {
             if (!_cache.ContainsKey(moduleName))
             {
@@ -634,11 +684,71 @@ namespace ScubaDiver
 
     }
 
-    public static class DllExportExt
+    public class UndecoratedMethodGroup : List<UndecoratedFunction>
     {
-        public static string UndecorateName(this DllExport export)
+    }
+
+    public class UndecoratedType : Dictionary<string, UndecoratedMethodGroup>
+    {
+        public void AddOrCreate(string methodName, UndecoratedFunction func) => GetOrAddGroup(methodName).Add(func);
+
+        private UndecoratedMethodGroup GetOrAddGroup(string method)
         {
-            return RttiScanner.UnDecorateSymbolNameWrapper(export.Name);
+            if (!this.ContainsKey(method))
+                this[method] = new UndecoratedMethodGroup();
+            return this[method];
+        }
+    }
+
+    public class UndecoratedModule
+    {
+        public string Name { get; private set; }
+
+        private Dictionary<Rtti.TypeInfo, UndecoratedType> _types;
+        private Dictionary<string, UndecoratedMethodGroup> _typelessFunctions;
+
+        public UndecoratedModule(string name)
+        {
+            Name = name;
+            _types = new Dictionary<Rtti.TypeInfo, UndecoratedType>();
+            _typelessFunctions = new Dictionary<string, UndecoratedMethodGroup>();
+        }
+
+        public IEnumerable<Rtti.TypeInfo> Type => _types.Keys;
+
+        public bool TryGetType(Rtti.TypeInfo type, out UndecoratedType res)
+            => _types.TryGetValue(type, out res);
+
+
+        public void AddTypeFunction(Rtti.TypeInfo type, UndecoratedFunction func)
+        {
+            var undType = GetOrAdd(type);
+            if (!undType.ContainsKey(func.UndecoratedName))
+                undType[func.UndecoratedName] = new UndecoratedMethodGroup();
+            undType[func.UndecoratedName].Add(func);
+        }
+
+        public bool TryGetTypeFunc(Rtti.TypeInfo type, string undecMethodName, out UndecoratedMethodGroup res)
+        {
+            res = null;
+            return TryGetType(type, out var undType) && undType.TryGetValue(undecMethodName, out res);
+        }
+        public void AddTypelessFunction(string decoratedMethodName, UndecoratedFunction func)
+        {
+            if (!_typelessFunctions.ContainsKey(decoratedMethodName))
+                _typelessFunctions[decoratedMethodName] = new UndecoratedMethodGroup();
+            _typelessFunctions[decoratedMethodName].Add(func);
+        }
+        public bool TryGetTypelessFunc(string decoratedMethodName, out UndecoratedMethodGroup res)
+        {
+            return _typelessFunctions.TryGetValue(decoratedMethodName, out res);
+        }
+
+        private UndecoratedType GetOrAdd(Rtti.TypeInfo type)
+        {
+            if (!_types.ContainsKey(type))
+                _types[type] = new UndecoratedType();
+            return _types[type];
         }
     }
 }

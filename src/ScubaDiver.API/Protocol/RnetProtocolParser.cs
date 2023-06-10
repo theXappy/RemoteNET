@@ -15,7 +15,6 @@ public static class RnetProtocolParser
     {
         try
         {
-            Console.Error.WriteLine($"[@@@][{DateTime.Now}][RnetProtocolParser] Parse started");
             if (token == default)
                 token = CancellationToken.None;
 
@@ -53,8 +52,6 @@ public static class RnetProtocolParser
                 break;
             }
 
-            Console.Error.WriteLine(
-                $"[@@@][{DateTime.Now}][RnetProtocolParser] Parse finished. OverTheWireRequest message's path: {request.UrlAbsolutePath}");
             return request;
         }
         catch (Exception ex)

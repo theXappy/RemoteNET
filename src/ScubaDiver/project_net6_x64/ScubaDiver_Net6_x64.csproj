@@ -30,9 +30,13 @@
 		<Compile Include="..\Utils\SmartLocksDict.cs" Link="Utils\SmartLocksDict.cs" />
 		<Compile Include="..\Utils\TypesResolver.cs" Link="Utils\TypesResolver.cs" />
 		<Compile Include="..\Utils\UnifiedAppDomain.cs" Link="Utils\UnifiedAppDomain.cs" />
-		<Compile Include="..\Rtti\RttiScanner.cs" Link="Rtti\RttiScanner.cs" />
-		<Compile Include="..\Rtti\Trickster.cs" Link="Rtti\Trickster.cs" />
-		<Compile Include="..\Rtti\TricksterUI.cs" Link="Rtti\TricksterUI.cs" />
+		<Compile Include="..\MsvcPrimitives\DllExportExt.cs" Link="MsvcPrimitives\DllExportExt.cs" />
+		<Compile Include="..\MsvcPrimitives\RttiScanner.cs" Link="MsvcPrimitives\RttiScanner.cs" />
+		<Compile Include="..\MsvcPrimitives\Trickster.cs" Link="MsvcPrimitives\Trickster.cs" />
+		<Compile Include="..\MsvcPrimitives\TricksterUI.cs" Link="MsvcPrimitives\TricksterUI.cs" />
+		<Compile Include="..\MsvcPrimitives\UndecoratedExport.cs" Link="MsvcPrimitives\UndecoratedExport.cs" />
+		<Compile Include="..\MsvcPrimitives\UndecoratedFunction.cs" Link="MsvcPrimitives\UndecoratedFunction.cs" />
+		<Compile Include="..\MsvcPrimitives\UndecoratedInternalFunction.cs" Link="MsvcPrimitives\UndecoratedInternalFunction.cs" />
 		<Compile Include="..\MsvcDiver.cs" />
 		<Compile Include="..\MsvcOffensiveGC.cs" />
 		<Compile Include="..\HttpRequestsListener.cs" />

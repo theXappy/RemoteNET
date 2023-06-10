@@ -12,226 +12,462 @@ using ScubaDiver.Hooking;
 using System.Reflection.Emit;
 using DetoursNet;
 using System.Threading;
+using ScubaDiver.Rtti;
+using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 
 namespace ScubaDiver
 {
     internal class MsvcOffensiveGC
     {
-        private Dictionary<string, int> ClassSizes = new Dictionary<string, int>();
 
-        public void Init(Dictionary<string, IEnumerable<MsvcDiver.UndecoratedExport>> types)
+        // From https://github.com/gperftools/gperftools/issues/715
+        // [x64] operator new(ulong size)
+        private string kMangledNew64 = "??2@YAPEAX_K@Z";
+        // [x64] operator new(ulong size, struct std::nothrow_t const &obj)
+        private string kMangledNewNothrow64 = "??2@YAPEAX_KAEBUnothrow_t@std@@@z";
+        // ucrtbase!malloc
+        private string ucrtbase_malloc = "malloc";
+        
+
+        public void Init(List<UndecoratedModule> modules)
         {
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(Init)} IN");
-            // Find all __autoclassinit functions
-            var initMethods = new Dictionary<long, MsvcDiver.UndecoratedExport>();
-            var ctors = new Dictionary<string, List<MsvcDiver.UndecoratedExport>>();
-            foreach (var type in types)
+
+            Dictionary<long, UndecoratedFunction> initMethods = GetAutoClassInit2Funcs(modules);
+            Dictionary<string, List<UndecoratedFunction>> ctors = GetCtors(modules);
+            Dictionary<string, List<UndecoratedFunction>> newOperators = GetNewOperators(modules);
+
+            HookAutoClassInit2Funcs(initMethods);
+            //HookCtors(ctors);
+            HookNewOperators(newOperators);
+
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(Init)} OUT");
+        }
+
+        private Dictionary<string, List<UndecoratedFunction>> GetNewOperators(List<UndecoratedModule> modules)
+        {
+            
+            void ProcessSingleModule(UndecoratedModule module,
+                Dictionary<string, List<UndecoratedFunction>> workingDict)
             {
-                string fullTypeName = type.Key;
-                string className = fullTypeName.Substring(fullTypeName.LastIndexOf("::") + 2);
-                string ctorName = $"{fullTypeName}::{className}";
-                foreach (var typeMethod in type.Value)
+                List<UndecoratedFunction> newOperators = new();
+                foreach (TypeInfo type in module.Type)
                 {
-                    // Find autoclassinit
-                    if (typeMethod.UndecoratedName.Contains("autoclassinit2"))
-                    {
-                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Auto Class Init 2: {typeMethod.UndecoratedName}");
+                    //if (module.TryGetTypelessFunc(kMangledNew64, out var methodGroup))
+                    //    newOperators.AddRange(methodGroup);
 
-                        // Multiple classes in the same module might share the autoclassinit func,
-                        // so we make sure to only add it once.
-                        if (!initMethods.ContainsKey(typeMethod.Export.Address))
-                            initMethods[typeMethod.Export.Address] = typeMethod;
-                    }
+                    //if (module.TryGetTypelessFunc(kMangledNewNothrow64, out methodGroup))
+                    //    newOperators.AddRange(methodGroup);
 
-                    // Find ctor(s)
-                    if (typeMethod.UndecoratedName.Contains(ctorName))
+                    if (module.TryGetTypelessFunc(ucrtbase_malloc, out var methodGroup))
                     {
-                        if (!ctors.ContainsKey(fullTypeName))
-                            ctors[fullTypeName] = new List<MsvcDiver.UndecoratedExport>();
-                        ctors[fullTypeName].Add(typeMethod);
+                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] FOUND {ucrtbase_malloc} ");
+                        newOperators.AddRange(methodGroup);
                     }
                 }
-
+                workingDict[module.Name] = newOperators;
             }
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done collecting __autoclasinit2, found {initMethods.Count}");
 
-            // Hook all __autoclassinit2
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2...");
-            foreach (var kvp in initMethods)
+            Dictionary<string, List<UndecoratedFunction>> res = new();
+            foreach (UndecoratedModule module in modules)
             {
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {kvp.Value.UndecoratedName}");
-                //MethodInfo mi = typeof(MsvcOffensiveGC).GetMethod(nameof(AutoInit2));
-                // TODO: will probably break just like ctors broke
-                //DetoursNetWrapper.Instance.AddHook(kvp.Value, HarmonyPatchPosition.Prefix, typeof(AutoInit2Type), mi);
+                ProcessSingleModule(module, res);
             }
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
 
+            return res;
+        }
+
+        private Dictionary<string, List<UndecoratedFunction>> GetCtors(List<UndecoratedModule> modules)
+        {
+            string GetCtorName(TypeInfo type)
+            {
+                string fullTypeName = type.Name;
+                string className = fullTypeName.Substring(fullTypeName.LastIndexOf("::") + 2);
+                return $"{fullTypeName}::{className}";
+            }
+
+            void ProcessSingleModule(UndecoratedModule module,
+                Dictionary<string, List<UndecoratedFunction>> workingDict)
+            {
+                foreach (TypeInfo type in module.Type)
+                {
+                    string ctorName = GetCtorName(type);
+                    if (!module.TryGetTypeFunc(type, ctorName, out var ctors))
+                        continue;
+
+                    // Found the method group
+                    workingDict[type.Name] = ctors;
+                }
+            }
+
+            Dictionary<string, List<UndecoratedFunction>> res = new();
+            foreach (UndecoratedModule module in modules)
+            {
+                ProcessSingleModule(module, res);
+            }
+
+            return res;
+        }
+
+        private Dictionary<long, UndecoratedFunction> GetAutoClassInit2Funcs(List<UndecoratedModule> modules)
+        {
+            void ProcessSingleModule(UndecoratedModule module,
+                Dictionary<long, UndecoratedFunction> workingDict)
+            {
+                foreach (TypeInfo type in module.Type)
+                {
+                    string methondName = $"{type.Name}::__autoclassinit2";
+                    if (!module.TryGetTypeFunc(type, methondName, out var methodGroup))
+                        continue;
+                    // Found the method group (all overloads with the same name)
+                    if (methodGroup.Count != 1)
+                    {
+                        Logger.Debug($"Expected exactly one __autoclassinit2 function for type {type.Name}, Found {methodGroup.Count}");
+                        continue;
+                    }
+
+                    var func = methodGroup.Single();
+                    workingDict[func.Address] = func;
+                }
+            }
+
+            Dictionary<long, UndecoratedFunction> res = new();
+            foreach (UndecoratedModule module in modules)
+            {
+                ProcessSingleModule(module, res);
+            }
+
+            return res;
+        }
+
+        private static void HookNewOperators(Dictionary<string, List<UndecoratedFunction>> newOperators)
+        {
+            // Hook all new operators
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook operator new(s)...");
+            int attemptedOperatorNews = 0;
+            foreach (var moduleToFuncs in newOperators)
+            {
+                foreach (var newOperator in moduleToFuncs.Value)
+                {
+                    attemptedOperatorNews++;
+                    Logger.Debug(
+                        $"[{nameof(MsvcOffensiveGC)}] Hooking operator new at 0x{newOperator.Address:x16}");
+                    DetoursNetWrapper.Instance.AddHook(
+                        newOperator,
+                        HarmonyPatchPosition.Prefix,
+                        typeof(OperatorNewType),
+                        OperatorNewTypeMethodInfo,
+                        (OperatorNewType)OperatorNew);
+                }
+            }
+
+            Logger.Debug(
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking operator news. attempted to hook: {attemptedOperatorNews} funcs");
+            Logger.Debug(
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking operator news.. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+        }
+
+        private static void HookCtors(Dictionary<string, List<UndecoratedFunction>> ctors)
+        {
             // Hook all ctors
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook ctors...");
             int attemptedHookedCtorsCount = 0;
             foreach (var kvp in ctors)
             {
-                if (_forbiddenClasses.Contains(kvp.Key))
-                {
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] SKIPPING FORBIDDEN CLASS: " + kvp.Key);
-                    continue;
-                }
-
                 foreach (var ctor in kvp.Value)
                 {
-                    MsMangledNameParser parser = new MsMangledNameParser(ctor.Export.Name);
                     string basicName;
-                    SerializedType sig = null;
-                    SerializedType enclosingType;
+                    SerializedType sig;
                     try
                     {
-                        (basicName, sig, enclosingType) = parser.Parse();
+                        var parser = new MsMangledNameParser(ctor.DecoratedName);
+                        (basicName, sig, _) = parser.Parse();
                     }
                     catch (Exception ex)
                     {
-                        Logger.Debug($"Failed to demangle ctor of {kvp.Key}, Raw: {ctor.Export.Name}, Exception: " + ex);
+                        Logger.Debug($"Failed to demangle ctor of {kvp.Key}, Raw: {ctor.DecoratedName}, Exception: " +  ex.Message);
                         continue;
-
                     }
 
                     Argument_v1[] args = (sig as SerializedSignature)?.Arguments;
                     if (args == null)
                     {
                         // Failed to parse?!?
-                        Logger.Debug($"Failed to parse arguments from ctor of {kvp.Key}, Raw: {ctor.Export.Name}");
+                        Logger.Debug($"Failed to parse arguments from ctor of {kvp.Key}, Raw: {ctor.DecoratedName}");
                         continue;
                     }
 
-
+                    // TODO: Expend to ctors with multiple args
+                    // NOTE: args are 0 but the 'this' argument is implied (Usually in ecx. Decompilers shows it as the first argument)
                     if (args.Length == 0)
                     {
-                        var (mi, delegateValue) = GenerateMethodsForSecret(ctor.UndecoratedName);
-                        DetoursNetWrapper.Instance.AddHook(ctor, HarmonyPatchPosition.Prefix, typeof(GenericCtorType), mi, delegateValue);
+                        var (mi, delegateValue) = GenerateMethodsForSecret(UnifiedCtorMethodInfo, typeof(GenericCtorType),
+                            ctor.UndecoratedName);
+                        DetoursNetWrapper.Instance.AddHook(ctor, HarmonyPatchPosition.Prefix, typeof(GenericCtorType),
+                            mi, delegateValue);
                         attemptedHookedCtorsCount++;
                     }
                 }
             }
 
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. attempted to hook: {attemptedHookedCtorsCount} ctors");
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
-
-
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(Init)} OUT");
+            Logger.Debug(
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. attempted to hook: {attemptedHookedCtorsCount} ctors");
+            Logger.Debug(
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
 
-        //public delegate void AutoInit2Type(ulong self, ulong size);
+        private void HookAutoClassInit2Funcs(Dictionary<long, UndecoratedFunction> initMethods)
+        {
+            // Hook all __autoclassinit2
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2. Count: {initMethods.Count}");
+            foreach (var kvp in initMethods)
+            {
+                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {kvp.Value.UndecoratedName}");
+                var (mi, delegateValue) = GenerateMethodsForSecret(UnifiedAutoClassInit2MethodInfo, typeof(AutoClassInit2Type), kvp.Value.UndecoratedName);
+                DetoursNetWrapper.Instance.AddHook(
+                    kvp.Value, HarmonyPatchPosition.Prefix,
+                    typeof(AutoClassInit2Type),
+                    mi, delegateValue);
+            }
 
-        //public static void AutoInit2(ulong self, ulong size)
-        //{
-        //    Logger.Debug($"[AutoInit2] Address: 0x{self:x16} Size: {size}");
-        //}
-
-
-        public delegate ulong GenericCtorType(ulong self);
-
-
-        public IReadOnlyDictionary<string, int> GetFindings() => ClassSizes;
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+        }
 
 
         // Cache for generated methods (Also used so they aren't GC'd)
-        private static Dictionary<string, (MethodInfo, Delegate)> _cached = new Dictionary<string, (MethodInfo, Delegate)>();
+        private static Dictionary<string, (MethodInfo, Delegate)> _cached =
+            new Dictionary<string, (MethodInfo, Delegate)>();
 
-        public static (MethodInfo, Delegate) GenerateMethodsForSecret(string secret)
+        public static (MethodInfo, Delegate) GenerateMethodsForSecret(MethodInfo mi, Type delegateType, string secret)
+            => GenerateMethodsForSecret(mi.Name, mi.GetParameters().Length - 1, mi.ReturnType, delegateType, secret);
+
+        public static (MethodInfo, Delegate) GenerateMethodsForSecret(string unifiedMethodName, int numArguments, Type retType, Type delegateType,
+            string secret)
         {
             if (_cached.TryGetValue(secret, out (MethodInfo, Delegate) existing))
                 return existing;
 
             // Get the method info of the UnifiedMethod
-            var unifiedMethodInfo = typeof(MsvcOffensiveGC).GetMethod("UnifiedMethod",
+            var unifiedMethodInfo = typeof(MsvcOffensiveGC).GetMethod(unifiedMethodName,
                 BindingFlags.Public | BindingFlags.Static);
 
-            // Generate methods for each character in "secret"
+            Type[] args = Enumerable.Repeat(typeof(ulong), numArguments).ToArray();
+
             // Create a dynamic method with the desired signature
             var dynamicMethod = new DynamicMethod(
                 "GeneratedMethod_" + secret,
-                typeof(ulong),
-                new Type[] { typeof(ulong) },
+                retType,
+                args,
                 typeof(MsvcOffensiveGC)
             );
 
             // Generate IL for the dynamic method
             var ilGenerator = dynamicMethod.GetILGenerator();
-            ilGenerator.Emit(OpCodes.Ldstr, secret);         // Load the secret string onto the stack
-            ilGenerator.Emit(OpCodes.Ldarg_0);               // Load the self argument onto the stack
-            ilGenerator.Emit(OpCodes.Call, unifiedMethodInfo);  // Call the UnifiedMethod
-            ilGenerator.Emit(OpCodes.Ret);                   // Return from the method
+            ilGenerator.Emit(OpCodes.Ldstr, secret); // Load the secret string onto the stack
+            // Load OUR args onto the stack as args to the unified method
+            for (int i = 0; i < numArguments; i++)
+                ilGenerator.Emit(OpCodes.Ldarg, i);
+
+            ilGenerator.Emit(OpCodes.Call, unifiedMethodInfo); // Call the UnifiedMethod
+            ilGenerator.Emit(OpCodes.Ret); // Return from the method
 
             // Create a delegate for the dynamic method
-            Delegate delegateInstance = dynamicMethod.CreateDelegate(typeof(GenericCtorType));
+            Delegate delegateInstance = dynamicMethod.CreateDelegate(delegateType);
             MethodInfo mi = delegateInstance.Method;
 
             _cached[secret] = (mi, delegateInstance);
             return (mi, delegateInstance);
         }
 
-        private static ThreadLocal<int> counter = new ThreadLocal<int>(() => 0);
-        private List<string> _forbiddenClasses = new List<string>()
-        {
-            "SPen::EndTag",
-            "SPen::File",
-            "SPen::GestureFactoryListener",
-            "SPen::AnimatorUpdateManager",
-            "SPen::AnimatorUpdateManagerEventListener",
-            "SPen::DrawLoopSwapChain",
-            "SPen::DrawLoop",
-            "SPen::IInvalidatable",
-            "SPen::Color",
-            "SPen::IColorTheme",
-        };
+        // +---------------+
+        // | Ctors Hooking |
+        // +---------------+
+        public delegate ulong GenericCtorType(ulong self);
 
-        public static ulong UnifiedMethod(string secret, ulong self)
+        private static MethodInfo UnifiedCtorMethodInfo = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor));
+
+        public static ulong UnifiedCtor(string secret, ulong self)
         {
+            RegisterClassName(self, secret);
+
             ulong res = 0x0bad_c0de_dead_c0de;
             int hashcode = 0x00000000;
-            void LogIndented(string prefix, int indent, string msg)
+
+            if (!_cached.ContainsKey(secret)) return res;
+            var (originalHookMethodInfo, _) = _cached[secret];
+
+            if (!DelegateStore.Real.ContainsKey(originalHookMethodInfo)) return res;
+            var originalMethod = (GenericCtorType)DelegateStore.Real[originalHookMethodInfo];
+            // Invoking original ctor
+            res = originalMethod(self);
+            return res;
+        }
+
+        // +--------------------------+
+        // | __autoclassinit2 Hooking |
+        // +--------------------------+
+        public delegate void AutoClassInit2Type(ulong self, ulong size);
+
+        private static MethodInfo UnifiedAutoClassInit2MethodInfo =
+            typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedAutoClassInit2));
+
+        public static void UnifiedAutoClassInit2(string secret, ulong self, ulong size)
+        {
+            Logger.Debug($@"[UnifiedAutoClassInit2] In. Self: 0x{self:x16}, Size: {size}");
+            // NOTE: Secret is not to be trusted here because __autoclassinit2 is often shared
+            // between various classes in the same dll.
+            RegisterSize(self, size);
+
+            if (!_cached.ContainsKey(secret)) return;
+            var (originalHookMethodInfo, _) = _cached[secret];
+
+            if (!DelegateStore.Real.ContainsKey(originalHookMethodInfo)) return;
+            var originalMethod = (AutoClassInit2Type)DelegateStore.Real[originalHookMethodInfo];
+            // Invoking original ctor
+            originalMethod(self, size);
+            Logger.Debug($@"[UnifiedAutoClassInit2] Out. Self: 0x{self:x16}, Size: {size}");
+            return;
+        }
+
+
+        // +----------------------+
+        // | Operator new Hooking |
+        // +----------------------+
+        public delegate ulong OperatorNewType(ulong size);
+
+        private static MethodInfo OperatorNewTypeMethodInfo =
+            typeof(MsvcOffensiveGC).GetMethod(nameof(OperatorNew));
+
+        public static ulong OperatorNew(ulong size)
+        {
+            Logger.Debug("[OperatorNew] In");
+            Logger.Debug(@"[OperatorNew] In. Size: {size}");
+            ulong res = 0;
+
+            if (!DelegateStore.Real.ContainsKey(OperatorNewTypeMethodInfo)) return res;
+            var originalMethod = (OperatorNewType)DelegateStore.Real[OperatorNewTypeMethodInfo];
+            // Invoking original ctor
+            res = originalMethod(size);
+            Logger.Debug(@"[OperatorNew] In. Size: {size}, returned addr: {res}");
+
+            if (res != 0)
             {
-                string indentation = new string(' ', indent * 2);
-                string indentedMsg = prefix + indentation + msg;
-                Logger.Debug(indentedMsg);
-            }
-            counter.Value++; // Increment the counter on entry
-
-            LogIndented($"[UnifiedMethod][HC={hashcode:x8}] ", counter.Value, "NEW CTOR: " + secret);
-            LogIndented($"[UnifiedMethod][HC={hashcode:x8}] ", counter.Value,$"Self: 0x{self:x16}");
-
-            LogIndented($"[UnifiedMethod][HC={hashcode:x8}] ", counter.Value, "Seeking MethodInfo of dynamic method");
-            if (_cached.ContainsKey(secret))
-            {
-                var (originalHookMethodInfo, _) = _cached[secret];
-                hashcode = originalHookMethodInfo.GetHashCode();
-                LogIndented($"[UnifiedMethod][HC={hashcode:x8}] ", counter.Value,
-                    $"Found MethodInfo of dynamic method. Hashcode: {hashcode}");
-
-                LogIndented($"[UnifiedMethod][HC={hashcode:x8}] ", counter.Value, "Seeking delegate for detour'd method.");
-                if (DelegateStore.Real.ContainsKey(originalHookMethodInfo))
-                {
-                    LogIndented($"[UnifiedMethod][HC={hashcode:x8}] ", counter.Value,
-                        $"Found delegate for detour'd method.");
-
-                    var originalMethod = (GenericCtorType)DelegateStore.Real[originalHookMethodInfo];
-                    // Invoking original ctor
-                    LogIndented($"[UnifiedMethod][HC={hashcode:x8}] ", counter.Value, $"Invoking original ctor");
-                    res = originalMethod(self);
-                    LogIndented($"[UnifiedMethod][HC={hashcode:x8}] ", counter.Value, $"Invoking completed! res: {res}");
-                }
-                else
-                {
-                    LogIndented("[UnifiedMethod][HC={hashcode:x8}] ", counter.Value,
-                        $"FATAL ERROR. Couldn't find detour'd method for MethodInfo of '{secret}'");
-                }
+                Logger.Debug("[OperatorNew] Calling RegisterSize");
+                RegisterSize(res, size);
+                Logger.Debug("[OperatorNew] Calling RegisterSize -- done");
             }
             else
             {
-                LogIndented("[UnifiedMethod][HC={hashcode:x8}] ", counter.Value, $"FATAL ERROR. Couldn't find origina for '{secret}'");
+                Logger.Debug("[Error] Operator new failed (returned null).");
             }
-            counter.Value--;
+
+            Logger.Debug("[OperatorNew] Out (Happy)");
             return res;
+        }
+
+
+        // +---------------------------+
+        // | Class Sizes Match  Making |
+        // +---------------------------+
+        private static LRUCache<ulong, ulong> _addrToSize = new LRUCache<ulong, ulong>(100);
+        private static Dictionary<string, ulong> ClassSizes = new Dictionary<string, ulong>();
+        public IReadOnlyDictionary<string, ulong> GetFindings() => ClassSizes;
+
+        public static void RegisterSize(ulong addr, ulong size)
+        {
+            _addrToSize.AddOrUpdate(addr, size);
+        }
+
+        public static void RegisterClassName(ulong addr, string className)
+        {
+            // Check if we already found the size of this class
+            if(ClassSizes.ContainsKey(className))
+                return;
+
+            // Check recent "allocations"
+            if (_addrToSize.TryGetValue(addr, true, out ulong size))
+            {
+                // Found a match!
+                ClassSizes[className] = size;
+                Logger.Debug($"[MsvcOffensiveGC][MatchMaking] Found size of class. Name: {className}, Size: {size} bytes");
+            }
+        }
+    }
+    public class LRUCache<TKey, TValue>
+    {
+        private readonly int capacity;
+        private readonly Dictionary<TKey, LinkedListNode<CacheItem>> cache;
+        private readonly LinkedList<CacheItem> lruList;
+
+        public LRUCache(int capacity)
+        {
+            this.capacity = capacity;
+            cache = new Dictionary<TKey, LinkedListNode<CacheItem>>(capacity);
+            lruList = new LinkedList<CacheItem>();
+        }
+
+        public void AddOrUpdate(TKey key, TValue value)
+        {
+            if (cache.ContainsKey(key))
+            {
+                // If the key is already in the cache, update its value and move it to the front of the LRU list
+                LinkedListNode<CacheItem> node = cache[key];
+                node.Value.Value = value;
+                lruList.Remove(node);
+                lruList.AddFirst(node);
+            }
+            else
+            {
+                // If the key is not in the cache, create a new node and add it to the cache and the front of the LRU list
+                LinkedListNode<CacheItem> node = new LinkedListNode<CacheItem>(new CacheItem(key, value));
+                cache.Add(key, node);
+                lruList.AddFirst(node);
+
+                // If the cache exceeds the capacity, remove the least recently used item from the cache and the LRU list
+                if (cache.Count > capacity)
+                {
+                    LinkedListNode<CacheItem> lastNode = lruList.Last;
+                    cache.Remove(lastNode.Value.Key);
+                    lruList.RemoveLast();
+                }
+            }
+        }
+
+        public bool TryGetValue(TKey key, bool delete, out TValue value)
+        {
+            if (cache.TryGetValue(key, out LinkedListNode<CacheItem> node))
+            {
+                // If the key is found in the cache, move it to the front of the LRU list and return its value
+                lruList.Remove(node);
+                if (delete)
+                {
+                    cache.Remove(key);
+                }
+                else
+                {
+                    lruList.AddFirst(node);
+                }
+
+                value = node.Value.Value;
+                return true;
+            }
+
+            // If the key is not found in the cache, return default value for TValue
+            value = default(TValue);
+            return false;
+        }
+
+        private class CacheItem
+        {
+            public TKey Key { get; }
+            public TValue Value { get; set; }
+
+            public CacheItem(TKey key, TValue value)
+            {
+                Key = key;
+                Value = value;
+            }
         }
     }
 }
