@@ -154,6 +154,7 @@ namespace ScubaDiver
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new's.. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
 
+        private static HashSet<string> _alreadyHookedDecorated = new HashSet<string>( );
         private static void HookCtors(Dictionary<TypeInfo, List<UndecoratedFunction>> ctors)
         {
             // Hook all ctors
@@ -188,13 +189,37 @@ namespace ScubaDiver
 
                     // TODO: Expend to ctors with multiple args
                     // NOTE: args are 0 but the 'this' argument is implied (Usually in ecx. Decompilers shows it as the first argument)
-                    if (args.Length == 0)
+                    if (args.Length < 4)
                     {
-                        var (mi, delegateValue) = GenerateMethodsForSecret(UnifiedCtorMethodInfo, typeof(GenericCtorType),
-                            ctor.UndecoratedName);
-                        DetoursNetWrapper.Instance.AddHook(ctor, HarmonyPatchPosition.Prefix, typeof(GenericCtorType),
-                            mi, delegateValue);
+                        MethodInfo requestMi = UnifiedCtorMethodInfo0;
+                        Type requestType = typeof(GenericCtorType0);
+                        switch (args.Length)
+                        {
+                            case 1:
+                                requestMi = UnifiedCtorMethodInfo1;
+                                requestType = typeof(GenericCtorType1);
+                                break;
+                            case 2:
+                                requestMi = UnifiedCtorMethodInfo2;
+                                requestType = typeof(GenericCtorType2);
+                                break;
+                            case 3:
+                                requestMi = UnifiedCtorMethodInfo3;
+                                requestType = typeof(GenericCtorType3);
+                                break;
+                        }
+
+                        if (_alreadyHookedDecorated.Contains(ctor.DecoratedName))
+                        {
+                            Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {basicName} , Decorated: {ctor.DecoratedName}");
+                            continue;
+                        }
+                        _alreadyHookedDecorated.Add(ctor.DecoratedName);
+
+                        var (generatedMi, generatedDelegate) = GenerateMethodsForSecret(requestMi, requestType, $"{type.ModuleName}!!{ctor.DecoratedName}");
+                        DetoursNetWrapper.Instance.AddHook(ctor, HarmonyPatchPosition.Prefix, requestType, generatedMi, generatedDelegate);
                         attemptedHookedCtorsCount++;
+
                     }
                 }
             }
@@ -262,7 +287,18 @@ namespace ScubaDiver
             ilGenerator.Emit(OpCodes.Ret); // Return from the method
 
             // Create a delegate for the dynamic method
-            Delegate delegateInstance = dynamicMethod.CreateDelegate(delegateType);
+            Delegate delegateInstance;
+            try
+            {
+                delegateInstance = dynamicMethod.CreateDelegate(delegateType);
+            }
+            catch(Exception ex) 
+            {
+                Console.WriteLine($"Delegate Casting issue. numArguments: {numArguments}, delegateType: {delegateType}");
+                Console.WriteLine($"Delegate Casting issue. raw: " + ex);
+                throw;
+            }
+
             MethodInfo mi = delegateInstance.Method;
 
             _cached[secret] = (mi, delegateInstance);
@@ -272,22 +308,57 @@ namespace ScubaDiver
         // +---------------+
         // | Ctors Hooking |
         // +---------------+
-        public delegate ulong GenericCtorType(ulong self);
+        public delegate ulong GenericCtorType0(ulong self);
+        public delegate ulong GenericCtorType1(ulong self, ulong _1);
+        public delegate ulong GenericCtorType2(ulong self, ulong _1, ulong _2);
+        public delegate ulong GenericCtorType3(ulong self, ulong _1, ulong _2, ulong _3);
 
-        private static MethodInfo UnifiedCtorMethodInfo = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor));
+        private static MethodInfo UnifiedCtorMethodInfo0 = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor0));
+        private static MethodInfo UnifiedCtorMethodInfo1 = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor1));
+        private static MethodInfo UnifiedCtorMethodInfo2 = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor2));
+        private static MethodInfo UnifiedCtorMethodInfo3 = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor3));
 
-        public static ulong UnifiedCtor(string secret, ulong self)
+        public static ulong UnifiedCtor0(string secret, ulong self)
+        {
+            var originalMethod = (GenericCtorType0)UnifiedCtorBase(secret, self);
+            // Invoking original ctor
+            var res = originalMethod(self);
+            return res;
+        }
+
+        public static ulong UnifiedCtor1(string secret, ulong self, ulong _1)
+        {
+            var originalMethod = (GenericCtorType1)UnifiedCtorBase(secret, self);
+            // Invoking original ctor
+            var res = originalMethod(self, _1);
+            return res;
+        }
+
+        public static ulong UnifiedCtor2(string secret, ulong self, ulong _1, ulong _2)
+        {
+            var originalMethod = (GenericCtorType2)UnifiedCtorBase(secret, self);
+            // Invoking original ctor
+            var res = originalMethod(self, _1, _2);
+            return res;
+        }
+
+        public static ulong UnifiedCtor3(string secret, ulong self, ulong _1, ulong _2, ulong _3)
+        {
+            var originalMethod = (GenericCtorType3)UnifiedCtorBase(secret, self);
+            // Invoking original ctor
+            var res = originalMethod(self, _1, _2, _3);
+            return res;
+        }
+
+        public static Delegate UnifiedCtorBase(string secret, ulong self)
         {
             RegisterClassName(self, secret);
-
-            ulong res = 0x0bad_c0de_dead_c0de;
-            int hashcode = 0x00000000;
 
             if (!_cached.ContainsKey(secret))
             {
                 Console.WriteLine("[MsvcOffensiveGC] CAN'T FIND CTOR IN CACHE! Expect a crash! Offender in next line: ");
                 Console.WriteLine(secret);
-                return res;
+                return null;
             }
             var (originalHookMethodInfo, _) = _cached[secret];
 
@@ -295,12 +366,10 @@ namespace ScubaDiver
             {
                 Console.WriteLine("[MsvcOffensiveGC] CAN'T FIND CTOR IN DelegateStore! Expect a crash! Offender in next line: ");
                 Console.WriteLine(secret);
-                return res;
+                return null;
             }
-            var originalMethod = (GenericCtorType)DelegateStore.Real[originalHookMethodInfo];
-            // Invoking original ctor
-            res = originalMethod(self);
-            return res;
+                
+            return DelegateStore.Real[originalHookMethodInfo];
         }
 
         // +--------------------------+
