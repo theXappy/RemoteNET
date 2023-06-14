@@ -336,7 +336,18 @@ public unsafe class Trickster : IDisposable
         Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
         foreach (ModuleInfo modInfo in ModulesParsed)
         {
-            List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
+            List<ModuleSegment> sections;
+            try
+            {
+                sections = ProcessModuleExtensions.ListSections(modInfo);
+            }
+            catch (AccessViolationException)
+            {
+                // Probably an unloaded dll
+                Logger.Debug($"[Warning] Couldn't list sections of {modInfo.Name} at 0x{modInfo.BaseAddress:x16}");
+                continue;
+            }
+
             foreach (ModuleSegment moduleSegment in sections)
             {
                 if (!dataSegments.ContainsKey(modInfo))
