@@ -42,6 +42,7 @@
 		<Compile Include="..\HttpRequestsListener.cs" />
 		<Compile Include="..\IRequestsListener.cs" />
 		<Compile Include="..\ScubaDiverMessage.cs" />
+		<Compile Include="..\DynamicMethodGenerator.cs" />
 	</ItemGroup>
 
 	<ItemGroup>

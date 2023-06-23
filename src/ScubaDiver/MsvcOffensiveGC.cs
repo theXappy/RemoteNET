@@ -1,7 +1,9 @@
 using ScubaDiver.API.Interactions.Dumps;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,6 +17,8 @@ using System.Threading;
 using ScubaDiver.Rtti;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 using System.Net.Sockets;
+using NtApiDotNet.Ndr.Marshal;
+using System.Runtime.InteropServices;
 
 namespace ScubaDiver
 {
@@ -141,10 +145,7 @@ namespace ScubaDiver
                     Logger.Debug(
                         $"[{nameof(MsvcOffensiveGC)}] Hooking 'operator new' at 0x{newOperator.Address:x16} ({newOperator.Module})");
 
-                    var (mi, delegateValue) = GenerateMethodsForSecret(UnifiedOperatorNewMethodInfo, typeof(OperatorNewType),
-                        $"{newOperator.Module.Name}!!{newOperator.UndecoratedName}");
-                    DetoursNetWrapper.Instance.AddHook(newOperator, HarmonyPatchPosition.Prefix, typeof(OperatorNewType),
-                        mi, delegateValue);
+                    DetoursNetWrapper.Instance.AddHook(newOperator, UnifiedOperatorNew);
                 }
             }
 
@@ -154,7 +155,7 @@ namespace ScubaDiver
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new's.. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
 
-        private static HashSet<string> _alreadyHookedDecorated = new HashSet<string>( );
+        private static HashSet<string> _alreadyHookedDecorated = new HashSet<string>();
         private static void HookCtors(Dictionary<TypeInfo, List<UndecoratedFunction>> ctors)
         {
             // Hook all ctors
@@ -164,63 +165,32 @@ namespace ScubaDiver
             {
                 TypeInfo type = kvp.Key;
                 string fullTypeName = $"{type.ModuleName}!{type.Name}";
-                foreach (var ctor in kvp.Value)
+                foreach (UndecoratedFunction ctor in kvp.Value)
                 {
-                    string basicName;
-                    SerializedType sig;
-                    try
-                    {
-                        var parser = new MsMangledNameParser(ctor.DecoratedName);
-                        (basicName, sig, _) = parser.Parse();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Debug($"Failed to demangle ctor of {kvp.Key}, Raw: {ctor.DecoratedName}, Exception: " + ex.Message);
-                        continue;
-                    }
-
-                    Argument_v1[] args = (sig as SerializedSignature)?.Arguments;
-                    if (args == null)
-                    {
-                        // Failed to parse?!?
-                        Logger.Debug($"Failed to parse arguments from ctor of {kvp.Key}, Raw: {ctor.DecoratedName}");
-                        continue;
-                    }
-
                     // TODO: Expend to ctors with multiple args
                     // NOTE: args are 0 but the 'this' argument is implied (Usually in ecx. Decompilers shows it as the first argument)
-                    if (args.Length < 4)
+                    if (ctor.NumArgs > 4)
+                        continue;
+
+
+                    if (_alreadyHookedDecorated.Contains(ctor.DecoratedName))
                     {
-                        MethodInfo requestMi = UnifiedCtorMethodInfo0;
-                        Type requestType = typeof(GenericCtorType0);
-                        switch (args.Length)
-                        {
-                            case 1:
-                                requestMi = UnifiedCtorMethodInfo1;
-                                requestType = typeof(GenericCtorType1);
-                                break;
-                            case 2:
-                                requestMi = UnifiedCtorMethodInfo2;
-                                requestType = typeof(GenericCtorType2);
-                                break;
-                            case 3:
-                                requestMi = UnifiedCtorMethodInfo3;
-                                requestType = typeof(GenericCtorType3);
-                                break;
-                        }
-
-                        if (_alreadyHookedDecorated.Contains(ctor.DecoratedName))
-                        {
-                            Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {basicName} , Decorated: {ctor.DecoratedName}");
-                            continue;
-                        }
-                        _alreadyHookedDecorated.Add(ctor.DecoratedName);
-
-                        var (generatedMi, generatedDelegate) = GenerateMethodsForSecret(requestMi, requestType, $"{type.ModuleName}!!{ctor.DecoratedName}");
-                        DetoursNetWrapper.Instance.AddHook(ctor, HarmonyPatchPosition.Prefix, requestType, generatedMi, generatedDelegate);
-                        attemptedHookedCtorsCount++;
-
+                        Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {ctor.UndecoratedName} , Decorated: {ctor.DecoratedName}");
+                        continue;
                     }
+                    _alreadyHookedDecorated.Add(ctor.DecoratedName);
+
+
+                    if (ctor.NumArgs > 1 || !ctor.UndecoratedName.StartsWith("SPen"))
+                    {
+                        Debug.WriteLine($"[{nameof(MsvcOffensiveGC)}] Skipping hooking CTOR {ctor.UndecoratedName} with {ctor.NumArgs} args");
+                        continue;
+                    }
+
+                    Console.WriteLine($"[{nameof(MsvcOffensiveGC)}] Hooking CTOR {ctor.UndecoratedName} with {ctor.NumArgs} args");
+                    DetoursNetWrapper.Instance.AddHook(ctor, UnifiedCtor);
+                    Console.WriteLine($"[{nameof(MsvcOffensiveGC)}] QUICK EXIT");
+                    attemptedHookedCtorsCount++;
                 }
             }
 
@@ -232,16 +202,17 @@ namespace ScubaDiver
 
         private void HookAutoClassInit2Funcs(Dictionary<long, UndecoratedFunction> initMethods)
         {
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] HookAutoClassInit2Funcs DISABLED!");
+            return;
+
+
             // Hook all __autoclassinit2
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2. Count: {initMethods.Count}");
             foreach (var kvp in initMethods)
             {
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {kvp.Value.UndecoratedName}");
-                var (mi, delegateValue) = GenerateMethodsForSecret(UnifiedAutoClassInit2MethodInfo, typeof(AutoClassInit2Type), kvp.Value.UndecoratedName);
-                DetoursNetWrapper.Instance.AddHook(
-                    kvp.Value, HarmonyPatchPosition.Prefix,
-                    typeof(AutoClassInit2Type),
-                    mi, delegateValue);
+                UndecoratedFunction autoClassInit2 = kvp.Value;
+                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedName}");
+                DetoursNetWrapper.Instance.AddHook(kvp.Value, UnifiedAutoClassInit2);
             }
 
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
@@ -249,197 +220,128 @@ namespace ScubaDiver
         }
 
 
-        // Cache for generated methods (Also used so they aren't GC'd)
-        private static Dictionary<string, (MethodInfo, Delegate)> _cached =
-            new Dictionary<string, (MethodInfo, Delegate)>();
-
-        public static (MethodInfo, Delegate) GenerateMethodsForSecret(MethodInfo mi, Type delegateType, string secret)
-            => GenerateMethodsForSecret(mi.Name, mi.GetParameters().Length - 1, mi.ReturnType, delegateType, secret);
-
-        public static (MethodInfo, Delegate) GenerateMethodsForSecret(string unifiedMethodName, int numArguments, Type retType, Type delegateType,
-            string secret)
-        {
-            if (_cached.TryGetValue(secret, out (MethodInfo, Delegate) existing))
-                return existing;
-
-            // Get the method info of the UnifiedMethod
-            var unifiedMethodInfo = typeof(MsvcOffensiveGC).GetMethod(unifiedMethodName,
-                BindingFlags.Public | BindingFlags.Static);
-
-            Type[] args = Enumerable.Repeat(typeof(ulong), numArguments).ToArray();
-
-            // Create a dynamic method with the desired signature
-            var dynamicMethod = new DynamicMethod(
-                "GeneratedMethod_" + secret,
-                retType,
-                args,
-                typeof(MsvcOffensiveGC)
-            );
-
-            // Generate IL for the dynamic method
-            var ilGenerator = dynamicMethod.GetILGenerator();
-            ilGenerator.Emit(OpCodes.Ldstr, secret); // Load the secret string onto the stack
-            // Load OUR args onto the stack as args to the unified method
-            for (int i = 0; i < numArguments; i++)
-                ilGenerator.Emit(OpCodes.Ldarg, i);
-
-            ilGenerator.Emit(OpCodes.Call, unifiedMethodInfo); // Call the UnifiedMethod
-            ilGenerator.Emit(OpCodes.Ret); // Return from the method
-
-            // Create a delegate for the dynamic method
-            Delegate delegateInstance;
-            try
-            {
-                delegateInstance = dynamicMethod.CreateDelegate(delegateType);
-            }
-            catch(Exception ex) 
-            {
-                Console.WriteLine($"Delegate Casting issue. numArguments: {numArguments}, delegateType: {delegateType}");
-                Console.WriteLine($"Delegate Casting issue. raw: " + ex);
-                throw;
-            }
-
-            MethodInfo mi = delegateInstance.Method;
-
-            _cached[secret] = (mi, delegateInstance);
-            return (mi, delegateInstance);
-        }
-
         // +---------------+
         // | Ctors Hooking |
         // +---------------+
-        public delegate ulong GenericCtorType0(ulong self);
-        public delegate ulong GenericCtorType1(ulong self, ulong _1);
-        public delegate ulong GenericCtorType2(ulong self, ulong _1, ulong _2);
-        public delegate ulong GenericCtorType3(ulong self, ulong _1, ulong _2, ulong _3);
 
-        private static MethodInfo UnifiedCtorMethodInfo0 = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor0));
-        private static MethodInfo UnifiedCtorMethodInfo1 = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor1));
-        private static MethodInfo UnifiedCtorMethodInfo2 = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor2));
-        private static MethodInfo UnifiedCtorMethodInfo3 = typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedCtor3));
-
-        public static ulong UnifiedCtor0(string secret, ulong self)
+        public static bool UnifiedCtor(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overridenReturnValue)
         {
-            var originalMethod = (GenericCtorType0)UnifiedCtorBase(secret, self);
-            // Invoking original ctor
-            var res = originalMethod(self);
-            return res;
-        }
+            overridenReturnValue = 0;
 
-        public static ulong UnifiedCtor1(string secret, ulong self, ulong _1)
-        {
-            var originalMethod = (GenericCtorType1)UnifiedCtorBase(secret, self);
-            // Invoking original ctor
-            var res = originalMethod(self, _1);
-            return res;
-        }
-
-        public static ulong UnifiedCtor2(string secret, ulong self, ulong _1, ulong _2)
-        {
-            var originalMethod = (GenericCtorType2)UnifiedCtorBase(secret, self);
-            // Invoking original ctor
-            var res = originalMethod(self, _1, _2);
-            return res;
-        }
-
-        public static ulong UnifiedCtor3(string secret, ulong self, ulong _1, ulong _2, ulong _3)
-        {
-            var originalMethod = (GenericCtorType3)UnifiedCtorBase(secret, self);
-            // Invoking original ctor
-            var res = originalMethod(self, _1, _2, _3);
-            return res;
-        }
-
-        public static Delegate UnifiedCtorBase(string secret, ulong self)
-        {
-            RegisterClassName(self, secret);
-
-            if (!_cached.ContainsKey(secret))
+            //Console.WriteLine($"[UnifiedCtor] Secret: {secret}, Args: {args.Length}");
+            object first = args.FirstOrDefault();
+            if (first is nuint self)
             {
-                Console.WriteLine("[MsvcOffensiveGC] CAN'T FIND CTOR IN CACHE! Expect a crash! Offender in next line: ");
-                Console.WriteLine(secret);
-                return null;
+                //Console.WriteLine($"[UnifiedCtor] Secret: {secret}, Args: {args.Length}, Self: 0x{self:x16}");
+                RegisterClassName(self, secret.Name);
             }
-            var (originalHookMethodInfo, _) = _cached[secret];
-
-            if (!DelegateStore.Real.ContainsKey(originalHookMethodInfo))
+            else
             {
-                Console.WriteLine("[MsvcOffensiveGC] CAN'T FIND CTOR IN DelegateStore! Expect a crash! Offender in next line: ");
-                Console.WriteLine(secret);
-                return null;
+                Console.WriteLine($"[UnifiedCtor] Secret: {secret}, Args: {args.Length}, Self: <ERROR!>");
             }
-                
-            return DelegateStore.Real[originalHookMethodInfo];
+            return true;
         }
 
         // +--------------------------+
         // | __autoclassinit2 Hooking |
         // +--------------------------+
-        public delegate void AutoClassInit2Type(ulong self, ulong size);
 
-        private static MethodInfo UnifiedAutoClassInit2MethodInfo =
-            typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedAutoClassInit2));
+        //public static void UnifiedAutoClassInit2(string secret, ulong self, ulong size)
+        //{
+        //    // NOTE: Secret is not to be trusted here because __autoclassinit2 is often shared
+        //    // between various classes in the same dll.
+        //    RegisterSize(self, size);
 
-        public static void UnifiedAutoClassInit2(string secret, ulong self, ulong size)
+        //    if (!_cached.ContainsKey(secret)) return;
+        //    var (originalHookMethodInfo, _) = _cached[secret];
+
+        //    if (!DelegateStore.Real.ContainsKey(originalHookMethodInfo)) return;
+        //    var originalMethod = (AutoClassInit2Type)DelegateStore.Real[originalHookMethodInfo];
+        //    // Invoking original ctor
+        //    originalMethod(self, size);
+        //}
+        public static bool UnifiedAutoClassInit2(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overridenReturnValue)
         {
-            // NOTE: Secret is not to be trusted here because __autoclassinit2 is often shared
-            // between various classes in the same dll.
-            RegisterSize(self, size);
+            overridenReturnValue = 0;
 
-            if (!_cached.ContainsKey(secret)) return;
-            var (originalHookMethodInfo, _) = _cached[secret];
-
-            if (!DelegateStore.Real.ContainsKey(originalHookMethodInfo)) return;
-            var originalMethod = (AutoClassInit2Type)DelegateStore.Real[originalHookMethodInfo];
-            // Invoking original ctor
-            originalMethod(self, size);
+            Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}");
+            object first = args.FirstOrDefault();
+            Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Self: {(first is nuint ? $"0x{first:x16}" : "<ERROR!>")}");
+            object second = args.FirstOrDefault();
+            Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Size: {(second is nuint ? $"0x{second:x16}" : "<ERROR!>")}");
+            return true;
         }
 
 
         // +----------------------+
         // | Operator new Hooking |
         // +----------------------+
-        public delegate ulong OperatorNewType(ulong size);
 
-        private static MethodInfo UnifiedOperatorNewMethodInfo =
-            typeof(MsvcOffensiveGC).GetMethod(nameof(UnifiedOperatorNew));
+        //public static ulong UnifiedOperatorNew(string secret, ulong size)
+        //{
+        //    ulong res = 0;
 
-        public static ulong UnifiedOperatorNew(string secret, ulong size)
+        //    if (!_cached.ContainsKey(secret))
+        //        return res;
+        //    var (originalHookMethodInfo, _) = _cached[secret];
+
+        //    var originalMethod = (OperatorNewType)DelegateStore.Real[originalHookMethodInfo];
+        //    // Invoking original ctor
+        //    res = originalMethod(size);
+        //    //Logger.Debug($"[OperatorNew] Invoked original. Size: {size}, returned addr: {res}");
+
+        //    if (res != 0)
+        //    {
+        //        RegisterSize(res, size);
+        //    }
+        //    else
+        //    {
+        //        Logger.Debug("[Error] Operator new failed (returned null).");
+        //    }
+
+        //    return res;
+        //}
+        private delegate nuint OperatorNewType(nuint size);
+
+        public static bool UnifiedOperatorNew(DetoursMethodGenerator.DetoursTrampoline trampoline, object[] args, out nuint overridenReturnValue)
         {
-            ulong res = 0;
+            overridenReturnValue = 0;
 
-            if (!_cached.ContainsKey(secret))
-                return res;
-            var (originalHookMethodInfo, _) = _cached[secret];
-
-            var originalMethod = (OperatorNewType)DelegateStore.Real[originalHookMethodInfo];
-            // Invoking original ctor
-            res = originalMethod(size);
-            //Logger.Debug($"[OperatorNew] Invoked original. Size: {size}, returned addr: {res}");
-
-            if (res != 0)
+            //Console.WriteLine($"[UnifiedOperatorNew] Secret: {secret}, Args: {args.Length}");
+            object first = args.FirstOrDefault();
+            if (first is nuint size)
             {
-                RegisterSize(res, size);
+                // Ugly casting
+                Delegate originalDelegate = DelegateStore.Real[trampoline.GenerateMethodInfo];
+                IntPtr functionPointer = Marshal.GetFunctionPointerForDelegate(originalDelegate);
+                OperatorNewType opNew = (OperatorNewType)Marshal.GetDelegateForFunctionPointer(functionPointer, typeof(OperatorNewType));
+
+
+                // Invoking original ctor
+                overridenReturnValue = opNew(size);
+                if(overridenReturnValue != 0)
+                    RegisterSize(overridenReturnValue, size);
+                return false;
             }
             else
             {
-                Logger.Debug("[Error] Operator new failed (returned null).");
+                Console.WriteLine(
+                    $"[UnifiedOperatorNew] Secret: {trampoline.Name}, Args: {args.Length}, Size: <ERROR!>");
             }
 
-            return res;
+            return true;
         }
-
 
         // +---------------------------+
         // | Class Sizes Match  Making |
         // +---------------------------+
-        private static LRUCache<ulong, ulong> _addrToSize = new LRUCache<ulong, ulong>(100);
+        private static LRUCache<nuint, nuint> _addrToSize = new LRUCache<nuint, nuint>(100);
         private static object _addrToSizeLock = new();
-        private static Dictionary<string, ulong> ClassSizes = new Dictionary<string, ulong>();
+        private static Dictionary<string, nuint> ClassSizes = new Dictionary<string, nuint>();
         private static object ClassSizesLock = new();
-        public IReadOnlyDictionary<string, ulong> GetFindings() => ClassSizes;
+        public IReadOnlyDictionary<string, nuint> GetFindings() => ClassSizes;
 
-        public static void RegisterSize(ulong addr, ulong size)
+        public static void RegisterSize(nuint addr, nuint size)
         {
             lock (_addrToSizeLock)
             {
@@ -447,7 +349,7 @@ namespace ScubaDiver
             }
         }
 
-        public static void RegisterClassName(ulong addr, string className)
+        public static void RegisterClassName(nuint addr, string className)
         {
             // Check if we already found the size of this class
             lock (ClassSizesLock)
@@ -458,7 +360,7 @@ namespace ScubaDiver
 
             // Check recent "allocations"
             bool res;
-            ulong size;
+            nuint size;
             lock (_addrToSizeLock)
             {
                 res = _addrToSize.TryGetValue(addr, true, out size);
