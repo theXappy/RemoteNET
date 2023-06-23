@@ -96,6 +96,7 @@ namespace ScubaDiver
                 // This list should now hold only typeless funcs
                 foreach (DllExport export in allExports)
                 {
+                    // TODO: Then why the fuck am I trying to undecorate??
                     if(!export.TryUndecorate(moduleInfo, out UndecoratedFunction output))
                         continue;
                     
@@ -108,7 +109,7 @@ namespace ScubaDiver
                     foreach (nuint operatorNewAddr in operatorNewAddresses)
                     {
                         UndecoratedFunction undecFunction =
-                            new UndecoratedInternalFunction("operator new", "operator new", (long)operatorNewAddr,
+                            new UndecoratedInternalFunction("operator new", "operator new", (long)operatorNewAddr, 1,
                                 moduleInfo);
                         module.AddTypelessFunction("operator new", undecFunction);
                     }
