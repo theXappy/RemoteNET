@@ -311,11 +311,8 @@ namespace ScubaDiver
             object first = args.FirstOrDefault();
             if (first is nuint size)
             {
-                // Ugly casting
-                Delegate originalDelegate = DelegateStore.Real[trampoline.GenerateMethodInfo];
-                IntPtr functionPointer = Marshal.GetFunctionPointerForDelegate(originalDelegate);
-                OperatorNewType opNew = (OperatorNewType)Marshal.GetDelegateForFunctionPointer(functionPointer, typeof(OperatorNewType));
-
+                // Calling original
+                OperatorNewType opNew = trampoline.GetRealMethod<OperatorNewType>();
 
                 // Invoking original ctor
                 overridenReturnValue = opNew(size);

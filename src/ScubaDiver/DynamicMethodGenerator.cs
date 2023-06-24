@@ -4,6 +4,8 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.InteropServices;
+using DetoursNet;
 
 namespace ScubaDiver;
 
@@ -30,6 +32,15 @@ public static class DetoursMethodGenerator
         public void Dispose()
         {
             DetoursMethodGenerator._callbacks.Remove(Name);
+        }
+
+        public T GetRealMethod<T>() where T : Delegate
+        {
+            // Ugly casting
+            Delegate originalDelegate = DelegateStore.GetReal(GenerateMethodInfo);
+            IntPtr functionPointer = Marshal.GetFunctionPointerForDelegate(originalDelegate);
+            T output = (T)Marshal.GetDelegateForFunctionPointer(functionPointer, typeof(T));
+            return output;
         }
     }
 
