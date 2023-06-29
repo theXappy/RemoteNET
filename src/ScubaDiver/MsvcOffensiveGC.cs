@@ -39,10 +39,12 @@ namespace ScubaDiver
 
             Dictionary<long, UndecoratedFunction> initMethods = GetAutoClassInit2Funcs(modules);
             Dictionary<TypeInfo, List<UndecoratedFunction>> ctors = GetCtors(modules);
+            Dictionary<TypeInfo, List<UndecoratedFunction>> dtors = GetDtors(modules);
             Dictionary<string, List<UndecoratedFunction>> newOperators = GetNewOperators(modules);
 
             HookAutoClassInit2Funcs(initMethods);
             HookCtors(ctors);
+            HookDtors(dtors);
             HookNewOperators(newOperators);
 
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(Init)} OUT");
@@ -89,6 +91,37 @@ namespace ScubaDiver
 
                     // Found the method group
                     workingDict[type] = ctors;
+                }
+            }
+
+            Dictionary<TypeInfo, List<UndecoratedFunction>> res = new();
+            foreach (UndecoratedModule module in modules)
+            {
+                ProcessSingleModule(module, res);
+            }
+
+            return res;
+        }
+        private Dictionary<TypeInfo, List<UndecoratedFunction>> GetDtors(List<UndecoratedModule> modules)
+        {
+            string GetDtorName(TypeInfo type)
+            {
+                string fullTypeName = type.Name;
+                string className = fullTypeName.Substring(fullTypeName.LastIndexOf("::") + 2);
+                return $"{fullTypeName}::~{className}";
+            }
+
+            void ProcessSingleModule(UndecoratedModule module,
+                Dictionary<TypeInfo, List<UndecoratedFunction>> workingDict)
+            {
+                foreach (TypeInfo type in module.Type)
+                {
+                    string ctorName = GetDtorName(type);
+                    if (!module.TryGetTypeFunc(type, ctorName, out var dtors))
+                        continue;
+
+                    // Found the method group
+                    workingDict[type] = dtors;
                 }
             }
 
@@ -199,6 +232,46 @@ namespace ScubaDiver
             Logger.Debug(
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
+        private static void HookDtors(Dictionary<TypeInfo, List<UndecoratedFunction>> dtors)
+        {
+            // Hook all ctors
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook dtors...");
+            int attemptedHookedCtorsCount = 0;
+            foreach (var kvp in dtors)
+            {
+                TypeInfo type = kvp.Key;
+                string fullTypeName = $"{type.ModuleName}!{type.Name}";
+                foreach (UndecoratedFunction dtor in kvp.Value)
+                {
+                    // NOTE: args are 0 but the 'this' argument is implied (Usually in ecx. Decompilers shows it as the first argument)
+                    if (dtor.NumArgs > 4)
+                        continue;
+
+
+                    if (_alreadyHookedDecorated.Contains(dtor.DecoratedName))
+                    {
+                        Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {dtor.UndecoratedName} , Decorated: {dtor.DecoratedName}");
+                        continue;
+                    }
+                    _alreadyHookedDecorated.Add(dtor.DecoratedName);
+
+
+                    if (dtor.NumArgs > 1 || !dtor.UndecoratedName.StartsWith("SPen"))
+                    {
+                        Debug.WriteLine($"[{nameof(MsvcOffensiveGC)}] Skipping hooking CTOR {dtor.UndecoratedName} with {dtor.NumArgs} args");
+                        continue;
+                    }
+
+                    DetoursNetWrapper.Instance.AddHook(dtor, UnifiedDtor);
+                    attemptedHookedCtorsCount++;
+                }
+            }
+
+            Logger.Debug(
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. attempted to hook: {attemptedHookedCtorsCount} ctors");
+            Logger.Debug(
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+        }
 
         private void HookAutoClassInit2Funcs(Dictionary<long, UndecoratedFunction> initMethods)
         {
@@ -241,6 +314,23 @@ namespace ScubaDiver
             }
             return true;
         }
+        public static bool UnifiedDtor(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overridenReturnValue)
+        {
+            overridenReturnValue = 0;
+
+            //Console.WriteLine($"[UnifiedDtor] Secret: {secret.Name}, Args: {args.Length}");
+            object first = args.FirstOrDefault();
+            if (first is nuint self)
+            {
+                Console.WriteLine($"[UnifiedDtor] Secret: {secret.Name}, Args: {args.Length}, Self: 0x{self:x16}");
+            }
+            else
+            {
+                Console.WriteLine($"[UnifiedDtor] Secret: {secret.Name}, Args: {args.Length}, Self: <ERROR!>");
+            }
+            return true;
+        }
+
 
         // +--------------------------+
         // | __autoclassinit2 Hooking |
