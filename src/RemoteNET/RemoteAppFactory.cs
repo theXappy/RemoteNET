@@ -110,6 +110,10 @@ namespace RemoteNET
                 DotNetHostInjector hostInjector = new DotNetHostInjector(new DotNetHostInjectorOptions());
                 var results = hostInjector.Inject(target, injectableDummy, "InjectableDummy.DllMain, InjectableDummy");
                 Debug.WriteLine("hostInjector.Inject RESULTS: " + results);
+                if (!results.IsSuccess)
+                    throw new Exception(
+                        "DotNetHostInjector failed to host the .NET runtime in the target. Raw error: " +
+                        results.Error.Message);
             }
 
             string scubaDiverArgs = $"{diverPort}";
