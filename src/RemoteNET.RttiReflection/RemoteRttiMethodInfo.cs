@@ -23,7 +23,7 @@ namespace RemoteNET.Internal.Reflection
         public override bool IsGenericMethodDefinition => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
         public override bool ContainsGenericParameters => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
         public override Type[] GetGenericArguments() => AssignedGenericArgs;
-        public string UndecoratedName { get; private set; }
+        public string MangledName { get; private set; }
 
         public Type[] AssignedGenericArgs { get; }
         private readonly ParameterInfo[] _paramInfos;
@@ -34,14 +34,14 @@ namespace RemoteNET.Internal.Reflection
             this(declaringType,
                 new LazyRemoteTypeResolver(mi.ReturnType),
                 mi.Name,
-                (mi as RemoteRttiMethodInfo)?.UndecoratedName ?? mi.Name,
+                (mi as RemoteRttiMethodInfo)?.MangledName ?? mi.Name,
                 mi.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
         {
         }
-        public RemoteRttiMethodInfo(Type declaringType, LazyRemoteTypeResolver returnType, string name, string undecoratedName, ParameterInfo[] paramInfos)
+        public RemoteRttiMethodInfo(Type declaringType, LazyRemoteTypeResolver returnType, string name, string mangledName, ParameterInfo[] paramInfos)
         {
             Name = name;
-            UndecoratedName = undecoratedName;
+            MangledName = mangledName;
             DeclaringType = declaringType;
             _paramInfos = paramInfos;
             _retType = returnType;
@@ -92,14 +92,14 @@ namespace RemoteNET.Internal.Reflection
             throw new NotImplementedException();
         }
 
-        public override string ToString() => Name;
+        public override string ToString() => MangledName;
 
         public string UndecoratedSignature()
         {
             try
             {
                 string args = string.Join(", ", _paramInfos.Select(pi => pi.ToString()));
-                return $"{_retType.TypeFullName ?? _retType.TypeName} {UndecoratedName}({args})";
+                return $"{_retType.TypeFullName ?? _retType.TypeName} {Name}({args})";
             }
             catch (Exception)
             {

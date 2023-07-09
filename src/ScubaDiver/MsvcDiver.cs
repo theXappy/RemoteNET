@@ -453,14 +453,49 @@ namespace ScubaDiver
                     string moduleName = typeInfo.ModuleName;
                     string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
                     string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
+                    string vftableName = $"{typeInfo.Name}::`vftable'"; // Constructing NameSpace::ClassName::ClassName
 
+                    List<ManagedTypeDump.TypeField> fields = new();
                     List<ManagedTypeDump.TypeMethod> methods = new();
                     List<ManagedTypeDump.TypeMethod> constructors = new();
                     foreach (UndecoratedFunction dllExport in GetExportedTypeMethod(module, typeInfo.Name))
                     {
+                        // TODO: Fields could be exported as well..
+                        // we only expected the "vftable" field (not actualy a field...) and methods/ctors right now
+
+                        List<ManagedTypeDump.TypeMethod.MethodParameter> parameters;
+                        string[] argTypes = dllExport.ArgTypes;
+                        if (argTypes != null)
+                        {
+                            parameters = argTypes.Select(argType =>
+                                new ManagedTypeDump.TypeMethod.MethodParameter()
+                                {
+                                    FullTypeName = argType,
+                                    Name = argType
+                                }).ToList();
+                        }
+                        else
+                        {
+                            if (dllExport.UndecoratedName == vftableName)
+                            {
+                                fields.Add(new ManagedTypeDump.TypeField()
+                                {
+                                    Name = "vftable",
+                                    TypeFullName = dllExport.UndecoratedName,
+                                    Visibility = "Public"
+                                });
+                                continue;
+                            }
+                            // Something went wrong when parsing this method's parameters...
+                            Logger.Debug($"[{nameof(GetManagedTypeDump)}] Failed to parse parameters of {dllExport.UndecoratedName}");
+                            continue;
+                        }
+
                         ManagedTypeDump.TypeMethod method = new()
                         {
                             Name = dllExport.UndecoratedName,
+                            MangledName = dllExport.DecoratedName,
+                            Parameters = parameters,
                             Visibility = "Public" // Because it's exported
                         };
 
@@ -475,7 +510,8 @@ namespace ScubaDiver
                         Assembly = moduleName,
                         Type = typeInfo.Name,
                         Methods = methods,
-                        Constructors = constructors
+                        Constructors = constructors,
+                        Fields = fields
                     };
                     return recusiveManagedTypeDump;
                 }

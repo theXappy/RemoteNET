@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using NtApiDotNet.Win32;
 using ScubaDiver.Rtti;
 
@@ -7,28 +8,32 @@ namespace ScubaDiver;
 public class UndecoratedExport : UndecoratedFunction
 {
     private ModuleInfo _module;
-    private Lazy<int?> _lazyNumArgs;
-    public override string DecoratedName => Export.Name;
+    private Lazy<string[]> _lazyArgTypes;
     public override long Address => Export.Address;
     public override ModuleInfo Module => _module;
-    public override int? NumArgs
+    public string ClassName { get; set; }
+    public override string[] ArgTypes
     {
         get
         {
-            int? res = _lazyNumArgs.Value;
-            if (res != null)
-                res++; // TODO: Assuming instance method
-            return res;
+            string[] args = _lazyArgTypes.Value;
+            if (args != null)
+                args = args.Prepend(ClassName).ToArray(); // TODO: Assuming instance method
+            return args;
         }
     }
 
+    public override int? NumArgs => ArgTypes.Length;
+
+
     public DllExport Export { get; set; }
 
-    public UndecoratedExport(string undecoratedName, Lazy<int?> numArgs, DllExport export, ModuleInfo module) : base(undecoratedName)
+    public UndecoratedExport(string className, string undecoratedName, Lazy<string[]> args, DllExport export, ModuleInfo module) : base(export.Name, undecoratedName)
     {
+        ClassName = className;
         UndecoratedName = undecoratedName;
         Export = export;
         _module = module;
-        _lazyNumArgs = numArgs;
+        _lazyArgTypes = args;
     }
 }

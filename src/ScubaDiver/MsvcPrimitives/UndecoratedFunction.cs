@@ -5,13 +5,15 @@ namespace ScubaDiver;
 public abstract class UndecoratedFunction
 {
     public string UndecoratedName { get; set; }
-    public abstract string DecoratedName { get; }
+    public string DecoratedName { get; set; }
     public abstract long Address { get; }
     public abstract ModuleInfo Module { get; }
+    public virtual string[] ArgTypes { get; }
     public virtual int? NumArgs { get; }
 
-    public UndecoratedFunction(string undecName, int? numArgs = null)
+    public UndecoratedFunction(string decoratedName, string undecName, int? numArgs = null)
     {
+        DecoratedName = decoratedName;
         UndecoratedName = undecName;
         NumArgs = numArgs;
     }

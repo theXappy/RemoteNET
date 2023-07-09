@@ -185,6 +185,18 @@ namespace ScubaDiver.Demangle.Demangle
 
             public StringBuilder VisitTypeReference(TypeReference_v1 typeReference)
             {
+                if (typeReference.Scope != null)
+                {
+                    if (typeReference.Scope.Length == 1)
+                    {
+                        sb.Append(typeReference.Scope[0]);
+                        sb.Append("::");
+                    }
+                    else
+                    {
+                        // SS: Multiple Scope? Not expected...
+                    }
+                }
                 sb.Append(typeReference.TypeName);
                 if (name != null)
                     sb.AppendFormat(" {0}", name);
