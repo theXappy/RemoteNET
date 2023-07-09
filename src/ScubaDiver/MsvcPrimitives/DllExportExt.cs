@@ -2,6 +2,7 @@
 using NtApiDotNet.Win32;
 using ScubaDiver.Rtti;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ScubaDiver.Demangle.Demangle;
 using ScubaDiver.Demangle.Demangle.Core.Serialization;
@@ -29,7 +30,7 @@ public static class DllExportExt
         }
 
 
-        Lazy<int?> lazyNumArgs = new Lazy<int?>(() =>
+        Lazy<string[]> lazyNumArgs = new Lazy<string[]>(() =>
         {
             SerializedType sig;
             if (input.Name.FirstOrDefault() != '?')
@@ -45,18 +46,33 @@ public static class DllExportExt
                 return null;
             }
 
-            Argument_v1[] args = (sig as SerializedSignature)?.Arguments;
-            if (args == null)
+            if (sig is not SerializedSignature serSig)
             {
                 // Failed to parse?!?
                 //Logger.Debug($"Failed to parse arguments of function, Raw: {input.Name}");
                 return null;
             }
 
-            return args.Length;
+
+            List<RestarizedParameter> restParameters;
+            try
+            {
+                restParameters = TypesRestarizer.RestarizeParameters(serSig);
+            }
+            catch
+            {
+                // Failed to parse?!?
+                Logger.Debug($"[TypesRestarizer.RestarizeParameters] Failed to parse arguments of function, Raw: {input.Name}");
+                return null;
+            }
+
+            return restParameters.Select(param => param.FriendlyName).ToArray();
         });
 
-        output = new UndecoratedExport(basicUndecoratedName, lazyNumArgs, input, module);
+        string className = "";
+        if(basicUndecoratedName.Contains("::"))
+            className = basicUndecoratedName[..(basicUndecoratedName.LastIndexOf("::"))];
+        output = new UndecoratedExport(className, basicUndecoratedName, lazyNumArgs, input, module);
         return true;
     }
 }

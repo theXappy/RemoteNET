@@ -15,7 +15,7 @@ namespace RemoteNET.RttiReflection
         public override string Name => _name;
         public override string FullName => _fullName;
 
-        private Dictionary<string, MethodInfo> _methods = new Dictionary<string, MethodInfo>();
+        private List<MethodInfo> _methods = new List<MethodInfo>();
         private List<ConstructorInfo> _ctors = new List<ConstructorInfo>();
         private Lazy<Type> _parent;
         public override Type BaseType => _parent?.Value;
@@ -47,7 +47,8 @@ namespace RemoteNET.RttiReflection
             _parent = parent;
         }
 
-        public void AddMethod(MethodInfo mi) => _methods.Add(mi.Name, mi);
+        public void AddConstructor(ConstructorInfo ci) => _ctors.Add(ci);
+        public void AddMethod(MethodInfo mi) => _methods.Add(mi);
         public void AddUnresolvedMember(string member) => UnresolvedMembers.Add(member);
 
         public override object[] GetCustomAttributes(bool inherit)
@@ -144,7 +145,7 @@ namespace RemoteNET.RttiReflection
 
         public override MethodInfo[] GetMethods(BindingFlags bindingAttr)
         {
-            return _methods.Values.ToArray();
+            return _methods.ToArray();
         }
 
         public override PropertyInfo[] GetProperties(BindingFlags bindingAttr)

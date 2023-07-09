@@ -147,53 +147,28 @@ namespace RemoteNET.RttiReflection
         {
             foreach (ManagedTypeDump.TypeMethod func in functions)
             {
-                // Demangle
-                MsMangledNameParser parser = new MsMangledNameParser(func.Name);
+                string? mangledName = func.MangledName;
+                if(string.IsNullOrEmpty(mangledName))
+                    mangledName = func.Name;
 
-                string? undecoratedFuncName;
-                SerializedType? funcSig;
-                SerializedType? enclosingType;
-                List<RestarizedParameter> parsedParameters;
-                RestarizedParameter parsedReturnParameters;
-                try
-                {
-                    (undecoratedFuncName, funcSig, enclosingType) = parser.Parse();
-                    if (!(funcSig is SerializedSignature sig))
-                    {
-                        Debug.WriteLine($"Demangling of method name did not result in a function signture. RAW: {func.Name}, " +
-                                        $"Got back Name: {undecoratedFuncName}," +
-                                        $"Got Back type: {(funcSig?.GetType()?.Name ?? "NULL")}");
-                        declaringType.AddUnresolvedMember(func.Name);
-                        continue;
-                    }
-                    parsedParameters = TypesRestarizer.RestarizeParameters(sig);
-                    parsedReturnParameters = TypesRestarizer.RestarizeArgument(sig.ReturnValue);
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteLine($"Error when parsing mangled name. Input: {func.Name} , Exception: {e}");
-                    declaringType.AddUnresolvedMember(func.Name);
-                    continue;
-                }
-
-                List<ParameterInfo> parameters = new List<ParameterInfo>(parsedParameters.Count);
+                List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);
                 int i = 1;
-                foreach (RestarizedParameter restarizedParameter in parsedParameters)
+                foreach (ManagedTypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
                 {
                     string fakeParamName = $"a{i}";
                     i++;
                     Lazy<Type> paramFactory = new Lazy<Type>(() =>
                     {
                         // TODO: Actual resolve
-                        return new DummyGenericType(restarizedParameter.FriendlyName);
+                        return new DummyGenericType(restarizedParameter.FullTypeName);
                     });
                     LazyRemoteTypeResolver paramTypeResolver = new LazyRemoteTypeResolver(paramFactory,
                                    //methodParameter.Assembly,
                                    //methodParameter.FullTypeName,
                                    //methodParameter.TypeName
                                    null,
-                                   restarizedParameter.FriendlyName,
-                                   restarizedParameter.FriendlyName
+                                   restarizedParameter.FullTypeName,
+                                   restarizedParameter.FullTypeName
                                    );
                     RemoteParameterInfo rpi = new RemoteParameterInfo(fakeParamName, paramTypeResolver);
                     parameters.Add(rpi);
@@ -202,25 +177,25 @@ namespace RemoteNET.RttiReflection
                 Lazy<Type> returnTypeFactory = new Lazy<Type>(() =>
                 {
                     // TODO: Actual resolve
-                    return new DummyGenericType(parsedReturnParameters.FriendlyName);
+                    return new DummyGenericType(func.ReturnTypeFullName);
                 });
                 LazyRemoteTypeResolver returnTypeResolver = new LazyRemoteTypeResolver(returnTypeFactory,
                     null,
-                    parsedReturnParameters.FriendlyName,
-                    parsedReturnParameters.FriendlyName);
+                    func.ReturnTypeFullName,
+                    func.ReturnTypeFullName);
 
                 if (areConstructors)
                 {
                     // TODO: RTTI Constructors
-                    //RemoteConstructorInfo ctorInfo =
-                    //    new RemoteConstructorInfo(declaringType, parameters.ToArray());
-                    //declaringType.AddConstructor(ctorInfo);
+                    RemoteRttiConstructorInfo ctorInfo =
+                        new RemoteRttiConstructorInfo(declaringType, parameters.ToArray());
+                    declaringType.AddConstructor(ctorInfo);
                 }
                 else
                 {
                     // Regular method
                     RemoteRttiMethodInfo methodInfo =
-                        new RemoteRttiMethodInfo(declaringType, returnTypeResolver, func.Name, undecoratedFuncName, parameters.ToArray());
+                        new RemoteRttiMethodInfo(declaringType, returnTypeResolver, func.Name, mangledName, parameters.ToArray());
                     declaringType.AddMethod(methodInfo);
                 }
             }

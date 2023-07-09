@@ -9,6 +9,8 @@ namespace ScubaDiver.API.Interactions.Dumps
     [DebuggerDisplay("ManagedTypeDump of {" + nameof(Type) + "} (Assembly: {" + nameof(Assembly) + "})")]
     public class ManagedTypeDump
     {
+        [DebuggerDisplay("{" + nameof(ReturnTypeName) + "} {" + nameof(Name) + "}(...)")]
+
         public class TypeMethod
         {
             public class MethodParameter
@@ -58,6 +60,7 @@ namespace ScubaDiver.API.Interactions.Dumps
 
             public string Visibility { get; set; }
             public string Name { get; set; }
+            public string MangledName { get; set; }
             public string ReturnTypeFullName { get; set; }
             // This is not a list of the PARAMETERS which are generic -> This is the list of TYPES place holders usually found between
             // the "LESS THEN" and "GEATER THEN" signs so for this methods:
@@ -132,7 +135,6 @@ namespace ScubaDiver.API.Interactions.Dumps
 
             public override string ToString()
             {
-
                 return $"{ReturnTypeFullName} {Name}({string.Join(",", Parameters)})";
             }
         }
