@@ -467,11 +467,11 @@ namespace ScubaDiver
                         string[] argTypes = dllExport.ArgTypes;
                         if (argTypes != null)
                         {
-                            parameters = argTypes.Select(argType =>
+                            parameters = argTypes.Select((argType, i) =>
                                 new ManagedTypeDump.TypeMethod.MethodParameter()
                                 {
                                     FullTypeName = argType,
-                                    Name = argType
+                                    Name = $"a{i}"
                                 }).ToList();
                         }
                         else
