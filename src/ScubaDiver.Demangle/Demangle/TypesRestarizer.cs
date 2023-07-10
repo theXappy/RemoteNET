@@ -46,7 +46,7 @@ namespace ScubaDiver.Demangle.Demangle
                             case 1: sb.Append("int8_t"); break;
                             case 2: sb.Append("int16_t"); break;
                             case 4: sb.Append("int32_t"); break;
-                            case 8: sb.Append("__int64"); break;
+                            case 8: sb.Append("int64_t"); break;
                             default: throw new NotImplementedException();
                         }
                         break;
@@ -55,6 +55,7 @@ namespace ScubaDiver.Demangle.Demangle
                         {
                             case 2: sb.Append("uint16_t"); break;
                             case 4: sb.Append("uint32_t"); break;
+                            case 8: sb.Append("uint64_t"); break;
                             default: throw new NotImplementedException();
                         }
                         break;
