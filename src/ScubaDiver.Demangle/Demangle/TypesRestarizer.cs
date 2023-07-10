@@ -175,7 +175,8 @@ namespace ScubaDiver.Demangle.Demangle
 
             public StringBuilder VisitStructure(StructType_v1 structure)
             {
-                throw new NotImplementedException();
+                sb.Append(structure.Name);
+                return sb;
             }
 
             public StringBuilder VisitTypedef(SerializedTypedef typedef)
