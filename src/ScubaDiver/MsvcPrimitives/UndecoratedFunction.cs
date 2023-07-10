@@ -10,6 +10,7 @@ public abstract class UndecoratedFunction
     public abstract ModuleInfo Module { get; }
     public virtual string[] ArgTypes { get; }
     public virtual int? NumArgs { get; }
+    public virtual string RetType { get; }
 
     public UndecoratedFunction(string decoratedName, string undecName, int? numArgs = null)
     {

@@ -30,11 +30,11 @@ public static class DllExportExt
         }
 
 
-        Lazy<string[]> lazyNumArgs = new Lazy<string[]>(() =>
+        Lazy<(string, string[])> lazyArgs = new Lazy<(string, string[])>(() =>
         {
             SerializedType sig;
             if (input.Name.FirstOrDefault() != '?')
-                return null;
+                return (null, null);
             try
             {
                 var parser = new MsMangledNameParser(input.Name);
@@ -43,36 +43,40 @@ public static class DllExportExt
             catch (Exception ex)
             {
                 //Logger.Debug($"Failed to demangle name of function, Raw: {input.Name}, Exception: " + ex.Message);
-                return null;
+                return (null, null);
             }
 
             if (sig is not SerializedSignature serSig)
             {
                 // Failed to parse?!?
                 //Logger.Debug($"Failed to parse arguments of function, Raw: {input.Name}");
-                return null;
+                return (null, null);
             }
 
 
             List<RestarizedParameter> restParameters;
+            RestarizedParameter resRetType;
             try
             {
                 restParameters = TypesRestarizer.RestarizeParameters(serSig);
+                resRetType = TypesRestarizer.RestarizeArgument(serSig.ReturnValue);
             }
             catch
             {
                 // Failed to parse?!?
                 Logger.Debug($"[TypesRestarizer.RestarizeParameters] Failed to parse arguments of function, Raw: {input.Name}");
-                return null;
+                return (null, null);
             }
 
-            return restParameters.Select(param => param.FriendlyName).ToArray();
+            string[] argTypes = restParameters.Select(param => param.FriendlyName).ToArray();
+            string retType = resRetType.FriendlyName;
+            return (retType, argTypes);
         });
 
         string className = "";
-        if(basicUndecoratedName.Contains("::"))
+        if (basicUndecoratedName.Contains("::"))
             className = basicUndecoratedName[..(basicUndecoratedName.LastIndexOf("::"))];
-        output = new UndecoratedExport(className, basicUndecoratedName, lazyNumArgs, input, module);
+        output = new UndecoratedExport(className, basicUndecoratedName, lazyArgs, input, module);
         return true;
     }
 }
