@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "LifeboatProxy": {
+      "commandName": "Project",
+      "commandLineArgs": "29808"
+    }
+  }
+}
