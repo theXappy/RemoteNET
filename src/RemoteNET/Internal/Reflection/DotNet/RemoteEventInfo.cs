@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using ScubaDiver.API;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
     public class RemoteEventInfo : EventInfo
     {

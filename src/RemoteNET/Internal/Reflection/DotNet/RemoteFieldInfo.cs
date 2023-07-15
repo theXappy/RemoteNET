@@ -4,7 +4,7 @@ using System.Reflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Utils;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
     public class RemoteFieldInfo : FieldInfo
     {
@@ -40,7 +40,7 @@ namespace RemoteNET.Internal.Reflection
         {
         }
 
-        public RemoteFieldInfo(RemoteType declaringType, FieldInfo fi) : this(declaringType, new Lazy<Type>(()=> fi.FieldType), fi.Name)
+        public RemoteFieldInfo(RemoteType declaringType, FieldInfo fi) : this(declaringType, new Lazy<Type>(() => fi.FieldType), fi.Name)
         {
         }
 
@@ -52,15 +52,15 @@ namespace RemoteNET.Internal.Reflection
             {
                 // No 'this' object --> Static field
 
-                if (this.App == null)
+                if (App == null)
                 {
                     throw new InvalidOperationException($"Trying to get a static field (null target object) " +
                                                         $"on a {nameof(RemoteFieldInfo)} but it's associated " +
-                                                        $"Declaring Type ({this.DeclaringType}) does not have a ManagedRemoteApp associated. " +
+                                                        $"Declaring Type ({DeclaringType}) does not have a ManagedRemoteApp associated. " +
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                oora = this.App.Communicator.GetField(0, DeclaringType.FullName, this.Name).ReturnedObjectOrAddress;
+                oora = App.Communicator.GetField(0, DeclaringType.FullName, Name).ReturnedObjectOrAddress;
             }
             else
             {
@@ -69,7 +69,7 @@ namespace RemoteNET.Internal.Reflection
                 ro ??= (obj as DynamicRemoteObject)?.__ro as RemoteObject;
                 if (ro != null)
                 {
-                    oora = ro.GetField(this.Name);
+                    oora = ro.GetField(Name);
                 }
                 else
                 {
@@ -89,7 +89,7 @@ namespace RemoteNET.Internal.Reflection
                 {
                     // I only support managed here because I don't think I'll implement "Field Infos" for unmanaged
                     // objects any time soon.
-                    var remoteObject = this.App.GetRemoteObject(oora.RemoteAddress, oora.Type);
+                    var remoteObject = App.GetRemoteObject(oora.RemoteAddress, oora.Type);
                     return remoteObject.Dynamify();
                 }
                 else if (oora.IsNull)
@@ -106,7 +106,7 @@ namespace RemoteNET.Internal.Reflection
             var val = value;
             if (val.GetType().IsEnum)
             {
-                var enumClass = this.App.GetRemoteEnum(val.GetType().FullName);
+                var enumClass = App.GetRemoteEnum(val.GetType().FullName);
                 // TODO: This will break on the first enum value which represents 2 or more flags
                 object enumVal = enumClass.GetValue(val.ToString());
                 // NOTE: Object stays in place in the remote app as long as we have it's reference
@@ -115,21 +115,21 @@ namespace RemoteNET.Internal.Reflection
             }
 
             // Might throw if the parameter is a local object (not RemoteObject or DynamicRemoteObject).
-            ObjectOrRemoteAddress remoteNewValue = RemoteFunctionsInvokeHelper.CreateRemoteParameter(value);
+            ObjectOrRemoteAddress remoteNewValue = ManagedRemoteFunctionsInvokeHelper.CreateRemoteParameter(value);
 
             if (obj == null)
             {
                 // No 'this' object --> Static field
 
-                if (this.App == null)
+                if (App == null)
                 {
                     throw new InvalidOperationException($"Trying to get a static field (null target object) " +
                                                         $"on a {nameof(RemoteFieldInfo)} but it's associated " +
-                                                        $"Declaring Type ({this.DeclaringType}) does not have a ManagedRemoteApp associated. " +
+                                                        $"Declaring Type ({DeclaringType}) does not have a ManagedRemoteApp associated. " +
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                this.App.Communicator.SetField(0, DeclaringType.FullName, this.Name, remoteNewValue);
+                App.Communicator.SetField(0, DeclaringType.FullName, Name, remoteNewValue);
                 return;
             }
 
@@ -138,7 +138,7 @@ namespace RemoteNET.Internal.Reflection
             ro ??= (obj as DynamicRemoteObject)?.__ro as RemoteObject;
             if (ro != null)
             {
-                ro.SetField(this.Name, remoteNewValue);
+                ro.SetField(Name, remoteNewValue);
                 return;
             }
 

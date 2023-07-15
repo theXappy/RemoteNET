@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using RemoteNET.Internal.Reflection;
+using RemoteNET.Internal.Reflection.DotNet;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions;
 
@@ -42,7 +43,7 @@ namespace RemoteNET
                 }
             }
 
-            ObjectOrRemoteAddress[] remoteParams = paramsNoEnums.Select(RemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
+            ObjectOrRemoteAddress[] remoteParams = paramsNoEnums.Select(ManagedRemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
 
             // Create object + pin
             InvocationResults invoRes = _communicator.CreateObject(typeFullName, remoteParams);

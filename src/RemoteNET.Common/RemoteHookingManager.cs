@@ -1,18 +1,19 @@
-﻿using RemoteNET.Internal;
-using ScubaDiver.API;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using ScubaDiver.API;
 using ScubaDiver.API.Hooking;
+using ScubaDiver.API.Utils;
 
-namespace RemoteNET
+namespace RemoteNET.Common
 {
     public delegate void HookAction(HookContext context, dynamic instance, dynamic[] args);
 
-    public class RemoteHarmony
+    public class RemoteHookingManager
     {
-        private readonly ManagedRemoteApp _app;
+        private readonly RemoteApp _app;
 
         private readonly Dictionary<MethodBase, MethodHooks> _callbacksToProxies;
 
@@ -35,7 +36,7 @@ namespace RemoteNET
         }
 
 
-        internal RemoteHarmony(ManagedRemoteApp app)
+        public RemoteHookingManager(RemoteApp app)
         {
             _app = app;
             _callbacksToProxies = new Dictionary<MethodBase, MethodHooks>();
@@ -79,15 +80,19 @@ namespace RemoteNET
             LocalHookCallback hookProxy = (HookContext context, ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args) =>
             {
                 // Converting instance to DRO
-                DynamicRemoteObject droInstance;
+                dynamic droInstance;
                 if (instance.IsNull)
                 {
                     droInstance = null;
                 }
+                else if(instance.IsRemoteAddress)
+                {
+                    IRemoteObject roInstance = this._app.GetRemoteObject(instance.RemoteAddress, instance.Type);
+                    droInstance = roInstance.Dynamify();
+                }
                 else
                 {
-                    RemoteObject roInstance = this._app.GetRemoteObject(instance.RemoteAddress, instance.Type);
-                    droInstance = roInstance.Dynamify();
+                    droInstance = PrimitivesEncoder.Decode(instance.EncodedObject, instance.Type);
                 }
 
                 // Converting args to DROs/raw primitive types
@@ -95,31 +100,51 @@ namespace RemoteNET
                 {
                     throw new NotImplementedException("Unexpected arguments forwarded to callback from the diver.");
                 }
-                // We are expecting a single arg which is a REMOTE array of objects (object[]) and we need to flatten it
-                // into several (Dynamic) Remote Objects in a LOCAL array of objects.
-                RemoteObject ro = _app.GetRemoteObject(args[0].RemoteAddress, args[0].Type);
-                dynamic dro = ro.Dynamify();
-                if (!ro.GetRemoteType().IsArray)
-                {
-                    throw new NotImplementedException("Unexpected arguments forwarded to callback from the diver -- single arg but not an array.");
-                }
 
-                int len = 0;
-                try
+                object[] decodedParameters;
+                if (args[0].Type == typeof(UIntPtr[]).FullName)
                 {
-                    len = (int)dro.Length;
+                    //
+                    // PARSE UNMANAGED ARGUMENTS
+                    //
+
+                    object decoded = PrimitivesEncoder.Decode(args[0]);
+                    decodedParameters = (decoded as UIntPtr[]).Cast<object>().ToArray();
                 }
-                catch (Exception e)
+                else
                 {
-                    Logger.Debug("ERROR ACCESSING ARRAY LEN: " + e);
-                }
-                object[] decodedParameters = new object[len];
-                for (int i = 0; i < len; i++)
-                {
-                    // Since this object isn't really a local array (just a proxy of a remote one) the index
-                    // acceess causes a 'GetItem' function call and retrival of the remote object at the position
-                    dynamic item = dro[i];
-                    decodedParameters[i] = item;
+                    //
+                    // PARSE MANAGED ARGUMENTS
+                    //
+
+                    // We are expecting a single arg which is a REMOTE array of objects (object[]) and we need to flatten it
+                    // into several (Dynamic) Remote Objects in a LOCAL array of objects.
+                    IRemoteObject ro = _app.GetRemoteObject(args[0].RemoteAddress, args[0].Type);
+                    dynamic dro = ro.Dynamify();
+                    if (!ro.GetRemoteType().IsArray)
+                    {
+                        throw new NotImplementedException(
+                            "Unexpected arguments forwarded to callback from the diver -- single arg but not an array.");
+                    }
+
+                    int len = 0;
+                    try
+                    {
+                        len = (int)dro.Length;
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine("ERROR ACCESSING ARRAY LEN: " + e);
+                    }
+
+                    decodedParameters = new object[len];
+                    for (int i = 0; i < len; i++)
+                    {
+                        // Since this object isn't really a local array (just a proxy of a remote one) the index
+                        // acceess causes a 'GetItem' function call and retrival of the remote object at the position
+                        dynamic item = dro[i];
+                        decodedParameters[i] = item;
+                    }
                 }
 
                 // Call the callback with the proxied parameters (using DynamicRemoteObjects)

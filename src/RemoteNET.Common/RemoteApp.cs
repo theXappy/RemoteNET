@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RemoteNET.Common;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 
@@ -8,6 +9,7 @@ namespace RemoteNET
     public abstract class RemoteApp : IDisposable
     {
         public abstract DiverCommunicator Communicator { get; }
+        public abstract RemoteHookingManager HookingManager { get; }
 
         public abstract IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter);
 

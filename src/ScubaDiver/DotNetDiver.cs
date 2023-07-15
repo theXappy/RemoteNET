@@ -38,11 +38,9 @@ namespace ScubaDiver
 
 
         // Callbacks Endpoint of the Controller process
-        private bool _monitorEndpoints = true;
-        private int _nextAvailableCallbackToken;
         private readonly UnifiedAppDomain _unifiedAppDomain;
         private readonly ConcurrentDictionary<int, RegisteredEventHandlerInfo> _remoteEventHandler;
-        private readonly ConcurrentDictionary<int, RegisteredManagedMethodHookInfo> _remoteHooks;
+
 
         // Object freezing (pinning)
         FrozenObjectsCollection _freezer = new FrozenObjectsCollection();
@@ -53,7 +51,6 @@ namespace ScubaDiver
             _responseBodyCreators.Add("/event_unsubscribe", MakeEventUnsubscribeResponse);
 
             _remoteEventHandler = new ConcurrentDictionary<int, RegisteredEventHandlerInfo>();
-            _remoteHooks = new ConcurrentDictionary<int, RegisteredManagedMethodHookInfo>();
             _unifiedAppDomain = new UnifiedAppDomain(this);
         }
 
@@ -76,7 +73,7 @@ namespace ScubaDiver
             base.Start();
         }
 
-        private void CallbacksEndpointsMonitor()
+        protected void CallbacksEndpointsMonitor()
         {
             while (_monitorEndpoints)
             {
@@ -533,7 +530,7 @@ namespace ScubaDiver
         protected override string MakeTypeResponse(ScubaDiverMessage req)
         {
             string body = req.Body;
-            
+
             if (string.IsNullOrEmpty(body))
             {
                 return QuickError("Missing body");
@@ -554,7 +551,7 @@ namespace ScubaDiver
             string dumpHashcodesStr = arg.QueryString.Get("dump_hashcodes");
             bool dumpHashcodes = dumpHashcodesStr?.ToLower() == "true";
 
-                                 // Default filter - no filter. Just return everything.
+            // Default filter - no filter. Just return everything.
             Predicate<string> matchesFilter = Filter.CreatePredicate(filter);
 
             (bool anyErrors, List<HeapDump.HeapObject> objects) = GetHeapObjects(matchesFilter, dumpHashcodes);
@@ -571,118 +568,66 @@ namespace ScubaDiver
         }
         #region Hooks & Events Handlers
 
-        protected override string MakeUnhookMethodResponse(ScubaDiverMessage arg)
+        /// <returns>Unhook action</returns>
+        protected override Action HookFunction(FunctionHookRequest request, HarmonyWrapper.HookCallback patchCallback)
         {
-            string tokenStr = arg.QueryString.Get("token");
-            if (tokenStr == null || !int.TryParse(tokenStr, out int token))
-            {
-                return QuickError("Missing parameter 'address'");
-            }
-            Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Called! Token: {token}");
+            string hookPositionStr = request.HookPosition;
+            HarmonyPatchPosition hookPosition = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPositionStr);
+            if (!Enum.IsDefined(typeof(HarmonyPatchPosition), hookPosition))
+                throw new Exception("hook_position has an invalid or unsupported value");
 
-            if (_remoteHooks.TryRemove(token, out RegisteredManagedMethodHookInfo rmhi))
-            {
-                HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
-                return "{\"status\":\"OK\"}";
-            }
+            if (ResolveManagedHookTargetFunc(request, out MethodBase methodInfo, out var resolutionError))
+                throw new Exception(resolutionError);
 
-            Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Unknown token for event callback subscription. Token: {token}");
-            return QuickError("Unknown token for event callback subscription");
+            // Might throw and it's fine
+            HarmonyWrapper.Instance.AddHook(methodInfo, hookPosition, patchCallback);
+
+            Action unhookMethod = (Action)(() =>
+            {
+                HarmonyWrapper.Instance.RemovePrefix(methodInfo);
+            });
+            return unhookMethod;
         }
-        protected override string MakeHookMethodResponse(ScubaDiverMessage arg)
+
+        private bool ResolveManagedHookTargetFunc(FunctionHookRequest request, out MethodBase methodInfo, out string error)
         {
-            Logger.Debug("[DotNetDiver] Got Hook Method request!");
-            string body = arg.Body;
-
-            if (string.IsNullOrEmpty(body))
-                return QuickError("Missing body");
-
-            var request = JsonConvert.DeserializeObject<FunctionHookRequest>(body);
-            if (request == null)
-                return QuickError("Failed to deserialize body");
-
-            if (!IPAddress.TryParse(request.IP, out IPAddress ipAddress))
-            {
-                return QuickError("Failed to parse IP address. Input: " + request.IP);
-            }
-            int port = request.Port;
-            IPEndPoint endpoint = new IPEndPoint(ipAddress, port);
-            string typeFullName = request.TypeFullName;
-            string methodName = request.MethodName;
-            string hookPosition = request.HookPosition;
-            HarmonyPatchPosition pos = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPosition);
-            if (!Enum.IsDefined(typeof(HarmonyPatchPosition), pos))
-                return QuickError("hook_position has an invalid or unsupported value");
-
+            error = null;
+            methodInfo = null;
             Type resolvedType;
             lock (_clrMdLock)
             {
-                resolvedType = _unifiedAppDomain.ResolveType(typeFullName);
+                resolvedType = _unifiedAppDomain.ResolveType(request.TypeFullName);
             }
+
             if (resolvedType == null)
-                return QuickError("Failed to resolve type");
+            {
+                error = "Failed to resolve type";
+                return true;
+            }
 
             Type[] paramTypes;
             lock (_clrMdLock)
             {
-                paramTypes = request.ParametersTypeFullNames.Select(typeFullName => _unifiedAppDomain.ResolveType(typeFullName)).ToArray();
+                paramTypes = request.ParametersTypeFullNames.Select(typeFullName => _unifiedAppDomain.ResolveType(typeFullName))
+                    .ToArray();
             }
 
             // We might be searching for a constructor. Switch based on method name.
-            MethodBase methodInfo = methodName == ".ctor"
+            string methodName = request.MethodName;
+            methodInfo = methodName == ".ctor"
                 ? resolvedType.GetConstructor(paramTypes)
                 : resolvedType.GetMethodRecursive(methodName, paramTypes);
 
             if (methodInfo == null)
-                return QuickError($"Failed to find method {methodName} in type {resolvedType.Name}");
+            {
+                error = $"Failed to find method {methodName} in type {resolvedType.Name}";
+                return true;
+            }
+
             Logger.Debug("[DotNetDiver] Hook Method - Resolved Method");
-
-            // We're all good regarding the signature!
-            // assign subscriber unique id
-            int token = AssignCallbackToken();
-            Logger.Debug($"[DotNetDiver] Hook Method - Assigned Token: {token}");
-
-            // Preparing a proxy method that Harmony will invoke
-            HarmonyWrapper.HookCallback patchCallback = (obj, args) =>
-            {
-                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), obj, args);
-                bool skipOriginal = false;
-                if (res != null && !res.IsRemoteAddress)
-                {
-                    object decodedRes = PrimitivesEncoder.Decode(res);
-                    if(decodedRes is bool boolRes)
-                        skipOriginal = boolRes;
-                }
-                return skipOriginal;
-            };
-
-            Logger.Debug($"[DotNetDiver] Hooking function {methodName}...");
-            try
-            {
-                HarmonyWrapper.Instance.AddHook(methodInfo, pos, patchCallback);
-            }
-            catch (Exception ex)
-            {
-                // Hooking filed so we cleanup the Hook Info we inserted beforehand 
-                _remoteHooks.TryRemove(token, out _);
-
-                Logger.Debug($"[DotNetDiver] Failed to hook func {methodName}. Exception: {ex}");
-                return QuickError("Failed insert the hook for the function. HarmonyWrapper.AddHook failed.");
-            }
-            Logger.Debug($"[DotNetDiver] Hooked func {methodName}!");
-
-            // Keeping all hooking information aside so we can unhook later.
-            _remoteHooks[token] = new RegisteredManagedMethodHookInfo()
-            {
-                Endpoint = endpoint,
-                OriginalHookedMethod = methodInfo,
-                RegisteredProxy = patchCallback
-            };
-
-
-            EventRegistrationResults erResults = new() { Token = token };
-            return JsonConvert.SerializeObject(erResults);
+            return false;
         }
+
         private string MakeEventUnsubscribeResponse(ScubaDiverMessage arg)
         {
             string tokenStr = arg.QueryString.Get("token");
@@ -778,7 +723,6 @@ namespace ScubaDiver
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
-        public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvailableCallbackToken);
 
         /// <summary>
         /// 
@@ -788,7 +732,7 @@ namespace ScubaDiver
         /// <param name="stackTrace"></param>
         /// <param name="parameters"></param>
         /// <returns>Any results returned from the</returns>
-        public ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
+        protected override ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
         {
             ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
@@ -1516,7 +1460,7 @@ namespace ScubaDiver
             }
             foreach (RegisteredManagedMethodHookInfo rmhi in _remoteHooks.Values)
             {
-                HarmonyWrapper.Instance.RemovePrefix(rmhi.OriginalHookedMethod);
+                rmhi.UnhookAction();
             }
             _remoteEventHandler.Clear();
             _remoteHooks.Clear();

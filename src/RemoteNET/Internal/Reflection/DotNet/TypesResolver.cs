@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
     /// <summary>
     /// Resolves local and remote types. Contains a cache so the same TypeFullName object is returned for different
@@ -38,18 +38,18 @@ namespace RemoteNET.Internal.Reflection
             // EXCEPT for enums because that breaks RemoteEnum
             IEnumerable<Assembly> assemblies = AppDomain.CurrentDomain.GetAssemblies();
             // Filter assemblies but avoid filtering for "mscorlib" because it's the devil
-            if(assemblyName?.Equals("mscorlib") == false)
+            if (assemblyName?.Equals("mscorlib") == false)
             {
                 assemblies = assemblies.Where(assm => assm.FullName.Contains(assemblyName ?? ""));
             }
             foreach (Assembly assembly in assemblies)
             {
                 resolvedType = assembly.GetType(typeFullName);
-                if(resolvedType != null)
+                if (resolvedType != null)
                 {
                     // Found the type!
                     // But retreat if it's an enum (and get remote proxy of it instead)
-                    if(resolvedType.IsEnum)
+                    if (resolvedType.IsEnum)
                     {
                         resolvedType = null;
                     }

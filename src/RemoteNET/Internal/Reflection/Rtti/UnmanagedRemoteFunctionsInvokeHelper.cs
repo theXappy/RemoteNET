@@ -1,16 +1,18 @@
 ﻿using System;
 using System.Linq;
+using RemoteNET.Internal;
+using RemoteNET.Internal.Reflection;
+using RemoteNET.Internal.Reflection.DotNet;
 using ScubaDiver.API;
-using ScubaDiver.API.Extensions;
 using ScubaDiver.API.Interactions;
 using ScubaDiver.API.Utils;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.RttiReflection
 {
     /// <summary>
     /// In this context: "function" = Methdods + Constructors.
     /// </summary>
-    internal static class RemoteFunctionsInvokeHelper
+    internal static class UnmanagedRemoteFunctionsInvokeHelper
     {
         public static ObjectOrRemoteAddress CreateRemoteParameter(object parameter)
         {
@@ -22,7 +24,7 @@ namespace RemoteNET.Internal.Reflection
             {
                 return ObjectOrRemoteAddress.FromObj(parameter);
             }
-            else if (parameter is RemoteObject remoteArg)
+            else if (parameter is IRemoteObject remoteArg)
             {
                 return ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetRemoteType().FullName);
             }
@@ -38,36 +40,19 @@ namespace RemoteNET.Internal.Reflection
             else
             {
                 throw new Exception(
-                    $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only works with primitive (int, " +
-                    $"double, string,...) or remote (in {nameof(RemoteObject)}) parameters. " +
+                    $"{nameof(RemoteRttiMethodInfo)}.{nameof(Invoke)} only works with primitive (int, " +
+                    $"double, string,...) or remote (in {nameof(IRemoteObject)}) parameters. " +
                     $"One of the parameter was of unsupported type {parameter.GetType()}");
             }
         }
 
-        public static object Invoke(ManagedRemoteApp app, Type declaringType, string funcName, object obj, Type[] genericArgs, object[] parameters)
-            => Invoke(app, declaringType, funcName, obj, genericArgs.Select(arg => arg.FullName).ToArray(), parameters);
-
-        public static object Invoke(ManagedRemoteApp app, Type declaringType, string funcName, object obj, string[] genericArgsFullNames, object[] parameters)
+        public static object Invoke(UnmanagedRemoteApp app, Type declaringType, string funcName, object obj, object[] parameters)
         {
             // invokeAttr, binder and culture currently ignored
             // TODO: Actually validate parameters and expected parameters.
 
             object[] paramsNoEnums = parameters.ToArray();
-            for (int i = 0; i < paramsNoEnums.Length; i++)
-            {
-                var val = paramsNoEnums[i];
-                if (val != null && val.GetType().IsEnum)
-                {
-                    var enumClass = app.GetRemoteEnum(val.GetType().FullName);
-                    // TODO: This will break on the first enum value which represents 2 or more flags
-                    object enumVal = enumClass.GetValue(val.ToString());
-                    // NOTE: Object stays in place in the remote app as long as we have it's reference
-                    // in the paramsNoEnums array (so untill end of this method)
-                    paramsNoEnums[i] = enumVal;
-                }
-            }
-
-            ObjectOrRemoteAddress[] remoteParams = paramsNoEnums.Select(RemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
+            ObjectOrRemoteAddress[] remoteParams = paramsNoEnums.Select(ManagedRemoteFunctionsInvokeHelper.CreateRemoteParameter).ToArray();
 
             bool hasResults;
             ObjectOrRemoteAddress oora;
@@ -81,7 +66,7 @@ namespace RemoteNET.Internal.Reflection
                                                         $"The type was either mis-constructed or it's not a {nameof(RemoteType)} object");
                 }
 
-                InvocationResults invokeRes = app.Communicator.InvokeStaticMethod(declaringType.FullName, funcName, genericArgsFullNames, remoteParams);
+                InvocationResults invokeRes = app.Communicator.InvokeStaticMethod(declaringType.FullName, funcName, remoteParams);
                 if (invokeRes.VoidReturnType)
                 {
                     hasResults = false;
@@ -96,12 +81,12 @@ namespace RemoteNET.Internal.Reflection
             else
             {
                 // obj is NOT null. Make sure it's a RemoteObject.
-                if (!(obj is RemoteObject ro))
+                if (!(obj is UnmanagedRemoteObject ro))
                 {
                     throw new NotImplementedException(
-                        $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(RemoteObject)} targets at the moment.");
+                        $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(UnmanagedRemoteObject)} targets at the moment.");
                 }
-                (hasResults, oora) = ro.InvokeMethod(funcName, genericArgsFullNames, remoteParams);
+                (hasResults, oora) = ro.InvokeMethod(funcName, remoteParams);
             }
 
             if (!hasResults)
@@ -116,7 +101,7 @@ namespace RemoteNET.Internal.Reflection
             }
             else
             {
-                RemoteObject ro = app.GetRemoteObject(oora.RemoteAddress, oora.Type);
+                IRemoteObject ro = app.GetRemoteObject(oora.RemoteAddress, oora.Type);
                 return ro.Dynamify();
             }
         }

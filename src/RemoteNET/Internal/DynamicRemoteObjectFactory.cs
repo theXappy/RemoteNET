@@ -5,17 +5,19 @@ using ScubaDiver.API.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RemoteNET.RttiReflection;
 
 namespace RemoteNET.Internal
 {
     public class DynamicRemoteObjectFactory
     {
-        private RemoteApp _app;
-
         public DynamicRemoteObject Create(RemoteApp rApp, IRemoteObject remoteObj, ManagedTypeDump managedTypeDump)
         {
-            _app = rApp;
-            return new DynamicRemoteObject(rApp, remoteObj);
+            if(rApp is ManagedRemoteApp)
+                return new DynamicManagedRemoteObject(rApp, remoteObj);
+            if(rApp is UnmanagedRemoteApp)
+                return new DynamicUnmanagedRemoteObject(rApp, remoteObj);
+            throw new NotImplementedException($"Unexpected RemoteApp subtype: {rApp?.GetType().Name}");
         }
     }
 }

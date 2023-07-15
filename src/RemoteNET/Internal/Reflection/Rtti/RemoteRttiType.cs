@@ -1,10 +1,14 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Reflection;
+using RemoteNET.Common;
 using RemoteNET.Internal.Reflection;
 
 namespace RemoteNET.RttiReflection
 {
-    public class RemoteRttiType : Type
+    public class RemoteRttiType : RemoteTypeBase
     {
         private readonly string _assembly;
         private string _namespace;
@@ -13,7 +17,7 @@ namespace RemoteNET.RttiReflection
         public override Module Module { get; }
         public override string Namespace => _namespace;
         public override string Name => _name;
-        public override string FullName => _fullName;
+        public override string FullName => $"{_assembly}!{_fullName}";
 
         private List<MethodInfo> _methods = new List<MethodInfo>();
         private List<ConstructorInfo> _ctors = new List<ConstructorInfo>();

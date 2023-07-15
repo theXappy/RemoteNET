@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Reko.Core;
+using RemoteNET.Common;
 using RemoteNET.Internal;
 using RemoteNET.RttiReflection;
 using ScubaDiver.API;
@@ -11,48 +12,6 @@ using ScubaDiver.API.Utils;
 
 namespace RemoteNET
 {
-    public class UnmanagedRemoteObject : IRemoteObject
-    {
-        private static int NextIndex = 1;
-        public int Index;
-
-        private readonly RemoteApp _app;
-        private RemoteObjectRef _ref;
-        private Type _type = null;
-
-        private readonly Dictionary<Delegate, DiverCommunicator.LocalEventCallback> _eventCallbacksAndProxies;
-
-        public ulong RemoteToken => _ref.Token;
-
-        internal UnmanagedRemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
-        {
-            Index = NextIndex++;
-            _app = remoteApp;
-            _ref = reference;
-            _eventCallbacksAndProxies = new Dictionary<Delegate, DiverCommunicator.LocalEventCallback>();
-        }
-
-        public Type GetRemoteType()
-        {
-            return _type ??= _app.GetRemoteType(_ref.GetTypeDump());
-        }
-
-        public dynamic Dynamify()
-        {
-            // Adding fields 
-            ManagedTypeDump managedTypeDump = _ref.GetTypeDump();
-
-            var factory = new DynamicRemoteObjectFactory();
-            return factory.Create(_app, this, managedTypeDump);
-        }
-
-        public ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
-        {
-            throw new NotImplementedException();
-        }
-    }
-
-
     public class UnmanagedRemoteApp : RemoteApp
     {
         private Process _procWithDiver;
@@ -62,6 +21,8 @@ namespace RemoteNET
 
         private DiverCommunicator _unmanagedCommunicator;
         public override DiverCommunicator Communicator => _unmanagedCommunicator;
+        private RemoteHookingManager _hookingManager;
+        public override RemoteHookingManager HookingManager => _hookingManager;
 
         private List<string> _unmanagedModulesList;
 
@@ -69,7 +30,7 @@ namespace RemoteNET
         {
             _procWithDiver = procWithDiver;
             _unmanagedCommunicator = unmanagedCommunicator;
-            _unmanagedCommunicator = unmanagedCommunicator;
+            _hookingManager = new RemoteHookingManager(this);
         }
 
         //

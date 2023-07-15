@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using RemoteNET;
+using RemoteNET.Common;
 using ScubaDiver.API;
 using ScubaDiver.API.Hooking;
 using static RemoteNET.Utils.Lambda;
@@ -320,13 +321,13 @@ namespace ScubaDiver.Tester
                             switch (selection)
                             {
                                 case 1:
-                                    remoteApp.Harmony.Patch(mi, prefix: callback);
+                                    remoteApp.HookingManager.Patch(mi, prefix: callback);
                                     break;
                                 case 2:
-                                    remoteApp.Harmony.Patch(mi, postfix: callback);
+                                    remoteApp.HookingManager.Patch(mi, postfix: callback);
                                     break;
                                 case 3:
-                                    remoteApp.Harmony.Patch(mi, finalizer: callback);
+                                    remoteApp.HookingManager.Patch(mi, finalizer: callback);
                                     break;
                             }
                         }

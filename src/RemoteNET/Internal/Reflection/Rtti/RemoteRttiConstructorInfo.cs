@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using RemoteNET.Common;
 using RemoteNET.RttiReflection;

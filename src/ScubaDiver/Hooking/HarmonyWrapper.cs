@@ -88,6 +88,8 @@ namespace ScubaDiver.Hooking
             _locksDict.SetSpecialThreadState(id, SmartLocksDict<MethodBase>.SmartLockThreadState.AllowAllLocks);
         }
 
+
+        /// <returns>Skip original</returns>
         public delegate bool HookCallback(object instance, object[] args);
 
         public void AddHook(MethodBase target, HarmonyPatchPosition pos, HookCallback patch)

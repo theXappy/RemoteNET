@@ -12,6 +12,7 @@ public class DetoursNetWrapper
     private static DetoursNetWrapper _instance = null;
     public static DetoursNetWrapper Instance => _instance ??= new();
 
+    /// <returns>Skip original</returns>
     public delegate bool HookCallback(DetoursMethodGenerator.DetoursTrampoline tramp, object[] args, out nuint overridenReturnValue);
 
     private static readonly ConcurrentDictionary<MethodInfo, HookCallback> _actualHooks = new();
@@ -45,7 +46,7 @@ public class DetoursNetWrapper
             return false;
         }
         // TODO: Is "nuint" return type always right here?
-        var tramp = DetoursMethodGenerator.GenerateMethod(target.NumArgs.Value, typeof(nuint), target.UndecoratedName, SingeCallback);
+        var tramp = DetoursMethodGenerator.GenerateMethod(target.NumArgs.Value, typeof(nuint), target.UndecoratedFullName, SingeCallback);
 
         AddToDicts(target.DecoratedName, callback, tramp.GenerateMethodInfo);
 
@@ -59,7 +60,7 @@ public class DetoursNetWrapper
             return true;
 
         // Fallback, Try directly with pointers
-        Console.WriteLine($"[DetoursNetWrapper] Hooking with LoadLibrary + GetProcAddress failed, trying direct pointers. Target: {target.Module.Name}!{target.UndecoratedName}");
+        Console.WriteLine($"[DetoursNetWrapper] Hooking with LoadLibrary + GetProcAddress failed, trying direct pointers. Target: {target.Module.Name}!{target.UndecoratedFullName}");
         IntPtr module = new IntPtr((long)target.Module.BaseAddress);
         IntPtr targetFunc = new IntPtr(target.Address);
         success = Loader.HookMethod(module, targetFunc, tramp.DelegateType, tramp.GenerateMethodInfo, tramp.GeneratedDelegate);
@@ -78,9 +79,9 @@ public class DetoursNetWrapper
 
         // Call hook
         var hook = _actualHooks[tramp.GenerateMethodInfo];
-        bool callOriginal = hook(tramp, args, out nuint overridenReturnValue);
+        bool skipOriginal = hook(tramp, args, out nuint overridenReturnValue);
 
-        if (!callOriginal)
+        if (skipOriginal)
         {
             return overridenReturnValue;
         }

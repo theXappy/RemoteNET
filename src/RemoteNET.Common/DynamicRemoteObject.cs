@@ -11,6 +11,7 @@ using System.Dynamic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using RemoteNET.Common;
 using Binder = Microsoft.CSharp.RuntimeBinder.Binder;
 
 namespace RemoteNET.Internal
@@ -24,7 +25,7 @@ namespace RemoteNET.Internal
     /// 
     /// </summary>
     [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "}")]
-    public class DynamicRemoteObject : DynamicObject, IEnumerable
+    public abstract class DynamicRemoteObject : DynamicObject
     {
         public class DynamicRemoteMethod : DynamicObject
         {
@@ -52,7 +53,7 @@ namespace RemoteNET.Internal
 
             public bool TryInvoke(object[] args, out object result)
             {
-                List<RemoteMethodInfo> overloads = _methods;
+                List<RemoteMethodInfoBase> overloads = _methods;
 
                 // Narrow down (hopefuly to one) overload with the same amount of types
                 // TODO: We COULD possibly check the args types (local ones, RemoteObjects, DynamicObjects, ...) if we still have multiple results
@@ -61,7 +62,7 @@ namespace RemoteNET.Internal
                 if (overloads.Count == 1)
                 {
                     // Easy case - a unique function name so we can just return it.
-                    RemoteMethodInfo overload = overloads.Single();
+                    RemoteMethodInfoBase overload = overloads.Single();
                     if (_genericArguments != null && _genericArguments.Any())
                     {
                         if (!overload.IsGenericMethod)
@@ -143,7 +144,7 @@ namespace RemoteNET.Internal
 
         public RemoteApp __ra;
         public IRemoteObject __ro;
-        public RemoteType __type;
+        public RemoteTypeBase __type;
 
 
         private IEnumerable<MemberInfo> __ongoingMembersDumper = null;
@@ -155,7 +156,7 @@ namespace RemoteNET.Internal
         {
             __ra = ra;
             __ro = ro;
-            __type = ro.GetRemoteType() as RemoteType;
+            __type = ro.GetRemoteType() as RemoteTypeBase;
             if (__type == null && ro.GetRemoteType() != null)
             {
                 throw new ArgumentException("Can only create DynamicRemoteObjects of RemoteObjects with Remote Types. (As returned from GetType())");
@@ -338,13 +339,13 @@ namespace RemoteNET.Internal
             {
                 throw new Exception($"A member called \"{name}\" exists in the type and it isn't a method (It's a {methods.First(m => m.MemberType != MemberTypes.Method).MemberType})");
             }
-            if (methods.Any(member => !(member is RemoteMethodInfo)))
+            if (methods.Any(member => !(member is RemoteMethodInfoBase)))
             {
                 throw new Exception($"A method overload for \"{name}\" wasn't a MethodInfo");
             }
 
             ProxiedMethodGroup methodGroup = new ProxiedMethodGroup();
-            methodGroup.AddRange(methods.Cast<RemoteMethodInfo>());
+            methodGroup.AddRange(methods.Cast<RemoteMethodInfoBase>());
             try
             {
                 return new DynamicRemoteMethod(name, this, methodGroup);
@@ -516,31 +517,6 @@ namespace RemoteNET.Internal
         }
         #endregion
 
-        /// <summary>
-        /// Array access. Key can be any primitive / RemoteObject / DynamicRemoteObject
-        /// </summary>
-        public dynamic this[object key]
-        {
-            get
-            {
-
-                ScubaDiver.API.ObjectOrRemoteAddress ooraKey = RemoteFunctionsInvokeHelper.CreateRemoteParameter(key);
-                ScubaDiver.API.ObjectOrRemoteAddress item = __ro.GetItem(ooraKey);
-                if (item.IsNull)
-                {
-                    return null;
-                }
-                else if (item.IsRemoteAddress)
-                {
-                    return __ra.GetRemoteObject(item.RemoteAddress, item.Type).Dynamify();
-                }
-                else
-                {
-                    return PrimitivesEncoder.Decode(item.EncodedObject, item.Type);
-                }
-            }
-            set => throw new NotImplementedException();
-        }
 
         #region Array Casting
         private static T[] __cast_to_array<T>(DynamicRemoteObject dro)
@@ -565,13 +541,5 @@ namespace RemoteNET.Internal
         public static implicit operator string[](DynamicRemoteObject dro) => __cast_to_array<string>(dro);
         #endregion
 
-        public IEnumerator GetEnumerator()
-        {
-            if (!__members.Any(member => member.Name == nameof(GetEnumerator)))
-                throw new Exception($"No method called {nameof(GetEnumerator)} found. The remote object probably doesn't implement IEnumerable");
-
-            dynamic enumeratorDro = InvokeMethod<object>(nameof(GetEnumerator));
-            return new DynamicRemoteEnumerator(enumeratorDro);
-        }
     }
 }

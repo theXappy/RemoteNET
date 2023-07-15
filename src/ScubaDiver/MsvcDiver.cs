@@ -1,4 +1,4 @@
-﻿using ScubaDiver.API.Interactions.Dumps;
+using ScubaDiver.API.Interactions.Dumps;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,18 +8,16 @@ using ScubaDiver.API.Utils;
 using NtApiDotNet.Win32;
 using System.IO;
 using ScubaDiver.Rtti;
-using ScubaDiver.API.Hooking;
-using ScubaDiver.API.Interactions.Callbacks;
-using ScubaDiver.Hooking;
 using System.Threading;
 using ScubaDiver.API.Interactions;
 using ScubaDiver.API;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using ScubaDiver.API.Hooking;
+using ScubaDiver.API.Interactions.Callbacks;
+using ScubaDiver.Hooking;
 using ModuleInfo = Microsoft.Diagnostics.Runtime.ModuleInfo;
 using TypeInfo = System.Reflection.TypeInfo;
-using System.Reflection;
-using ScubaDiver.Demangle.Demangle.Core.NativeInterface;
 
 namespace ScubaDiver
 {
@@ -29,8 +27,6 @@ namespace ScubaDiver
 
         public MsvcDiver(IRequestsListener listener) : base(listener)
         {
-            _remoteHooks = new ConcurrentDictionary<int, RegisteredUnmanagedMethodHookInfo>();
-
             base._responseBodyCreators["/gc"] = MakeGcResponse;
         }
 
@@ -88,18 +84,18 @@ namespace ScubaDiver
                         module.AddTypeFunction(typeInfo, method);
 
                         // Removing type funcs from allExports
-                        if(method is UndecoratedExport undecExport)
+                        if (method is UndecoratedExport undecExport)
                             allExports.Remove(undecExport.Export);
                     }
                 }
-                
+
                 // This list should now hold only typeless funcs
                 foreach (DllExport export in allExports)
                 {
                     // TODO: Then why the fuck am I trying to undecorate??
-                    if(!export.TryUndecorate(moduleInfo, out UndecoratedFunction output))
+                    if (!export.TryUndecorate(moduleInfo, out UndecoratedFunction output))
                         continue;
-                    
+
                     module.AddTypelessFunction(export.Name, output);
                 }
 
@@ -109,7 +105,11 @@ namespace ScubaDiver
                     foreach (nuint operatorNewAddr in operatorNewAddresses)
                     {
                         UndecoratedFunction undecFunction =
-                            new UndecoratedInternalFunction("operator new", "operator new", (long)operatorNewAddr, 1,
+                            new UndecoratedInternalFunction(
+                                undecoratedName: "operator new", 
+                                undecoratedFullName: "operator new", 
+                                decoratedName: "operator new", 
+                                (long)operatorNewAddr, 1,
                                 moduleInfo);
                         module.AddTypelessFunction("operator new", undecFunction);
                     }
@@ -200,35 +200,10 @@ namespace ScubaDiver
             Logger.Debug($"[MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
         }
 
-        protected override string MakeUnhookMethodResponse(ScubaDiverMessage arg)
+        protected override Action HookFunction(FunctionHookRequest request, HarmonyWrapper.HookCallback patchCallback)
         {
-            throw new NotImplementedException();
-        }
-
-        protected override string MakeHookMethodResponse(ScubaDiverMessage arg)
-        {
-            Logger.Debug("[MsvcDiver] Got Hook Method request!");
-            string body = arg.Body;
-
-            if (string.IsNullOrEmpty(body))
-                return QuickError("Missing body");
-
-            var request = JsonConvert.DeserializeObject<FunctionHookRequest>(body);
-            if (request == null)
-                return QuickError("Failed to deserialize body");
-
-            if (!IPAddress.TryParse(request.IP, out IPAddress ipAddress))
-            {
-                return QuickError("Failed to parse IP address. Input: " + request.IP);
-            }
-            int port = request.Port;
-            IPEndPoint endpoint = new IPEndPoint(ipAddress, port);
             string rawTypeFilter = request.TypeFullName;
             string methodName = request.MethodName;
-            string hookPosition = request.HookPosition;
-            HarmonyPatchPosition pos = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPosition);
-            if (pos != HarmonyPatchPosition.Prefix)
-                return QuickError($"hook_position in native apps can only be {HarmonyPatchPosition.Prefix}");
 
             ParseFullTypeName(rawTypeFilter, out var rawAssemblyFilter, out rawTypeFilter);
             var modulesToTypes = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
@@ -238,12 +213,10 @@ namespace ScubaDiver
             Rtti.ModuleInfo module = modulesToTypes.Keys.Single();
             Rtti.TypeInfo[] typeInfos = modulesToTypes[module].ToArray();
             if (typeInfos.Length != 1)
-                QuickError($"Expected exactly 1 match for module, got {typeInfos.Length}");
+                QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
 
             Rtti.TypeInfo typeInfo = typeInfos.Single();
-
-            var methods = GetExportedTypeMethod(module, typeInfo.Name);
-
+            List<UndecoratedFunction> methods = GetExportedTypeMethod(module, typeInfo.Name).ToList();
             UndecoratedFunction methodToHook = null;
             foreach (var method in methods)
             {
@@ -251,69 +224,45 @@ namespace ScubaDiver
                     continue;
 
                 if (methodToHook != null)
-                    return QuickError($"Too many matches for {methodName}");
+                    throw new Exception($"Too many matches for {methodName}");
 
                 methodToHook = method;
             }
-
-
             if (methodToHook == null)
-                return QuickError($"No matches for {methodName}");
-
-
-
+                throw new Exception($"No matches for {methodName}");
             Logger.Debug("[MsvcDiver] Hook Method - Resolved Method");
 
-            // We're all good regarding the signature!
-            // assign subscriber unique id
-            int token = AssignCallbackToken();
-            Logger.Debug($"[MsvcDiver] Hook Method - Assigned Token: {token}");
-
-            // Preparing a proxy method that Harmony will invoke
-            HarmonyWrapper.HookCallback patchCallback = (obj, args) =>
-            {
-                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), obj, args);
-                bool skipOriginal = false;
-                if (res != null && !res.IsRemoteAddress)
-                {
-                    object decodedRes = PrimitivesEncoder.Decode(res);
-                    if (decodedRes is bool boolRes)
-                        skipOriginal = boolRes;
-                }
-                return skipOriginal;
-            };
 
             Logger.Debug($"[MsvcDiver] Hooking function {methodName}...");
-            try
+            DetoursNetWrapper.HookCallback hook =
+                (DetoursMethodGenerator.DetoursTrampoline tramp, object[] args, out nuint value) =>
+                {
+                    object self = new NativeObject((nuint)args.FirstOrDefault(), typeInfo);
+
+                    // TODO: Make the arguments into "NativeObject"s as well? Need to figure out which nuints
+                    // are pointers and which aren't...
+                    object[] argsToForward = args;
+                    if (args.Length > 0)
+                        argsToForward = args.Skip(1).ToArray();
+
+                    // TODO: We're currently ignoring the "skip original" return value because the callback
+                    // doesn't support setting the return value...
+                    patchCallback(self, argsToForward);
+
+                    value = 0;
+                    bool skipOriginal = false;
+                    return skipOriginal;
+                };
+            DetoursNetWrapper.Instance.AddHook(methodToHook, hook);
+            Logger.Debug($"[MsvcDiver] Hooked function {methodName}!");
+
+            Action unhook = (Action)(() =>
             {
-                //DetoursNetWrapper.Instance.AddHook(methodToHook, pos, patchCallback);
-                throw new NotImplementedException("LOL");
-            }
-            catch (Exception ex)
-            {
-                // Hooking filed so we cleanup the Hook Info we inserted beforehand 
-                _remoteHooks.TryRemove(token, out _);
-
-                Logger.Debug($"[DotNetDiver] Failed to hook func {methodName}. Exception: {ex}");
-                return QuickError("Failed insert the hook for the function. HarmonyWrapper.AddHook failed.");
-            }
-            Logger.Debug($"[DotNetDiver] Hooked func {methodName}!");
-
-            // Keeping all hooking information aside so we can unhook later.
-            _remoteHooks[token] = new RegisteredUnmanagedMethodHookInfo()
-            {
-                Endpoint = endpoint,
-                OriginalHookedMethod = methodToHook,
-                RegisteredProxy = patchCallback
-            };
-
-
-            EventRegistrationResults erResults = new() { Token = token };
-            return JsonConvert.SerializeObject(erResults);
+                DetoursNetWrapper.Instance.RemoveHook(methodToHook, hook);
+            });
+            return unhook;
         }
-        private readonly ConcurrentDictionary<int, RegisteredUnmanagedMethodHookInfo> _remoteHooks;
-        private int _nextAvailableCallbackToken;
-        public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvailableCallbackToken);
+
         /// <summary>
         /// 
         /// </summary>
@@ -322,7 +271,7 @@ namespace ScubaDiver
         /// <param name="stackTrace"></param>
         /// <param name="parameters"></param>
         /// <returns>Any results returned from the</returns>
-        public ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
+        protected override ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
         {
             ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
@@ -337,6 +286,16 @@ namespace ScubaDiver
                 else if (parameter.GetType().IsPrimitiveEtc())
                 {
                     remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
+                }
+                else if (parameter is NativeObject nativeObj)
+                {
+                    // TODO: Freeze?
+                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(nativeObj.Address, nativeObj.TypeInfo.FullTypeName);
+                }
+                else if (parameter is object[] arrayParam && arrayParam.All(item => item is nuint))
+                {
+                    nuint[] pointers = arrayParam.Cast<nuint>().ToArray();
+                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(pointers);
                 }
                 else // Not primitive
                 {
@@ -476,18 +435,18 @@ namespace ScubaDiver
                         }
                         else
                         {
-                            if (dllExport.UndecoratedName == vftableName)
+                            if (dllExport.UndecoratedFullName == vftableName)
                             {
                                 fields.Add(new ManagedTypeDump.TypeField()
                                 {
                                     Name = "vftable",
-                                    TypeFullName = dllExport.UndecoratedName,
+                                    TypeFullName = dllExport.UndecoratedFullName,
                                     Visibility = "Public"
                                 });
                                 continue;
                             }
                             // Something went wrong when parsing this method's parameters...
-                            Logger.Debug($"[{nameof(GetManagedTypeDump)}] Failed to parse parameters of {dllExport.UndecoratedName}");
+                            Logger.Debug($"[{nameof(GetManagedTypeDump)}] Failed to parse parameters of {dllExport.UndecoratedFullName}");
                             continue;
                         }
 
@@ -499,7 +458,7 @@ namespace ScubaDiver
                             Visibility = "Public" // Because it's exported
                         };
 
-                        if (dllExport.UndecoratedName == ctorName)
+                        if (dllExport.UndecoratedFullName == ctorName)
                             constructors.Add(method);
                         else
                             methods.Add(method);
@@ -522,6 +481,9 @@ namespace ScubaDiver
 
 
 
+        /// <summary>
+        /// Get a specific method of a specific type, which is exported from the given module.
+        /// </summary>
         protected IEnumerable<UndecoratedFunction> GetExportedTypeMethod(Rtti.ModuleInfo module, string typeFullName)
         {
             string membersPrefix = $"{typeFullName}::";
@@ -530,7 +492,7 @@ namespace ScubaDiver
             foreach (DllExport dllExport in exports)
             {
                 if (dllExport.TryUndecorate(module, out UndecoratedFunction output) &&
-                    output.UndecoratedName.StartsWith(membersPrefix))
+                    output.UndecoratedFullName.StartsWith(membersPrefix))
                 {
                     yield return output;
                 }
@@ -777,9 +739,9 @@ namespace ScubaDiver
         public void AddTypeFunction(Rtti.TypeInfo type, UndecoratedFunction func)
         {
             var undType = GetOrAdd(type);
-            if (!undType.ContainsKey(func.UndecoratedName))
-                undType[func.UndecoratedName] = new UndecoratedMethodGroup();
-            undType[func.UndecoratedName].Add(func);
+            if (!undType.ContainsKey(func.UndecoratedFullName))
+                undType[func.UndecoratedFullName] = new UndecoratedMethodGroup();
+            undType[func.UndecoratedFullName].Add(func);
         }
 
         public bool TryGetTypeFunc(Rtti.TypeInfo type, string undecMethodName, out UndecoratedMethodGroup res)
@@ -805,4 +767,6 @@ namespace ScubaDiver
             return _types[type];
         }
     }
+
+    public record NativeObject(nuint Address, ScubaDiver.Rtti.TypeInfo TypeInfo);
 }

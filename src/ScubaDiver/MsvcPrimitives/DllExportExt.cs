@@ -19,10 +19,10 @@ public static class DllExportExt
     public static bool TryUndecorate(this DllExport input, ModuleInfo module, out UndecoratedFunction output)
     {
         output = null;
-        string basicUndecoratedName;
+        string undecoratedFullName;
         try
         {
-            basicUndecoratedName = UndecorateName(input);
+            undecoratedFullName = UndecorateName(input);
         }
         catch
         {
@@ -74,9 +74,14 @@ public static class DllExportExt
         });
 
         string className = "";
-        if (basicUndecoratedName.Contains("::"))
-            className = basicUndecoratedName[..(basicUndecoratedName.LastIndexOf("::"))];
-        output = new UndecoratedExport(className, basicUndecoratedName, lazyArgs, input, module);
+        string undecoratedName = undecoratedFullName;
+        if (undecoratedFullName.Contains("::"))
+        {
+            className = undecoratedFullName[..(undecoratedFullName.LastIndexOf("::"))];
+            undecoratedName = undecoratedFullName[(undecoratedFullName.LastIndexOf("::")+2)..];
+        }
+
+        output = new UndecoratedExport(className, undecoratedName, undecoratedFullName, lazyArgs, input, module);
         return true;
     }
 }
