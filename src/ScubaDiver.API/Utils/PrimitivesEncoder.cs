@@ -118,6 +118,10 @@ namespace ScubaDiver.API.Utils
 
             if (resultType.IsArray)
             {
+                Type elementType = resultType.GetElementType();
+                if (string.IsNullOrEmpty(toDecode))
+                    return Array.CreateInstance(elementType, 0);
+
                 List<int> commas = new();
                 commas.Add(0); // To capture the first item we need to "imagine a comma" right before it.
                 for (int i = 1; i < toDecode.Length; i++)
@@ -140,7 +144,6 @@ namespace ScubaDiver.API.Utils
                     encodedElements.Add(toDecode.Substring(currCommaIndex + 1, nextCommandIndex - currCommaIndex - 1).Trim('\"'));
                 }
 
-                Type elementType = resultType.GetElementType();
                 List<object> decodedObjects = new();
                 foreach (string encodedElement in encodedElements)
                 {

@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using RemoteNET.Common;
 using RemoteNET.Internal;
-using RemoteNET.Internal.Reflection;
+using RemoteNET.Internal.Reflection.DotNet;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.API.Utils;
@@ -97,9 +98,12 @@ namespace RemoteNET
         private DomainsDump _managedDomains;
         private readonly ManagedRemoteApp.RemoteObjectsCollection _remoteObjects;
 
+        private RemoteHookingManager _hookingManager;
+        public override RemoteHookingManager HookingManager => _hookingManager;
+
+
         public Process Process => _procWithDiver;
         public RemoteActivator Activator { get; private set; }
-        public RemoteHarmony Harmony { get; private set; }
 
         public override DiverCommunicator Communicator => _managedCommunicator;
 
@@ -108,7 +112,7 @@ namespace RemoteNET
             _procWithDiver = procWithDiver;
             _managedCommunicator = managedCommunicator;
             Activator = new RemoteActivator(managedCommunicator, this);
-            Harmony = new RemoteHarmony(this);
+            _hookingManager = new RemoteHookingManager(this);
             _remoteObjects = new ManagedRemoteApp.RemoteObjectsCollection(this);
         }
 

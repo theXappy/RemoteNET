@@ -1,12 +1,18 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Reflection;
+using ScubaDiver.API;
+using System.Threading;
 using ScubaDiver.API.Interactions;
+using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.API.Interactions.Client;
 using ScubaDiver.API.Utils;
+using ScubaDiver.Hooking;
 using Exception = System.Exception;
 
 namespace ScubaDiver
@@ -20,6 +26,11 @@ namespace ScubaDiver
         // HTTP Responses fields
         protected readonly Dictionary<string, Func<ScubaDiverMessage, string>> _responseBodyCreators;
         private IRequestsListener _listener;
+
+        // Hooks Tracking
+        protected bool _monitorEndpoints = true;
+        private int _nextAvailableCallbackToken;
+        protected readonly ConcurrentDictionary<int, RegisteredManagedMethodHookInfo> _remoteHooks;
 
         public DiverBase(IRequestsListener listener)
         {
@@ -51,12 +62,35 @@ namespace ScubaDiver
                 {"/hook_method", MakeHookMethodResponse},
                 {"/unhook_method", MakeUnhookMethodResponse},
             };
+            _remoteHooks = new ConcurrentDictionary<int, RegisteredManagedMethodHookInfo>();
         }
 
         public virtual void Start()
         {
             _listener.RequestReceived += HandleDispatchedRequest;
             _listener.Start();
+        }
+        protected virtual void CallbacksEndpointsMonitor()
+        {
+            while (_monitorEndpoints)
+            {
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+                IPEndPoint endpoint;
+                foreach (var registeredMethodHookInfo in _remoteHooks)
+                {
+                    endpoint = registeredMethodHookInfo.Value.Endpoint;
+                    ReverseCommunicator reverseCommunicator = new(endpoint);
+                    Logger.Debug($"[DotNetDiver] Checking if callback client at {endpoint} is alive. Token = {registeredMethodHookInfo.Key}. Type = Method Hook");
+                    bool alive = reverseCommunicator.CheckIfAlive();
+                    Logger.Debug($"[DotNetDiver] Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) is alive = {alive}");
+                    if (!alive)
+                    {
+                        Logger.Debug(
+                            $"[DotNetDiver] Dead Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) DROPPED!");
+                        _remoteHooks.TryRemove(registeredMethodHookInfo.Key, out _);
+                    }
+                }
+            }
         }
 
         #region Helpers
@@ -136,8 +170,102 @@ namespace ScubaDiver
 
         #endregion
 
-        protected abstract string MakeUnhookMethodResponse(ScubaDiverMessage arg);
-        protected abstract string MakeHookMethodResponse(ScubaDiverMessage arg);
+
+        protected string MakeUnhookMethodResponse(ScubaDiverMessage arg)
+        {
+            string tokenStr = arg.QueryString.Get("token");
+            if (tokenStr == null || !int.TryParse(tokenStr, out int token))
+            {
+                return QuickError("Missing parameter 'address'");
+            }
+            Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Called! Token: {token}");
+
+            if (_remoteHooks.TryRemove(token, out RegisteredManagedMethodHookInfo rmhi))
+            {
+                rmhi.UnhookAction();
+                return "{\"status\":\"OK\"}";
+            }
+
+            Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Unknown token for event callback subscription. Token: {token}");
+            return QuickError("Unknown token for event callback subscription");
+        }
+        protected string MakeHookMethodResponse(ScubaDiverMessage arg)
+        {
+            Logger.Debug("[DotNetDiver] Got Hook Method request!");
+            if (string.IsNullOrEmpty(arg.Body))
+                return QuickError("Missing body");
+
+            var request = JsonConvert.DeserializeObject<FunctionHookRequest>(arg.Body);
+            if (request == null)
+                return QuickError("Failed to deserialize body");
+
+            if (!IPAddress.TryParse(request.IP, out IPAddress ipAddress))
+                return QuickError("Failed to parse IP address. Input: " + request.IP);
+
+            int port = request.Port;
+            IPEndPoint endpoint = new IPEndPoint(ipAddress, port);
+
+            return HookFunctionWrapper(request, endpoint);
+        }
+
+        private string HookFunctionWrapper(FunctionHookRequest req, IPEndPoint endpoint)
+        {
+            // We're all good regarding the signature!
+            // assign subscriber unique id
+            int token = AssignCallbackToken();
+            Logger.Debug($"[DotNetDiver] Hook Method - Assigned Token: {token}");
+
+
+            // Preparing a proxy method that Harmony will invoke
+            HarmonyWrapper.HookCallback patchCallback = (obj, args) =>
+            {
+                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), obj, args);
+                bool skipOriginal = false;
+                if (res != null && !res.IsRemoteAddress)
+                {
+                    object decodedRes = PrimitivesEncoder.Decode(res);
+                    if (decodedRes is bool boolRes)
+                        skipOriginal = boolRes;
+                }
+
+                return skipOriginal;
+            };
+
+            Logger.Debug($"[DotNetDiver] Hooking function {req.MethodName}...");
+            Action unhookAction;
+            try
+            {
+                unhookAction = HookFunction(req, patchCallback);
+            }
+            catch (Exception ex)
+            {
+                // Hooking filed so we cleanup the Hook Info we inserted beforehand 
+                _remoteHooks.TryRemove(token, out _);
+
+                Logger.Debug($"[DotNetDiver] Failed to hook func {req.MethodName}. Exception: {ex}");
+                return QuickError($"Failed insert the hook for the function. HarmonyWrapper.AddHook failed. Exception: {ex}", ex.StackTrace);
+            }
+
+            Logger.Debug($"[DotNetDiver] Hooked func {req.MethodName}!");
+
+            // Keeping all hooking information aside so we can unhook later.
+            _remoteHooks[token] = new RegisteredManagedMethodHookInfo()
+            {
+                Endpoint = endpoint,
+                RegisteredProxy = patchCallback,
+                UnhookAction = unhookAction
+            };
+
+            EventRegistrationResults erResults = new() { Token = token };
+            return JsonConvert.SerializeObject(erResults);
+        }
+        public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvailableCallbackToken);
+
+        protected abstract Action HookFunction(FunctionHookRequest req, HarmonyWrapper.HookCallback patchCallback);
+
+        protected abstract ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters);
+
+
 
         #region Ping Handler
 

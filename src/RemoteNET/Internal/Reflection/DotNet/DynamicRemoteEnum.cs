@@ -1,7 +1,7 @@
 ﻿using System.Dynamic;
 using ScubaDiver.API;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
     public class DynamicRemoteEnum : DynamicObject
     {

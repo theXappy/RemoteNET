@@ -4,9 +4,9 @@ using System.Linq;
 using System.Reflection;
 using RemoteNET.Common;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
-    public class RemoteMethodInfo : MethodInfo
+    public class RemoteMethodInfo : RemoteMethodInfoBase
     {
         private LazyRemoteTypeResolver _retType;
 
@@ -17,7 +17,7 @@ namespace RemoteNET.Internal.Reflection
         public override Type ReflectedType => throw new NotImplementedException();
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
         public override MethodAttributes Attributes => throw new NotImplementedException();
-        
+
         public override bool IsGenericMethod => AssignedGenericArgs.Length > 0;
         public override bool IsGenericMethodDefinition => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
         public override bool ContainsGenericParameters => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
@@ -49,7 +49,7 @@ namespace RemoteNET.Internal.Reflection
 
         public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos) :
             this(declaringType, new LazyRemoteTypeResolver(returnType), name, genericArgs, paramInfos)
-        { 
+        {
         }
 
         public override MethodInfo MakeGenericMethod(params Type[] typeArguments)
@@ -76,7 +76,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
-            return RemoteFunctionsInvokeHelper.Invoke(this.App, DeclaringType, Name, obj, AssignedGenericArgs, parameters);
+            return ManagedRemoteFunctionsInvokeHelper.Invoke(App, DeclaringType, Name, obj, AssignedGenericArgs, parameters);
         }
 
         public override MethodInfo GetBaseDefinition()

@@ -30,10 +30,10 @@ public class UndecoratedExport : UndecoratedFunction
 
     public DllExport Export { get; set; }
 
-    public UndecoratedExport(string className, string undecoratedName, Lazy<(string, string[])> signatureParser, DllExport export, ModuleInfo module) : base(export.Name, undecoratedName)
+    public UndecoratedExport(string className, string undecoratedName, string undecoratedFullName, Lazy<(string, string[])> signatureParser, DllExport export, ModuleInfo module) 
+        : base(export.Name, undecoratedName, undecoratedFullName)
     {
         ClassName = className;
-        UndecoratedName = undecoratedName;
         Export = export;
         _module = module;
         _lazySignatureParse = signatureParser;

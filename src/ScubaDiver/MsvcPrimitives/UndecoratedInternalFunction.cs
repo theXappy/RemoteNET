@@ -10,7 +10,8 @@ public class UndecoratedInternalFunction : UndecoratedFunction
     public override long Address => _address;
     public override ModuleInfo Module => _module;
 
-    public UndecoratedInternalFunction(string undecoratedName, string decoratedName, long address, int numArgs, ModuleInfo moduleInfo) : base(decoratedName, undecoratedName, numArgs)
+    public UndecoratedInternalFunction(string undecoratedName, string undecoratedFullName, string decoratedName, long address, int numArgs, ModuleInfo moduleInfo) 
+        : base(decoratedName, undecoratedName, undecoratedFullName, numArgs)
     {
         _address = address;
         _module = moduleInfo;

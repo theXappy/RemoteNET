@@ -1,30 +1,15 @@
-using ScubaDiver.API.Interactions.Dumps;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using ScubaDiver.API.Hooking;
-using ScubaDiver.Demangle.Demangle;
-using ScubaDiver.Demangle.Demangle.Core.Serialization;
 using ScubaDiver.Hooking;
-using System.Reflection.Emit;
 using DetoursNet;
-using System.Threading;
-using ScubaDiver.Rtti;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
-using System.Net.Sockets;
-using NtApiDotNet.Ndr.Marshal;
-using System.Runtime.InteropServices;
 
 namespace ScubaDiver
 {
     internal class MsvcOffensiveGC
     {
-
         // From https://github.com/gperftools/gperftools/issues/715
         // [x64] operator new(ulong size)
         private string kMangledNew64 = "??2@YAPEAX_K@Z";
@@ -208,19 +193,19 @@ namespace ScubaDiver
 
                     if (_alreadyHookedDecorated.Contains(ctor.DecoratedName))
                     {
-                        Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {ctor.UndecoratedName} , Decorated: {ctor.DecoratedName}");
+                        Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {ctor.UndecoratedFullName} , Decorated: {ctor.DecoratedName}");
                         continue;
                     }
                     _alreadyHookedDecorated.Add(ctor.DecoratedName);
 
 
-                    if (ctor.NumArgs > 1 || !ctor.UndecoratedName.StartsWith("SPen"))
+                    if (ctor.NumArgs > 1 || !ctor.UndecoratedFullName.StartsWith("SPen"))
                     {
-                        Debug.WriteLine($"[{nameof(MsvcOffensiveGC)}] Skipping hooking CTOR {ctor.UndecoratedName} with {ctor.NumArgs} args");
+                        Debug.WriteLine($"[{nameof(MsvcOffensiveGC)}] Skipping hooking CTOR {ctor.UndecoratedFullName} with {ctor.NumArgs} args");
                         continue;
                     }
 
-                    Console.WriteLine($"[{nameof(MsvcOffensiveGC)}] Hooking CTOR {ctor.UndecoratedName} with {ctor.NumArgs} args");
+                    Console.WriteLine($"[{nameof(MsvcOffensiveGC)}] Hooking CTOR {ctor.UndecoratedFullName} with {ctor.NumArgs} args");
                     DetoursNetWrapper.Instance.AddHook(ctor, UnifiedCtor);
                     Console.WriteLine($"[{nameof(MsvcOffensiveGC)}] QUICK EXIT");
                     attemptedHookedCtorsCount++;
@@ -250,15 +235,15 @@ namespace ScubaDiver
 
                     if (_alreadyHookedDecorated.Contains(dtor.DecoratedName))
                     {
-                        Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {dtor.UndecoratedName} , Decorated: {dtor.DecoratedName}");
+                        Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {dtor.UndecoratedFullName} , Decorated: {dtor.DecoratedName}");
                         continue;
                     }
                     _alreadyHookedDecorated.Add(dtor.DecoratedName);
 
 
-                    if (dtor.NumArgs > 1 || !dtor.UndecoratedName.StartsWith("SPen"))
+                    if (dtor.NumArgs > 1 || !dtor.UndecoratedFullName.StartsWith("SPen"))
                     {
-                        Debug.WriteLine($"[{nameof(MsvcOffensiveGC)}] Skipping hooking CTOR {dtor.UndecoratedName} with {dtor.NumArgs} args");
+                        Debug.WriteLine($"[{nameof(MsvcOffensiveGC)}] Skipping hooking CTOR {dtor.UndecoratedFullName} with {dtor.NumArgs} args");
                         continue;
                     }
 
@@ -284,7 +269,7 @@ namespace ScubaDiver
             foreach (var kvp in initMethods)
             {
                 UndecoratedFunction autoClassInit2 = kvp.Value;
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedName}");
+                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedFullName}");
                 DetoursNetWrapper.Instance.AddHook(kvp.Value, UnifiedAutoClassInit2);
             }
 
@@ -301,24 +286,21 @@ namespace ScubaDiver
         {
             overridenReturnValue = 0;
 
-            //Console.WriteLine($"[UnifiedCtor] Secret: {secret}, Args: {args.Length}");
             object first = args.FirstOrDefault();
             if (first is nuint self)
             {
-                //Console.WriteLine($"[UnifiedCtor] Secret: {secret}, Args: {args.Length}, Self: 0x{self:x16}");
                 RegisterClassName(self, secret.Name);
             }
             else
             {
                 Console.WriteLine($"[UnifiedCtor] Secret: {secret}, Args: {args.Length}, Self: <ERROR!>");
             }
-            return true;
+            return false; // Skip original
         }
         public static bool UnifiedDtor(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overridenReturnValue)
         {
             overridenReturnValue = 0;
 
-            //Console.WriteLine($"[UnifiedDtor] Secret: {secret.Name}, Args: {args.Length}");
             object first = args.FirstOrDefault();
             if (first is nuint self)
             {
@@ -328,7 +310,7 @@ namespace ScubaDiver
             {
                 Console.WriteLine($"[UnifiedDtor] Secret: {secret.Name}, Args: {args.Length}, Self: <ERROR!>");
             }
-            return true;
+            return false; // Skip original
         }
 
 
@@ -336,20 +318,6 @@ namespace ScubaDiver
         // | __autoclassinit2 Hooking |
         // +--------------------------+
 
-        //public static void UnifiedAutoClassInit2(string secret, ulong self, ulong size)
-        //{
-        //    // NOTE: Secret is not to be trusted here because __autoclassinit2 is often shared
-        //    // between various classes in the same dll.
-        //    RegisterSize(self, size);
-
-        //    if (!_cached.ContainsKey(secret)) return;
-        //    var (originalHookMethodInfo, _) = _cached[secret];
-
-        //    if (!DelegateStore.Real.ContainsKey(originalHookMethodInfo)) return;
-        //    var originalMethod = (AutoClassInit2Type)DelegateStore.Real[originalHookMethodInfo];
-        //    // Invoking original ctor
-        //    originalMethod(self, size);
-        //}
         public static bool UnifiedAutoClassInit2(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overridenReturnValue)
         {
             overridenReturnValue = 0;
@@ -359,7 +327,8 @@ namespace ScubaDiver
             Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Self: {(first is nuint ? $"0x{first:x16}" : "<ERROR!>")}");
             object second = args.FirstOrDefault();
             Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Size: {(second is nuint ? $"0x{second:x16}" : "<ERROR!>")}");
-            return true;
+
+            return false; // Don't skip original
         }
 
 
@@ -367,30 +336,6 @@ namespace ScubaDiver
         // | Operator new Hooking |
         // +----------------------+
 
-        //public static ulong UnifiedOperatorNew(string secret, ulong size)
-        //{
-        //    ulong res = 0;
-
-        //    if (!_cached.ContainsKey(secret))
-        //        return res;
-        //    var (originalHookMethodInfo, _) = _cached[secret];
-
-        //    var originalMethod = (OperatorNewType)DelegateStore.Real[originalHookMethodInfo];
-        //    // Invoking original ctor
-        //    res = originalMethod(size);
-        //    //Logger.Debug($"[OperatorNew] Invoked original. Size: {size}, returned addr: {res}");
-
-        //    if (res != 0)
-        //    {
-        //        RegisterSize(res, size);
-        //    }
-        //    else
-        //    {
-        //        Logger.Debug("[Error] Operator new failed (returned null).");
-        //    }
-
-        //    return res;
-        //}
         private delegate nuint OperatorNewType(nuint size);
 
         public static bool UnifiedOperatorNew(DetoursMethodGenerator.DetoursTrampoline trampoline, object[] args, out nuint overridenReturnValue)
@@ -408,7 +353,7 @@ namespace ScubaDiver
                 overridenReturnValue = opNew(size);
                 if(overridenReturnValue != 0)
                     RegisterSize(overridenReturnValue, size);
-                return false;
+                return true; // Skip original method
             }
             else
             {
@@ -416,7 +361,7 @@ namespace ScubaDiver
                     $"[UnifiedOperatorNew] Secret: {trampoline.Name}, Args: {args.Length}, Size: <ERROR!>");
             }
 
-            return true;
+            return false; // Don't skip original
         }
 
         // +---------------------------+

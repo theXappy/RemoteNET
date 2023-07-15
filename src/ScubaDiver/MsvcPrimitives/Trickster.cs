@@ -21,6 +21,8 @@ public class TricksterException : Exception { }
 
 public record struct TypeInfo(string ModuleName, string Name, nuint Address, nuint Offset)
 {
+    public string FullTypeName => $"{ModuleName}!{Name}";
+
     public override string ToString()
     {
         return $"{Name} - {Offset:X}";

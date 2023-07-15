@@ -8,7 +8,7 @@ using RemoteNET.Common;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
     public class RemoteTypesFactory
     {
@@ -103,13 +103,13 @@ namespace RemoteNET.Internal.Reflection
                             $"{typeInProgress} but the {nameof(DiverCommunicator)}.{nameof(DiverCommunicator.DumpType)} function failed.");
                     }
 
-                    Type newCreatedType = this.Create(app, dumpedArgType);
+                    Type newCreatedType = Create(app, dumpedArgType);
                     if (newCreatedType == null)
                     {
                         // remove on-going creation indication
                         throw new Exception(
                             $"{nameof(RemoteTypesFactory)} tried to dump type {type} when handling method {methodName} of type" +
-                            $"{typeInProgress} but the inner {nameof(RemoteTypesFactory)}.{nameof(RemoteTypesFactory.Create)} function failed.");
+                            $"{typeInProgress} but the inner {nameof(RemoteTypesFactory)}.{nameof(Create)} function failed.");
                     }
                     paramType = newCreatedType;
                 }
@@ -157,7 +157,7 @@ namespace RemoteNET.Internal.Reflection
                     try
                     {
                         return Create(app, parentType, managedTypeDump.ParentAssembly);
-                        
+
                     }
                     catch (Exception ex)
                     {

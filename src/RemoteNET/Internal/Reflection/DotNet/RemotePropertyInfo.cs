@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Reflection;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
     public class RemotePropertyInfo : PropertyInfo
     {
@@ -35,11 +35,11 @@ namespace RemoteNET.Internal.Reflection
             Name = name;
         }
         public RemotePropertyInfo(Type declaringType, Type propType, string name) :
-            this(declaringType, new Lazy<Type>(()=> propType), name)
+            this(declaringType, new Lazy<Type>(() => propType), name)
         {
         }
 
-        public RemotePropertyInfo(RemoteType declaringType, PropertyInfo pi) : this(declaringType, new Lazy<Type>(()=> pi.PropertyType), pi.Name)
+        public RemotePropertyInfo(RemoteType declaringType, PropertyInfo pi) : this(declaringType, new Lazy<Type>(() => pi.PropertyType), pi.Name)
         {
         }
 
@@ -58,8 +58,8 @@ namespace RemoteNET.Internal.Reflection
             throw new NotImplementedException();
         }
 
-        public override MethodInfo GetGetMethod(bool nonPublic) => this.GetMethod;
-        public override MethodInfo GetSetMethod(bool nonPublic) => this.SetMethod;
+        public override MethodInfo GetGetMethod(bool nonPublic) => GetMethod;
+        public override MethodInfo GetSetMethod(bool nonPublic) => SetMethod;
 
         public override ParameterInfo[] GetIndexParameters()
         {
@@ -76,7 +76,7 @@ namespace RemoteNET.Internal.Reflection
             }
             else
             {
-                throw new Exception($"Couldn't retrieve 'get' method of property '{this.Name}'");
+                throw new Exception($"Couldn't retrieve 'get' method of property '{Name}'");
             }
         }
 
@@ -94,7 +94,7 @@ namespace RemoteNET.Internal.Reflection
             }
             else
             {
-                throw new Exception($"Couldn't retrieve 'set' method of property '{this.Name}'");
+                throw new Exception($"Couldn't retrieve 'set' method of property '{Name}'");
             }
         }
 

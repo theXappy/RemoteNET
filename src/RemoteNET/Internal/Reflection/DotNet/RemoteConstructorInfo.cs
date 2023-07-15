@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using RemoteNET.Common;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
     public class RemoteConstructorInfo : ConstructorInfo
     {
@@ -27,7 +27,7 @@ namespace RemoteNET.Internal.Reflection
             _paramInfos = paramInfos;
         }
 
-        public RemoteConstructorInfo(RemoteType declaringType, ConstructorInfo ci) : 
+        public RemoteConstructorInfo(RemoteType declaringType, ConstructorInfo ci) :
             this(declaringType,
                  ci.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
         {
@@ -52,7 +52,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override object Invoke(BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
-            return RemoteFunctionsInvokeHelper.Invoke(this.App, DeclaringType, Name, null, new Type[0], parameters);
+            return ManagedRemoteFunctionsInvokeHelper.Invoke(App, DeclaringType, Name, null, new Type[0], parameters);
         }
 
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
@@ -74,7 +74,7 @@ namespace RemoteNET.Internal.Reflection
         public override string ToString()
         {
             string args = string.Join(", ", _paramInfos.Select(pi => pi.ParameterType.FullName));
-            return $"Void {this.Name}({args})";
+            return $"Void {Name}({args})";
         }
     }
 }

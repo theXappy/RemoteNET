@@ -1,13 +1,16 @@
 ﻿using Reko.Core.Hll.Pascal;
 using System;
+using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using RemoteNET.Common;
 using RemoteNET.RttiReflection;
 
 namespace RemoteNET.Internal.Reflection
 {
-    public class RemoteRttiMethodInfo : MethodInfo
+    [DebuggerDisplay("Remote RTTI Method: {UndecoratedSignature}")]
+    public class RemoteRttiMethodInfo : RemoteMethodInfoBase
     {
         private LazyRemoteTypeResolver _retType;
 
@@ -26,6 +29,10 @@ namespace RemoteNET.Internal.Reflection
         public string MangledName { get; private set; }
 
         public Type[] AssignedGenericArgs { get; }
+
+        /// <summary>
+        /// All C++ parameters of the function. First one is (likely) 'this'
+        /// </summary>
         private readonly ParameterInfo[] _paramInfos;
 
         private RemoteApp App => (DeclaringType as RemoteRttiType)?.App;
@@ -69,7 +76,11 @@ namespace RemoteNET.Internal.Reflection
             throw new NotImplementedException();
         }
 
-        public override ParameterInfo[] GetParameters() => _paramInfos;
+        public override ParameterInfo[] GetParameters()
+        {
+            // Skipping 'this'
+            return _paramInfos.Skip(1).ToArray();
+        }
 
         public override MethodImplAttributes GetMethodImplementationFlags()
         {
@@ -78,8 +89,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
-            //return RemoteFunctionsInvokeHelper.Invoke(this.App, DeclaringType, Name, obj, AssignedGenericArgs, parameters);
-            throw new NotImplementedException();
+            return UnmanagedRemoteFunctionsInvokeHelper.Invoke(this.App as UnmanagedRemoteApp, DeclaringType, Name, obj, parameters);
         }
 
         public override MethodInfo GetBaseDefinition()
@@ -94,16 +104,19 @@ namespace RemoteNET.Internal.Reflection
 
         public override string ToString() => MangledName;
 
-        public string UndecoratedSignature()
+        public string UndecoratedSignature
         {
-            try
+            get
             {
-                string args = string.Join(", ", _paramInfos.Select(pi => pi.ToString()));
-                return $"{_retType.TypeFullName ?? _retType.TypeName} {Name}({args})";
-            }
-            catch (Exception)
-            {
-                throw;
+                try
+                {
+                    string args = string.Join(", ", _paramInfos.Select(pi => pi.ToString()));
+                    return $"{_retType.TypeFullName ?? _retType.TypeName} {Name}({args})";
+                }
+                catch (Exception)
+                {
+                    throw;
+                }
             }
         }
     }

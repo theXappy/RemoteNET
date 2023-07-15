@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using RemoteNET.Common;
 
-namespace RemoteNET.Internal.Reflection
+namespace RemoteNET.Internal.Reflection.DotNet
 {
-    public class RemoteType : Type
+    public class RemoteType : RemoteTypeBase
     {
         private readonly List<RemoteConstructorInfo> _ctors = new List<RemoteConstructorInfo>();
         private readonly List<RemoteMethodInfo> _methods = new List<RemoteMethodInfo>();
