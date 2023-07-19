@@ -13,6 +13,7 @@ using ScubaDiver.API.Interactions;
 using ScubaDiver.API;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using Microsoft.VisualBasic;
 using ScubaDiver.API.Hooking;
 using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.Hooking;
@@ -106,9 +107,9 @@ namespace ScubaDiver
                     {
                         UndecoratedFunction undecFunction =
                             new UndecoratedInternalFunction(
-                                undecoratedName: "operator new", 
-                                undecoratedFullName: "operator new", 
-                                decoratedName: "operator new", 
+                                undecoratedName: "operator new",
+                                undecoratedFullName: "operator new",
+                                decoratedName: "operator new",
                                 (long)operatorNewAddr, 1,
                                 moduleInfo);
                         module.AddTypelessFunction("operator new", undecFunction);
@@ -381,24 +382,28 @@ namespace ScubaDiver
 
         public string MakeTypeResponse(TypeDumpRequest dumpRequest)
         {
-            string rawTypeFilter = dumpRequest.TypeFullName;
+            ManagedTypeDump dump = GetRttiType(dumpRequest.TypeFullName, dumpRequest.Assembly);
+            if (dump != null)
+                return JsonConvert.SerializeObject(dump);
+
+            return QuickError("Failed to find type in searched assemblies");
+        }
+
+        private ManagedTypeDump GetRttiType(string rawTypeFilter, string assembly = null)
+        {
             if (string.IsNullOrEmpty(rawTypeFilter))
             {
-                return QuickError("Missing parameter 'TypeFullName'");
+                throw new Exception("Missing parameter 'TypeFullName'");
             }
 
             ParseFullTypeName(rawTypeFilter, out var rawAssemblyFilter, out rawTypeFilter);
-            string assembly = dumpRequest.Assembly;
             if (!string.IsNullOrEmpty(assembly))
             {
                 rawAssemblyFilter = assembly;
             }
 
             ManagedTypeDump dump = GetManagedTypeDump(rawAssemblyFilter, rawTypeFilter);
-            if (dump != null)
-                return JsonConvert.SerializeObject(dump);
-
-            return QuickError("Failed to find type in searched assemblies");
+            return dump;
         }
 
         private ManagedTypeDump GetManagedTypeDump(string rawAssemblyFilter, string rawTypeFilter)
@@ -420,7 +425,7 @@ namespace ScubaDiver
                     foreach (UndecoratedFunction dllExport in GetExportedTypeMethod(module, typeInfo.Name))
                     {
                         // TODO: Fields could be exported as well..
-                        // we only expected the "vftable" field (not actualy a field...) and methods/ctors right now
+                        // we only expected the "vftable" field (not actually a field...) and methods/ctors right now
 
                         List<ManagedTypeDump.TypeMethod.MethodParameter> parameters;
                         string[] argTypes = dllExport.ArgTypes;
@@ -653,7 +658,7 @@ namespace ScubaDiver
                 {
                     Type = $"{typeInfo.ModuleName}!{typeInfo.Name}",
                     RetrivalAddress = objAddr,
-                    PinnedAddress = pinAddr,
+                    PinnedAddress = objAddr,
                     HashCode = 0x0bad0bad
                 };
                 return JsonConvert.SerializeObject(od);
@@ -671,8 +676,135 @@ namespace ScubaDiver
 
         protected override string MakeInvokeResponse(ScubaDiverMessage arg)
         {
-            return QuickError("Not Implemented");
+            Logger.Debug("[MsvcDiver] Got /Invoke request!");
+            string body = arg.Body;
+            if (string.IsNullOrEmpty(body))
+            {
+                return QuickError("Missing body");
+            }
+            var request = JsonConvert.DeserializeObject<InvocationRequest>(body);
+            if (request == null)
+            {
+                return QuickError("Failed to deserialize body");
+            }
+
+            // Need to figure target instance and the target type.
+            // In case of a static call the target instance stays null.
+            object instance = null;
+            if (request.ObjAddress == 0)
+            {
+                return QuickError("Calling a instance-less function is not implemented");
+            }
+            ManagedTypeDump dumpedObjType = GetRttiType(request.TypeFullName);
+
+            //
+            // Non-null target object address. Non-static call
+            //
+
+            // Check if we have this objects in our pinned pool
+            // TODO: Pull from freezer?
+            nuint objAddress = (nuint)request.ObjAddress;
+
+            //
+            // We have our target and it's type. No look for a matching overload for the
+            // function to invoke.
+            //
+            List<object> paramsList = new();
+            if (request.Parameters.Any())
+            {
+                Logger.Debug($"[MsvcDiver] Invoking with parameters. Count: {request.Parameters.Count}");
+                paramsList = request.Parameters.Select(PrimitivesEncoder.Decode).ToList();
+            }
+            else
+            {
+                // No parameters.
+                Logger.Debug("[MsvcDiver] Invoking without parameters");
+            }
+
+            // Search the method with the matching signature
+            var overloads = dumpedObjType.Methods
+                .Where(m => m.Name == request.MethodName)
+                .Where(m => m.Parameters.Count == paramsList.Count + 1)
+                .ToList();
+            if (overloads.Count == 0)
+            {
+                Debugger.Launch();
+                Logger.Debug($"[MsvcDiver] Failed to Resolved method :/");
+                return QuickError("Couldn't find method in type.");
+            }
+            if (overloads.Count > 1)
+            {
+                Debugger.Launch();
+                Logger.Debug($"[MsvcDiver] Failed to Resolved method :/");
+                return QuickError($"Too many matches for {request.MethodName} in type {request.TypeFullName}. Got: {overloads.Count}");
+            }
+            ManagedTypeDump.TypeMethod method = overloads.Single();
+
+            string argsSummary = string.Join(", ", Enumerable.Repeat("nuin", paramsList.Count));
+            Logger.Debug($"[MsvcDiver] Resolved method: {method.Name}({argsSummary}), Containing Type: {dumpedObjType.Type}");
+
+
+            Logger.Debug($"[MsvcDiver] Assuming target module name from TypeFullName: {request.TypeFullName}");
+            ParseFullTypeName(request.TypeFullName, out string moduleName, out string typeName);
+            Logger.Debug($"[MsvcDiver] Assumed target module name: {moduleName}");
+            Rtti.ModuleInfo module = _trickster.ModulesParsed.Single(mod => mod.Name.StartsWith(moduleName));
+            Logger.Debug($"[MsvcDiver] Getting export from name and module ...");
+            IEnumerable<UndecoratedFunction> typeFuncs = GetExportedTypeMethod(module, typeName).ToList();
+            Logger.Debug($"[MsvcDiver] Getting export from name and module. Got back: {typeFuncs.Count()} items");
+            Logger.Debug($"[MsvcDiver] Searching mangled name: {method.MangledName}");
+            UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.MangledName);
+            Logger.Debug($"[MsvcDiver] FOUDN a function: {targetMethod}");
+            JustATestDelegate methodPtr = (JustATestDelegate)Marshal.GetDelegateForFunctionPointer(new IntPtr(targetMethod.Address), typeof(JustATestDelegate));
+
+            Logger.Debug($"[MsvcDiver] Invoking {targetMethod} with 1 arg ('this'): 0x{objAddress:x16}");
+            nuint? results = methodPtr(objAddress);
+
+            //object results = null;
+            //try
+            //{
+            //    argsSummary = string.Join(", ", paramsList.Select(param => param?.ToString() ?? "null"));
+            //    if (string.IsNullOrEmpty(argsSummary))
+            //        argsSummary = "No Arguments";
+            //    Logger.Debug($"[MsvcDiver] Invoking {method.Name} with those args (Count: {paramsList.Count}): `{argsSummary}`");
+            //    HarmonyWrapper.Instance.AllowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
+            //    results = method.Invoke(instance, paramsList.ToArray());
+            //}
+            //catch (Exception e)
+            //{
+            //    return QuickError($"Invocation caused exception: {e}");
+            //}
+            //finally
+            //{
+            //    HarmonyWrapper.Instance.DisallowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
+            //}
+
+            InvocationResults invocResults;
+            // Need to return the results. If it's primitive we'll encode it
+            // If it's non-primitive we pin it and send the address.
+            ObjectOrRemoteAddress returnValue;
+            if (results.GetType().IsPrimitiveEtc())
+            {
+                returnValue = ObjectOrRemoteAddress.FromObj(results);
+            }
+            else
+            {
+                //// Pinning results
+                //ulong resultsAddress = _freezer.Pin(results);
+                //Type resultsType = results.GetType();
+                //returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
+                throw new NotImplementedException("Non-primitive object returned from native function.");
+            }
+
+            invocResults = new InvocationResults()
+            {
+                VoidReturnType = false,
+                ReturnedObjectOrAddress = returnValue
+            };
+
+            return JsonConvert.SerializeObject(invocResults);
         }
+
+        public delegate nuint JustATestDelegate(nuint arg);
 
         protected override string MakeGetFieldResponse(ScubaDiverMessage arg)
         {
