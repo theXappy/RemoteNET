@@ -73,6 +73,14 @@ namespace ScubaDiver.Demangle.Demangle
                             default: throw new NotImplementedException();
                         }
                         break;
+                    case Domain.Real:
+                        switch (primitive.ByteSize)
+                        {
+                            case 4: sb.Append("float"); break;
+                            case 8: sb.Append("double"); break;
+                            default: throw new NotImplementedException();
+                        }
+                        break;
                     default:
                         throw new NotSupportedException(string.Format("Domain {0} is not supported.", primitive.Domain));
                 }
