@@ -227,5 +227,7 @@ namespace RemoteNET.RttiReflection
         {
             throw new NotImplementedException();
         }
+
+        public override string ToString() => FullName;
     }
 }

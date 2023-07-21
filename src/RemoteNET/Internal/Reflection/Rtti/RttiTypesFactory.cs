@@ -201,6 +201,7 @@ namespace RemoteNET.RttiReflection
                     declaringType.AddMethod(methodInfo);
                 }
             }
+
         }
     }
 }
