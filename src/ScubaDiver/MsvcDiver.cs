@@ -1,4 +1,4 @@
-using ScubaDiver.API.Interactions.Dumps;
+﻿using ScubaDiver.API.Interactions.Dumps;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -19,6 +19,8 @@ using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.Hooking;
 using ModuleInfo = Microsoft.Diagnostics.Runtime.ModuleInfo;
 using TypeInfo = System.Reflection.TypeInfo;
+using System.Reflection;
+using Microsoft.Diagnostics.Runtime.Utilities;
 
 namespace ScubaDiver
 {
@@ -419,6 +421,9 @@ namespace ScubaDiver
                     string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
                     string vftableName = $"{typeInfo.Name}::`vftable'"; // Constructing NameSpace::ClassName::ClassName
 
+                    UndecoratedFunction vftable = null;
+                    HashSet<nuint> methodAddresses = new HashSet<nuint>();
+
                     List<ManagedTypeDump.TypeField> fields = new();
                     List<ManagedTypeDump.TypeMethod> methods = new();
                     List<ManagedTypeDump.TypeMethod> constructors = new();
@@ -448,6 +453,9 @@ namespace ScubaDiver
                                     TypeFullName = dllExport.UndecoratedFullName,
                                     Visibility = "Public"
                                 });
+
+                                // Keep vftable aside so we can also gather functions from it
+                                vftable = dllExport;
                                 continue;
                             }
                             // Something went wrong when parsing this method's parameters...
@@ -455,11 +463,14 @@ namespace ScubaDiver
                             continue;
                         }
 
+                        methodAddresses.Add((nuint)dllExport.Address);
+
                         ManagedTypeDump.TypeMethod method = new()
                         {
                             Name = dllExport.UndecoratedName,
                             MangledName = dllExport.DecoratedName,
                             Parameters = parameters,
+                            ReturnTypeName = dllExport.RetType,
                             Visibility = "Public" // Because it's exported
                         };
 
@@ -467,6 +478,11 @@ namespace ScubaDiver
                             constructors.Add(method);
                         else
                             methods.Add(method);
+                    }
+
+                    if (vftable != null)
+                    {
+                        // Also collect methods from 
                     }
 
                     ManagedTypeDump recusiveManagedTypeDump = new ManagedTypeDump()
@@ -504,6 +520,31 @@ namespace ScubaDiver
             }
         }
 
+        private Rtti.TypeInfo? ResolveTypeFromVftableAddress(nuint address)
+        {
+            foreach (var kvp in _trickster.ScannedTypes)
+            {
+                var module = kvp.Key;
+                if (address < module.BaseAddress || address > (module.BaseAddress + module.Size))
+                    continue;
+
+                ScubaDiver.Rtti.TypeInfo[] typeInfos = kvp.Value;
+
+                foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
+                {
+                    if (typeInfo.Address == address)
+                        return typeInfo;
+                }
+                // This module was the module containing our queried address.
+                // We couldn't find the type within the module.
+                // Modules don't overlap so no other module will help use. It's safe to abort (Skipping the rest of the modules list)
+                return null;
+            }
+
+            // Address was not in range of any of the modules...
+            return null;
+        }
+
         private IReadOnlyDictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
         {
             if (_trickster == null || !_trickster.ScannedTypes.Any())
@@ -532,7 +573,10 @@ namespace ScubaDiver
                         yield return typeInfo;
                     }
                 }
-                output[module] = TypesDumperForModule();
+
+                IEnumerable<ScubaDiver.Rtti.TypeInfo> types = TypesDumperForModule();
+                if (types.Any())
+                    output[module] = types;
             }
 
             return output;
@@ -644,19 +688,22 @@ namespace ScubaDiver
                 }
             }
 
-            ParseFullTypeName(typeName, out var rawAssemblyFilter, out var rawTypeFilter);
-
             try
             {
-                var moduleAndTypes = GetTypeInfos(rawAssemblyFilter, rawTypeFilter).Single();
-                Rtti.TypeInfo typeInfo = moduleAndTypes.Value.Single();
+                // TODO: Wrong for x86
+                long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
+                Rtti.TypeInfo? typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                if (typeInfo == null)
+                {
+                    throw new Exception("Failed to resolve vftable of target to any RTTI type.");
+                }
 
                 // TODO: Actual Pin
                 ulong pinAddr = 0x0;
 
                 ObjectDump od = new ObjectDump()
                 {
-                    Type = $"{typeInfo.ModuleName}!{typeInfo.Name}",
+                    Type = $"{typeInfo.Value.ModuleName}!{typeInfo.Value.Name}",
                     RetrivalAddress = objAddr,
                     PinnedAddress = objAddr,
                     HashCode = 0x0bad0bad
@@ -696,17 +743,12 @@ namespace ScubaDiver
                 return QuickError("Calling a instance-less function is not implemented");
             }
             ManagedTypeDump dumpedObjType = GetRttiType(request.TypeFullName);
-
-            //
-            // Non-null target object address. Non-static call
-            //
-
             // Check if we have this objects in our pinned pool
             // TODO: Pull from freezer?
             nuint objAddress = (nuint)request.ObjAddress;
 
             //
-            // We have our target and it's type. No look for a matching overload for the
+            // We have our target and it's type. Now look for a matching overload for the
             // function to invoke.
             //
             List<object> paramsList = new();
@@ -724,7 +766,7 @@ namespace ScubaDiver
             // Search the method with the matching signature
             var overloads = dumpedObjType.Methods
                 .Where(m => m.Name == request.MethodName)
-                .Where(m => m.Parameters.Count == paramsList.Count + 1)
+                .Where(m => m.Parameters.Count == paramsList.Count + 1) // TODO: Check types
                 .ToList();
             if (overloads.Count == 0)
             {
@@ -740,59 +782,112 @@ namespace ScubaDiver
             }
             ManagedTypeDump.TypeMethod method = overloads.Single();
 
-            string argsSummary = string.Join(", ", Enumerable.Repeat("nuin", paramsList.Count));
-            Logger.Debug($"[MsvcDiver] Resolved method: {method.Name}({argsSummary}), Containing Type: {dumpedObjType.Type}");
+            Logger.Debug($"[MsvcDiver] Getting RTTI info objects from TypeFullName: {request.TypeFullName}");
+            ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
+            IReadOnlyDictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
+            Rtti.ModuleInfo module = typeInfos.Keys.Single();
+            Rtti.TypeInfo typeInfo = typeInfos[module].Single();
 
-
-            Logger.Debug($"[MsvcDiver] Assuming target module name from TypeFullName: {request.TypeFullName}");
-            ParseFullTypeName(request.TypeFullName, out string moduleName, out string typeName);
-            Logger.Debug($"[MsvcDiver] Assumed target module name: {moduleName}");
-            Rtti.ModuleInfo module = _trickster.ModulesParsed.Single(mod => mod.Name.StartsWith(moduleName));
-            Logger.Debug($"[MsvcDiver] Getting export from name and module ...");
-            IEnumerable<UndecoratedFunction> typeFuncs = GetExportedTypeMethod(module, typeName).ToList();
-            Logger.Debug($"[MsvcDiver] Getting export from name and module. Got back: {typeFuncs.Count()} items");
-            Logger.Debug($"[MsvcDiver] Searching mangled name: {method.MangledName}");
+            IEnumerable<UndecoratedFunction> typeFuncs = GetExportedTypeMethod(module, typeInfo.Name).ToList();
             UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.MangledName);
-            Logger.Debug($"[MsvcDiver] FOUDN a function: {targetMethod}");
-            JustATestDelegate methodPtr = (JustATestDelegate)Marshal.GetDelegateForFunctionPointer(new IntPtr(targetMethod.Address), typeof(JustATestDelegate));
+            Logger.Debug($"[MsvcDiver] FOUND the target function: {targetMethod}");
 
+            //
+            // Turn target method into an invoke-able delegate
+            //
+
+            Type retType = method.ReturnTypeName.Equals("void", StringComparison.OrdinalIgnoreCase)
+                ? typeof(void)
+                : typeof(nuint);
+            var delegateType = NativeDelegatesFactory.GetDelegateType(retType, method.Parameters.Count);
+            var methodPtr = Marshal.GetDelegateForFunctionPointer(new IntPtr(targetMethod.Address), delegateType);
+
+            //
+            // Prepare parameters
+            //
             Logger.Debug($"[MsvcDiver] Invoking {targetMethod} with 1 arg ('this'): 0x{objAddress:x16}");
-            nuint? results = methodPtr(objAddress);
+            object[] invocationArgs = new object[method.Parameters.Count];
+            invocationArgs[0] = objAddress;
+            for (int i = 0; i < paramsList.Count; i++)
+            {
+                Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Decoding parameter #{i} (skipping 'this').");
+                var decodedParam = paramsList[i];
+                Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Decoded parameter #{i}, Is Null: {decodedParam == null}");
+                nuint nuintParam = 0;
+                if (decodedParam != null)
+                {
+                    Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Decoded parameter #{i}, Result Managed Type: {decodedParam?.GetType().Name}");
+                    Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Casting parameter #{i} to nuint");
+                    nuintParam = (nuint)(Convert.ToUInt64(decodedParam));
+                }
 
-            //object results = null;
-            //try
-            //{
-            //    argsSummary = string.Join(", ", paramsList.Select(param => param?.ToString() ?? "null"));
-            //    if (string.IsNullOrEmpty(argsSummary))
-            //        argsSummary = "No Arguments";
-            //    Logger.Debug($"[MsvcDiver] Invoking {method.Name} with those args (Count: {paramsList.Count}): `{argsSummary}`");
-            //    HarmonyWrapper.Instance.AllowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
-            //    results = method.Invoke(instance, paramsList.ToArray());
-            //}
-            //catch (Exception e)
-            //{
-            //    return QuickError($"Invocation caused exception: {e}");
-            //}
-            //finally
-            //{
-            //    HarmonyWrapper.Instance.DisallowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
-            //}
+                invocationArgs[i + 1] = nuintParam;
+                Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Done with parameter #{i}");
+            }
+
+            //
+            // Invoke target
+            //
+            nuint? results = methodPtr.DynamicInvoke(invocationArgs) as nuint?;
+
+            //
+            // Prepare invocation results for response
+            //
+            ManagedTypeDump returnTypeDump = null;
+            if (targetMethod.RetType.Contains("::") && /*Is a pointer */ targetMethod.RetType.EndsWith(" *"))
+            {
+                string normalizedRetType = method.ReturnTypeName[..^2]; // Remove ' *' suffix
+                returnTypeDump = GetRttiType(normalizedRetType);
+            }
 
             InvocationResults invocResults;
             // Need to return the results. If it's primitive we'll encode it
             // If it's non-primitive we pin it and send the address.
             ObjectOrRemoteAddress returnValue;
-            if (results.GetType().IsPrimitiveEtc())
+            if (returnTypeDump == null || results is null or 0)
             {
-                returnValue = ObjectOrRemoteAddress.FromObj(results);
+                if (returnTypeDump != null)
+                {
+                    // This is a null pointer
+                    returnValue = ObjectOrRemoteAddress.Null;
+                }
+                else
+                {
+                    // This is (probably) not a pointer. Hopefully just a primitive.
+                    returnValue = ObjectOrRemoteAddress.FromObj(results);
+                }
             }
             else
             {
-                //// Pinning results
-                //ulong resultsAddress = _freezer.Pin(results);
-                //Type resultsType = results.GetType();
-                //returnValue = ObjectOrRemoteAddress.FromToken(resultsAddress, resultsType.Name);
-                throw new NotImplementedException("Non-primitive object returned from native function.");
+                Console.WriteLine($"[MsvcDiver] Invoking {targetMethod} result with a not-null OBJECT address");
+
+                // Pinning results TODO
+                string normalizedRetType = targetMethod.RetType[..^2]; // Remove ' *' suffix
+                Console.WriteLine(
+                    $"[MsvcDiver] Trying to result the type of the returned object. Normalized return type from signature: {normalizedRetType}");
+                ParseFullTypeName(normalizedRetType, out string retTypeRawAssemblyFilter, out string retTypeRawTypeFilter);
+
+
+                Console.WriteLine($"Dumping vftable (8 bytes) at the results address: 0x{results.Value:x16}");
+                // TODO: Wrong for x86
+                long vftable = Marshal.ReadInt64(new IntPtr((long)results.Value));
+                Console.WriteLine($"vftable: {vftable:x16}");
+                Console.WriteLine("Trying to resolve vftable to type...");
+                Rtti.TypeInfo? reTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                Console.WriteLine($"Trying to resolve vftable to type... Got back: {reTypeInfo}");
+
+                if (reTypeInfo.HasValue)
+                {
+                    ulong pinAddr = 0x0;
+
+                    string actualRetTypeFullTypeName = $"{reTypeInfo.Value.ModuleName}!{reTypeInfo.Value.Name}";
+                    returnValue = ObjectOrRemoteAddress.FromToken(results.Value, actualRetTypeFullTypeName);
+                }
+                else
+                {
+                    Console.WriteLine("FAILED to resolve vftable to type. returning as nuint.");
+                    returnValue = ObjectOrRemoteAddress.FromObj(results);
+                }
             }
 
             invocResults = new InvocationResults()
@@ -803,8 +898,6 @@ namespace ScubaDiver
 
             return JsonConvert.SerializeObject(invocResults);
         }
-
-        public delegate nuint JustATestDelegate(nuint arg);
 
         protected override string MakeGetFieldResponse(ScubaDiverMessage arg)
         {

@@ -15,7 +15,7 @@ namespace ScubaDiver.API.Exceptions
             $"--- End of remote exception stack trace ---\n" +
             $"{base.StackTrace}";
 
-        public RemoteException(string msg, string remoteStackTrace)
+        public RemoteException(string msg, string remoteStackTrace) : base ("RemoteException: " + msg)
         {
             RemoteMessage = msg;
             _remoteStackTrace = remoteStackTrace;

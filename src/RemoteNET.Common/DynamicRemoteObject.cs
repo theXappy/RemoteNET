@@ -218,7 +218,7 @@ namespace RemoteNET.Internal
                 {
                     yield return member;
                 }
-                while(__ongoingMembersDumperEnumerator.MoveNext())
+                while (__ongoingMembersDumperEnumerator.MoveNext())
                 {
                     var member = __ongoingMembersDumperEnumerator.Current;
                     __membersInner.Add(member);
@@ -231,13 +231,22 @@ namespace RemoteNET.Internal
             return Aggregator();
         }
 
+        private MethodInfo GetSingleMethod(string name, params object[] args)
+        {
+            var matchingMethods = (from member in __members
+                                   where member.Name == name && member is MethodInfo
+                                   let methodMember = member as MethodInfo
+                                   where methodMember.GetParameters().Length == args.Length
+                                   select methodMember).ToList();
+            if (matchingMethods.Count == 1)
+                return matchingMethods[0];
+            return null;
+        }
+
         public T InvokeMethod<T>(string name, params object[] args)
         {
-            var matchingMethods = from member in __members
-                                  where member.Name == name
-                                  where ((MethodInfo)member).GetParameters().Length == args.Length
-                                  select member;
-            return (T)(matchingMethods.Single() as MethodInfo).Invoke(__ro, args);
+            MethodInfo matchingMethod = GetSingleMethod(name, args);
+            return (T)matchingMethod.Invoke(__ro, args);
         }
 
         #region Dynamic Object API 
@@ -503,14 +512,26 @@ namespace RemoteNET.Internal
                 return false;
             }
         }
-#endregion
+        #endregion
 
         #region ToString / GetHashCode / Equals
 
-        public override string ToString() => InvokeMethod<string>(nameof(ToString));
+        public override string ToString()
+        {
+            if (GetSingleMethod(nameof(ToString)) != null)
+                return InvokeMethod<string>(nameof(ToString));
+            // No "ToString" method, target is not a .NET object
+            return __type.ToString();
+        }
 
-        public override int GetHashCode() => InvokeMethod<int>(nameof(GetHashCode));
-
+        public override int GetHashCode()
+        {
+            if (GetSingleMethod(nameof(GetHashCode)) != null)
+                return InvokeMethod<int>(nameof(GetHashCode));
+            // No "GetHashCode" method, target is not a .NET object
+            // TODO: Return token?
+            throw new NotImplementedException("Hashcode not implemented for non-managed objects");
+        }
         public override bool Equals(object obj)
         {
             throw new NotImplementedException($"Can not call `Equals` on {nameof(DynamicRemoteObject)} instances");
