@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
@@ -8,16 +7,15 @@ using Windows.Win32.Foundation;
 using Windows.Win32.System.Threading;
 using Windows.Win32.System.Memory;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Threading.Tasks;
-using System.Threading;
 using System.Runtime.InteropServices;
 using System.Text;
-using ScubaDiver.Utils;
 
 namespace ScubaDiver.Rtti;
 
 public class TricksterException : Exception { }
+
+public record struct FunctionInfo(string mangledName, nuint address);
 
 public record struct TypeInfo(string ModuleName, string Name, nuint Address, nuint Offset)
 {
