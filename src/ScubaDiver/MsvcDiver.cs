@@ -81,25 +81,32 @@ namespace ScubaDiver
                 UndecoratedModule module = new UndecoratedModule(moduleInfo.Name);
                 foreach (Rtti.TypeInfo typeInfo in types)
                 {
-                    IEnumerable<UndecoratedFunction> methods = GetExportedTypeMethod(moduleInfo, typeInfo.Name);
-                    foreach (var method in methods)
+                    IEnumerable<UndecoratedSymbol> methods = GetExportedTypeMembers(moduleInfo, typeInfo.Name);
+                    foreach (var symbol in methods)
                     {
-                        module.AddTypeFunction(typeInfo, method);
-
                         // Removing type funcs from allExports
-                        if (method is UndecoratedExport undecExport)
-                            allExports.Remove(undecExport.Export);
+                        if (symbol is UndecoratedExportedFunc undecFunc)
+                        {
+                            module.AddTypeFunction(typeInfo, undecFunc);
+                            allExports.Remove(undecFunc.Export);
+                        }
                     }
                 }
 
-                // This list should now hold only typeless funcs
+                // This list should now hold only typeless symbols...
                 foreach (DllExport export in allExports)
                 {
-                    // TODO: Then why the fuck am I trying to undecorate??
-                    if (!export.TryUndecorate(moduleInfo, out UndecoratedFunction output))
+                    // TODO: ... Then why the fuck am I trying to undecorate??
+                    if (!export.TryUndecorate(moduleInfo, out UndecoratedSymbol output))
                         continue;
 
-                    module.AddTypelessFunction(export.Name, output);
+                    if (output is not UndecoratedFunction undecFunc)
+                    {
+                        Logger.Debug("Typless-export which isn't a function is discarded. Undecorated name: " + output.UndecoratedFullName);
+                        continue;
+                    }
+
+                    module.AddTypelessFunction(export.Name, undecFunc);
                 }
 
                 // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
@@ -219,7 +226,7 @@ namespace ScubaDiver
                 QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
 
             Rtti.TypeInfo typeInfo = typeInfos.Single();
-            List<UndecoratedFunction> methods = GetExportedTypeMethod(module, typeInfo.Name).ToList();
+            List<UndecoratedFunction> methods = GetExportedTypeFunctions(module, typeInfo.Name).ToList();
             UndecoratedFunction methodToHook = null;
             foreach (var method in methods)
             {
@@ -416,78 +423,20 @@ namespace ScubaDiver
                 Rtti.ModuleInfo module = moduleAndTypes.Key;
                 foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
                 {
-                    string moduleName = typeInfo.ModuleName;
-                    string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
-                    string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
-                    string vftableName = $"{typeInfo.Name}::`vftable'"; // Constructing NameSpace::ClassName::ClassName
-
-                    UndecoratedFunction vftable = null;
-                    HashSet<nuint> methodAddresses = new HashSet<nuint>();
-
+                    UndecoratedSymbol vftable;
                     List<ManagedTypeDump.TypeField> fields = new();
                     List<ManagedTypeDump.TypeMethod> methods = new();
                     List<ManagedTypeDump.TypeMethod> constructors = new();
-                    foreach (UndecoratedFunction dllExport in GetExportedTypeMethod(module, typeInfo.Name))
-                    {
-                        // TODO: Fields could be exported as well..
-                        // we only expected the "vftable" field (not actually a field...) and methods/ctors right now
-
-                        List<ManagedTypeDump.TypeMethod.MethodParameter> parameters;
-                        string[] argTypes = dllExport.ArgTypes;
-                        if (argTypes != null)
-                        {
-                            parameters = argTypes.Select((argType, i) =>
-                                new ManagedTypeDump.TypeMethod.MethodParameter()
-                                {
-                                    FullTypeName = argType,
-                                    Name = $"a{i}"
-                                }).ToList();
-                        }
-                        else
-                        {
-                            if (dllExport.UndecoratedFullName == vftableName)
-                            {
-                                fields.Add(new ManagedTypeDump.TypeField()
-                                {
-                                    Name = "vftable",
-                                    TypeFullName = dllExport.UndecoratedFullName,
-                                    Visibility = "Public"
-                                });
-
-                                // Keep vftable aside so we can also gather functions from it
-                                vftable = dllExport;
-                                continue;
-                            }
-                            // Something went wrong when parsing this method's parameters...
-                            Logger.Debug($"[{nameof(GetManagedTypeDump)}] Failed to parse parameters of {dllExport.UndecoratedFullName}");
-                            continue;
-                        }
-
-                        methodAddresses.Add((nuint)dllExport.Address);
-
-                        ManagedTypeDump.TypeMethod method = new()
-                        {
-                            Name = dllExport.UndecoratedName,
-                            MangledName = dllExport.DecoratedName,
-                            Parameters = parameters,
-                            ReturnTypeName = dllExport.RetType,
-                            Visibility = "Public" // Because it's exported
-                        };
-
-                        if (dllExport.UndecoratedFullName == ctorName)
-                            constructors.Add(method);
-                        else
-                            methods.Add(method);
-                    }
+                    DeconstructRttiType(typeInfo, module, fields, constructors, methods, out vftable);
 
                     if (vftable != null)
                     {
-                        // Also collect methods from 
+                        // TODO: Also collect methods from vftable
                     }
 
                     ManagedTypeDump recusiveManagedTypeDump = new ManagedTypeDump()
                     {
-                        Assembly = moduleName,
+                        Assembly = module.Name,
                         Type = typeInfo.Name,
                         Methods = methods,
                         Constructors = constructors,
@@ -500,22 +449,126 @@ namespace ScubaDiver
             return null;
         }
 
+        private void DeconstructRttiType(Rtti.TypeInfo typeInfo,
+            Rtti.ModuleInfo module,
+            List<ManagedTypeDump.TypeField> fields,
+            List<ManagedTypeDump.TypeMethod> constructors,
+            List<ManagedTypeDump.TypeMethod> methods,
+            out UndecoratedSymbol vftable)
+        {
+            vftable = null;
+
+            string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
+            string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
+            string vftableName = $"{typeInfo.Name}::`vftable'"; // Constructing NameSpace::ClassName::`vftable
+            foreach (UndecoratedSymbol dllExport in GetExportedTypeMembers(module, typeInfo.Name))
+            {
+                if (dllExport is UndecoratedFunction undecFunc)
+                {
+                    HandleTypeFunction(undecFunc, ctorName, constructors, methods);
+                }
+                else if (dllExport is UndecoratedExportedField undecField)
+                {
+                    HandleTypeField(undecField, vftableName, fields, ref vftable);
+                }
+            }
+        }
+
+        private void HandleTypeField(UndecoratedExportedField undecField, string vftableName,
+            List<ManagedTypeDump.TypeField> fields, ref UndecoratedSymbol vftable)
+        {
+            // TODO: Fields could be exported as well..
+            // we only expected the "vftable" field (not actually a field...) and methods/ctors right now
+
+            if (undecField.UndecoratedFullName == vftableName)
+            {
+                if (vftable != null)
+                {
+                    Logger.Debug(
+                        $"Duplicate vftable export found. Old: {vftable.UndecoratedFullName} , New: {undecField.UndecoratedFullName}");
+                    return;
+                }
+
+                vftable = undecField;
+
+
+                fields.Add(new ManagedTypeDump.TypeField()
+                {
+                    Name = "vftable",
+                    TypeFullName = undecField.UndecoratedFullName,
+                    Visibility = "Public"
+                });
+
+                // Keep vftable aside so we can also gather functions from it
+                vftable = undecField;
+                return;
+            }
+
+            Logger.Debug(
+                $"[{nameof(GetManagedTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
+        }
+
+        private void HandleTypeFunction(UndecoratedFunction undecFunc, string ctorName,
+            List<ManagedTypeDump.TypeMethod> constructors, List<ManagedTypeDump.TypeMethod> methods)
+        {
+            List<ManagedTypeDump.TypeMethod.MethodParameter> parameters;
+            string[] argTypes = undecFunc.ArgTypes;
+            if (argTypes != null)
+            {
+                parameters = argTypes.Select((argType, i) =>
+                    new ManagedTypeDump.TypeMethod.MethodParameter()
+                    {
+                        FullTypeName = argType,
+                        Name = $"a{i}"
+                    }).ToList();
+            }
+            else
+            {
+                Logger.Debug(
+                    $"[{nameof(GetManagedTypeDump)}] Failed to parse function's argumenst. Undecorated name: {undecFunc.UndecoratedFullName}");
+                return;
+            }
+
+            ManagedTypeDump.TypeMethod method = new()
+            {
+                Name = undecFunc.UndecoratedName,
+                MangledName = undecFunc.DecoratedName,
+                Parameters = parameters,
+                ReturnTypeName = undecFunc.RetType,
+                Visibility = "Public" // Because it's exported
+            };
+
+            if (undecFunc.UndecoratedFullName == ctorName)
+                constructors.Add(method);
+            else
+                methods.Add(method);
+        }
 
 
         /// <summary>
         /// Get a specific method of a specific type, which is exported from the given module.
         /// </summary>
-        protected IEnumerable<UndecoratedFunction> GetExportedTypeMethod(Rtti.ModuleInfo module, string typeFullName)
+        protected IEnumerable<UndecoratedSymbol> GetExportedTypeMembers(Rtti.ModuleInfo module, string typeFullName)
         {
             string membersPrefix = $"{typeFullName}::";
             IReadOnlyList<DllExport> exports = GetExports(module.Name);
 
             foreach (DllExport dllExport in exports)
             {
-                if (dllExport.TryUndecorate(module, out UndecoratedFunction output) &&
+                if (dllExport.TryUndecorate(module, out UndecoratedSymbol output) &&
                     output.UndecoratedFullName.StartsWith(membersPrefix))
                 {
                     yield return output;
+                }
+            }
+        }
+        protected IEnumerable<UndecoratedFunction> GetExportedTypeFunctions(Rtti.ModuleInfo module, string typeFullName)
+        {
+            foreach (UndecoratedSymbol symbol in GetExportedTypeMembers(module, typeFullName))
+            {
+                if (symbol is UndecoratedFunction undecFunc)
+                {
+                    yield return undecFunc;
                 }
             }
         }
@@ -788,7 +841,7 @@ namespace ScubaDiver
             Rtti.ModuleInfo module = typeInfos.Keys.Single();
             Rtti.TypeInfo typeInfo = typeInfos[module].Single();
 
-            IEnumerable<UndecoratedFunction> typeFuncs = GetExportedTypeMethod(module, typeInfo.Name).ToList();
+            List<UndecoratedFunction> typeFuncs = GetExportedTypeFunctions(module, typeInfo.Name).ToList();
             UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.MangledName);
             Logger.Debug($"[MsvcDiver] FOUND the target function: {targetMethod}");
 

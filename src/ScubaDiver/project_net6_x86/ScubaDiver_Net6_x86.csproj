@@ -36,6 +36,7 @@
 		<Compile Include="..\MsvcPrimitives\UndecoratedExport.cs" Link="MsvcPrimitives\UndecoratedExport.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedFunction.cs" Link="MsvcPrimitives\UndecoratedFunction.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedInternalFunction.cs" Link="MsvcPrimitives\UndecoratedInternalFunction.cs" />
+		<Compile Include="..\MsvcPrimitives\VftableParser.cs" Link="MsvcPrimitives\VftableParser.cs" />
 		<Compile Include="..\MsvcPrimitives\NativeDelegatesFactory.cs" Link="MsvcPrimitives\NativeDelegatesFactory.cs" />
 		<Compile Include="..\MsvcDiver.cs" />
 		<Compile Include="..\MsvcOffensiveGC.cs" />
