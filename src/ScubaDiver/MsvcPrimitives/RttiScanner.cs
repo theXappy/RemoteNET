@@ -57,17 +57,24 @@ public unsafe struct RttiScanner : IDisposable {
         return UnDecorateSymbolNameWrapper(buffer);
     }
 
+    private static object _dbgHelpLock = new object();
     public static string UnDecorateSymbolNameWrapper(byte* buffer)
     {
-        byte* target = stackalloc byte[BUFFER_SIZE];
-        uint len = DbgHelp.UnDecorateSymbolName(new PCSTR(buffer), new PSTR(target), BUFFER_SIZE, 0x1800);
-        return len != 0 ? Encoding.UTF8.GetString(target, (int)len) : null;
+        lock (_dbgHelpLock)
+        {
+            byte* target = stackalloc byte[BUFFER_SIZE];
+            uint len = DbgHelp.UnDecorateSymbolName(new PCSTR(buffer), new PSTR(target), BUFFER_SIZE, 0x1800);
+            return len != 0 ? Encoding.UTF8.GetString(target, (int)len) : null;
+        }
     }
     public static string UnDecorateSymbolNameWrapper(string buffer)
     {
-        byte* target = stackalloc byte[BUFFER_SIZE];
-        uint len = DbgHelp.UnDecorateSymbolName(buffer, new PSTR(target), BUFFER_SIZE, 0x1800);
-        return len != 0 ? Encoding.UTF8.GetString(target, (int)len) : null;
+        lock (_dbgHelpLock)
+        {
+            byte* target = stackalloc byte[BUFFER_SIZE];
+            uint len = DbgHelp.UnDecorateSymbolName(buffer, new PSTR(target), BUFFER_SIZE, 0x1800);
+            return len != 0 ? Encoding.UTF8.GetString(target, (int)len) : null;
+        }
     }
 
     public string GetClassName32(ulong address) {
@@ -77,8 +84,11 @@ public unsafe struct RttiScanner : IDisposable {
         byte* buffer = stackalloc byte[BUFFER_SIZE];
         buffer[0] = (byte)'?';
         if (!TryRead(class_name, BUFFER_SIZE - 1, buffer + 1)) return null;
-        byte* target = stackalloc byte[BUFFER_SIZE];
-        uint len = DbgHelp.UnDecorateSymbolName(new PCSTR(buffer), new PSTR(target), BUFFER_SIZE, 0x1000);
-        return len != 0 ? Encoding.UTF8.GetString(target, (int)len) : null;
+        lock (_dbgHelpLock)
+        {
+            byte* target = stackalloc byte[BUFFER_SIZE];
+            uint len = DbgHelp.UnDecorateSymbolName(new PCSTR(buffer), new PSTR(target), BUFFER_SIZE, 0x1000);
+            return len != 0 ? Encoding.UTF8.GetString(target, (int)len) : null;
+        }
     }
 }
