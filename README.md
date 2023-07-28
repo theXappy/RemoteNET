@@ -20,6 +20,18 @@ There are 2 ways to get the library:
 -or-
 2. Clone this repo, compile then reference `RemoteNET.dll` and `ScubaDiver.API.dll` in your project.
 
+## Compiling
+
+1. Clone
+2. Initialize git modules (For `detours.net`)
+3. Launch "x64 Native Tools Command Prompt for VS 2022"
+4. `cd <<your RemoteNET repo path>>\src`
+5. `mkdir detours_build`
+6. `cd detours_build`
+7. `cmake ..\detours.net`
+8. Open `RemoteNET.sln` in Visual Studio
+9. Compile the RemoteNET project
+
 ## Minimal Working Example
 To get the essence of how easy and usefull this library can be, see below a re-implementation of [denandz/KeeFarce](https://github.com/denandz/KeeFarce).  
 This example interacts with an open KeePass process and makes it export all credentials to a CSV file.  
