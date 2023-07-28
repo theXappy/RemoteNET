@@ -336,3 +336,5 @@ ASALocalRun/
 src/RemoteNET/CompileAndLocalPublishRemoteNet.exe
 
 src/RemoteNET/publish.ps1
+
+src/detours_build/
