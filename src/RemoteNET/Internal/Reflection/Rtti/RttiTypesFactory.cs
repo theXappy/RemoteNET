@@ -149,7 +149,7 @@ namespace RemoteNET.RttiReflection
         {
             foreach (ManagedTypeDump.TypeMethod func in functions)
             {
-                string? mangledName = func.MangledName;
+                string? mangledName = func.DecoratedName;
                 if(string.IsNullOrEmpty(mangledName))
                     mangledName = func.Name;
 

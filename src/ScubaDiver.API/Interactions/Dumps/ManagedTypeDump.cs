@@ -60,7 +60,8 @@ namespace ScubaDiver.API.Interactions.Dumps
 
             public string Visibility { get; set; }
             public string Name { get; set; }
-            public string MangledName { get; set; }
+            public string DecoratedName { get; set; }
+            public string UndecoratedFullName { get; set; }
             public string ReturnTypeFullName { get; set; }
             // This is not a list of the PARAMETERS which are generic -> This is the list of TYPES place holders usually found between
             // the "LESS THEN" and "GEATER THEN" signs so for this methods:

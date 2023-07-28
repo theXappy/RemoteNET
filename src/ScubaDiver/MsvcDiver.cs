@@ -20,7 +20,10 @@ using ScubaDiver.Hooking;
 using ModuleInfo = Microsoft.Diagnostics.Runtime.ModuleInfo;
 using TypeInfo = System.Reflection.TypeInfo;
 using System.Reflection;
+using Windows.Win32.Foundation;
 using Microsoft.Diagnostics.Runtime.Utilities;
+using Newtonsoft.Json.Linq;
+using System.Security.Cryptography.X509Certificates;
 
 namespace ScubaDiver
 {
@@ -431,7 +434,17 @@ namespace ScubaDiver
 
                     if (vftable != null)
                     {
-                        // TODO: Also collect methods from vftable
+                        List<ManagedTypeDump.TypeMethod> virtualFunctions = AnalyzeVftable(module, vftable);
+                        foreach (ManagedTypeDump.TypeMethod virtualFunction in virtualFunctions)
+                        {
+                            bool exists = methods.Any(existingMethod =>
+                                existingMethod.UndecoratedFullName == virtualFunction.UndecoratedFullName);
+                            if(exists)
+                                continue;
+
+                            Console.WriteLine($"[GetManagedTypeDump] Found new method for type {typeInfo.Name}, Method Name: {virtualFunction.UndecoratedFullName}");
+                            methods.Add(virtualFunction);
+                        }
                     }
 
                     ManagedTypeDump recusiveManagedTypeDump = new ManagedTypeDump()
@@ -447,6 +460,79 @@ namespace ScubaDiver
             }
 
             return null;
+        }
+
+        private List<ManagedTypeDump.TypeMethod> AnalyzeVftable(Rtti.ModuleInfo module, UndecoratedSymbol vftable)
+        {
+            using var scanner = new RttiScanner(
+                _trickster._processHandle,
+                module.BaseAddress,
+                module.Size);
+
+            var exports = GetExports(module.Name);
+            Dictionary<nuint, DllExport> dict = exports.DistinctBy(exp => exp.Address).ToDictionary(exp => (nuint)exp.Address);
+            List<ManagedTypeDump.TypeMethod> virtualMethods = new List<ManagedTypeDump.TypeMethod>();
+
+            DllExport entryMatchingExport;
+            bool nextVftableFound = false;
+            nuint nextTableEntryAddress = (nuint)vftable.Address;
+            // Assuming at most 99 functions in the vftable.
+            for (int i = 0; i < 100; i++)
+            {
+                nuint currAddress = (nextTableEntryAddress + (nuint)(i * IntPtr.Size));
+
+                // Check if this address is some other type's vftable address
+                // (Not checking the first one, since it OUR vftable)
+                if (i != 0 && dict.TryGetValue(currAddress, out entryMatchingExport))
+                {
+                    Console.WriteLine($"[AnalyzeVftable] Found new record backked by export. Name: {entryMatchingExport.Name}");
+
+                    if (!entryMatchingExport.TryUndecorate(module, out UndecoratedSymbol undecSymbol))
+                    {
+                        Console.WriteLine($"[AnalyzeVftable] Failed to undecorate. Name: {entryMatchingExport.Name}");
+                        continue;
+                    }
+
+                    if (undecSymbol.UndecoratedName.EndsWith("`vftable'"))
+                    {
+                        Console.WriteLine($"[AnalyzeVftable] Found next type's vftable function: {entryMatchingExport.Name}");
+                        nextVftableFound = true;
+                        break;
+                    }
+                }
+
+
+                Console.WriteLine($"[AnalyzeVftable][i={i}] Trying to read a nuint from address: 0x{currAddress:x16}");
+                bool readNext = scanner.TryRead(currAddress, out nuint entryContent);
+                if (!readNext)
+                    break;
+
+                if (dict.TryGetValue(entryContent, out entryMatchingExport))
+                {
+                    Console.WriteLine($"[AnalyzeVftable] Found new record backked by export. Name: {entryMatchingExport.Name}");
+                    if (!entryMatchingExport.TryUndecorate(module, out UndecoratedSymbol undecSymbol))
+                    {
+                        Console.WriteLine($"[AnalyzeVftable] Failed to undecorate. Name: {entryMatchingExport.Name}");
+                        continue;
+                    }
+                    Console.WriteLine($"[AnalyzeVftable] Found new vftable function: {entryMatchingExport.Name}");
+                    if (undecSymbol is UndecoratedFunction undecFunc)
+                    {
+                        HandleTypeFunction(undecFunc, null, null, virtualMethods);
+                    }
+                }
+            }
+
+            Console.WriteLine($"[AnalyzeVftable] Loop ended. Num virtual funcs: {virtualMethods.Count}");
+            Console.WriteLine($"[AnalyzeVftable] nextVftableFound = {nextVftableFound}");
+
+            if (nextVftableFound)
+            {
+                Console.WriteLine($"[AnalyzeVftable] Adding {virtualMethods.Count} methods to the methods list");
+                return virtualMethods;
+            }
+
+            return new List<ManagedTypeDump.TypeMethod>();
         }
 
         private void DeconstructRttiType(Rtti.TypeInfo typeInfo,
@@ -532,7 +618,8 @@ namespace ScubaDiver
             ManagedTypeDump.TypeMethod method = new()
             {
                 Name = undecFunc.UndecoratedName,
-                MangledName = undecFunc.DecoratedName,
+                UndecoratedFullName = undecFunc.UndecoratedFullName,
+                DecoratedName = undecFunc.DecoratedName,
                 Parameters = parameters,
                 ReturnTypeName = undecFunc.RetType,
                 Visibility = "Public" // Because it's exported
@@ -842,7 +929,7 @@ namespace ScubaDiver
             Rtti.TypeInfo typeInfo = typeInfos[module].Single();
 
             List<UndecoratedFunction> typeFuncs = GetExportedTypeFunctions(module, typeInfo.Name).ToList();
-            UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.MangledName);
+            UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.DecoratedName);
             Logger.Debug($"[MsvcDiver] FOUND the target function: {targetMethod}");
 
             //

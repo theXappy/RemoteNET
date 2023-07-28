@@ -59,7 +59,7 @@ public struct ModuleInfo
 
 public unsafe class Trickster : IDisposable
 {
-    private HANDLE _processHandle;
+    public HANDLE _processHandle;
 
     private ModuleInfo _mainModule;
 
