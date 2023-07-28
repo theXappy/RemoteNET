@@ -54,9 +54,28 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\detours.net\build\DetoursNet\DetoursNet.csproj" />
 		<ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj" />
 		<ProjectReference Include="..\..\ScubaDiver.Demangle\ScubaDiver.Demangle.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Include="..\..\detours_build\bin\Debug\DetoursDll.dll" Link="DetoursDll.dll">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="..\..\detours_build\bin\Debug\DetoursDll.pdb" Link="DetoursDll.pdb">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="..\..\detours_build\bin\Debug\DetoursNetCLR.dll" Link="DetoursNetCLR.dll">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="..\..\detours_build\bin\Debug\DetoursNetCLR.pdb" Link="DetoursNetCLR.pdb">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	</ItemGroup>
+	<ItemGroup>
+	  <Reference Include="DetoursNet">
+	    <HintPath>..\..\detours_build\bin\Debug\DetoursNet.dll</HintPath>
+	  </Reference>
 	</ItemGroup>
 
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
