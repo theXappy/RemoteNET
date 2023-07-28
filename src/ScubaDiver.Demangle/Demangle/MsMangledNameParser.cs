@@ -62,7 +62,14 @@ namespace ScubaDiver.Demangle.Demangle
 
         public static bool IsFunction(string str)
         {
-            return (new MsMangledNameParser(str)).IsFunction();
+            try
+            {
+                return (new MsMangledNameParser(str)).IsFunction();
+            }
+            catch
+            {
+                return false;
+            }
         }
         private bool IsFunction()
         {
