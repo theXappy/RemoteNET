@@ -113,7 +113,10 @@ public unsafe class Trickster : IDisposable
                 nuint address = segmentBaseAddress + offset;
                 if (getClassName(address) is string className)
                 {
-                    // Checking for the "BEL" control char
+                    // Avoiding names with the "BEL" control ASCII char specifically.
+                    // The heuristic search in this method finds a lot of garbage, but this one is particularly 
+                    // annoying because trying to print any type's "name" containing
+                    // "BEL" to the console will trigger a *ding* sound.
                     if (className.Contains('\a'))
                         continue;
 
