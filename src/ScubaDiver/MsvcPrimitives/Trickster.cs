@@ -277,7 +277,7 @@ public unsafe class Trickster : IDisposable
                     ulong suspect = *(uint*)a;
                     if (!results.TryGetValue(suspect, out var bag))
                         continue;
-                    ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
+                    ulong result = (ulong)a;
                     bag.Add(result);
                 }
             }
@@ -288,7 +288,7 @@ public unsafe class Trickster : IDisposable
                     ulong suspect = *(ulong*)a;
                     if (!results.TryGetValue(suspect, out var bag))
                         continue;
-                    ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
+                    ulong result = (ulong)a;
                     bag.Add(result);
                 }
             }
