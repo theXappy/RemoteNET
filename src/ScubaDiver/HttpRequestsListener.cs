@@ -16,8 +16,14 @@ public static class RnetRequestsListenerFactory
 {
     public static IRequestsListener Create(ushort port, bool reverse)
     {
+        Logger.Debug("[RnetRequestsListenerFactory] Create()");
         if (reverse)
+        {
+            Logger.Debug("[RnetRequestsListenerFactory] Create() - Reverse Listener");
             return new RnetReverseRequestsListener(port);
+        }
+
+        Logger.Debug("[RnetRequestsListenerFactory] Create() - Normal Listener");
         return new RnetRequestsListener(port);
     }
 }
@@ -33,11 +39,13 @@ public class RnetReverseRequestsListener : IRequestsListener
 
     public RnetReverseRequestsListener(int reverseProxyPort)
     {
+        Logger.Debug($"[RnetReverseRequestsListener] ctor() -- port: {reverseProxyPort}");
         _port = reverseProxyPort;
     }
 
     public void Start()
     {
+        Logger.Debug("[RnetReverseRequestsListener] Start() -- entered");
         _stayAlive.Set();
         _client = new TcpClient("localhost", _port);
         _task = Task.Run(Dispatcher);
@@ -51,6 +59,7 @@ public class RnetReverseRequestsListener : IRequestsListener
 
     private void Dispatcher()
     {
+        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- entered");
         // Introduce ourselves to the proxy
         OverTheWireRequest intro = new OverTheWireRequest
         {
@@ -69,7 +78,7 @@ public class RnetReverseRequestsListener : IRequestsListener
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
             var request = RnetProtocolParser.Parse(client);
-            if(request == null)
+            if (request == null)
                 continue;
 
             void RespondFunc(string body)
@@ -122,12 +131,14 @@ public class RnetRequestsListener : IRequestsListener
 
     public RnetRequestsListener(int listenPort)
     {
+        Logger.Debug($"[RnetRequestsListener] ctor() port: {listenPort}");
         _listener = new TcpListener(IPAddress.Any, listenPort);
     }
 
 
     public void Start()
     {
+        Logger.Debug("[RnetRequestsListener] Start()");
         _stayAlive.Set();
         _listener.Start();
         _task = Task.Run(Dispatcher);
@@ -140,6 +151,8 @@ public class RnetRequestsListener : IRequestsListener
     }
     private void Dispatcher()
     {
+        Logger.Debug("[RnetRequestsListener] Dispatcher() -- entered");
+
         // Using a timeout we can make sure not to block if the
         // 'stayAlive' state changes to "reset" (which means we should die)
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))

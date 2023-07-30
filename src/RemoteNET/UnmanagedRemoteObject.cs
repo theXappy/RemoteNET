@@ -7,7 +7,7 @@ using ScubaDiver.API.Interactions.Dumps;
 
 namespace RemoteNET;
 
-public class UnmanagedRemoteObject : IRemoteObject
+public class UnmanagedRemoteObject : RemoteObject
 {
     private static int NextIndex = 1;
     public int Index;
@@ -18,7 +18,7 @@ public class UnmanagedRemoteObject : IRemoteObject
 
     private readonly Dictionary<Delegate, DiverCommunicator.LocalEventCallback> _eventCallbacksAndProxies;
 
-    public ulong RemoteToken => _ref.Token;
+    public override ulong RemoteToken => _ref.Token;
 
     internal UnmanagedRemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
     {
@@ -28,12 +28,12 @@ public class UnmanagedRemoteObject : IRemoteObject
         _eventCallbacksAndProxies = new Dictionary<Delegate, DiverCommunicator.LocalEventCallback>();
     }
 
-    public Type GetRemoteType()
+    public override Type GetRemoteType()
     {
         return _type ??= _app.GetRemoteType(_ref.GetTypeDump());
     }
 
-    public dynamic Dynamify()
+    public override dynamic Dynamify()
     {
         // Adding fields 
         ManagedTypeDump managedTypeDump = _ref.GetTypeDump();
@@ -42,7 +42,7 @@ public class UnmanagedRemoteObject : IRemoteObject
         return factory.Create(_app, this, managedTypeDump);
     }
 
-    public ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
+    public override ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
     {
         throw new NotImplementedException();
     }

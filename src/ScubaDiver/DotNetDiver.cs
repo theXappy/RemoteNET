@@ -65,12 +65,15 @@ namespace ScubaDiver
             Logger.Debug("[DotNetDiver] Newtonsoft.Json's module path: " + nsJson.Location);
 
             // Start session
+            Logger.Debug("[DotNetDiver] Refreshing runtime...");
             RefreshRuntime();
+            Logger.Debug("[DotNetDiver] Refreshed runtime");
 
             endpointsMonitor = Task.Run(CallbacksEndpointsMonitor);
 
             // This will runt the requests listener
             base.Start();
+            Logger.Debug("[DotNetDiver] Start() -- returning");
         }
 
         protected void CallbacksEndpointsMonitor()

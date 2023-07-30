@@ -48,7 +48,16 @@ namespace ScubaDiver.API
         {
             queryParams ??= new();
 
-            using TcpClient client = new TcpClient(_hostname, DiverPort);
+            TcpClient client = new TcpClient();
+            if (IPAddress.TryParse(_hostname, out IPAddress? ip))
+            {
+                client.Connect(new IPEndPoint(ip, DiverPort));
+            }
+            else
+            {
+                client.Connect(_hostname, DiverPort);
+            }
+
             OverTheWireRequest request = new OverTheWireRequest()
             {
                 RequestId = Interlocked.Increment(ref _requestId),

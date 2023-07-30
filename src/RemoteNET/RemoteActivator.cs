@@ -20,13 +20,13 @@ namespace RemoteNET
         }
 
 
-        public RemoteObject CreateInstance(Type t) => CreateInstance(t, new object[0]);
-        public RemoteObject CreateInstance(Type t, params object[] parameters)
+        public ManagedRemoteObject CreateInstance(Type t) => CreateInstance(t, new object[0]);
+        public ManagedRemoteObject CreateInstance(Type t, params object[] parameters)
             => CreateInstance(t.Assembly.FullName, t.FullName, parameters);
 
-        public RemoteObject CreateInstance(string typeFullName, params object[] parameters)
+        public ManagedRemoteObject CreateInstance(string typeFullName, params object[] parameters)
             => CreateInstance(null, typeFullName, parameters);
-        public RemoteObject CreateInstance(string assembly, string typeFullName, params object[] parameters)
+        public ManagedRemoteObject CreateInstance(string assembly, string typeFullName, params object[] parameters)
         {
             object[] paramsNoEnums = parameters.ToArray();
             for (int i = 0; i < paramsNoEnums.Length; i++)
@@ -53,6 +53,6 @@ namespace RemoteNET
             return remoteObject;
         }
 
-        public RemoteObject CreateInstance<T>() => CreateInstance(typeof(T));
+        public ManagedRemoteObject CreateInstance<T>() => CreateInstance(typeof(T));
     }
 }

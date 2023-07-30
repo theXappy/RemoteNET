@@ -67,8 +67,10 @@ namespace ScubaDiver
 
         public virtual void Start()
         {
+            Logger.Debug("[DiverBase] Start() -- entering");
             _listener.RequestReceived += HandleDispatchedRequest;
             _listener.Start();
+            Logger.Debug("[DiverBase] Start() -- returning");
         }
         protected virtual void CallbacksEndpointsMonitor()
         {

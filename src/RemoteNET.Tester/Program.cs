@@ -66,7 +66,7 @@ namespace ScubaDiver.Tester
                 break;
             }
 
-            List<RemoteObject> remoteObjects = new();
+            List<ManagedRemoteObject> remoteObjects = new();
             while (true)
             {
                 if (DoSingleMenu(remoteApp, unmanRemoteApp, remoteObjects))
@@ -76,7 +76,7 @@ namespace ScubaDiver.Tester
             remoteApp.Dispose();
         }
 
-        private static bool DoSingleMenu(ManagedRemoteApp remoteApp, UnmanagedRemoteApp unmanRemoteApp, List<RemoteObject> remoteObjects)
+        private static bool DoSingleMenu(ManagedRemoteApp remoteApp, UnmanagedRemoteApp unmanRemoteApp, List<ManagedRemoteObject> remoteObjects)
         {
             Console.WriteLine("Menu:");
             Console.WriteLine("2. Get Remote Object");
@@ -114,7 +114,7 @@ namespace ScubaDiver.Tester
                             {
                                 try
                                 {
-                                    RemoteObject remoteObject = remoteApp.GetRemoteObject(addr, typeName);
+                                    ManagedRemoteObject remoteObject = remoteApp.GetRemoteObject(addr, typeName);
                                     remoteObjects.Add(remoteObject);
                                     Console.WriteLine($"Get back this object: {remoteObject}");
                                     Console.WriteLine($"This object's local index is {remoteObjects.IndexOf(remoteObject)}");
@@ -183,7 +183,7 @@ namespace ScubaDiver.Tester
                             var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
                             foreach (CandidateObject candidateRsa in rsaProviderCandidates)
                             {
-                                RemoteObject rsaProv = (RemoteObject)remoteApp.GetRemoteObject(candidateRsa);
+                                ManagedRemoteObject rsaProv = (ManagedRemoteObject)remoteApp.GetRemoteObject(candidateRsa);
                                 dynamic dynamicRsaProv = rsaProv.Dynamify();
                                 // Calling remote `ExportParameters`.
                                 // First parameter (true) indicates we want the private key.
@@ -209,7 +209,7 @@ namespace ScubaDiver.Tester
                             }
                             else
                             {
-                                RemoteObject remoteObj = remoteObjects[(int)index];
+                                ManagedRemoteObject remoteObj = remoteObjects[(int)index];
                                 dynamic dro = remoteObj.Dynamify();
                                 Action<dynamic, dynamic> callback = new((dynamic arg1, dynamic arg2) => Console.WriteLine("INVOKED!!"));
 

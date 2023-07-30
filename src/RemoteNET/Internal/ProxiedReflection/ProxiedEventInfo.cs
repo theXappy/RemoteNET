@@ -8,12 +8,12 @@ namespace RemoteNET.Internal.ProxiedReflection
     {
         public ProxiedMemberType Type => ProxiedMemberType.Event;
 
-        private readonly RemoteObject _ro;
+        private readonly ManagedRemoteObject _ro;
         private string Name { get; set; }
         private List<Type> ArgumentsTypes { get; set; }
 
 
-        public ProxiedEventInfo(RemoteObject ro, string name, List<Type> args)
+        public ProxiedEventInfo(ManagedRemoteObject ro, string name, List<Type> args)
         {
             this._ro = ro;
             this.Name = name;

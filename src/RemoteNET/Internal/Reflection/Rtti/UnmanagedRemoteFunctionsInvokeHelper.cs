@@ -24,13 +24,13 @@ namespace RemoteNET.RttiReflection
             {
                 return ObjectOrRemoteAddress.FromObj(parameter);
             }
-            else if (parameter is IRemoteObject remoteArg)
+            else if (parameter is RemoteObject remoteArg)
             {
                 return ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetRemoteType().FullName);
             }
             else if (parameter is DynamicRemoteObject dro)
             {
-                IRemoteObject originRemoteObject = dro.__ro;
+                RemoteObject originRemoteObject = dro.__ro;
                 return ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetRemoteType().FullName);
             }
             else if (parameter is Type t)
@@ -41,7 +41,7 @@ namespace RemoteNET.RttiReflection
             {
                 throw new Exception(
                     $"{nameof(RemoteRttiMethodInfo)}.{nameof(Invoke)} only works with primitive (int, " +
-                    $"double, string,...) or remote (in {nameof(IRemoteObject)}) parameters. " +
+                    $"double, string,...) or remote (in {nameof(RemoteObject)}) parameters. " +
                     $"One of the parameter was of unsupported type {parameter.GetType()}");
             }
         }
@@ -101,7 +101,7 @@ namespace RemoteNET.RttiReflection
             }
             else
             {
-                IRemoteObject ro = app.GetRemoteObject(oora.RemoteAddress, oora.Type);
+                RemoteObject ro = app.GetRemoteObject(oora.RemoteAddress, oora.Type);
                 return ro.Dynamify();
             }
         }

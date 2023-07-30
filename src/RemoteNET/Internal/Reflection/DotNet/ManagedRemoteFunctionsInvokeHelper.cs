@@ -22,13 +22,13 @@ namespace RemoteNET.Internal.Reflection.DotNet
             {
                 return ObjectOrRemoteAddress.FromObj(parameter);
             }
-            else if (parameter is RemoteObject remoteArg)
+            else if (parameter is ManagedRemoteObject remoteArg)
             {
                 return ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetRemoteType().FullName);
             }
             else if (parameter is DynamicRemoteObject dro)
             {
-                IRemoteObject originRemoteObject = dro.__ro;
+                RemoteObject originRemoteObject = dro.__ro;
                 return ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetRemoteType().FullName);
             }
             else if (parameter is Type t)
@@ -39,7 +39,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             {
                 throw new Exception(
                     $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only works with primitive (int, " +
-                    $"double, string,...) or remote (in {nameof(RemoteObject)}) parameters. " +
+                    $"double, string,...) or remote (in {nameof(ManagedRemoteObject)}) parameters. " +
                     $"One of the parameter was of unsupported type {parameter.GetType()}");
             }
         }
@@ -96,10 +96,10 @@ namespace RemoteNET.Internal.Reflection.DotNet
             else
             {
                 // obj is NOT null. Make sure it's a RemoteObject.
-                if (!(obj is RemoteObject ro))
+                if (!(obj is ManagedRemoteObject ro))
                 {
                     throw new NotImplementedException(
-                        $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(RemoteObject)} targets at the moment.");
+                        $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(ManagedRemoteObject)} targets at the moment.");
                 }
                 (hasResults, oora) = ro.InvokeMethod(funcName, genericArgsFullNames, remoteParams);
             }
@@ -116,7 +116,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
             else
             {
-                RemoteObject ro = app.GetRemoteObject(oora.RemoteAddress, oora.Type);
+                ManagedRemoteObject ro = app.GetRemoteObject(oora.RemoteAddress, oora.Type);
                 return ro.Dynamify();
             }
         }

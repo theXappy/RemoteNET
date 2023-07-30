@@ -87,7 +87,7 @@ namespace RemoteNET.Common
                 }
                 else if(instance.IsRemoteAddress)
                 {
-                    IRemoteObject roInstance = this._app.GetRemoteObject(instance.RemoteAddress, instance.Type);
+                    RemoteObject roInstance = this._app.GetRemoteObject(instance.RemoteAddress, instance.Type);
                     droInstance = roInstance.Dynamify();
                 }
                 else
@@ -119,7 +119,7 @@ namespace RemoteNET.Common
 
                     // We are expecting a single arg which is a REMOTE array of objects (object[]) and we need to flatten it
                     // into several (Dynamic) Remote Objects in a LOCAL array of objects.
-                    IRemoteObject ro = _app.GetRemoteObject(args[0].RemoteAddress, args[0].Type);
+                    RemoteObject ro = _app.GetRemoteObject(args[0].RemoteAddress, args[0].Type);
                     dynamic dro = ro.Dynamify();
                     if (!ro.GetRemoteType().IsArray)
                     {

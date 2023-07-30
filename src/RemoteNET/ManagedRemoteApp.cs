@@ -17,7 +17,7 @@ namespace RemoteNET
         internal class RemoteObjectsCollection
         {
             // The WeakReferences are to RemoteObject
-            private readonly Dictionary<ulong, WeakReference<RemoteObject>> _pinnedAddressesToRemoteObjects;
+            private readonly Dictionary<ulong, WeakReference<ManagedRemoteObject>> _pinnedAddressesToRemoteObjects;
             private readonly object _lock = new object();
 
             private readonly ManagedRemoteApp _app;
@@ -25,10 +25,10 @@ namespace RemoteNET
             public RemoteObjectsCollection(ManagedRemoteApp app)
             {
                 _app = app;
-                _pinnedAddressesToRemoteObjects = new Dictionary<ulong, WeakReference<RemoteObject>>();
+                _pinnedAddressesToRemoteObjects = new Dictionary<ulong, WeakReference<ManagedRemoteObject>>();
             }
 
-            private RemoteObject GetRemoteObjectUncached(ulong remoteAddress, string typeName, int? hashCode = null)
+            private ManagedRemoteObject GetRemoteObjectUncached(ulong remoteAddress, string typeName, int? hashCode = null)
             {
                 ObjectDump od;
                 ManagedTypeDump td;
@@ -43,14 +43,14 @@ namespace RemoteNET
                 }
 
 
-                var remoteObject = new RemoteObject(new RemoteObjectRef(od, td, _app._managedCommunicator), _app);
+                var remoteObject = new ManagedRemoteObject(new RemoteObjectRef(od, td, _app._managedCommunicator), _app);
                 return remoteObject;
             }
 
-            public RemoteObject GetRemoteObject(ulong address, string typeName, int? hashcode = null)
+            public ManagedRemoteObject GetRemoteObject(ulong address, string typeName, int? hashcode = null)
             {
-                RemoteObject ro;
-                WeakReference<RemoteObject> weakRef;
+                ManagedRemoteObject ro;
+                WeakReference<ManagedRemoteObject> weakRef;
                 // Easiert way - Non-collected and previouslt obtained object ("Cached")
                 if (_pinnedAddressesToRemoteObjects.TryGetValue(address, out weakRef) &&
                     weakRef.TryGetTarget(out ro))
@@ -85,7 +85,7 @@ namespace RemoteNET
                     // Get remote
                     ro = this.GetRemoteObjectUncached(address, typeName, hashcode);
                     // Add to cache
-                    weakRef = new WeakReference<RemoteObject>(ro);
+                    weakRef = new WeakReference<ManagedRemoteObject>(ro);
                     _pinnedAddressesToRemoteObjects[ro.RemoteToken] = weakRef;
                 }
 
@@ -226,7 +226,7 @@ namespace RemoteNET
         // Getting Remote Objects
         //
 
-        public override RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
+        public override ManagedRemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
         {
             return _remoteObjects.GetRemoteObject(remoteAddress, typeName, hashCode);
         }

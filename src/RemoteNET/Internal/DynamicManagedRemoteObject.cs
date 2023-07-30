@@ -28,7 +28,7 @@ namespace RemoteNET.Internal
 
     public class DynamicManagedRemoteObject : DynamicRemoteObject, IEnumerable
     {
-        public DynamicManagedRemoteObject(RemoteApp ra, IRemoteObject ro) : base(ra, ro)
+        public DynamicManagedRemoteObject(RemoteApp ra, RemoteObject ro) : base(ra, ro)
         {
         }
 

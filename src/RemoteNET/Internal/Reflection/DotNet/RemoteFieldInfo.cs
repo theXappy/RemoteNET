@@ -65,8 +65,8 @@ namespace RemoteNET.Internal.Reflection.DotNet
             else
             {
                 // obj is NOT null. Make sure it's a RemoteObject or DynamicRemoteObject.
-                RemoteObject ro = obj as RemoteObject;
-                ro ??= (obj as DynamicRemoteObject)?.__ro as RemoteObject;
+                ManagedRemoteObject ro = obj as ManagedRemoteObject;
+                ro ??= (obj as DynamicRemoteObject)?.__ro as ManagedRemoteObject;
                 if (ro != null)
                 {
                     oora = ro.GetField(Name);
@@ -74,13 +74,13 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 else
                 {
                     throw new NotImplementedException(
-                        $"{nameof(RemoteFieldInfo)}.{nameof(GetValue)} only supports {nameof(RemoteObject)} or {nameof(DynamicRemoteObject)} targets.");
+                        $"{nameof(RemoteFieldInfo)}.{nameof(GetValue)} only supports {nameof(ManagedRemoteObject)} or {nameof(DynamicRemoteObject)} targets.");
                 }
             }
 
             if (oora == null)
             {
-                string offendingFunc = obj == null ? $"{nameof(DiverCommunicator)}.{nameof(DiverCommunicator.GetField)}" : $"{nameof(RemoteObject)}.{nameof(RemoteObject.GetField)}";
+                string offendingFunc = obj == null ? $"{nameof(DiverCommunicator)}.{nameof(DiverCommunicator.GetField)}" : $"{nameof(ManagedRemoteObject)}.{nameof(ManagedRemoteObject.GetField)}";
                 throw new Exception($"Could not get {nameof(ObjectOrRemoteAddress)} object. Seems like invoking {offendingFunc} returned null.");
             }
             else
@@ -134,8 +134,8 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
 
             // obj is NOT null. Make sure it's a RemoteObject or DynamicRemoteObject.
-            RemoteObject ro = obj as RemoteObject;
-            ro ??= (obj as DynamicRemoteObject)?.__ro as RemoteObject;
+            ManagedRemoteObject ro = obj as ManagedRemoteObject;
+            ro ??= (obj as DynamicRemoteObject)?.__ro as ManagedRemoteObject;
             if (ro != null)
             {
                 ro.SetField(Name, remoteNewValue);
@@ -143,7 +143,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
 
             throw new NotImplementedException(
-                $"{nameof(RemoteFieldInfo)}.{nameof(SetValue)} only supports {nameof(RemoteObject)} or {nameof(DynamicRemoteObject)} targets.");
+                $"{nameof(RemoteFieldInfo)}.{nameof(SetValue)} only supports {nameof(ManagedRemoteObject)} or {nameof(DynamicRemoteObject)} targets.");
         }
 
         public override FieldAttributes Attributes { get; }
