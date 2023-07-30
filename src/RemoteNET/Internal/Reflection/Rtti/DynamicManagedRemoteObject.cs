@@ -17,7 +17,7 @@ namespace RemoteNET.RttiReflection
 
     public class DynamicUnmanagedRemoteObject : DynamicRemoteObject
     {
-        public DynamicUnmanagedRemoteObject(RemoteApp ra, IRemoteObject ro) : base(ra, ro)
+        public DynamicUnmanagedRemoteObject(RemoteApp ra, RemoteObject ro) : base(ra, ro)
         {
         }
     }

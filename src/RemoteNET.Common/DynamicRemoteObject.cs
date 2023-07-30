@@ -143,7 +143,7 @@ namespace RemoteNET.Internal
         }
 
         public RemoteApp __ra;
-        public IRemoteObject __ro;
+        public RemoteObject __ro;
         public RemoteTypeBase __type;
 
 
@@ -152,7 +152,7 @@ namespace RemoteNET.Internal
         private List<MemberInfo> __membersInner = null;
         public IEnumerable<MemberInfo> __members => MindFuck();
 
-        public DynamicRemoteObject(RemoteApp ra, IRemoteObject ro)
+        public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
         {
             __ra = ra;
             __ro = ro;

@@ -40,8 +40,8 @@ namespace RemoteNET
         public virtual Type GetRemoteType(ManagedTypeDump managedTypeDump) => GetRemoteType(managedTypeDump.Type, managedTypeDump.Assembly);
 
 
-        public abstract IRemoteObject  GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null);
-        public virtual IRemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.TypeFullName, candidate.HashCode);
+        public abstract RemoteObject  GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null);
+        public virtual RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.TypeFullName, candidate.HashCode);
 
         /// <summary>
         /// Loads an assembly into the remote process

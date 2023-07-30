@@ -45,7 +45,7 @@ namespace RemoteNET.Utils
     {
         public static DebuggableRemoteObject AsDebuggable(this DynamicRemoteObject dro) =>
             new DebuggableRemoteObject(dro);
-        public static DebuggableRemoteObject AsDebuggable(this RemoteObject ro) =>
+        public static DebuggableRemoteObject AsDebuggable(this ManagedRemoteObject ro) =>
             new DebuggableRemoteObject(ro.Dynamify());
     }
 }

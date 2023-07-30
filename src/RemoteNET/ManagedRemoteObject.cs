@@ -7,7 +7,7 @@ using ScubaDiver.API.Interactions.Dumps;
 
 namespace RemoteNET
 {
-    public class RemoteObject : IRemoteObject
+    public class ManagedRemoteObject : RemoteObject
     {
         private static int NextIndex = 1;
         public int Index;
@@ -18,9 +18,9 @@ namespace RemoteNET
 
         private readonly Dictionary<Delegate, DiverCommunicator.LocalEventCallback> _eventCallbacksAndProxies;
 
-        public ulong RemoteToken => _ref.Token;
+        public override ulong RemoteToken => _ref.Token;
 
-        internal RemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
+        internal ManagedRemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
         {
             Index = NextIndex++;
             _app = remoteApp;
@@ -32,7 +32,7 @@ namespace RemoteNET
         /// Gets the type of the proxied remote object, in the remote app. (This does not reutrn `typeof(RemoteObject)`)
         /// </summary>
         public new Type GetType() => GetRemoteType();
-        public Type GetRemoteType()
+        public override Type GetRemoteType()
         {
             return _type ??= _app.GetRemoteType(_ref.GetTypeDump());
         }
@@ -59,7 +59,7 @@ namespace RemoteNET
             return (true, invokeRes.ReturnedObjectOrAddress);
         }
 
-        public dynamic Dynamify()
+        public override dynamic Dynamify()
         {
             // Adding fields 
             ManagedTypeDump managedTypeDump = _ref.GetTypeDump();
@@ -69,7 +69,7 @@ namespace RemoteNET
         }
 
 
-        ~RemoteObject()
+        ~ManagedRemoteObject()
         {
             _ref?.RemoteRelease();
             _ref = null;
@@ -95,7 +95,7 @@ namespace RemoteNET
                 DynamicRemoteObject[] droParameters = new DynamicRemoteObject[args.Length];
                 for (int i = 0; i < args.Length; i++)
                 {
-                    IRemoteObject ro = _app.GetRemoteObject(args[i].RemoteAddress, args[i].Type);
+                    RemoteObject ro = _app.GetRemoteObject(args[i].RemoteAddress, args[i].Type);
                     DynamicRemoteObject dro = ro.Dynamify() as DynamicRemoteObject;
 
                     droParameters[i] = dro;
@@ -122,7 +122,7 @@ namespace RemoteNET
             }
         }
 
-        public ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
+        public override ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
         {
             return  _ref.GetItem(key);
         }

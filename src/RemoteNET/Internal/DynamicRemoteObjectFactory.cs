@@ -11,7 +11,7 @@ namespace RemoteNET.Internal
 {
     public class DynamicRemoteObjectFactory
     {
-        public DynamicRemoteObject Create(RemoteApp rApp, IRemoteObject remoteObj, ManagedTypeDump managedTypeDump)
+        public DynamicRemoteObject Create(RemoteApp rApp, RemoteObject remoteObj, ManagedTypeDump managedTypeDump)
         {
             if(rApp is ManagedRemoteApp)
                 return new DynamicManagedRemoteObject(rApp, remoteObj);
