@@ -353,15 +353,17 @@ namespace ScubaDiver
                 }).ToList();
             }
 
-
-            var assm = matchingAssemblies.Single();
             List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
-            foreach (var type in _trickster.ScannedTypes[assm])
+            if (matchingAssemblies.Count != 0)
             {
-                types.Add(new TypesDump.TypeIdentifiers()
+                var assm = matchingAssemblies.Single();
+                foreach (var type in _trickster.ScannedTypes[assm])
                 {
-                    TypeName = $"{assm.Name}!{type.Name}"
-                });
+                    types.Add(new TypesDump.TypeIdentifiers()
+                    {
+                        TypeName = $"{assm.Name}!{type.Name}"
+                    });
+                }
             }
 
             TypesDump dump = new()
