@@ -8,10 +8,11 @@ Basically this library lets you mess with objects of any other .NET app without 
 ### 👉 Try It Now: Download the [RemoteNET Spy](https://github.com/theXappy/rnet-kit) app to see this lib in action! 👈
 
 
-## **Supported versions**  
+## **Supported Targets**  
 ✅ .NET 5/6/7  
 ✅ .NET Core 3.0/3.1  
-✅ .NET Framework 4.5/4.6/4.7/4.8 (incl. subversions)
+✅ .NET Framework 4.5/4.6/4.7/4.8 (incl. subversions)  
+✅ MSVC-compiled C++ (experimental)  
 
 ## Including the library in your project
 There are 2 ways to get the library:
