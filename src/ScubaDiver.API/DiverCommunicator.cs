@@ -67,6 +67,14 @@ namespace ScubaDiver.API
             };
             RnetProtocolParser.Write(client, request);
             OverTheWireRequest response = RnetProtocolParser.Parse(client);
+
+            // Done with the client. Peacefully close the TCP connection
+            try
+            {
+                client.Close();
+            }
+            catch { }
+
             if (response == null)
             {
                 throw new Exception(
