@@ -77,7 +77,7 @@ namespace RemoteNET
 
         public override string ToString()
         {
-            return $"RemoteObject. Type: {_type?.FullName ?? "UNK"} Reference: [{_ref}]";
+            return $"{nameof(ManagedRemoteObject)}. Type: {_type?.FullName ?? "UNK"} Reference: [{_ref}]";
         }
 
         public ObjectOrRemoteAddress GetField(string name)
