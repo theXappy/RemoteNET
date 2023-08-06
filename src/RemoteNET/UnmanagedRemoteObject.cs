@@ -56,4 +56,9 @@ public class UnmanagedRemoteObject : RemoteObject
         }
         return (true, invokeRes.ReturnedObjectOrAddress);
     }
+
+    public override string ToString()
+    {
+        return $"{nameof(UnmanagedRemoteObject)}. Type: {_type?.FullName ?? "UNK"} Reference: [{_ref}]";
+    }
 }

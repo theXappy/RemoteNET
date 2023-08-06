@@ -13,7 +13,7 @@ namespace RemoteNET.RttiReflection
     /// Function calls are redirected to functions calls in the remote process on the remote object
     /// 
     /// </summary>
-    [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "} (Managed)")]
+    [DebuggerDisplay("Dynamic Proxy of {" + nameof(__ro) + "} (Unmanaged)")]
 
     public class DynamicUnmanagedRemoteObject : DynamicRemoteObject
     {
