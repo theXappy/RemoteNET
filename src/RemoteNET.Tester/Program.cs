@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using RemoteNET;
 using RemoteNET.Common;
+using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Hooking;
 using static RemoteNET.Utils.Lambda;
@@ -455,7 +456,7 @@ namespace ScubaDiver.Tester
                             Console.WriteLine($"Methods");
                             foreach (var method in res.GetMethods())
                             {
-                                Console.WriteLine("Method: " + method.Name);
+                                Console.WriteLine("Method: " + (method as RemoteRttiMethodInfo).UndecoratedSignature);
                             }
                         }
                         break;

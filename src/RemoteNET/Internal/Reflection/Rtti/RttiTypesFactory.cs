@@ -179,12 +179,12 @@ namespace RemoteNET.RttiReflection
                 Lazy<Type> returnTypeFactory = new Lazy<Type>(() =>
                 {
                     // TODO: Actual resolve
-                    return new DummyGenericType(func.ReturnTypeFullName);
+                    return new DummyRttiType(func.ReturnTypeFullName ?? func.ReturnTypeName);
                 });
                 LazyRemoteTypeResolver returnTypeResolver = new LazyRemoteTypeResolver(returnTypeFactory,
                     null,
                     func.ReturnTypeFullName,
-                    func.ReturnTypeFullName);
+                    func.ReturnTypeName);
 
                 if (areConstructors)
                 {
