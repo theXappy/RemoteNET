@@ -897,7 +897,7 @@ namespace ScubaDiver
             if (request.Parameters.Any())
             {
                 Logger.Debug($"[MsvcDiver] Invoking with parameters. Count: {request.Parameters.Count}");
-                paramsList = request.Parameters.Select(PrimitivesEncoder.Decode).ToList();
+                paramsList = request.Parameters.Select(ParseParameterObject).ToList();
             }
             else
             {
@@ -1039,6 +1039,31 @@ namespace ScubaDiver
             };
 
             return JsonConvert.SerializeObject(invocResults);
+        }
+
+        private object ParseParameterObject(ObjectOrRemoteAddress param)
+        {
+            switch (param)
+            {
+                case { IsNull: true }:
+                    return null;
+                case { IsType: true }:
+                    throw new NotImplementedException(
+                        "A ObjectOrRemoteAddress with IsType=True was sent to a MSVC Diver.");
+                case { IsRemoteAddress: false }:
+                    return PrimitivesEncoder.Decode(param.EncodedObject, param.Type);
+                case { IsRemoteAddress: true }:
+                    // Look in freezer?
+                    //if (_freezer.TryGetPinnedObject(param.RemoteAddress, out object pinnedObj))
+                    {
+                        return param.RemoteAddress;
+                    }
+                    break;
+            }
+
+            Debugger.Launch();
+            throw new NotImplementedException(
+                $"Don't know how to parse this parameter into an object of type `{param.Type}`");
         }
 
         protected override string MakeGetFieldResponse(ScubaDiverMessage arg)
