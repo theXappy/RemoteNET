@@ -87,8 +87,16 @@ namespace RemoteNET.Common
                 }
                 else if(instance.IsRemoteAddress)
                 {
-                    RemoteObject roInstance = this._app.GetRemoteObject(instance.RemoteAddress, instance.Type);
-                    droInstance = roInstance.Dynamify();
+                    try
+                    {
+                        RemoteObject roInstance = this._app.GetRemoteObject(instance.RemoteAddress, instance.Type);
+                        droInstance = roInstance.Dynamify();
+                    }
+                    catch(Exception ex)
+                    {
+                        // HACK: If we failed to resolve a remote object, we just return it's pointer as a long...
+                        droInstance = instance.RemoteAddress;
+                    }
                 }
                 else
                 {
