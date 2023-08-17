@@ -1,4 +1,4 @@
-﻿using ScubaDiver.API.Interactions.Dumps;
+using ScubaDiver.API.Interactions.Dumps;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -487,37 +487,31 @@ namespace ScubaDiver
                 // (Not checking the first one, since it OUR vftable)
                 if (i != 0 && dict.TryGetValue(currAddress, out entryMatchingExport))
                 {
-                    Console.WriteLine($"[AnalyzeVftable] Found new record backked by export. Name: {entryMatchingExport.Name}");
-
                     if (!entryMatchingExport.TryUndecorate(module, out UndecoratedSymbol undecSymbol))
                     {
-                        Console.WriteLine($"[AnalyzeVftable] Failed to undecorate. Name: {entryMatchingExport.Name}");
+                        Logger.Debug($"[AnalyzeVftable] Failed to undecorate. Name: {entryMatchingExport.Name}");
                         continue;
                     }
 
                     if (undecSymbol.UndecoratedName.EndsWith("`vftable'"))
                     {
-                        Console.WriteLine($"[AnalyzeVftable] Found next type's vftable function: {entryMatchingExport.Name}");
                         nextVftableFound = true;
                         break;
                     }
                 }
 
-
-                Console.WriteLine($"[AnalyzeVftable][i={i}] Trying to read a nuint from address: 0x{currAddress:x16}");
                 bool readNext = scanner.TryRead(currAddress, out nuint entryContent);
                 if (!readNext)
                     break;
 
                 if (dict.TryGetValue(entryContent, out entryMatchingExport))
                 {
-                    Console.WriteLine($"[AnalyzeVftable] Found new record backked by export. Name: {entryMatchingExport.Name}");
                     if (!entryMatchingExport.TryUndecorate(module, out UndecoratedSymbol undecSymbol))
                     {
-                        Console.WriteLine($"[AnalyzeVftable] Failed to undecorate. Name: {entryMatchingExport.Name}");
+                        Logger.Debug($"[AnalyzeVftable] Failed to undecorate. Name: {entryMatchingExport.Name}");
                         continue;
                     }
-                    Console.WriteLine($"[AnalyzeVftable] Found new vftable function: {entryMatchingExport.Name}");
+
                     if (undecSymbol is UndecoratedFunction undecFunc)
                     {
                         HandleTypeFunction(undecFunc, null, null, virtualMethods);
@@ -525,15 +519,12 @@ namespace ScubaDiver
                 }
             }
 
-            Console.WriteLine($"[AnalyzeVftable] Loop ended. Num virtual funcs: {virtualMethods.Count}");
-            Console.WriteLine($"[AnalyzeVftable] nextVftableFound = {nextVftableFound}");
-
             if (nextVftableFound)
             {
-                Console.WriteLine($"[AnalyzeVftable] Adding {virtualMethods.Count} methods to the methods list");
                 return virtualMethods;
             }
 
+            Logger.Debug($"[AnalyzeVftable] Next vftable not found starting at {vftable.UndecoratedName}");
             return new List<ManagedTypeDump.TypeMethod>();
         }
 
