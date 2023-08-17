@@ -95,7 +95,7 @@ public unsafe class Trickster : IDisposable
         _is32Bit = is32Bit;
     }
 
-    private TypeInfo[] ScanTypesCore(string moduleName, nuint moduleBaseAddress, nuint moduleSize, nuint segmentBaseAddress, nuint segmentBSize)
+    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(string moduleName, nuint moduleBaseAddress, nuint moduleSize, nuint segmentBaseAddress, nuint segmentBSize)
     {
         List<TypeInfo> list = new();
 
@@ -127,7 +127,7 @@ public unsafe class Trickster : IDisposable
             }
         }
 
-        return typeInfoSeen ? list.ToArray() : Array.Empty<TypeInfo>();
+        return (typeInfoSeen, list);
     }
 
     private Dictionary<ModuleInfo, TypeInfo[]> ScanTypesCore()
@@ -157,22 +157,26 @@ public unsafe class Trickster : IDisposable
             var module = kvp.Key;
             var segments = kvp.Value;
 
+            bool typeInfoSeenInModule = false;
+            IEnumerable<TypeInfo> allModuleTypes = Array.Empty<TypeInfo>();
             foreach (ModuleSegment segment in segments)
             {
                 try
                 {
-                    var types = ScanTypesCore(module.Name, module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
-                    if (types.Length > 0)
-                    {
-                        if (!res.ContainsKey(module))
-                            res[module] = Array.Empty<TypeInfo>();
-                        res[module] = res[module].Concat(types).ToArray();
-                    }
+                    (bool typeInfoSeenInSeg, List<TypeInfo> types) = ScanTypesCore(module.Name, module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
+                    typeInfoSeenInModule = typeInfoSeenInModule || typeInfoSeenInSeg;
+                    allModuleTypes = allModuleTypes.Concat(types);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[Error] Couldn't scan for RTTI info in {module.Name}, EX: " + ex.GetType().Name);
                 }
+            }
+            if ( typeInfoSeenInModule && allModuleTypes.Any())
+            {
+                if (!res.ContainsKey(module))
+                    res[module] = Array.Empty<TypeInfo>();
+                res[module] = res[module].Concat(allModuleTypes).ToArray();
             }
         }
 
