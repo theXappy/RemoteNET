@@ -117,7 +117,7 @@ namespace ScubaDiver.API
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine("[Diver] Task faulted! Exception:");
+                        Console.WriteLine("[CallbacksListener] Error when process outoing request! Exception:");
                         Console.WriteLine(e);
                     }
                 }

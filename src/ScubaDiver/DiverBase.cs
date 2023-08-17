@@ -82,13 +82,13 @@ namespace ScubaDiver
                 {
                     endpoint = registeredMethodHookInfo.Value.Endpoint;
                     ReverseCommunicator reverseCommunicator = new(endpoint);
-                    Logger.Debug($"[DotNetDiver] Checking if callback client at {endpoint} is alive. Token = {registeredMethodHookInfo.Key}. Type = Method Hook");
+                    Logger.Debug($"[DiverBase] Checking if callback client at {endpoint} is alive. Token = {registeredMethodHookInfo.Key}. Type = Method Hook");
                     bool alive = reverseCommunicator.CheckIfAlive();
-                    Logger.Debug($"[DotNetDiver] Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) is alive = {alive}");
+                    Logger.Debug($"[DiverBase] Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) is alive = {alive}");
                     if (!alive)
                     {
                         Logger.Debug(
-                            $"[DotNetDiver] Dead Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) DROPPED!");
+                            $"[DiverBase] Dead Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) DROPPED!");
                         _remoteHooks.TryRemove(registeredMethodHookInfo.Key, out _);
                     }
                 }
@@ -180,7 +180,7 @@ namespace ScubaDiver
             {
                 return QuickError("Missing parameter 'address'");
             }
-            Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Called! Token: {token}");
+            Logger.Debug($"[DiverBase][MakeUnhookMethodResponse] Called! Token: {token}");
 
             if (_remoteHooks.TryRemove(token, out RegisteredManagedMethodHookInfo rmhi))
             {
@@ -188,12 +188,12 @@ namespace ScubaDiver
                 return "{\"status\":\"OK\"}";
             }
 
-            Logger.Debug($"[DotNetDiver][MakeUnhookMethodResponse] Unknown token for event callback subscription. Token: {token}");
+            Logger.Debug($"[DiverBase][MakeUnhookMethodResponse] Unknown token for event callback subscription. Token: {token}");
             return QuickError("Unknown token for event callback subscription");
         }
         protected string MakeHookMethodResponse(ScubaDiverMessage arg)
         {
-            Logger.Debug("[DotNetDiver] Got Hook Method request!");
+            Logger.Debug("[DiverBase] Got Hook Method request!");
             if (string.IsNullOrEmpty(arg.Body))
                 return QuickError("Missing body");
 
@@ -215,7 +215,7 @@ namespace ScubaDiver
             // We're all good regarding the signature!
             // assign subscriber unique id
             int token = AssignCallbackToken();
-            Logger.Debug($"[DotNetDiver] Hook Method - Assigned Token: {token}");
+            Logger.Debug($"[DiverBase] Hook Method - Assigned Token: {token}");
 
 
             // Preparing a proxy method that Harmony will invoke
@@ -233,7 +233,7 @@ namespace ScubaDiver
                 return skipOriginal;
             };
 
-            Logger.Debug($"[DotNetDiver] Hooking function {req.MethodName}...");
+            Logger.Debug($"[DiverBase] Hooking function {req.MethodName}...");
             Action unhookAction;
             try
             {
@@ -244,11 +244,11 @@ namespace ScubaDiver
                 // Hooking filed so we cleanup the Hook Info we inserted beforehand 
                 _remoteHooks.TryRemove(token, out _);
 
-                Logger.Debug($"[DotNetDiver] Failed to hook func {req.MethodName}. Exception: {ex}");
+                Logger.Debug($"[DiverBase] Failed to hook func {req.MethodName}. Exception: {ex}");
                 return QuickError($"Failed insert the hook for the function. HarmonyWrapper.AddHook failed. Exception: {ex}", ex.StackTrace);
             }
 
-            Logger.Debug($"[DotNetDiver] Hooked func {req.MethodName}!");
+            Logger.Debug($"[DiverBase] Hooked func {req.MethodName}!");
 
             // Keeping all hooking information aside so we can unhook later.
             _remoteHooks[token] = new RegisteredManagedMethodHookInfo()
