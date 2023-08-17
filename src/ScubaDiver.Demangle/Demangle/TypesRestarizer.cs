@@ -94,7 +94,8 @@ namespace ScubaDiver.Demangle.Demangle
                 var n = name;
                 name = null;
                 pointer.DataType.Accept(this);
-                sb.AppendFormat(" *");
+                // SS: Removed a space before the *
+                sb.AppendFormat("*");
                 name = n;
                 if (name != null)
                     sb.AppendFormat(" {0}", name);
