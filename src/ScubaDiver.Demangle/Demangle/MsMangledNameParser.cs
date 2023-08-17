@@ -73,6 +73,10 @@ namespace ScubaDiver.Demangle.Demangle
         }
         private bool IsFunction()
         {
+            // Optimization: If we call "Expect" it throws an exception...
+            if (str[i] != '?')
+                return false;
+
             Expect('?');
             string? basicName = ParseBasicName();
             if (basicName is null)
