@@ -29,13 +29,17 @@ public class DetoursNetWrapper
         hooksDict[callback] = generateMethodInfo;
     }
 
-    private void RemoveFromDicts(string decoratedTargetName, HookCallback callback)
+    private bool RemoveFromDicts(string decoratedTargetName, HookCallback callback, out MethodInfo generateMethodInfo)
     {
+        generateMethodInfo = null;
+        bool res = false;
         if (_hooksToGenMethod.TryGetValue(decoratedTargetName, out var hooksDict))
         {
-            hooksDict.TryRemove(callback, out MethodInfo generateMethodInfo);
-            _actualHooks.TryRemove(generateMethodInfo, out _);
+            res = hooksDict.TryRemove(callback, out generateMethodInfo) || 
+                  _actualHooks.TryRemove(generateMethodInfo, out _);
         }
+
+        return res;
     }
 
     public bool AddHook(UndecoratedFunction target, HookCallback callback)
@@ -68,9 +72,17 @@ public class DetoursNetWrapper
         return success;
     }
 
-    public void RemoveHook(UndecoratedFunction target, HookCallback callback)
+    public bool RemoveHook(UndecoratedFunction target, HookCallback callback)
     {
-        RemoveFromDicts(target.DecoratedName, callback);
+        IntPtr module = new IntPtr((long)target.Module.BaseAddress);
+        IntPtr targetFunc = new IntPtr(target.Address);
+
+        bool success = false;
+        if (RemoveFromDicts(target.DecoratedName, callback, out MethodInfo genMethodInfo))
+        {
+            success = Loader.UnHookMethod(module, targetFunc, genMethodInfo);
+        }
+        return success;
     }
 
     private static nuint SingeCallback(DetoursMethodGenerator.DetoursTrampoline tramp, object[] args)
