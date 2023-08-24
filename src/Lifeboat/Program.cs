@@ -6,11 +6,14 @@ using System.Net.Sockets;
 using System.Threading.Channels;
 using Newtonsoft.Json.Linq;
 using ScubaDiver.API.Protocol;
+using ScubaDiver.API.Protocol.SimpleHttp;
 
 namespace Lifeboat;
 
 public class Program
 {
+    private static EndPoint _diver = null;
+
     static bool HandleCommandLineArgs(string[] args, out int diverPort)
     {
         diverPort = 0;
@@ -41,26 +44,16 @@ public class Program
         return true;
     }
 
-    static void SendRejectRole(TcpClient client, int requestId, string error)
+    static void SendRejectRole(TcpClient client, string error)
     {
-        OverTheWireRequest introAccept = new OverTheWireRequest
-        {
-            UrlAbsolutePath = "/proxy_intro",
-            RequestId = requestId,
-            Body = $"{{\"status\":\"reject, {error}\"}}"
-        };
-        RnetProtocolParser.Write(client, introAccept);
+        HttpResponseSummary introReject = HttpResponseSummary.FromJson(HttpStatusCode.Unauthorized, $"{{\"status\":\"reject, {error}\"}}");
+        SimpleHttpProtocolParser.Write(client, introReject);
         client.GetStream().Flush();
     }
-    static void SendAcceptRole(int requestId, TcpClient client)
+    static void SendAcceptRole(TcpClient client)
     {
-        OverTheWireRequest introAccept = new OverTheWireRequest
-        {
-            UrlAbsolutePath = "/proxy_intro",
-            RequestId = requestId,
-            Body = "{\"status\":\"OK\"}"
-        };
-        RnetProtocolParser.Write(client, introAccept);
+        HttpResponseSummary introAccept = HttpResponseSummary.FromJson(HttpStatusCode.OK, "{\"status\":\"OK\"}");
+        SimpleHttpProtocolParser.Write(client, introAccept);
         client.GetStream().Flush();
     }
 
@@ -71,8 +64,6 @@ public class Program
         Console.WriteLine("  _______/_____\\_______\\_____   ");
         Console.WriteLine("  \\  Lifeboat    < < <       |   ");
         Console.WriteLine("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-
-        OverTheWireRequest msg;
 
         if (!HandleCommandLineArgs(args, out int port))
             return;
@@ -98,28 +89,29 @@ public class Program
             Log($"Waiting for diver...");
             TcpClient diverConnection = listener.AcceptTcpClient();
             Log($"Diver Suspect: {diverConnection.Client.RemoteEndPoint}");
-            OverTheWireRequest msg = RnetProtocolParser.Parse(diverConnection);
+            HttpRequestSummary msg = SimpleHttpProtocolParser.ReadRequest(diverConnection);
             if (msg == null)
             {
                 Log($"NOT a Diver: Connection close prematurely");
                 diverConnection.Close();
                 continue;
             }
-            if (msg.UrlAbsolutePath != "/proxy_intro" || msg.Body != "{\"role\":\"diver\"}")
+            if (msg.Url != "/proxy_intro" || msg.BodyString != "{\"role\":\"diver\"}")
             {
                 Log($"NOT a Diver: {diverConnection.Client.RemoteEndPoint}");
-                SendRejectRole(diverConnection, msg.RequestId, "No diver");
+                SendRejectRole(diverConnection, "No diver");
                 diverConnection.Close();
                 continue;
             }
 
-            SendAcceptRole(msg.RequestId, diverConnection);
+            SendAcceptRole(diverConnection);
             stage++;
-            Log($"Diver Found: {diverConnection.Client.RemoteEndPoint}");
+            _diver = diverConnection.Client.RemoteEndPoint;
+            Log($" ~~~~> Diver Found: {diverConnection.Client.RemoteEndPoint} <~~~~~");
 
             // Start the data transfer on the diver connection
-            var diverIn = new BlockingCollection<OverTheWireRequest>();
-            var diverOut = new BlockingCollection<OverTheWireRequest>();
+            var diverIn = new BlockingCollection<HttpRequestSummary>();
+            var diverOut = new BlockingCollection<HttpResponseSummary>();
             var diverReaderTask = Task.Run(() => Reader(diverConnection, diverOut));
             var diverWriterTask = Task.Run(() => Writer(diverConnection, diverIn));
             ManualResetEvent diverDied = new ManualResetEvent(true);
@@ -179,20 +171,21 @@ public class Program
         }
     }
 
-    public static void Reader(TcpClient client, BlockingCollection<OverTheWireRequest> outQueue, CancellationToken token = default)
+    public static void Reader<T>(TcpClient client, BlockingCollection<T> outQueue, CancellationToken token = default)
     {
+        Log(nameof(Reader), client, $"Reader Started. Type: {typeof(T).Name}");
         if (token == default)
             token = CancellationToken.None;
 
-        Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] TransferData == IN ==");
+        Log(nameof(Reader), client, $" TransferData == IN ==");
         while (client.Connected && !token.IsCancellationRequested)
         {
-            Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] waiting for more...");
-            OverTheWireRequest recv = RnetProtocolParser.Parse(client, token);
-            Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] New RECV message! ID: {recv?.RequestId}, PATH: {(recv?.UrlAbsolutePath ?? "null")}");
-            if (recv != null)
+            Log(nameof(Reader), client, $"waiting for more...");
+            T item = SimpleHttpProtocolParser.Read<T>(client);
+            Log(nameof(Reader), client, $"New RECV message!");
+            if (item != null)
             {
-                outQueue.Add(recv, token);
+                outQueue.Add(item, token);
             }
             else
             {
@@ -200,23 +193,32 @@ public class Program
                 break;
             }
         }
-        Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] TransferData == OUT ?!?!?!?!?! ==");
+        Log(nameof(Reader), client, $"TransferData == OUT ?!?!?!?!?! ==");
     }
 
-    public static void Writer(TcpClient client, BlockingCollection<OverTheWireRequest> inQueue, CancellationToken token = default)
+    public static void Writer<T>(TcpClient client, BlockingCollection<T> inQueue, CancellationToken token = default)
     {
+        Log(nameof(Writer), client, $"Writer Started. Type: {typeof(T).Name}");
         if (token == default)
             token = CancellationToken.None;
 
-        Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] TransferData == IN ==");
+        Log(nameof(Writer), client, $"TransferData == IN ==");
         while (client.Connected && !token.IsCancellationRequested)
         {
-            OverTheWireRequest toSend = inQueue.Take(token);
-            Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] New TO_SEND message! ID: {toSend?.RequestId}, PATH: {(toSend.UrlAbsolutePath ?? "null")}");
-            RnetProtocolParser.Write(client, toSend, token);
-            Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] Written!");
+            T toSend = inQueue.Take(token);
+            Log(nameof(Writer), client, $"New TO_SEND message!");
+
+            SimpleHttpProtocolParser.Write(client, toSend);
+            Log(nameof(Writer), client, $"Written!");
         }
-        Console.WriteLine($"[<->][{client?.Client?.RemoteEndPoint}] TransferData == OUT ?!?!?!?!?! ==");
+        Log(nameof(Writer), client, $"TransferData == OUT ?!?!?!?!?! ==");
+    }
+
+    private static void Log(string method, TcpClient client, string msg)
+    {
+        bool isDiver = client.Client.RemoteEndPoint == _diver;
+        string isDiverStr = isDiver ? "[ *DIVER* ]" : "";
+        Console.WriteLine($"[{client?.Client?.RemoteEndPoint}]{isDiverStr}[{method}] {msg}");
     }
 
 }
