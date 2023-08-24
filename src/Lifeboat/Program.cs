@@ -114,7 +114,6 @@ public class Program
             var diverOut = new BlockingCollection<HttpResponseSummary>();
             var diverReaderTask = Task.Run(() => Reader(diverConnection, diverOut));
             var diverWriterTask = Task.Run(() => Writer(diverConnection, diverIn));
-            ManualResetEvent diverDied = new ManualResetEvent(true);
             diverReaderTask.ContinueWith(t =>
             {
                 Log("DIVER READER DIED :(");
