@@ -50,7 +50,7 @@ public class DetoursNetWrapper
             return false;
         }
         // TODO: Is "nuint" return type always right here?
-        var tramp = DetoursMethodGenerator.GenerateMethod(target.NumArgs.Value, typeof(nuint), target.UndecoratedFullName, SingeCallback);
+        var tramp = DetoursMethodGenerator.GenerateMethod(target, typeof(nuint), target.UndecoratedFullName, SingeCallback);
 
         AddToDicts(target.DecoratedName, callback, tramp.GenerateMethodInfo);
 

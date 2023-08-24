@@ -753,7 +753,7 @@ namespace ScubaDiver
                 }
                 else // Not primitive
                 {
-                    // Check fi the object was pinned
+                    // Check if the object was pinned
                     if (!_freezer.TryGetPinningAddress(parameter, out ulong addr))
                     {
                         // Pin and mark for unpinning later
