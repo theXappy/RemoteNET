@@ -149,6 +149,8 @@ namespace RemoteNET
             startInfo.WorkingDirectory = remoteNetAppDataDir;
             startInfo.UseShellExecute = false;
             startInfo.RedirectStandardOutput = true;
+            startInfo.CreateNoWindow = true;
+            startInfo.WindowStyle = ProcessWindowStyle.Hidden;
             var injectorProc = Process.Start(startInfo);
             // TODO: Currently I allow 5 sec for the injector to fail (indicated by exiting)
             if (injectorProc != null && injectorProc.WaitForExit(5000))
