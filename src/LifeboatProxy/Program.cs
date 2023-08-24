@@ -7,6 +7,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using ScubaDiver.API.Protocol;
+using ScubaDiver.API.Protocol.SimpleHttp;
 
 namespace LifeboatProxy
 {
@@ -51,18 +52,13 @@ namespace LifeboatProxy
             await targetClient.ConnectAsync(targetHost, targetPort);
             using NetworkStream targetStream = targetClient.GetStream();
 
-            OverTheWireRequest r = new OverTheWireRequest()
-            {
-                RequestId = 0,
-                UrlAbsolutePath = requestUrl,
-                QueryString = ParseQueryString(context.Request.QueryString),
-                Body = ReadRequestBody(context)
-            };
-            RnetProtocolParser.Write(targetClient, r);
+            var r = HttpRequestSummary.FromJson(requestUrl, ParseQueryString(context.Request.QueryString),
+                ReadRequestBody(context));
+            SimpleHttpProtocolParser.WriteRequest(targetClient, r);
             Console.WriteLine($"Forwarded request: {requestUrl}");
 
-            OverTheWireRequest resp = RnetProtocolParser.Parse(targetClient);
-            byte[] respBody = Encoding.UTF8.GetBytes(resp.Body);
+            HttpResponseSummary resp = SimpleHttpProtocolParser.ReadResponse(targetClient);
+            byte[] respBody = resp.Body;
             context.Response.OutputStream.Write(respBody);
             context.Response.Close();
             Console.WriteLine($"Forwarded response: {requestUrl}, body: {respBody.Length} bytes");

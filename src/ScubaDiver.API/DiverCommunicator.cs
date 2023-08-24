@@ -17,6 +17,7 @@ using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.API.Interactions.Object;
 using ScubaDiver.API.Protocol;
+using ScubaDiver.API.Protocol.SimpleHttp;
 using ScubaDiver.API.Utils;
 
 namespace ScubaDiver.API
@@ -58,15 +59,9 @@ namespace ScubaDiver.API
                 client.Connect(_hostname, DiverPort);
             }
 
-            OverTheWireRequest request = new OverTheWireRequest()
-            {
-                RequestId = Interlocked.Increment(ref _requestId),
-                UrlAbsolutePath = path,
-                QueryString = queryParams,
-                Body = jsonBody
-            };
-            RnetProtocolParser.Write(client, request);
-            OverTheWireRequest response = RnetProtocolParser.Parse(client);
+            HttpRequestSummary reqSummary = HttpRequestSummary.FromJson(path, queryParams, jsonBody);
+            SimpleHttpProtocolParser.WriteRequest(client, reqSummary);
+            HttpResponseSummary response = SimpleHttpProtocolParser.ReadResponse(client);
 
             // Done with the client. Peacefully close the TCP connection
             try
@@ -80,15 +75,8 @@ namespace ScubaDiver.API
                 throw new Exception(
                     $"Failed to read response, connection closed prematurely");
             }
-            // TODO: If we end up supporting multiple requsts at the same time we need to add some component
-            // to sort responses and requests by their IDs
-            if (response.RequestId != request.RequestId)
-            {
-                throw new Exception(
-                    $"Mismatch of rNET protocol request and response IDs. Req: {request.RequestId}, Resp: {response.RequestId}");
-            }
 
-            string body = response.Body;
+            string body = Encoding.UTF8.GetString(response.Body);
             if (body.StartsWith("{\"error\":", StringComparison.InvariantCultureIgnoreCase))
             {
                 // Diver sent back an error. We parse it here and throwing a 'proxied' exception
