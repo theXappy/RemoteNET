@@ -54,29 +54,26 @@ public class TricksterUI {
     }
 
     public static ulong[] Scan(Trickster trickster, FirstClassTypeInfo typeInfo) {
-        return trickster.ScanRegions(typeInfo.Address);
+        return trickster.ScanRegions(typeInfo.XoredVftableAddress, FirstClassTypeInfo.XorMask);
     }
 
     /// <summary>
     /// Scan the process memory for vftables to spot instances of First-Class types.
     /// </summary>
     /// <param name="trickster"></param>
-    /// <param name="typeInfo"></param>
+    /// <param name="typeInfos"></param>
     /// <returns></returns>
-    public static Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(Trickster trickster, IEnumerable<FirstClassTypeInfo> typeInfo)
+    public static Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(Trickster trickster, IEnumerable<FirstClassTypeInfo> typeInfos)
     {
-        Dictionary<nuint, FirstClassTypeInfo> mtToType = typeInfo.ToDictionary(ti => ti.Address);
-        IDictionary<ulong, IReadOnlyCollection<ulong>> matches = trickster.ScanRegions(mtToType.Keys);
+        Dictionary</*xored vftable*/ nuint, FirstClassTypeInfo> xoredVftableToType = typeInfos.ToDictionary(ti => ti.XoredVftableAddress);
+        IDictionary</*xored vftable*/ ulong, /*instance pointers*/ IReadOnlyCollection<ulong>> xoredVftablesToInstances = trickster.ScanRegions(xoredVftableToType.Keys, FirstClassTypeInfo.XorMask);
 
         Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> res = new();
-        foreach (var kvp in matches)
+        foreach (var kvp in xoredVftablesToInstances)
         {
-            res[mtToType[(nuint)kvp.Key]] = kvp.Value;
+            res[xoredVftableToType[(nuint)kvp.Key]] = kvp.Value;
         }
 
         return res;
     }
-
-    public string[] Scan(FirstClassTypeInfo typeInfo) 
-        => Scan(Trickster, typeInfo).Select(x => x.ToString("X")).ToArray();
 }

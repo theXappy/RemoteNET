@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Xml.Linq;
 
 namespace ScubaDiver.Rtti;
 
@@ -18,16 +19,35 @@ public class TricksterException : Exception { }
 public record struct FunctionInfo(string mangledName, nuint address);
 
 
-public abstract record TypeInfo(string ModuleName, string Name)
+public abstract class TypeInfo
 {
+    public string ModuleName { get; }
+    public string Name { get; }
     public string FullTypeName => $"{ModuleName}!{Name}";
+
+    protected TypeInfo(string moduleName, string name)
+    {
+        ModuleName = moduleName;
+        Name = name;
+    }
 }
 
 /// <summary>
 /// Information about a "First-Class Type" - Types which have a full RTTI entry and, most importantly, a vftable.
 /// </summary>
-public record FirstClassTypeInfo(string ModuleName, string Name, nuint Address, nuint Offset) : TypeInfo(ModuleName, Name)
+public class FirstClassTypeInfo : TypeInfo
 {
+    public const nuint XorMask = 0xaabbccdd; // Keeping it to 32 bits so it works in both x32 and x64
+    public nuint XoredVftableAddress { get; }
+    public nuint VftableAddress => XoredVftableAddress ^ XorMask; // A function-based property so the address isn't needlessly kept in memory.
+    public nuint Offset { get; }
+
+    public FirstClassTypeInfo(string ModuleName, string Name, nuint VftableAddress, nuint Offset) : base(ModuleName, Name)
+    {
+        this.XoredVftableAddress = VftableAddress ^ XorMask;
+        this.Offset = Offset;
+    }
+
     public override string ToString()
     {
         return $"{Name} (First Class Type) ({Offset:X16})";
@@ -39,8 +59,12 @@ public record FirstClassTypeInfo(string ModuleName, string Name, nuint Address, 
 /// The existence of these types is inferred from export their export functions.
 /// If none of the type's methods are exported, we might not know such a type even exists.
 /// </summary>
-public record SecondClassTypeInfo(string ModuleName, string Name) : TypeInfo(ModuleName, Name) 
+public class SecondClassTypeInfo : TypeInfo
 {
+    public SecondClassTypeInfo(string ModuleName, string Name) : base(ModuleName, Name)
+    {
+    }
+
     public override string ToString()
     {
         return $"{Name} (Second Class Type)";
@@ -130,7 +154,7 @@ public unsafe class Trickster : IDisposable
             Func<ulong, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
             for (nuint offset = inc; offset < segmentBSize; offset += inc)
             {
-                nuint address = segmentBaseAddress + offset;
+                 nuint address = segmentBaseAddress + offset;
                 if (getClassName(address) is string className)
                 {
                     // Avoiding names with the "BEL" control ASCII char specifically.
@@ -176,7 +200,7 @@ public unsafe class Trickster : IDisposable
                     Console.WriteLine($"[Error] Couldn't scan for RTTI info in {module.Name}, EX: " + ex.GetType().Name);
                 }
             }
-            if ( typeInfoSeenInModule && allModuleTypes.Any())
+            if (typeInfoSeenInModule && allModuleTypes.Any())
             {
                 if (!res.ContainsKey(module))
                     res[module] = Array.Empty<TypeInfo>();
@@ -256,7 +280,7 @@ public unsafe class Trickster : IDisposable
         }
     }
 
-    private ulong[] ScanRegionsCore(MemoryRegion[] regionArray, ulong value)
+    private ulong[] ScanRegionsCore(MemoryRegion[] regionArray, ulong value, nuint xorMask)
     {
         List<ulong> list = new();
 
@@ -268,7 +292,7 @@ public unsafe class Trickster : IDisposable
             if (_is32Bit)
             {
                 for (byte* a = start; a < end; a += 4)
-                    if (*(uint*)a == value)
+                    if ((*(uint*)a ^ xorMask) == value)
                         lock (list)
                         {
                             ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
@@ -278,7 +302,7 @@ public unsafe class Trickster : IDisposable
             else
             {
                 for (byte* a = start; a < end; a += 8)
-                    if (*(ulong*)a == value)
+                    if ((*(ulong*)a ^ xorMask) == value)
                         lock (list)
                         {
                             ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
@@ -290,7 +314,7 @@ public unsafe class Trickster : IDisposable
         return list.ToArray();
     }
 
-    private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegion[] regionArray, IEnumerable<nuint> types)
+    private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegion[] regionArray, IEnumerable<nuint> types, nuint xorMask)
     {
         ConcurrentDictionary<ulong, ConcurrentBag<ulong>> results = new();
 
@@ -309,7 +333,7 @@ public unsafe class Trickster : IDisposable
                 for (byte* a = start; a < end; a += 4)
                 {
                     ulong suspect = *(uint*)a;
-                    if (!results.TryGetValue(suspect, out var bag))
+                    if (!results.TryGetValue(suspect ^ xorMask, out var bag))
                         continue;
                     ulong result = (ulong)a;
                     bag.Add(result);
@@ -320,7 +344,7 @@ public unsafe class Trickster : IDisposable
                 for (byte* a = start; a < end; a += 8)
                 {
                     ulong suspect = *(ulong*)a;
-                    if (!results.TryGetValue(suspect, out var bag))
+                    if (!results.TryGetValue(suspect ^ xorMask, out var bag))
                         continue;
                     ulong result = (ulong)a;
                     bag.Add(result);
@@ -410,7 +434,7 @@ public unsafe class Trickster : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    if(ex is not ApplicationException)
+                    if (ex is not ApplicationException)
                         Console.WriteLine($"[Error] Couldn't scan for 'operator new' in {module.Name}, EX: " + ex.GetType().Name);
                 }
             }
@@ -441,13 +465,13 @@ public unsafe class Trickster : IDisposable
         Regions = ReadRegionsCore(scannedRegions);
     }
 
-    public ulong[] ScanRegions(ulong value)
+    public ulong[] ScanRegions(ulong value, nuint xorMask = 0x00000000)
     {
-        return ScanRegionsCore(Regions, value);
+        return ScanRegionsCore(Regions, value, xorMask);
     }
-    public IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegions(IEnumerable<nuint> types)
+    public IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegions(IEnumerable<nuint> types, nuint xorMask = 0x00000000)
     {
-        return ScanRegionsCore2(Regions, types);
+        return ScanRegionsCore2(Regions, types, xorMask);
     }
 
     public void Dispose()
