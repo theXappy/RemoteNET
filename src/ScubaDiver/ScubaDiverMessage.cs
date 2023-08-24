@@ -25,4 +25,14 @@ public class ScubaDiverMessage
         Body = body;
         ResponseSender = responseSender;
     }
+
+    public ScubaDiverMessage(NameValueCollection queryString, string urlAbsolutePath, string body, Action<string> responseSender)
+    {
+        QueryString = queryString;
+        UrlAbsolutePath = urlAbsolutePath;
+        if (urlAbsolutePath.FirstOrDefault() != '/')
+            UrlAbsolutePath = '/' + UrlAbsolutePath;
+        Body = body;
+        ResponseSender = responseSender;
+    }
 }
