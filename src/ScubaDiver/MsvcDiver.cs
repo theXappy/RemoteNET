@@ -444,7 +444,7 @@ namespace ScubaDiver
                         {
                             bool exists = methods.Any(existingMethod =>
                                 existingMethod.UndecoratedFullName == virtualFunction.UndecoratedFullName);
-                            if(exists)
+                            if (exists)
                                 continue;
 
                             Console.WriteLine($"[GetManagedTypeDump] Found new method for type {typeInfo.Name}, Method Name: {virtualFunction.UndecoratedFullName}");
@@ -576,7 +576,7 @@ namespace ScubaDiver
 
                 foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
                 {
-                    if (typeInfo is FirstClassTypeInfo firstClassTypeInfo &&  firstClassTypeInfo.Address == address)
+                    if (typeInfo is FirstClassTypeInfo firstClassTypeInfo && firstClassTypeInfo.VftableAddress == address)
                         return firstClassTypeInfo;
                 }
                 // This module was the module containing our queried address.
@@ -690,14 +690,19 @@ namespace ScubaDiver
                     HeapDump.HeapObject ho = new HeapDump.HeapObject()
                     {
                         Address = addr,
-                        MethodTable = typeInfo.VftableAddress,
+                        MethodTable = typeInfo.VftableAddress, // TODO: Send XOR'd value instead?
                         Type = typeInfo.FullTypeName
                     };
                     hd.Objects.Add(ho);
                 }
             }
 
-            return JsonConvert.SerializeObject(hd);
+            string json = JsonConvert.SerializeObject(hd);
+
+            // Trying to get rid of the VFTable addresses from our heap.
+            hd.Objects.ForEach(heapObj => heapObj.MethodTable = 0xdeadc0de);
+
+            return json;
 
         }
 
@@ -911,7 +916,11 @@ namespace ScubaDiver
                 Console.WriteLine($"[MsvcDiver] Invoking {targetMethod} result with a not-null OBJECT address");
 
                 // Pinning results TODO
-                string normalizedRetType = targetMethod.RetType[..^2]; // Remove ' *' suffix
+                string normalizedRetType = targetMethod.RetType;
+                // Remove ' *' suffix, if exists
+                normalizedRetType = normalizedRetType.EndsWith('*') ? normalizedRetType[..^1] : normalizedRetType;
+                normalizedRetType = normalizedRetType.TrimEnd(' ');
+                
                 Console.WriteLine(
                     $"[MsvcDiver] Trying to result the type of the returned object. Normalized return type from signature: {normalizedRetType}");
                 ParseFullTypeName(normalizedRetType, out string retTypeRawAssemblyFilter, out string retTypeRawTypeFilter);
