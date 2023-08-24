@@ -25,13 +25,13 @@ public static class DetoursMethodGenerator
             DelegateType = delegateType;
             Name = name;
             _callback = callback;
-            DetoursMethodGenerator._callbacks[Name] = _callback;
-            DetoursMethodGenerator._trampolines[Name] = this;
+            _callbacks[Name] = _callback;
+            _trampolines[Name] = this;
         }
 
         public void Dispose()
         {
-            DetoursMethodGenerator._callbacks.Remove(Name);
+            _callbacks.Remove(Name);
         }
 
         public T GetRealMethod<T>() where T : Delegate

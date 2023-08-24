@@ -44,7 +44,7 @@ public class FirstClassTypeInfo : TypeInfo
 
     public FirstClassTypeInfo(string ModuleName, string Name, nuint VftableAddress, nuint Offset) : base(ModuleName, Name)
     {
-        this.XoredVftableAddress = VftableAddress ^ XorMask;
+        XoredVftableAddress = VftableAddress ^ XorMask;
         this.Offset = Offset;
     }
 
