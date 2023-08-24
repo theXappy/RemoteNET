@@ -33,7 +33,7 @@ namespace ScubaDiver
 
         public MsvcDiver(IRequestsListener listener) : base(listener)
         {
-            base._responseBodyCreators["/gc"] = MakeGcResponse;
+            _responseBodyCreators["/gc"] = MakeGcResponse;
         }
 
         public override void Start()
@@ -564,7 +564,7 @@ namespace ScubaDiver
             }
         }
 
-        private Rtti.FirstClassTypeInfo ResolveTypeFromVftableAddress(nuint address)
+        private FirstClassTypeInfo ResolveTypeFromVftableAddress(nuint address)
         {
             foreach (var kvp in _trickster.ScannedTypes)
             {
@@ -654,14 +654,14 @@ namespace ScubaDiver
                 Objects = new List<HeapDump.HeapObject>()
             };
 
-            IEnumerable<Rtti.FirstClassTypeInfo> allClassesToScanFor = Array.Empty<Rtti.FirstClassTypeInfo>();
+            IEnumerable<FirstClassTypeInfo> allClassesToScanFor = Array.Empty<FirstClassTypeInfo>();
             foreach (var moduleTypesKvp in _trickster.ScannedTypes)
             {
                 var module = moduleTypesKvp.Key;
                 if (!assmFilter(module.Name))
                     continue;
 
-                IEnumerable<Rtti.FirstClassTypeInfo> currModuleClasses =
+                IEnumerable<FirstClassTypeInfo> currModuleClasses =
                     moduleTypesKvp.Value.OfType<FirstClassTypeInfo>();
                 if (!string.IsNullOrEmpty(rawTypeFilter) && rawTypeFilter != "*")
                     currModuleClasses = currModuleClasses.Where(ti => typeFilter(ti.Name));
@@ -671,11 +671,11 @@ namespace ScubaDiver
             }
 
             Logger.Debug($"[{DateTime.Now}] Starting Trickster Scan for class instances.");
-            Dictionary<Rtti.FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, allClassesToScanFor);
+            Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, allClassesToScanFor);
             Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {addresses.SelectMany(kvp => kvp.Value).Count()} results");
             foreach (var typeInstancesKvp in addresses)
             {
-                Rtti.FirstClassTypeInfo typeInfo = typeInstancesKvp.Key;
+                FirstClassTypeInfo typeInfo = typeInstancesKvp.Key;
                 foreach (nuint addr in typeInstancesKvp.Value)
                 {
                     HeapDump.HeapObject ho = new HeapDump.HeapObject()
@@ -1008,7 +1008,7 @@ namespace ScubaDiver
 
         private UndecoratedMethodGroup GetOrAddGroup(string method)
         {
-            if (!this.ContainsKey(method))
+            if (!ContainsKey(method))
                 this[method] = new UndecoratedMethodGroup();
             return this[method];
         }
