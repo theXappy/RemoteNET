@@ -13,20 +13,9 @@ namespace InjectableDummy
         public static int Main(nuint data)
         {
             AllocConsole();
-            new Thread
-            (
-                () =>
-                {
-                    try
-                    {
-                        Console.WriteLine("WIN!");
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e.ToString());
-                    }
-                }
-            ).Start();
+            Console.WriteLine("[InjectableDummy] .NET runtime successfully hosted.");
+            string runtimeDesc = RuntimeInformation.FrameworkDescription;
+            Console.WriteLine("[InjectableDummy] Runtime description: " + runtimeDesc);
             return 0;
         }
     }
