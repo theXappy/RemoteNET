@@ -640,17 +640,8 @@ namespace ScubaDiver
 
         protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
-            if (_trickster == null || !_trickster.ScannedTypes.Any())
-            {
-                RefreshRuntime();
-            }
-
-            if (_trickster.Regions == null || !_trickster.Regions.Any())
-            {
-                Console.WriteLine("[MsvcDiver] Calling Read Regions in trickster.");
-                _trickster.ReadRegions();
-                Console.WriteLine("[MsvcDiver] Calling Read Regions in trickster -- done!");
-            }
+            // TODO: Can't figure out why, but results stay the same between calls if trickster isn't refreshed.
+            RefreshRuntime();
 
             string rawFilter = arg.QueryString.Get("type_filter");
             ParseFullTypeName(rawFilter, out var rawAssemblyFilter, out var rawTypeFilter);
