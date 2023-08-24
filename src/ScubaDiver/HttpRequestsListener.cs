@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -8,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ScubaDiver.API.Protocol;
+using ScubaDiver.API.Protocol.SimpleHttp;
 using ScubaDiver.Hooking;
 
 namespace ScubaDiver;
@@ -60,55 +62,60 @@ public class RnetReverseRequestsListener : IRequestsListener
     private void Dispatcher()
     {
         Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- entered");
-        // Introduce ourselves to the proxy
-        OverTheWireRequest intro = new OverTheWireRequest
-        {
-            UrlAbsolutePath = "/proxy_intro",
-            RequestId = 1,
-            Body = "{\"role\":\"diver\"}"
-        };
         var client = _client;
-        var stream = _client.GetStream();
 
-        RnetProtocolParser.Write(client, intro);
-        var introResp = RnetProtocolParser.Parse(client);
-        if (introResp == null || !introResp.Body.Contains("\"status\":\"OK\""))
+
+        // Introduce ourselves to the proxy
+        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- Writing proxy_intro");
+        HttpRequestSummary intro =
+            HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver\"}");
+        SimpleHttpProtocolParser.WriteRequest(client, intro);
+        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- proxy_intro written");
+
+        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- reading proxy_intro resp");
+        var introResp = SimpleHttpProtocolParser.ReadResponse(client);
+        Logger.Debug($"[RnetReverseRequestsListener] Dispatcher() -- reading proxy_intro resp. Body: {introResp.Body}");
+        Logger.Debug($"[RnetReverseRequestsListener] Dispatcher() -- reading proxy_intro resp. BodyString: {introResp.BodyString}");
+        if (introResp == null || !introResp.BodyString.Contains("\"status\":\"OK\""))
             throw new Exception("Diver couldn't register at Lifeboat");
+        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- read proxy_intro, no exception");
 
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
-            var request = RnetProtocolParser.Parse(client);
+            Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- Looping! Reading request...");
+            var request = SimpleHttpProtocolParser.ReadRequest(client);
             if (request == null)
                 continue;
 
             void RespondFunc(string body)
             {
-                var resp = new OverTheWireRequest()
-                {
-                    RequestId = request.RequestId,
-                    UrlAbsolutePath = request.UrlAbsolutePath,
-                    Body = body
-                };
-                RnetProtocolParser.Write(client, resp);
+                var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body);
+                SimpleHttpProtocolParser.WriteResponse(client, resp);
             }
 
             ScubaDiverMessage req =
-                new ScubaDiverMessage(request.QueryString, request.UrlAbsolutePath, request.Body, RespondFunc);
+                new ScubaDiverMessage(request.QueryString, request.Url, request.BodyString, RespondFunc);
 
             RequestReceived?.Invoke(this, req);
         }
 
-        Logger.Debug("[DiverBase] Reverse TCP Loop ended. Cleaning up");
+        Logger.Debug("[DiverBase] Dispatcher() - Reverse TCP Loop ended. Cleaning up");
     }
 
     public void WaitForExit()
     {
+        Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Start");
+
         try
         {
+            Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Waiting on dispatch task");
             _task.Wait();
+            Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Dispatcher task existed gracefully");
         }
-        catch
+        catch(Exception e)
         {
+            Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Dispatcher task existed with exception. Ex: " + e);
+            return;
         }
     }
 
@@ -168,7 +175,7 @@ public class RnetRequestsListener : IRequestsListener
     {
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
-            var request = RnetProtocolParser.Parse(client);
+            var request = SimpleHttpProtocolParser.ReadRequest(client);
             if (request == null)
             {
                 // Connection closed
@@ -177,16 +184,12 @@ public class RnetRequestsListener : IRequestsListener
 
             void RespondFunc(string body)
             {
-                var resp = new OverTheWireRequest()
-                {
-                    RequestId = request.RequestId,
-                    Body = body
-                };
-                RnetProtocolParser.Write(client, resp);
+                var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body);
+                SimpleHttpProtocolParser.WriteResponse(client, resp);
             }
 
             ScubaDiverMessage req =
-                new ScubaDiverMessage(request.QueryString, request.UrlAbsolutePath, request.Body, RespondFunc);
+                new ScubaDiverMessage(request.QueryString, request.Url, request.BodyString, RespondFunc);
 
             RequestReceived?.Invoke(this, req);
         }

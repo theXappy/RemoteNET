@@ -17,13 +17,33 @@ public class TricksterException : Exception { }
 
 public record struct FunctionInfo(string mangledName, nuint address);
 
-public record struct TypeInfo(string ModuleName, string Name, nuint Address, nuint Offset)
+
+public abstract record TypeInfo(string ModuleName, string Name)
 {
     public string FullTypeName => $"{ModuleName}!{Name}";
+}
 
+/// <summary>
+/// Information about a "First-Class Type" - Types which have a full RTTI entry and, most importantly, a vftable.
+/// </summary>
+public record FirstClassTypeInfo(string ModuleName, string Name, nuint Address, nuint Offset) : TypeInfo(ModuleName, Name)
+{
     public override string ToString()
     {
-        return $"{Name} - {Offset:X}";
+        return $"{Name} (First Class Type) ({Offset:X16})";
+    }
+}
+
+/// <summary>
+/// Information about a "Second-Class Type" - Types which don't have a full RTTI entry and, most importantly, a vftable.
+/// The existence of these types is inferred from export their export functions.
+/// If none of the type's methods are exported, we might not know such a type even exists.
+/// </summary>
+public record SecondClassTypeInfo(string ModuleName, string Name) : TypeInfo(ModuleName, Name) 
+{
+    public override string ToString()
+    {
+        return $"{Name} (Second Class Type)";
     }
 }
 
@@ -122,7 +142,7 @@ public unsafe class Trickster : IDisposable
 
                     if (className == "type_info")
                         typeInfoSeen = true;
-                    list.Add(new TypeInfo(moduleName, className, address, offset));
+                    list.Add(new FirstClassTypeInfo(moduleName, className, address, offset));
                 }
             }
         }
@@ -134,28 +154,12 @@ public unsafe class Trickster : IDisposable
     {
         Dictionary<ModuleInfo, TypeInfo[]> res = new Dictionary<ModuleInfo, TypeInfo[]>();
 
-        Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
-        foreach (ModuleInfo modInfo in ModulesParsed)
-        {
-            List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
-            foreach (ModuleSegment moduleSegment in sections)
-            {
-                var name = moduleSegment.Name.ToUpperInvariant();
-                // It's probably only ever in ".rdata" but I'm a coward
-                if (name.Contains("DATA") || name.Contains("RTTI"))
-                {
-                    if (!dataSegments.ContainsKey(modInfo))
-                        dataSegments.Add(modInfo, new List<ModuleSegment>());
-
-                    dataSegments[modInfo].Add(moduleSegment);
-                }
-            }
-        }
+        Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = GetAllModulesSegments();
 
         foreach (var kvp in dataSegments)
         {
-            var module = kvp.Key;
-            var segments = kvp.Value;
+            ModuleInfo module = kvp.Key;
+            List<ModuleSegment> segments = kvp.Value;
 
             bool typeInfoSeenInModule = false;
             IEnumerable<TypeInfo> allModuleTypes = Array.Empty<TypeInfo>();
@@ -181,6 +185,29 @@ public unsafe class Trickster : IDisposable
         }
 
         return res;
+    }
+
+    private Dictionary<ModuleInfo, List<ModuleSegment>> GetAllModulesSegments()
+    {
+        Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
+        foreach (ModuleInfo modInfo in ModulesParsed)
+        {
+            List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
+            foreach (ModuleSegment moduleSegment in sections)
+            {
+                var name = moduleSegment.Name.ToUpperInvariant();
+                // It's probably only ever in ".rdata" but I'm a coward
+                if (name.Contains("DATA") || name.Contains("RTTI"))
+                {
+                    if (!dataSegments.ContainsKey(modInfo))
+                        dataSegments.Add(modInfo, new List<ModuleSegment>());
+
+                    dataSegments[modInfo].Add(moduleSegment);
+                }
+            }
+        }
+
+        return dataSegments;
     }
 
     private MemoryRegionInfo[] ScanRegionInfoCore()

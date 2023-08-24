@@ -53,15 +53,22 @@ public class TricksterUI {
         return $"Regions read: {Trickster.Regions.Length}";
     }
 
-    public static ulong[] Scan(Trickster trickster, TypeInfo typeInfo) {
+    public static ulong[] Scan(Trickster trickster, FirstClassTypeInfo typeInfo) {
         return trickster.ScanRegions(typeInfo.Address);
     }
-    public static Dictionary<TypeInfo, IReadOnlyCollection<ulong>> Scan(Trickster trickster, IEnumerable<TypeInfo> typeInfo)
+
+    /// <summary>
+    /// Scan the process memory for vftables to spot instances of First-Class types.
+    /// </summary>
+    /// <param name="trickster"></param>
+    /// <param name="typeInfo"></param>
+    /// <returns></returns>
+    public static Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(Trickster trickster, IEnumerable<FirstClassTypeInfo> typeInfo)
     {
-        Dictionary<nuint, TypeInfo> mtToType = typeInfo.ToDictionary(ti => ti.Address);
+        Dictionary<nuint, FirstClassTypeInfo> mtToType = typeInfo.ToDictionary(ti => ti.Address);
         IDictionary<ulong, IReadOnlyCollection<ulong>> matches = trickster.ScanRegions(mtToType.Keys);
 
-        Dictionary<TypeInfo, IReadOnlyCollection<ulong>> res = new();
+        Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> res = new();
         foreach (var kvp in matches)
         {
             res[mtToType[(nuint)kvp.Key]] = kvp.Value;
@@ -70,6 +77,6 @@ public class TricksterUI {
         return res;
     }
 
-    public string[] Scan(TypeInfo typeInfo) 
+    public string[] Scan(FirstClassTypeInfo typeInfo) 
         => Scan(Trickster, typeInfo).Select(x => x.ToString("X")).ToArray();
 }
