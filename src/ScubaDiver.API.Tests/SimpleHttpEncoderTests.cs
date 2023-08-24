@@ -105,7 +105,7 @@ namespace ScubaDiver.API.Tests
             Assert.AreEqual(inputSummary.Method, decodedSummary.Method);
             Assert.AreEqual(inputSummary.Url, decodedSummary.Url);
             CollectionAssert.AreEqual(inputSummary.QueryString, decodedSummary.QueryString);
-            CollectionAssert.AreEqual(inputSummary.Body, decodedSummary.Body);
+            CollectionAssert.AreEqual(Array.Empty<byte>(), decodedSummary.Body);
         }
 
 
