@@ -662,33 +662,38 @@ namespace ScubaDiver
             {
                 Objects = new List<HeapDump.HeapObject>()
             };
+
+            IEnumerable<Rtti.FirstClassTypeInfo> allClassesToScanFor = Array.Empty<Rtti.FirstClassTypeInfo>();
             foreach (var moduleTypesKvp in _trickster.ScannedTypes)
             {
                 var module = moduleTypesKvp.Key;
                 if (!assmFilter(module.Name))
                     continue;
 
-                IEnumerable<Rtti.FirstClassTypeInfo> typeInfos = moduleTypesKvp.Value.OfType<FirstClassTypeInfo>();
+                IEnumerable<Rtti.FirstClassTypeInfo> currModuleClasses =
+                    moduleTypesKvp.Value.OfType<FirstClassTypeInfo>();
                 if (!string.IsNullOrEmpty(rawTypeFilter) && rawTypeFilter != "*")
-                    typeInfos = typeInfos.Where(ti => typeFilter(ti.Name));
+                    currModuleClasses = currModuleClasses.Where(ti => typeFilter(ti.Name));
 
+                Logger.Debug($"[{DateTime.Now}] Trickster aggregating types from {module.Name}");
+                allClassesToScanFor = allClassesToScanFor.Concat(currModuleClasses);
+            }
 
-                Logger.Debug($"[{DateTime.Now}] Starting Trickster Scan for {typeInfos.Count()} types");
-                Dictionary<Rtti.FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, typeInfos);
-                Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {addresses.SelectMany(kvp => kvp.Value).Count()} results");
-                foreach (var typeInstancesKvp in addresses)
+            Logger.Debug($"[{DateTime.Now}] Starting Trickster Scan for class instances.");
+            Dictionary<Rtti.FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, allClassesToScanFor);
+            Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {addresses.SelectMany(kvp => kvp.Value).Count()} results");
+            foreach (var typeInstancesKvp in addresses)
+            {
+                Rtti.FirstClassTypeInfo typeInfo = typeInstancesKvp.Key;
+                foreach (nuint addr in typeInstancesKvp.Value)
                 {
-                    Rtti.FirstClassTypeInfo typeInfo = typeInstancesKvp.Key;
-                    foreach (nuint addr in typeInstancesKvp.Value)
+                    HeapDump.HeapObject ho = new HeapDump.HeapObject()
                     {
-                        HeapDump.HeapObject ho = new HeapDump.HeapObject()
-                        {
-                            Address = addr,
-                            MethodTable = typeInfo.Address,
-                            Type = typeInfo.FullTypeName
-                        };
-                        hd.Objects.Add(ho);
-                    }
+                        Address = addr,
+                        MethodTable = typeInfo.VftableAddress,
+                        Type = typeInfo.FullTypeName
+                    };
+                    hd.Objects.Add(ho);
                 }
             }
 
