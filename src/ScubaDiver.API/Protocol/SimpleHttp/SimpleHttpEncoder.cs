@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -154,6 +154,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
             {
                 StringBuilder responseBuilder = new StringBuilder();
                 responseBuilder.Append($"HTTP/1.1 {((int)summary.StatusCode)} {summary.StatusCode}\r\n");
+                responseBuilder.Append("Connection: close\r\n"); // Trying to cause Web browsers to release the connection.
 
                 if (summary.Body != null && summary.Body.Length > 0)
                 {
