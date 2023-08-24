@@ -18,7 +18,7 @@ public unsafe struct RttiScanner : IDisposable {
         _size = mainModuleSize;
         _pointer = (byte*)NativeMemory.Alloc(mainModuleSize);
         if (!Kernel32.ReadProcessMemory(handle, (void*)mainModuleBaseAddress, _pointer, mainModuleSize))
-            throw new ApplicationException();
+            throw new ApplicationException("RttiScanner failed on ReadProcessMemory");
     }
 
     public void Dispose() {

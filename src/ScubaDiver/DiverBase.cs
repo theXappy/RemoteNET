@@ -221,7 +221,11 @@ namespace ScubaDiver
             // Preparing a proxy method that Harmony will invoke
             HarmonyWrapper.HookCallback patchCallback = (obj, args) =>
             {
-                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), obj, args);
+                object[] parameters = new object[args.Length + 1];
+                parameters[0] = obj;
+                Array.Copy(args, 0, parameters, 1, args.Length);
+
+                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), parameters);
                 bool skipOriginal = false;
                 if (res != null && !res.IsRemoteAddress)
                 {

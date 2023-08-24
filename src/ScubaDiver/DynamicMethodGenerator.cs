@@ -13,13 +13,15 @@ public static class DetoursMethodGenerator
 {
     public class DetoursTrampoline : IDisposable
     {
+        public UndecoratedFunction Target { get; set; }
         public MethodInfo GenerateMethodInfo { get; set; }
         public Delegate GeneratedDelegate { get; set; }
         public Type DelegateType { get; set; }
         public string Name { get; set; }
         private DetoursWrapperCallback _callback;
-        public DetoursTrampoline(string name, MethodInfo generateMethodInfo, Delegate generatedDelegate, Type delegateType, DetoursWrapperCallback callback)
+        public DetoursTrampoline(UndecoratedFunction target, string name, MethodInfo generateMethodInfo, Delegate generatedDelegate, Type delegateType, DetoursWrapperCallback callback)
         {
+            Target = target;
             GenerateMethodInfo = generateMethodInfo;
             GeneratedDelegate = generatedDelegate;
             DelegateType = delegateType;
@@ -46,13 +48,13 @@ public static class DetoursMethodGenerator
 
     public delegate nuint DetoursWrapperCallback(DetoursTrampoline tramp, object[] args);
 
-    public static DetoursTrampoline GenerateMethod(int numArguments, Type retType, string generatedMethodName, DetoursWrapperCallback callback)
+    public static DetoursTrampoline GenerateMethod(UndecoratedFunction target, Type retType, string generatedMethodName, DetoursWrapperCallback callback)
     {
         MethodInfo unifiedMethod = typeof(DetoursMethodGenerator).GetMethod("Unified");
 
-        (var generatedMethodInfo, var generatedDelegate, var delType) = GenerateMethodForName(unifiedMethod, numArguments, retType, generatedMethodName);
+        (var generatedMethodInfo, var generatedDelegate, var delType) = GenerateMethodForName(unifiedMethod, target.NumArgs.Value, retType, generatedMethodName);
 
-        return new DetoursTrampoline(generatedMethodName, generatedMethodInfo, generatedDelegate, delType, callback);
+        return new DetoursTrampoline(target, generatedMethodName, generatedMethodInfo, generatedDelegate, delType, callback);
     }
 
 

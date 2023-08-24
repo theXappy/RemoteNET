@@ -461,8 +461,12 @@ public unsafe class Trickster : IDisposable
             FreeRegionsCore(Regions);
         }
 
+        Logger.Debug($"[{DateTime.Now}][Trickster][ReadRegions] ScanRegionInfoCore...");
         MemoryRegionInfo[] scannedRegions = ScanRegionInfoCore();
+        Logger.Debug($"[{DateTime.Now}][Trickster][ReadRegions] ScanRegionInfoCore - Done.");
+        Logger.Debug($"[{DateTime.Now}][Trickster][ReadRegions] ReadRegionsCore... ScannedRegion = {scannedRegions.Length}");
         Regions = ReadRegionsCore(scannedRegions);
+        Logger.Debug($"[{DateTime.Now}][Trickster][ReadRegions] ReadRegionsCore - Done.");
     }
 
     public ulong[] ScanRegions(ulong value, nuint xorMask = 0x00000000)

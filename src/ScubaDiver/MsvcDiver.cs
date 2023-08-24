@@ -207,10 +207,20 @@ namespace ScubaDiver
 
         protected override void RefreshRuntime()
         {
-            Logger.Debug("[MsvcDiver][Trickster] Refreshing runtime!");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Refreshing runtime!");
+            if (_trickster != null)
+            {
+                _trickster.Dispose();
+                _trickster = null;
+            }
             _trickster = new Trickster(Process.GetCurrentProcess());
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Scanning types...");
             _trickster.ScanTypes();
-            Logger.Debug($"[MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Reading Regions...");
+            _trickster.ReadRegions();
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
         }
 
         protected override Action HookFunction(FunctionHookRequest request, HarmonyWrapper.HookCallback patchCallback)
@@ -233,7 +243,13 @@ namespace ScubaDiver
             UndecoratedFunction methodToHook = null;
             foreach (var method in methods)
             {
+                // Check signature: Method Name
                 if (method.UndecoratedName != methodName)
+                    continue;
+
+                // Check signature: Method Arguments
+                // (Skipping first which is the type of 'this' and is not found in ParametersTypeFullNames)
+                if (!method.ArgTypes.Skip(1).SequenceEqual(request.ParametersTypeFullNames))
                     continue;
 
                 if (methodToHook != null)
@@ -250,13 +266,46 @@ namespace ScubaDiver
             DetoursNetWrapper.HookCallback hook =
                 (DetoursMethodGenerator.DetoursTrampoline tramp, object[] args, out nuint value) =>
                 {
+                    if (args.Length == 0)
+                        throw new Exception(
+                            "Bad arguments to unmanaged HookCallback. Expecting at least 1 (for 'this').");
+
                     object self = new NativeObject((nuint)args.FirstOrDefault(), typeInfo);
 
-                    // TODO: Make the arguments into "NativeObject"s as well? Need to figure out which nuints
-                    // are pointers and which aren't...
-                    object[] argsToForward = args;
-                    if (args.Length > 0)
-                        argsToForward = args.Skip(1).ToArray();
+                    // Args without self
+                    object[] argsToForward = new object[args.Length - 1];
+                    for (int i = 0; i < argsToForward.Length; i++)
+                    {
+                        nuint arg = (nuint)args[i + 1];
+
+                        // If the argument is a pointer, indicate it with a NativeObject
+                        string argType = tramp.Target.ArgTypes[i + 1];
+                        if (argType == "char*" || argType == "char *")
+                        {
+                            if (arg != 0)
+                            {
+                                string cString = Marshal.PtrToStringAnsi(new IntPtr((long)arg));
+                                argsToForward[i] = cString;
+                            }
+                            else
+                            {
+                                argsToForward[i] = arg;
+                            }
+                        }
+                        else if (argType.EndsWith('*'))
+                        {
+                            // TODO: SecondClassTypeInfo is abused here
+                            string fixedArgType = argType[..^1].Trim();
+                            argsToForward[i] = new NativeObject(arg,
+                                new SecondClassTypeInfo(module.Name, fixedArgType));
+                        }
+                        else
+                        {
+                            // Primitive or struct or something else crazy
+                            argsToForward[i] = arg;
+                        }
+                    }
+
 
                     // TODO: We're currently ignoring the "skip original" return value because the callback
                     // doesn't support setting the return value...
@@ -304,11 +353,6 @@ namespace ScubaDiver
                 {
                     // TODO: Freeze?
                     remoteParams[i] = ObjectOrRemoteAddress.FromToken(nativeObj.Address, nativeObj.TypeInfo.FullTypeName);
-                }
-                else if (parameter is object[] arrayParam && arrayParam.All(item => item is nuint))
-                {
-                    nuint[] pointers = arrayParam.Cast<nuint>().ToArray();
-                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(pointers);
                 }
                 else // Not primitive
                 {
@@ -911,7 +955,7 @@ namespace ScubaDiver
                 // Remove ' *' suffix, if exists
                 normalizedRetType = normalizedRetType.EndsWith('*') ? normalizedRetType[..^1] : normalizedRetType;
                 normalizedRetType = normalizedRetType.TrimEnd(' ');
-                
+
                 Console.WriteLine(
                     $"[MsvcDiver] Trying to result the type of the returned object. Normalized return type from signature: {normalizedRetType}");
                 ParseFullTypeName(normalizedRetType, out string retTypeRawAssemblyFilter, out string retTypeRawTypeFilter);

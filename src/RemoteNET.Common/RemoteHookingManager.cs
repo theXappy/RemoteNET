@@ -14,6 +14,7 @@ namespace RemoteNET.Common
     public class RemoteHookingManager
     {
         private readonly RemoteApp _app;
+        private bool _isUnmanaged;
 
         private readonly Dictionary<MethodBase, MethodHooks> _callbacksToProxies;
 
@@ -39,6 +40,7 @@ namespace RemoteNET.Common
         public RemoteHookingManager(RemoteApp app)
         {
             _app = app;
+            _isUnmanaged = _app.GetType().Name == "UnmanagedRemoteApp";
             _callbacksToProxies = new Dictionary<MethodBase, MethodHooks>();
         }
 
@@ -79,51 +81,64 @@ namespace RemoteNET.Common
         {
             LocalHookCallback hookProxy = (HookContext context, ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args) =>
             {
+                dynamic DecodeOora(ObjectOrRemoteAddress oora)
+                {
+                    dynamic o;
+                    if (oora.IsNull)
+                    {
+                        o = null;
+                    }
+                    else if (oora.IsRemoteAddress)
+                    {
+                        try
+                        {
+                            RemoteObject roInstance = this._app.GetRemoteObject(oora.RemoteAddress, oora.Type);
+                            o = roInstance.Dynamify();
+                        }
+                        catch (Exception ex)
+                        {
+                            // HACK: If we failed to resolve a remote object, we just return it's pointer as a long...
+                            o = oora.RemoteAddress;
+                        }
+                    }
+                    else
+                    {
+                        o = PrimitivesEncoder.Decode(oora.EncodedObject, oora.Type);
+                    }
+
+                    return o;
+                }
+
                 // Converting instance to DRO
                 dynamic droInstance;
-                if (instance.IsNull)
-                {
-                    droInstance = null;
-                }
-                else if(instance.IsRemoteAddress)
-                {
-                    try
-                    {
-                        RemoteObject roInstance = this._app.GetRemoteObject(instance.RemoteAddress, instance.Type);
-                        droInstance = roInstance.Dynamify();
-                    }
-                    catch(Exception ex)
-                    {
-                        // HACK: If we failed to resolve a remote object, we just return it's pointer as a long...
-                        droInstance = instance.RemoteAddress;
-                    }
-                }
-                else
-                {
-                    droInstance = PrimitivesEncoder.Decode(instance.EncodedObject, instance.Type);
-                }
+                droInstance = DecodeOora(instance);
 
-                // Converting args to DROs/raw primitive types
-                if (args.Length != 1)
-                {
-                    throw new NotImplementedException("Unexpected arguments forwarded to callback from the diver.");
-                }
 
                 object[] decodedParameters;
-                if (args[0].Type == typeof(UIntPtr[]).FullName)
+                if (_isUnmanaged)
                 {
                     //
                     // PARSE UNMANAGED ARGUMENTS
                     //
 
-                    object decoded = PrimitivesEncoder.Decode(args[0]);
-                    decodedParameters = (decoded as UIntPtr[]).Cast<object>().ToArray();
+                    decodedParameters = new object[args.Length];
+                    for (int i = 0; i < decodedParameters.Length; i++)
+                    {
+                        dynamic item = DecodeOora(args[i] as ObjectOrRemoteAddress);
+                        decodedParameters[i] = item;
+                    }
                 }
                 else
                 {
                     //
                     // PARSE MANAGED ARGUMENTS
                     //
+
+                    // Converting args to DROs/raw primitive types
+                    if (args.Length != 1)
+                    {
+                        throw new NotImplementedException("Unexpected arguments forwarded to callback from the diver.");
+                    }
 
                     // We are expecting a single arg which is a REMOTE array of objects (object[]) and we need to flatten it
                     // into several (Dynamic) Remote Objects in a LOCAL array of objects.
