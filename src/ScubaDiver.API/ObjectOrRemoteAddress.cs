@@ -29,5 +29,14 @@ namespace ScubaDiver.API
 
         public static ObjectOrRemoteAddress FromType(Type type) =>
             new() { Type = type.FullName, Assembly = type.Assembly.GetName().Name, IsType = true };
+
+        public override string ToString()
+        {
+            if (IsNull)
+                return "[ObjectOrRemoteAddress] NULL";
+            if (IsRemoteAddress)
+                return $"[ObjectOrRemoteAddress] RemoteAddress: 0x{RemoteAddress:x16}, Type: {Type}";
+            return $"[ObjectOrRemoteAddress] EncodedObject: {EncodedObject}, Type: {Type}";
+        }
     }
 }
