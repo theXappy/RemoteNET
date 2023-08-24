@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using ScubaDiver.Hooking;
 using DetoursNet;
-using TypeInfo = ScubaDiver.Rtti.TypeInfo;
+using ScubaDiver.Rtti;
 
 namespace ScubaDiver
 {

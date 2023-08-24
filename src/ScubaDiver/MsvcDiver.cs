@@ -436,7 +436,10 @@ namespace ScubaDiver
 
                     if (vftable != null)
                     {
-                        List<ManagedTypeDump.TypeMethod> virtualFunctions = AnalyzeVftable(module, vftable);
+                        HANDLE process = _trickster._processHandle;
+                        IReadOnlyList<DllExport> exports = GetExports(module.Name);
+                        List<ManagedTypeDump.TypeMethod> virtualFunctions = VftableParser.AnalyzeVftable(process, module, exports, vftable);
+
                         foreach (ManagedTypeDump.TypeMethod virtualFunction in virtualFunctions)
                         {
                             bool exists = methods.Any(existingMethod =>
@@ -464,70 +467,6 @@ namespace ScubaDiver
             return null;
         }
 
-        private List<ManagedTypeDump.TypeMethod> AnalyzeVftable(Rtti.ModuleInfo module, UndecoratedSymbol vftable)
-        {
-            using var scanner = new RttiScanner(
-                _trickster._processHandle,
-                module.BaseAddress,
-                module.Size);
-
-            var exports = GetExports(module.Name);
-            Dictionary<nuint, DllExport> dict = exports.DistinctBy(exp => exp.Address).ToDictionary(exp => (nuint)exp.Address);
-            List<ManagedTypeDump.TypeMethod> virtualMethods = new List<ManagedTypeDump.TypeMethod>();
-
-            DllExport entryMatchingExport;
-            bool nextVftableFound = false;
-            nuint nextTableEntryAddress = (nuint)vftable.Address;
-            // Assuming at most 99 functions in the vftable.
-            for (int i = 0; i < 100; i++)
-            {
-                nuint currAddress = (nextTableEntryAddress + (nuint)(i * IntPtr.Size));
-
-                // Check if this address is some other type's vftable address
-                // (Not checking the first one, since it OUR vftable)
-                if (i != 0 && dict.TryGetValue(currAddress, out entryMatchingExport))
-                {
-                    if (!entryMatchingExport.TryUndecorate(module, out UndecoratedSymbol undecSymbol))
-                    {
-                        Logger.Debug($"[AnalyzeVftable] Failed to undecorate. Name: {entryMatchingExport.Name}");
-                        continue;
-                    }
-
-                    if (undecSymbol.UndecoratedName.EndsWith("`vftable'"))
-                    {
-                        nextVftableFound = true;
-                        break;
-                    }
-                }
-
-                bool readNext = scanner.TryRead(currAddress, out nuint entryContent);
-                if (!readNext)
-                    break;
-
-                if (dict.TryGetValue(entryContent, out entryMatchingExport))
-                {
-                    if (!entryMatchingExport.TryUndecorate(module, out UndecoratedSymbol undecSymbol))
-                    {
-                        Logger.Debug($"[AnalyzeVftable] Failed to undecorate. Name: {entryMatchingExport.Name}");
-                        continue;
-                    }
-
-                    if (undecSymbol is UndecoratedFunction undecFunc)
-                    {
-                        HandleTypeFunction(undecFunc, null, null, virtualMethods);
-                    }
-                }
-            }
-
-            if (nextVftableFound)
-            {
-                return virtualMethods;
-            }
-
-            Logger.Debug($"[AnalyzeVftable] Next vftable not found starting at {vftable.UndecoratedName}");
-            return new List<ManagedTypeDump.TypeMethod>();
-        }
-
         private void DeconstructRttiType(Rtti.TypeInfo typeInfo,
             Rtti.ModuleInfo module,
             List<ManagedTypeDump.TypeField> fields,
@@ -544,7 +483,17 @@ namespace ScubaDiver
             {
                 if (dllExport is UndecoratedFunction undecFunc)
                 {
-                    HandleTypeFunction(undecFunc, ctorName, constructors, methods);
+                    var typeMethod = VftableParser.ConvertToTypeMethod(undecFunc);
+                    if (typeMethod == null)
+                    {
+                        Console.WriteLine($"[MsvcDiver] Failed to convert UndecoratedFunction: {undecFunc.UndecoratedFullName}. Skipping.");
+                        continue;
+                    }
+
+                    if (typeMethod.Name == ctorName)
+                        constructors.Add(typeMethod);
+                    else
+                        methods.Add(typeMethod);
                 }
                 else if (dllExport is UndecoratedExportedField undecField)
                 {
@@ -587,44 +536,6 @@ namespace ScubaDiver
                 $"[{nameof(GetManagedTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
         }
 
-        private void HandleTypeFunction(UndecoratedFunction undecFunc, string ctorName,
-            List<ManagedTypeDump.TypeMethod> constructors, List<ManagedTypeDump.TypeMethod> methods)
-        {
-            List<ManagedTypeDump.TypeMethod.MethodParameter> parameters;
-            string[] argTypes = undecFunc.ArgTypes;
-            if (argTypes != null)
-            {
-                parameters = argTypes.Select((argType, i) =>
-                    new ManagedTypeDump.TypeMethod.MethodParameter()
-                    {
-                        FullTypeName = argType,
-                        Name = $"a{i}"
-                    }).ToList();
-            }
-            else
-            {
-                Logger.Debug(
-                    $"[{nameof(GetManagedTypeDump)}] Failed to parse function's argumenst. Undecorated name: {undecFunc.UndecoratedFullName}");
-                return;
-            }
-
-            ManagedTypeDump.TypeMethod method = new()
-            {
-                Name = undecFunc.UndecoratedName,
-                UndecoratedFullName = undecFunc.UndecoratedFullName,
-                DecoratedName = undecFunc.DecoratedName,
-                Parameters = parameters,
-                ReturnTypeName = undecFunc.RetType,
-                Visibility = "Public" // Because it's exported
-            };
-
-            if (undecFunc.UndecoratedFullName == ctorName)
-                constructors.Add(method);
-            else
-                methods.Add(method);
-        }
-
-
         /// <summary>
         /// Get a specific method of a specific type, which is exported from the given module.
         /// </summary>
@@ -653,7 +564,7 @@ namespace ScubaDiver
             }
         }
 
-        private Rtti.TypeInfo? ResolveTypeFromVftableAddress(nuint address)
+        private Rtti.FirstClassTypeInfo ResolveTypeFromVftableAddress(nuint address)
         {
             foreach (var kvp in _trickster.ScannedTypes)
             {
@@ -665,8 +576,8 @@ namespace ScubaDiver
 
                 foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
                 {
-                    if (typeInfo.Address == address)
-                        return typeInfo;
+                    if (typeInfo is FirstClassTypeInfo firstClassTypeInfo &&  firstClassTypeInfo.Address == address)
+                        return firstClassTypeInfo;
                 }
                 // This module was the module containing our queried address.
                 // We couldn't find the type within the module.
@@ -757,24 +668,24 @@ namespace ScubaDiver
                 if (!assmFilter(module.Name))
                     continue;
 
-                IEnumerable<Rtti.TypeInfo> typeInfos = moduleTypesKvp.Value;
+                IEnumerable<Rtti.FirstClassTypeInfo> typeInfos = moduleTypesKvp.Value.OfType<FirstClassTypeInfo>();
                 if (!string.IsNullOrEmpty(rawTypeFilter) && rawTypeFilter != "*")
                     typeInfos = typeInfos.Where(ti => typeFilter(ti.Name));
 
 
                 Logger.Debug($"[{DateTime.Now}] Starting Trickster Scan for {typeInfos.Count()} types");
-                Dictionary<Rtti.TypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, typeInfos);
+                Dictionary<Rtti.FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, typeInfos);
                 Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {addresses.SelectMany(kvp => kvp.Value).Count()} results");
                 foreach (var typeInstancesKvp in addresses)
                 {
-                    Rtti.TypeInfo typeInfo = typeInstancesKvp.Key;
+                    Rtti.FirstClassTypeInfo typeInfo = typeInstancesKvp.Key;
                     foreach (nuint addr in typeInstancesKvp.Value)
                     {
                         HeapDump.HeapObject ho = new HeapDump.HeapObject()
                         {
                             Address = addr,
                             MethodTable = typeInfo.Address,
-                            Type = $"{module.Name}!{typeInfo.Name}"
+                            Type = typeInfo.FullTypeName
                         };
                         hd.Objects.Add(ho);
                     }
@@ -825,7 +736,7 @@ namespace ScubaDiver
             {
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
-                Rtti.TypeInfo? typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                Rtti.TypeInfo typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
                 if (typeInfo == null)
                 {
                     throw new Exception("Failed to resolve vftable of target to any RTTI type.");
@@ -836,7 +747,7 @@ namespace ScubaDiver
 
                 ObjectDump od = new ObjectDump()
                 {
-                    Type = $"{typeInfo.Value.ModuleName}!{typeInfo.Value.Name}",
+                    Type = typeInfo.FullTypeName,
                     RetrivalAddress = objAddr,
                     PinnedAddress = objAddr,
                     HashCode = 0x0bad0bad
@@ -1006,15 +917,14 @@ namespace ScubaDiver
                 long vftable = Marshal.ReadInt64(new IntPtr((long)results.Value));
                 Console.WriteLine($"vftable: {vftable:x16}");
                 Console.WriteLine("Trying to resolve vftable to type...");
-                Rtti.TypeInfo? reTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
-                Console.WriteLine($"Trying to resolve vftable to type... Got back: {reTypeInfo}");
+                Rtti.TypeInfo retTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                Console.WriteLine($"Trying to resolve vftable to type... Got back: {retTypeInfo}");
 
-                if (reTypeInfo.HasValue)
+                if (retTypeInfo != null)
                 {
                     ulong pinAddr = 0x0;
 
-                    string actualRetTypeFullTypeName = $"{reTypeInfo.Value.ModuleName}!{reTypeInfo.Value.Name}";
-                    returnValue = ObjectOrRemoteAddress.FromToken(results.Value, actualRetTypeFullTypeName);
+                    returnValue = ObjectOrRemoteAddress.FromToken(results.Value, retTypeInfo.FullTypeName);
                 }
                 else
                 {
