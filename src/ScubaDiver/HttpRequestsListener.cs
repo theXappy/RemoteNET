@@ -41,15 +41,15 @@ public class RnetReverseRequestsListener : IRequestsListener
 
     public RnetReverseRequestsListener(int reverseProxyPort)
     {
-        Logger.Debug($"[RnetReverseRequestsListener] ctor() -- port: {reverseProxyPort}");
         _port = reverseProxyPort;
     }
 
     public void Start()
     {
-        Logger.Debug("[RnetReverseRequestsListener] Start() -- entered");
         _stayAlive.Set();
-        _client = new TcpClient("localhost", _port);
+        _client = new TcpClient();
+        var ipe = new IPEndPoint(IPAddress.Parse("127.0.0.1"), _port);
+        _client.Connect(ipe);
         _task = Task.Run(Dispatcher);
     }
 
@@ -61,28 +61,22 @@ public class RnetReverseRequestsListener : IRequestsListener
 
     private void Dispatcher()
     {
-        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- entered");
         var client = _client;
 
-
         // Introduce ourselves to the proxy
-        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- Writing proxy_intro");
         HttpRequestSummary intro =
             HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver\"}");
         SimpleHttpProtocolParser.WriteRequest(client, intro);
-        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- proxy_intro written");
 
-        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- reading proxy_intro resp");
         var introResp = SimpleHttpProtocolParser.ReadResponse(client);
-        Logger.Debug($"[RnetReverseRequestsListener] Dispatcher() -- reading proxy_intro resp. Body: {introResp.Body}");
-        Logger.Debug($"[RnetReverseRequestsListener] Dispatcher() -- reading proxy_intro resp. BodyString: {introResp.BodyString}");
         if (introResp == null || !introResp.BodyString.Contains("\"status\":\"OK\""))
             throw new Exception("Diver couldn't register at Lifeboat");
-        Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- read proxy_intro, no exception");
+
+        string listeningUrl = $"http://127.0.0.1:{_port}/";
+        Logger.Debug($"[RnetReverseRequestsListener] Connected. Proxy should be available at: {listeningUrl}");
 
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
-            Logger.Debug("[RnetReverseRequestsListener] Dispatcher() -- Looping! Reading request...");
             var request = SimpleHttpProtocolParser.ReadRequest(client);
             if (request == null)
                 continue;
@@ -98,23 +92,17 @@ public class RnetReverseRequestsListener : IRequestsListener
 
             RequestReceived?.Invoke(this, req);
         }
-
-        Logger.Debug("[DiverBase] Dispatcher() - Reverse TCP Loop ended. Cleaning up");
     }
 
     public void WaitForExit()
     {
-        Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Start");
-
         try
         {
-            Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Waiting on dispatch task");
             _task.Wait();
-            Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Dispatcher task existed gracefully");
         }
         catch(Exception e)
         {
-            Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Dispatcher task existed with exception. Ex: " + e);
+            Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Dispatcher task exited with exception. Ex: " + e);
             return;
         }
     }
@@ -138,14 +126,12 @@ public class RnetRequestsListener : IRequestsListener
 
     public RnetRequestsListener(int listenPort)
     {
-        Logger.Debug($"[RnetRequestsListener] ctor() port: {listenPort}");
         _listener = new TcpListener(IPAddress.Any, listenPort);
     }
 
 
     public void Start()
     {
-        Logger.Debug("[RnetRequestsListener] Start()");
         _stayAlive.Set();
         _listener.Start();
         _task = Task.Run(Dispatcher);
@@ -158,8 +144,6 @@ public class RnetRequestsListener : IRequestsListener
     }
     private void Dispatcher()
     {
-        Logger.Debug("[RnetRequestsListener] Dispatcher() -- entered");
-
         // Using a timeout we can make sure not to block if the
         // 'stayAlive' state changes to "reset" (which means we should die)
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))
@@ -167,8 +151,6 @@ public class RnetRequestsListener : IRequestsListener
             TcpClient client = _listener.AcceptTcpClient();
             Task.Run(() => HandleTcpClient(client));
         }
-
-        Logger.Debug("[DiverBase] TCP Loop ended. Cleaning up");
     }
 
     private void HandleTcpClient(TcpClient client)
@@ -232,7 +214,7 @@ public class HttpRequestsListener : IRequestsListener
         var manager = listener.TimeoutManager;
         manager.IdleConnection = TimeSpan.FromSeconds(5);
         listener.Start();
-        Logger.Debug($"[DotNetDiver] Listening on {listeningUrl}...");
+        Logger.Debug($"[HttpRequestsListener] Listening on {listeningUrl}...");
 
         _listener = listener;
     }
