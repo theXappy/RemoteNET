@@ -68,6 +68,6 @@ jobs:
     - name: Build
       run: |
         cd src
-        msbuild $env:Solution_Name -target:RemoteNET:rebuild /p:Configuration=$env:Configuration
+        msbuild $env:Solution_Name -target:RemoteNET:rebuild /p:Configuration=$env:Configuration /property:Platform=Mixed
       env:
         Configuration: ${{ matrix.configuration }}
