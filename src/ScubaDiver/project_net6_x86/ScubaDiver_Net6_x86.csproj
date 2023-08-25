@@ -84,7 +84,7 @@
 		</CopyOperations>
 	</ItemGroup>
 
-	<Target Name="CopyOutputToDestination" AfterTargets="PostBuildEvent">
+	<Target Name="CopyOutputToDestination" AfterTargets="Build">
 		<Copy SourceFiles="@(CopyOperations)"
 		      DestinationFolder="%(CopyOperations.DestinationFolder)" />
 	</Target>
