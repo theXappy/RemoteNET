@@ -84,7 +84,7 @@
 			<ZipOperations Include="$(SolutionDir)\dist\$(Configuration)\ScubaDivers">
 				<ZipFileName>$(ProjectDir)\Resources\ScubaDivers.zip</ZipFileName>
 			</ZipOperations>
-			<ZipOperations Include="$(SolutionDir)\dist\$(Configuration)\DetoursNet">
+			<ZipOperations Include="$(SolutionDir)\detours_build\bin\$(Configuration)">
 				<ZipFileName>$(ProjectDir)\Resources\DetoursNet.zip</ZipFileName>
 			</ZipOperations>
 		</ItemGroup>
