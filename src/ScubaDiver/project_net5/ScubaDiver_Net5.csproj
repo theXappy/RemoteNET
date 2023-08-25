@@ -40,8 +40,15 @@
 		<ProjectReference Include="..\..\ScubaDiver.API\ScubaDiver.API.csproj" />
 	</ItemGroup>
 
-	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="xcopy /Y /s &quot;$(TargetDir)&quot; &quot;$(SolutionDir)dist\$(ConfigurationName)\$(ProjectName)\&quot;" />
+	<ItemGroup>
+		<CopyOperations Include="$(TargetDir)\*">
+			<DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
+		</CopyOperations>
+	</ItemGroup>
+
+	<Target Name="CopyOutputToDestination" AfterTargets="PostBuildEvent">
+		<Copy SourceFiles="@(CopyOperations)"
+		      DestinationFolder="%(CopyOperations.DestinationFolder)" />
 	</Target>
 
 </Project>
