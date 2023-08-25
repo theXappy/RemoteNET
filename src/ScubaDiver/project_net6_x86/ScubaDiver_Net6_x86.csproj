@@ -58,23 +58,56 @@
 		<ProjectReference Include="..\..\ScubaDiver.Demangle\ScubaDiver.Demangle.csproj" />
 	</ItemGroup>
 
-	<ItemGroup>
+	<!-- DetoursNET for DEBUG configuration -->
+	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
+		<!-- DLLs as Contents so they are copied to the output -->
 		<Content Include="..\..\detours_build\bin\$(ConfigurationName)\DetoursDll.dll" Link="DetoursDll.dll">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
-		<Content Include="..\..\detours_build\bin\$(ConfigurationName)\DetoursDll.pdb" Link="DetoursDll.pdb">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 		<Content Include="..\..\detours_build\bin\$(ConfigurationName)\DetoursNetCLR.dll" Link="DetoursNetCLR.dll">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
-		<Content Include="..\..\detours_build\bin\$(ConfigurationName)\DetoursNetCLR.pdb" Link="DetoursNetCLR.pdb">
+		<Content Include="..\..\detours_build\bin\Debug\DetoursDll.pdb" Link="DetoursDll.pdb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\detours_build\bin\Debug\DetoursNetCLR.pdb" Link="DetoursNetCLR.pdb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\detours_build\bin\Debug\DetoursNet.dll" Link="DetoursNet.dll">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\detours_build\bin\Debug\DetoursNet.pdb" Link="DetoursNet.pdb">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
+
+	<!-- DetoursNET for RELEASE configuration -->
+	<ItemGroup Condition="'$(Configuration)' == 'Release'">
+		<!-- DLLs as Contents so they are copied to the output -->
+		<Content Include="..\..\detours_build\bin\RelWithDebInfo\DetoursDll.dll" Link="DetoursDll.dll">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\detours_build\bin\RelWithDebInfo\DetoursNetCLR.dll" Link="DetoursNetCLR.dll">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\detours_build\bin\RelWithDebInfo\DetoursDll.pdb" Link="DetoursDll.pdb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\detours_build\bin\RelWithDebInfo\DetoursNetCLR.pdb" Link="DetoursNetCLR.pdb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\detours_build\bin\RelWithDebInfo\DetoursNet.dll" Link="DetoursNet.dll">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\detours_build\bin\RelWithDebInfo\DetoursNet.pdb" Link="DetoursNet.pdb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+	<!-- .NET Reference -->
 	<ItemGroup>
 		<Reference Include="DetoursNet">
-			<HintPath>..\..\detours_build\bin\$(ConfigurationName)\DetoursNet.dll</HintPath>
+			<HintPath>.\DetoursNet.dll</HintPath>
 		</Reference>
 	</ItemGroup>
 
