@@ -49,13 +49,12 @@
 	  <Folder Include="Utils\" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<CopyOperations Include="$(TargetDir)\*">
-			<DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
-		</CopyOperations>
-	</ItemGroup>
-
 	<Target Name="CopyOutputToDestination" AfterTargets="Build">
+		<ItemGroup>
+			<CopyOperations Include="$(TargetDir)\*">
+				<DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
+			</CopyOperations>
+		</ItemGroup>
 		<Message Text="[~] $(ProjectName) - Copying to ScubaDiver folder" Importance="high"/>
 		<Message Text="[~] Files to copy: @(CopyOperations) dest: %(CopyOperations.DestinationFolder)" Importance="high"/>
 		<Copy SourceFiles="@(CopyOperations)"
