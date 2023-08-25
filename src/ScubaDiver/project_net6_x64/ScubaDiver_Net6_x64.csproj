@@ -79,9 +79,15 @@
 		<ProjectReference Include="..\..\ScubaDiver.Demangle\ScubaDiver.Demangle.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<CopyOperations Include="$(TargetDir)\*">
+			<DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
+		</CopyOperations>
+	</ItemGroup>
 
-	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="xcopy /Y /s &quot;$(TargetDir)&quot; &quot;$(SolutionDir)dist\$(ConfigurationName)\$(ProjectName)\&quot;" />
+	<Target Name="CopyOutputToDestination" AfterTargets="PostBuildEvent">
+		<Copy SourceFiles="@(CopyOperations)"
+		      DestinationFolder="%(CopyOperations.DestinationFolder)" />
 	</Target>
 
 </Project>

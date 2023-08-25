@@ -59,12 +59,52 @@
 		</None>
 	</ItemGroup>
 
-	<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-		<Exec Command="xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\Win32\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\dist\$(Configuration)\x64\&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;xcopy /Y /s &quot;$(SolutionDir)\InjectableDummy\bin\$(Configuration)\net6.0&quot; &quot;$(ProjectDir)\Resources&quot;&#xD;&#xA;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\Lifeboat\bin\$(Configuration)\net6.0\*' '$(ProjectDir)\Resources\Lifeboat.zip' -Force&quot;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\ScubaDiver*' '$(ProjectDir)\Resources\ScubaDivers.zip' -Force&quot;&#xD;&#xA;powershell &quot;Compress-Archive '$(SolutionDir)\dist\$(Configuration)\DetoursNet\*' '$(ProjectDir)\Resources\DetoursNet.zip' -Force&quot;" />
+	<Target Name="CopyDlls" BeforeTargets="BeforeBuild">
+		<ItemGroup>
+			<CopyOperations Include="$(SolutionDir)\dist\$(Configuration)\Win32\**\*.exe;$(SolutionDir)\dist\$(Configuration)\Win32\**\*.dll;$(SolutionDir)\dist\$(Configuration)\Win32\**\*.pdb">
+				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
+			</CopyOperations>
+			<CopyOperations Include="$(SolutionDir)\dist\$(Configuration)\x64\**\*.exe;$(SolutionDir)\dist\$(Configuration)\x64\**\*.dll;$(SolutionDir)\dist\$(Configuration)\x64\**\*.pdb">
+				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
+			</CopyOperations>
+			<CopyOperations Include="$(SolutionDir)\InjectableDummy\bin\$(Configuration)\net6.0\**\*">
+				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
+			</CopyOperations>
+		</ItemGroup>
+		<Message Text="[~] Copying resources" Importance="high"/>
+		<Message Text="[~] Resources List: @(CopyOperations)" Importance="high"/>
+		<Copy SourceFiles="@(CopyOperations)" DestinationFolder="%(CopyOperations.DestinationFolder)" />
+	</Target>
+	
+	<Target Name="ZipFolders" BeforeTargets="BeforeBuild">
+		<ItemGroup>
+			<ZipOperations Include="$(SolutionDir)\Lifeboat\bin\$(Configuration)\net6.0">
+				<ZipFileName>$(ProjectDir)\Resources\Lifeboat.zip</ZipFileName>
+			</ZipOperations>
+			<ZipOperations Include="$(SolutionDir)\dist\$(Configuration)\ScubaDivers">
+				<ZipFileName>$(ProjectDir)\Resources\ScubaDivers.zip</ZipFileName>
+			</ZipOperations>
+			<ZipOperations Include="$(SolutionDir)\dist\$(Configuration)\DetoursNet">
+				<ZipFileName>$(ProjectDir)\Resources\DetoursNet.zip</ZipFileName>
+			</ZipOperations>
+		</ItemGroup>
+		<ZipDirectory
+			SourceDirectory="@(ZipOperations)"
+			DestinationFile="%(ZipOperations.ZipFileName)"
+			Overwrite="true" />
 	</Target>
 
-	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="powershell &quot;Get-ChildItem -Path '$(ProjectDir)\Resources' -Exclude '*READ_ME*' | Set-Content -Value 'dummy'&quot;" />
+	<Target Name="DeleteDebugSymbolFile" AfterTargets="Build">
+		<ItemGroup>
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.exe"/>
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.dll"/>
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.pdb"/>
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.json"/>
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.zip"/>
+		</ItemGroup>
+		<Message Text="[~] Cleaning up copied Resources" Importance="high"/>
+		<Message Text="[~] Deleting Files: @(FilesToDelete)" Importance="high"/>
+		<Delete Files="@(FilesToDelete)"/>
 	</Target>
 
 	<ItemGroup>

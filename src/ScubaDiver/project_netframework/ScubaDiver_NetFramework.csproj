@@ -89,7 +89,12 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
-    <PostBuildEvent>xcopy /Y /s "$(TargetDir)" "$(SolutionDir)dist\$(ConfigurationName)\$(ProjectName)\"</PostBuildEvent>
-  </PropertyGroup>
-</Project>
+  <ItemGroup>
+    <CopyOperations Include="$(TargetDir)\*">
+      <DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
+    </CopyOperations>
+  </ItemGroup>
+  <Target Name="CopyOutputToDestination" AfterTargets="PostBuildEvent">
+    <Copy SourceFiles="@(CopyOperations)"
+          DestinationFolder="%(CopyOperations.DestinationFolder)" />
+  </Target></Project>
