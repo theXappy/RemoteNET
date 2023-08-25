@@ -76,7 +76,7 @@ namespace ScubaDiver
             Logger.Debug("[DotNetDiver] Start() -- returning");
         }
 
-        protected void CallbacksEndpointsMonitor()
+        protected override void CallbacksEndpointsMonitor()
         {
             while (_monitorEndpoints)
             {
