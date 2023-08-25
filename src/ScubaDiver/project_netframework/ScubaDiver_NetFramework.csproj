@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ScubaDiver</RootNamespace>
     <AssemblyName>ScubaDiver_NetFramework</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <TargetFrameworkProfile />
@@ -56,9 +56,9 @@
     <Compile Include="..\Utils\SmartLocksDict.cs" Link="Utils\SmartLocksDict.cs" />
     <Compile Include="..\Utils\TypesResolver.cs" Link="Utils\TypesResolver.cs" />
     <Compile Include="..\Utils\UnifiedAppDomain.cs" Link="Utils\UnifiedAppDomain.cs" />
-	<Compile Include="..\HttpRequestsListener.cs" />
-	<Compile Include="..\IRequestsListener.cs" />
-	<Compile Include="..\ScubaDiverMessage.cs" />
+    <Compile Include="..\HttpRequestsListener.cs" />
+    <Compile Include="..\IRequestsListener.cs" />
+    <Compile Include="..\ScubaDiverMessage.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\app.config" />
