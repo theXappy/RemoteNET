@@ -89,12 +89,11 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <ItemGroup>
-    <CopyOperations Include="$(TargetDir)\*">
-      <DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
-    </CopyOperations>
-  </ItemGroup>
-  <Target Name="CopyOutputToDestination" AfterTargets="Build">
+  <Target Name="CopyOutputToDestination" AfterTargets="Build">	<ItemGroup>
+		<CopyOperations Include="$(TargetDir)\*">
+			<DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
+		</CopyOperations>
+	</ItemGroup>
     <Copy SourceFiles="@(CopyOperations)"
           DestinationFolder="%(CopyOperations.DestinationFolder)" />
   </Target></Project>
