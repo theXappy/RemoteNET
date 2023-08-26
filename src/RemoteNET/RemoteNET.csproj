@@ -84,7 +84,11 @@
 			<ZipOperations Include="$(SolutionDir)\dist\$(Configuration)\ScubaDivers">
 				<ZipFileName>$(ProjectDir)\Resources\ScubaDivers.zip</ZipFileName>
 			</ZipOperations>
-			<ZipOperations Include="$(SolutionDir)\detours_build\bin\$(Configuration)">
+			<!-- Detours - choose one of 2 directories based on configuration -->
+			<ZipOperations Include="$(SolutionDir)\detours_build\bin\$(Configuration)" Condition="'$(Configuration)' == 'Debug'">
+				<ZipFileName>$(ProjectDir)\Resources\DetoursNet.zip</ZipFileName>
+			</ZipOperations>
+			<ZipOperations Include="$(SolutionDir)\detours_build\bin\RelWithDebInfo" Condition="'$(Configuration)' == 'Release'">
 				<ZipFileName>$(ProjectDir)\Resources\DetoursNet.zip</ZipFileName>
 			</ZipOperations>
 		</ItemGroup>
