@@ -38,7 +38,7 @@ To get the essence of how easy and usefull this library can be, see below a re-i
 This example interacts with an open KeePass process and makes it export all credentials to a CSV file.  
 ```C#
 // Gain foothold within the target process
-RemoteApp remoteApp = RemoteApp.Connect("KeePass.exe");
+RemoteApp remoteApp = RemoteAppFactory.Connect("KeePass.exe", RuntimeType.Managed);
 RemoteActivator rActivator = remoteApp.Activator;
 
 // Get a remote DocumentManagerEx object
@@ -75,9 +75,13 @@ This section documents most parts of the library's API which you'll likely need.
 ### ✳️ Setup
 To start playing with a remote process you need to create a `RemoteApp` object like so:
 ```C#
-RemoteApp remoteApp = RemoteApp.Connect("OtherDotNetAppName");
+// For .NET targets
+RemoteApp remoteApp = RemoteAppFactory.Connect("MyDotNetTarget.exe", RuntimeType.Managed);
+// For MSVC C++ target
+RemoteApp remoteApp = RemoteAppFactory.Connect("MyNativeTarget.exe", RuntimeType.Unmanaged);
 ```
-If you have multiple processes with such name you can use the overload `Connect(System.Diagnostics.Process p)`;
+If you have multiple processes running with the same name,  
+you can use the overload `Connect(System.Diagnostics.Process p, RuntimeType r)`.
 
 ### ✳️ Getting Existing Remote Objects
 First and foremost RemoteNET allows you to find existing objects in the remote app.  
