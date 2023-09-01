@@ -73,7 +73,7 @@ namespace ScubaDiver
 
             // This will runt the requests listener
             base.Start();
-            Logger.Debug("[DotNetDiver] Start() -- returning");
+            Logger.Debug("[DotNetDiver] Started.");
         }
 
         protected override void CallbacksEndpointsMonitor()
@@ -809,19 +809,11 @@ namespace ScubaDiver
         protected override string MakeCreateObjectResponse(ScubaDiverMessage arg)
         {
             Logger.Debug("[DotNetDiver] Got /create_object request!");
-            string body = arg.Body;
-
-            if (string.IsNullOrEmpty(body))
-            {
+            if (string.IsNullOrEmpty(arg.Body))
                 return QuickError("Missing body");
-            }
-
-            var request = JsonConvert.DeserializeObject<CtorInvocationRequest>(body);
+            var request = JsonConvert.DeserializeObject<CtorInvocationRequest>(arg.Body);
             if (request == null)
-            {
                 return QuickError("Failed to deserialize body");
-            }
-
 
             Type t = null;
             lock (_clrMdLock)
@@ -829,9 +821,7 @@ namespace ScubaDiver
                 t = _unifiedAppDomain.ResolveType(request.TypeFullName);
             }
             if (t == null)
-            {
                 return QuickError("Failed to resolve type");
-            }
 
             List<object> paramsList = new();
             if (request.Parameters.Any())
@@ -845,7 +835,7 @@ namespace ScubaDiver
                 Logger.Debug("[DotNetDiver] Ctor'ing without parameters");
             }
 
-            object createdObject = null;
+            object createdObject;
             try
             {
                 object[] paramsArray = paramsList.ToArray();
@@ -863,9 +853,7 @@ namespace ScubaDiver
             }
 
             if (createdObject == null)
-            {
                 return QuickError("Activator.CreateInstance returned null");
-            }
 
             // Need to return the results. If it's primitive we'll encode it
             // If it's non-primitive we pin it and send the address.
@@ -884,14 +872,12 @@ namespace ScubaDiver
                 res = ObjectOrRemoteAddress.FromToken(pinAddr, createdObject.GetType().FullName);
             }
 
-
             InvocationResults invoRes = new()
             {
                 ReturnedObjectOrAddress = res,
                 VoidReturnType = false
             };
             return JsonConvert.SerializeObject(invoRes);
-
         }
 
         protected override string MakeInvokeResponse(ScubaDiverMessage arg)
@@ -900,16 +886,11 @@ namespace ScubaDiver
             string body = arg.Body;
 
             if (string.IsNullOrEmpty(body))
-            {
                 return QuickError("Missing body");
-            }
 
-            TextReader textReader = new StringReader(body);
             var request = JsonConvert.DeserializeObject<InvocationRequest>(body);
             if (request == null)
-            {
                 return QuickError("Failed to deserialize body");
-            }
 
             // Need to figure target instance and the target type.
             // In case of a static call the target instance stays null.
