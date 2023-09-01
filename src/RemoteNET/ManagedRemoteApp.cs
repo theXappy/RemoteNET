@@ -104,6 +104,7 @@ namespace RemoteNET
 
         public Process Process => _procWithDiver;
         public RemoteActivator Activator { get; private set; }
+        public RemoteMarshal Marshal { get; private set; }
 
         public override DiverCommunicator Communicator => _managedCommunicator;
 
@@ -112,6 +113,7 @@ namespace RemoteNET
             _procWithDiver = procWithDiver;
             _managedCommunicator = managedCommunicator;
             Activator = new RemoteActivator(managedCommunicator, this);
+            Marshal = new RemoteMarshal(this);
             _hookingManager = new RemoteHookingManager(this);
             _remoteObjects = new ManagedRemoteApp.RemoteObjectsCollection(this);
         }
