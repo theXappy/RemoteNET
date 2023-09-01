@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using RemoteNET;
@@ -48,7 +49,8 @@ namespace ScubaDiver.Tester
                 break;
             }
             UnmanagedRemoteApp unmanRemoteApp = null;
-            while (true)
+            //while (true)
+            for (int i = 0; i < 1; i++)
             {
                 try
                 {
@@ -97,7 +99,8 @@ namespace ScubaDiver.Tester
             Console.WriteLine("16. Dump Unmanaged Type Info");
             Console.WriteLine("17. Inject dll");
             Console.WriteLine("18. Offensive GC");
-            Console.WriteLine("19. Exit");
+            Console.WriteLine("19. Allocate-Write-Read buffer");
+            Console.WriteLine("20. Exit");
             string input = Console.ReadLine();
             uint index;
             if (int.TryParse(input, out int userChoice))
@@ -480,6 +483,26 @@ namespace ScubaDiver.Tester
                             break;
                         }
                     case 19:
+                    {
+                        Console.WriteLine("How many bytes do you want to allocate?");
+                        int num = int.Parse(Console.ReadLine());
+                        var res = remoteApp.Marshal.AllocHGlobal(num);
+                        Console.WriteLine($"Pointer: 0x{res:x16}");
+                        Console.WriteLine("Enter text to write:");
+                        string txt = Console.ReadLine();
+                        byte[] bytes = Encoding.ASCII.GetBytes(txt);
+
+                        // Write
+                        remoteApp.Marshal.Write(bytes, 0, res, bytes.Length);
+
+                        // Read
+                        byte[] newBytes = new byte[bytes.Length];
+                        remoteApp.Marshal.Read(res, newBytes, 0, newBytes.Length);
+                        Console.WriteLine("Read back:");
+                        Console.WriteLine(Encoding.ASCII.GetString(newBytes));
+                        break;
+                    }
+                    case 20:
                         // Exiting
                         return true;
                 }
