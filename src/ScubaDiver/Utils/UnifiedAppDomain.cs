@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Reflection;
 
@@ -26,6 +26,8 @@ namespace ScubaDiver.Utils
         {
             if (_domains == null)
             {
+                bool useFallback = false;
+
                 // Using DotNetDiver's heap searching abilities to locate all 'System.AppDomain'
                 try
                 {
@@ -40,21 +42,32 @@ namespace ScubaDiver.Utils
                         .Select(cand => _parentDiver.GetObject(cand.Address, false, cand.Type, cand.HashCode).instance)
                         .Cast<AppDomain>().ToArray();
                     Logger.Debug("[DotNetDiver][UnifiedAppDomain] All assemblies were retrieved from all AppDomains :)");
+
+                    // Check for failures
+                    if (_domains.Length == 0)
+                    {
+                        Console.WriteLine("[DotNetDiver][UnifiedAppDomain] WARNING searching the heap for System.AppDomains returned nothing.");
+                        useFallback = true;
+                    }
                 }
                 catch (Exception ex)
                 {
                     Logger.Debug("[DotNetDiver][UnifiedAppDomain] Failed to search heap for Runtime Assemblies. Error: " + ex.Message);
-
-                    // Fallback - Just return all assemblies in the current AppDomain. Obviously, it's not ALL of them but sometimes it's good enough.
-                    _domains = new[] { AppDomain.CurrentDomain };
+                    useFallback = true;
                 }
+
+                // if we failed to find app domains in the sneaky way, use formal .NET APIs to at least get OUR domain.
+                if(useFallback)
+                    _domains = new[] { AppDomain.CurrentDomain };
             }
             return _domains;
         }
 
         public Assembly[] GetAssemblies()
         {
-            return GetDomains().SelectMany(domain => domain.GetAssemblies()).ToArray();
+            var domains = GetDomains();
+            Console.WriteLine($"[GetAssemblies] Domains: {domains.Length}");
+            return domains.SelectMany(domain => domain.GetAssemblies()).ToArray();
         }
 
         public Type ResolveType(string typeFullName, string assembly = null)
