@@ -49,5 +49,10 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 
             return FromJson(url, queryString, json);
         }
+
+        public override string ToString()
+        {
+            return $"HTTP Request. Method: {Method}, URL: {Url}";
+        }
     }
 }
