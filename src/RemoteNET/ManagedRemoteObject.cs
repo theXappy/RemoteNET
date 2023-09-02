@@ -62,10 +62,10 @@ namespace RemoteNET
         public override dynamic Dynamify()
         {
             // Adding fields 
-            ManagedTypeDump managedTypeDump = _ref.GetTypeDump();
+            TypeDump typeDump = _ref.GetTypeDump();
 
             var factory = new DynamicRemoteObjectFactory();
-            return factory.Create(_app, this, managedTypeDump);
+            return factory.Create(_app, this, typeDump);
         }
 
 

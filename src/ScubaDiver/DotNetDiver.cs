@@ -486,22 +486,22 @@ namespace ScubaDiver
             // 
             // Defining a sub-function that parses a type and it's parents recursively
             //
-            static ManagedTypeDump ParseType(Type typeObj)
+            static TypeDump ParseType(Type typeObj)
             {
                 if (typeObj == null) return null;
 
-                var ctors = typeObj.GetConstructors((BindingFlags)0xffff).Select(ci => new ManagedTypeDump.TypeMethod(ci))
+                var ctors = typeObj.GetConstructors((BindingFlags)0xffff).Select(ci => new TypeDump.TypeMethod(ci))
                     .ToList();
-                var methods = typeObj.GetRuntimeMethods().Select(mi => new ManagedTypeDump.TypeMethod(mi))
+                var methods = typeObj.GetRuntimeMethods().Select(mi => new TypeDump.TypeMethod(mi))
                     .ToList();
-                var fields = typeObj.GetRuntimeFields().Select(fi => new ManagedTypeDump.TypeField(fi))
+                var fields = typeObj.GetRuntimeFields().Select(fi => new TypeDump.TypeField(fi))
                     .ToList();
-                var events = typeObj.GetRuntimeEvents().Select(ei => new ManagedTypeDump.TypeEvent(ei))
+                var events = typeObj.GetRuntimeEvents().Select(ei => new TypeDump.TypeEvent(ei))
                     .ToList();
-                var props = typeObj.GetRuntimeProperties().Select(pi => new ManagedTypeDump.TypeProperty(pi))
+                var props = typeObj.GetRuntimeProperties().Select(pi => new TypeDump.TypeProperty(pi))
                     .ToList();
 
-                ManagedTypeDump td = new()
+                TypeDump td = new()
                 {
                     Type = typeObj.FullName,
                     Assembly = typeObj.Assembly.GetName().Name,
@@ -524,8 +524,8 @@ namespace ScubaDiver
 
             if (resolvedType != null)
             {
-                ManagedTypeDump recusiveManagedTypeDump = ParseType(resolvedType);
-                return JsonConvert.SerializeObject(recusiveManagedTypeDump);
+                TypeDump recusiveTypeDump = ParseType(resolvedType);
+                return JsonConvert.SerializeObject(recusiveTypeDump);
             }
 
             return QuickError("Failed to find type in searched assemblies");

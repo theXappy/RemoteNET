@@ -94,7 +94,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 if (!_onGoingCreations.TryGetValue(
                     new Tuple<string, string>(assembly, type), out paramType) || paramType == null)
                 {
-                    ManagedTypeDump dumpedArgType =
+                    TypeDump dumpedArgType =
                         _communicator.DumpType(type, assembly);
                     if (dumpedArgType == null)
                     {
@@ -126,7 +126,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 return shortOutput;
             }
 
-            ManagedTypeDump parentDump = _communicator.DumpType(fullTypeName, assembly);
+            TypeDump parentDump = _communicator.DumpType(fullTypeName, assembly);
             if (parentDump == null)
             {
                 throw new Exception(
@@ -136,27 +136,27 @@ namespace RemoteNET.Internal.Reflection.DotNet
             return Create(app, parentDump);
         }
 
-        public Type Create(ManagedRemoteApp app, ManagedTypeDump managedTypeDump)
+        public Type Create(ManagedRemoteApp app, TypeDump typeDump)
         {
-            Type shortOutput = _resolver.Resolve(managedTypeDump.Assembly, managedTypeDump.Type);
+            Type shortOutput = _resolver.Resolve(typeDump.Assembly, typeDump.Type);
             if (shortOutput != null)
             {
                 return shortOutput;
             }
 
-            RemoteType output = new RemoteType(app, managedTypeDump.Type, managedTypeDump.Assembly, managedTypeDump.IsArray);
+            RemoteType output = new RemoteType(app, typeDump.Type, typeDump.Assembly, typeDump.IsArray);
 
             // Temporarily indicate we are on-going creation
-            _onGoingCreations[new Tuple<string, string>(managedTypeDump.Assembly, managedTypeDump.Type)] = output;
+            _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.Type)] = output;
 
-            string parentType = managedTypeDump.ParentFullTypeName;
+            string parentType = typeDump.ParentFullTypeName;
             if (parentType != null)
             {
                 Lazy<Type> parent = new Lazy<Type>(() =>
                 {
                     try
                     {
-                        return Create(app, parentType, managedTypeDump.ParentAssembly);
+                        return Create(app, parentType, typeDump.ParentAssembly);
 
                     }
                     catch (Exception ex)
@@ -168,24 +168,24 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 });
                 output.SetParent(parent);
             }
-            AddMembers(app, managedTypeDump, output);
+            AddMembers(app, typeDump, output);
 
             // remove on-going creation indication
-            _onGoingCreations.Remove(new Tuple<string, string>(managedTypeDump.Assembly, managedTypeDump.Type));
+            _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
 
             // Register at resolver
-            _resolver.RegisterType(managedTypeDump.Assembly, managedTypeDump.Type, output);
+            _resolver.RegisterType(typeDump.Assembly, typeDump.Type, output);
 
             return output;
         }
 
-        private void AddMembers(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
+        private void AddMembers(ManagedRemoteApp app, TypeDump typeDump, RemoteType output)
         {
-            AddGroupOfFunctions(app, managedTypeDump, managedTypeDump.Methods, output, areConstructors: false);
-            AddGroupOfFunctions(app, managedTypeDump, managedTypeDump.Constructors, output, areConstructors: true);
-            AddFields(app, managedTypeDump, output);
-            AddProperties(app, managedTypeDump, output);
-            AddEvents(app, managedTypeDump, output);
+            AddGroupOfFunctions(app, typeDump, typeDump.Methods, output, areConstructors: false);
+            AddGroupOfFunctions(app, typeDump, typeDump.Constructors, output, areConstructors: true);
+            AddFields(app, typeDump, output);
+            AddProperties(app, typeDump, output);
+            AddEvents(app, typeDump, output);
 
             // Enrich properties with getters and setters
             AttachAccessorsToProperties(output);
@@ -207,15 +207,15 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
         }
 
-        private void AddProperties(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
+        private void AddProperties(ManagedRemoteApp app, TypeDump typeDump, RemoteType output)
         {
-            foreach (ManagedTypeDump.TypeProperty propDump in managedTypeDump.Properties)
+            foreach (TypeDump.TypeProperty propDump in typeDump.Properties)
             {
                 Lazy<Type> factory = new Lazy<Type>(() =>
                 {
                     try
                     {
-                        return ResolveTypeWhileCreating(app, managedTypeDump.Type, "prop__resolving__logic",
+                        return ResolveTypeWhileCreating(app, typeDump.Type, "prop__resolving__logic",
                         propDump.Assembly, propDump.TypeFullName);
                     }
                     catch (Exception e)
@@ -244,15 +244,15 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
         }
 
-        private void AddEvents(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
+        private void AddEvents(ManagedRemoteApp app, TypeDump typeDump, RemoteType output)
         {
-            foreach (ManagedTypeDump.TypeEvent eventType in managedTypeDump.Events)
+            foreach (TypeDump.TypeEvent eventType in typeDump.Events)
             {
                 Lazy<Type> factory = new Lazy<Type>(() =>
                 {
                     try
                     {
-                        return ResolveTypeWhileCreating(app, managedTypeDump.Type, "event__resolving__logic", eventType.Assembly, eventType.TypeFullName);
+                        return ResolveTypeWhileCreating(app, typeDump.Type, "event__resolving__logic", eventType.Assembly, eventType.TypeFullName);
                     }
                     catch (Exception e)
                     {
@@ -267,15 +267,15 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
         }
 
-        private void AddFields(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, RemoteType output)
+        private void AddFields(ManagedRemoteApp app, TypeDump typeDump, RemoteType output)
         {
-            foreach (ManagedTypeDump.TypeField fieldDump in managedTypeDump.Fields)
+            foreach (TypeDump.TypeField fieldDump in typeDump.Fields)
             {
                 Lazy<Type> factory = new Lazy<Type>(() =>
                 {
                     try
                     {
-                        return ResolveTypeWhileCreating(app, managedTypeDump.Type, "field__resolving__logic",
+                        return ResolveTypeWhileCreating(app, typeDump.Type, "field__resolving__logic",
                         fieldDump.Assembly, fieldDump.TypeFullName);
                     }
                     catch (Exception e)
@@ -291,12 +291,12 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
         }
 
-        private void AddGroupOfFunctions(ManagedRemoteApp app, ManagedTypeDump managedTypeDump, List<ManagedTypeDump.TypeMethod> functions, RemoteType declaringType, bool areConstructors)
+        private void AddGroupOfFunctions(ManagedRemoteApp app, TypeDump typeDump, List<TypeDump.TypeMethod> functions, RemoteType declaringType, bool areConstructors)
         {
-            foreach (ManagedTypeDump.TypeMethod func in functions)
+            foreach (TypeDump.TypeMethod func in functions)
             {
                 List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);
-                foreach (ManagedTypeDump.TypeMethod.MethodParameter methodParameter in func.Parameters)
+                foreach (TypeDump.TypeMethod.MethodParameter methodParameter in func.Parameters)
                 {
                     Lazy<Type> paramFactory = new Lazy<Type>(() =>
                     {
@@ -305,7 +305,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                         {
                             // In case of a generic type we have no way to "resolve" it
                             // We are just creating a dummy type
-                            return new RemoteType(app, managedTypeDump.Type, "FakeAssemblyForGenericTypes", managedTypeDump.IsArray, true);
+                            return new RemoteType(app, typeDump.Type, "FakeAssemblyForGenericTypes", typeDump.IsArray, true);
                         }
                         else
                         {
@@ -316,7 +316,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                             //      void MyOtherMethod(System.Text.StringBuilder sb) <-- The 'sb' parameter WILL get here
                             try
                             {
-                                Type paramType = ResolveTypeWhileCreating(app, managedTypeDump.Type, func.Name, methodParameter.Assembly,
+                                Type paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
                                    methodParameter.FullTypeName);
                                 if (paramType == null)
                                 {
@@ -351,7 +351,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 {
                     try
                     {
-                        return ResolveTypeWhileCreating(app, managedTypeDump.Type, func.Name,
+                        return ResolveTypeWhileCreating(app, typeDump.Type, func.Name,
                         func.ReturnTypeAssembly, func.ReturnTypeFullName);
                     }
                     catch (Exception e)

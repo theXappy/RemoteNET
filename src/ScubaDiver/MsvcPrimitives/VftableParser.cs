@@ -20,9 +20,9 @@ public static class VftableParser
     /// Assuming all function (3 in the example above) are exported, we'd find their names in <see cref="mangledExports"/>
     /// and return them together with their names.
     /// </summary>
-    public static List<ManagedTypeDump.TypeMethod> AnalyzeVftable(HANDLE process, ModuleInfo module, IReadOnlyList<DllExport> exportsList, UndecoratedSymbol vftable)
+    public static List<TypeDump.TypeMethod> AnalyzeVftable(HANDLE process, ModuleInfo module, IReadOnlyList<DllExport> exportsList, UndecoratedSymbol vftable)
     {
-        List<ManagedTypeDump.TypeMethod> virtualMethods = new List<ManagedTypeDump.TypeMethod>();
+        List<TypeDump.TypeMethod> virtualMethods = new List<TypeDump.TypeMethod>();
 
         using var scanner = new RttiScanner(
             process,
@@ -64,7 +64,7 @@ public static class VftableParser
                 continue;
 
             // Converting to type method (parsing parameters)
-            ManagedTypeDump.TypeMethod m = ConvertToTypeMethod(undecFunc);
+            TypeDump.TypeMethod m = ConvertToTypeMethod(undecFunc);
             if (m == null) 
                 continue;
 
@@ -78,7 +78,7 @@ public static class VftableParser
         }
 
         Logger.Debug($"[AnalyzeVftable] Next vftable not found starting at {vftable.UndecoratedName}");
-        return new List<ManagedTypeDump.TypeMethod>();
+        return new List<TypeDump.TypeMethod>();
 
         bool IsVftableAddress(nuint addr)
         {
@@ -91,14 +91,14 @@ public static class VftableParser
     }
 
     // TODO: Move somewhere else
-    public static ManagedTypeDump.TypeMethod ConvertToTypeMethod(UndecoratedFunction undecFunc)
+    public static TypeDump.TypeMethod ConvertToTypeMethod(UndecoratedFunction undecFunc)
     {
-        List<ManagedTypeDump.TypeMethod.MethodParameter> parameters;
+        List<TypeDump.TypeMethod.MethodParameter> parameters;
         string[] argTypes = undecFunc.ArgTypes;
         if (argTypes != null)
         {
             parameters = argTypes.Select((argType, i) =>
-                new ManagedTypeDump.TypeMethod.MethodParameter()
+                new TypeDump.TypeMethod.MethodParameter()
                 {
                     FullTypeName = argType,
                     Name = $"a{i}"
@@ -111,7 +111,7 @@ public static class VftableParser
             return null;
         }
 
-        ManagedTypeDump.TypeMethod method = new()
+        TypeDump.TypeMethod method = new()
         {
             Name = undecFunc.UndecoratedName,
             UndecoratedFullName = undecFunc.UndecoratedFullName,
