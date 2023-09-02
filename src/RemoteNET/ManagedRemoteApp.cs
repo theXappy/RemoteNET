@@ -31,7 +31,7 @@ namespace RemoteNET
             private ManagedRemoteObject GetRemoteObjectUncached(ulong remoteAddress, string typeName, int? hashCode = null)
             {
                 ObjectDump od;
-                ManagedTypeDump td;
+                TypeDump td;
                 try
                 {
                     od = _app._managedCommunicator.DumpObject(remoteAddress, typeName, true, hashCode);

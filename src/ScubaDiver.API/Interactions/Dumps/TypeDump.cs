@@ -7,7 +7,7 @@ using System.Reflection;
 namespace ScubaDiver.API.Interactions.Dumps
 {
     [DebuggerDisplay("ManagedTypeDump of {" + nameof(Type) + "} (Assembly: {" + nameof(Assembly) + "})")]
-    public class ManagedTypeDump
+    public class TypeDump
     {
         [DebuggerDisplay("{" + nameof(ReturnTypeName) + "} {" + nameof(Name) + "}(...)")]
 

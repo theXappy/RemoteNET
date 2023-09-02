@@ -124,7 +124,7 @@ namespace RemoteNET
         public override UnmanagedRemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
         {
             ObjectDump od;
-            ManagedTypeDump td;
+            TypeDump td;
             try
             {
                 od = _unmanagedCommunicator.DumpObject(remoteAddress, typeName, true, hashCode);

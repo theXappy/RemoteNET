@@ -48,7 +48,7 @@ namespace RemoteNET.RttiReflection
                 if (!_onGoingCreations.TryGetValue(
                     new Tuple<string, string>(assembly, type), out paramType) || paramType == null)
                 {
-                    ManagedTypeDump dumpedArgType =
+                    TypeDump dumpedArgType =
                         _communicator.DumpType(type, assembly);
                     if (dumpedArgType == null)
                     {
@@ -80,7 +80,7 @@ namespace RemoteNET.RttiReflection
                 return shortOutput;
             }
 
-            ManagedTypeDump parentDump = _communicator.DumpType(fullTypeName, assembly);
+            TypeDump parentDump = _communicator.DumpType(fullTypeName, assembly);
             if (parentDump == null)
             {
                 throw new Exception(
@@ -90,27 +90,27 @@ namespace RemoteNET.RttiReflection
             return Create(app, parentDump);
         }
 
-        public Type Create(RemoteApp app, ManagedTypeDump managedTypeDump)
+        public Type Create(RemoteApp app, TypeDump typeDump)
         {
-            Type shortOutput = _resolver.Resolve(managedTypeDump.Assembly, managedTypeDump.Type);
+            Type shortOutput = _resolver.Resolve(typeDump.Assembly, typeDump.Type);
             if (shortOutput != null)
             {
                 return shortOutput;
             }
 
-            RemoteRttiType output = new RemoteRttiType(app, managedTypeDump.Type, managedTypeDump.Assembly);
+            RemoteRttiType output = new RemoteRttiType(app, typeDump.Type, typeDump.Assembly);
 
             // Temporarily indicate we are on-going creation
-            _onGoingCreations[new Tuple<string, string>(managedTypeDump.Assembly, managedTypeDump.Type)] = output;
+            _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.Type)] = output;
 
-            string parentType = managedTypeDump.ParentFullTypeName;
+            string parentType = typeDump.ParentFullTypeName;
             if (parentType != null)
             {
                 Lazy<Type> parent = new Lazy<Type>(() =>
                 {
                     try
                     {
-                        return Create(app, parentType, managedTypeDump.ParentAssembly);
+                        return Create(app, parentType, typeDump.ParentAssembly);
 
                     }
                     catch (Exception ex)
@@ -122,32 +122,32 @@ namespace RemoteNET.RttiReflection
                 });
                 output.SetParent(parent);
             }
-            AddMembers(app, managedTypeDump, output);
+            AddMembers(app, typeDump, output);
 
             // remove on-going creation indication
-            _onGoingCreations.Remove(new Tuple<string, string>(managedTypeDump.Assembly, managedTypeDump.Type));
+            _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
 
             // Register at resolver
-            _resolver.RegisterType(managedTypeDump.Assembly, managedTypeDump.Type, output);
+            _resolver.RegisterType(typeDump.Assembly, typeDump.Type, output);
 
             return output;
         }
 
-        private void AddMembers(RemoteApp app, ManagedTypeDump managedTypeDump, RemoteRttiType output)
+        private void AddMembers(RemoteApp app, TypeDump typeDump, RemoteRttiType output)
         {
-            AddGroupOfFunctions(app, managedTypeDump, managedTypeDump.Methods, output, areConstructors: false);
-            AddGroupOfFunctions(app, managedTypeDump, managedTypeDump.Constructors, output, areConstructors: true);
+            AddGroupOfFunctions(app, typeDump, typeDump.Methods, output, areConstructors: false);
+            AddGroupOfFunctions(app, typeDump, typeDump.Constructors, output, areConstructors: true);
             //AddFields(app, managedTypeDump, output);
         }
 
-        private void AddFields(RemoteApp app, ManagedTypeDump managedTypeDump, RemoteRttiType output)
+        private void AddFields(RemoteApp app, TypeDump typeDump, RemoteRttiType output)
         {
             throw new NotImplementedException();
         }
 
-        private void AddGroupOfFunctions(RemoteApp app, ManagedTypeDump managedTypeDump, List<ManagedTypeDump.TypeMethod> functions, RemoteRttiType declaringType, bool areConstructors)
+        private void AddGroupOfFunctions(RemoteApp app, TypeDump typeDump, List<TypeDump.TypeMethod> functions, RemoteRttiType declaringType, bool areConstructors)
         {
-            foreach (ManagedTypeDump.TypeMethod func in functions)
+            foreach (TypeDump.TypeMethod func in functions)
             {
                 string? mangledName = func.DecoratedName;
                 if(string.IsNullOrEmpty(mangledName))
@@ -155,7 +155,7 @@ namespace RemoteNET.RttiReflection
 
                 List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);
                 int i = 1;
-                foreach (ManagedTypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
+                foreach (TypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
                 {
                     string fakeParamName = $"a{i}";
                     i++;

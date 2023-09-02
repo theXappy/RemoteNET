@@ -9,7 +9,7 @@ namespace RemoteNET.Internal
     internal class RemoteObjectRef
     {
         private bool _isReleased;
-        private readonly ManagedTypeDump _typeInfo;
+        private readonly TypeDump _typeInfo;
         private ObjectDump _remoteObjectInfo;
         private readonly DiverCommunicator _creatingCommunicator;
 
@@ -18,7 +18,7 @@ namespace RemoteNET.Internal
         public DiverCommunicator Communicator => _creatingCommunicator;
 
         
-        public RemoteObjectRef(ObjectDump remoteObjectInfo, ManagedTypeDump typeInfo, DiverCommunicator creatingCommunicator)
+        public RemoteObjectRef(ObjectDump remoteObjectInfo, TypeDump typeInfo, DiverCommunicator creatingCommunicator)
         {
             if (typeInfo == null)
             {
@@ -31,7 +31,7 @@ namespace RemoteNET.Internal
             _isReleased = false;
         }
 
-        public ManagedTypeDump GetTypeDump()
+        public TypeDump GetTypeDump()
         {
             return _typeInfo;
         }
