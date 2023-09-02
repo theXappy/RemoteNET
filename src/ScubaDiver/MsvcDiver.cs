@@ -24,6 +24,7 @@ using Windows.Win32.Foundation;
 using Microsoft.Diagnostics.Runtime.Utilities;
 using Newtonsoft.Json.Linq;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
 
 namespace ScubaDiver
 {
@@ -401,7 +402,8 @@ namespace ScubaDiver
             if (matchingAssemblies.Count != 0)
             {
                 var assm = matchingAssemblies.Single();
-                foreach (var type in _trickster.ScannedTypes[assm])
+                var rawTypes = GetTypeInfos(assm.Name, "*").Single().Value;
+                foreach (var type in rawTypes)
                 {
                     types.Add(new TypesDump.TypeIdentifiers()
                     {
@@ -440,14 +442,14 @@ namespace ScubaDiver
 
         public string MakeTypeResponse(TypeDumpRequest dumpRequest)
         {
-            ManagedTypeDump dump = GetRttiType(dumpRequest.TypeFullName, dumpRequest.Assembly);
+            TypeDump dump = GetRttiType(dumpRequest.TypeFullName, dumpRequest.Assembly);
             if (dump != null)
                 return JsonConvert.SerializeObject(dump);
 
             return QuickError("Failed to find type in searched assemblies");
         }
 
-        private ManagedTypeDump GetRttiType(string rawTypeFilter, string assembly = null)
+        private TypeDump GetRttiType(string rawTypeFilter, string assembly = null)
         {
             if (string.IsNullOrEmpty(rawTypeFilter))
             {
@@ -460,11 +462,11 @@ namespace ScubaDiver
                 rawAssemblyFilter = assembly;
             }
 
-            ManagedTypeDump dump = GetManagedTypeDump(rawAssemblyFilter, rawTypeFilter);
+            TypeDump dump = GetTypeDump(rawAssemblyFilter, rawTypeFilter);
             return dump;
         }
 
-        private ManagedTypeDump GetManagedTypeDump(string rawAssemblyFilter, string rawTypeFilter)
+        private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
             var typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
             foreach (KeyValuePair<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> moduleAndTypes in typeInfos)
@@ -473,18 +475,18 @@ namespace ScubaDiver
                 foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
                 {
                     UndecoratedSymbol vftable;
-                    List<ManagedTypeDump.TypeField> fields = new();
-                    List<ManagedTypeDump.TypeMethod> methods = new();
-                    List<ManagedTypeDump.TypeMethod> constructors = new();
+                    List<TypeDump.TypeField> fields = new();
+                    List<TypeDump.TypeMethod> methods = new();
+                    List<TypeDump.TypeMethod> constructors = new();
                     DeconstructRttiType(typeInfo, module, fields, constructors, methods, out vftable);
 
                     if (vftable != null)
                     {
                         HANDLE process = _trickster._processHandle;
                         IReadOnlyList<DllExport> exports = GetExports(module.Name);
-                        List<ManagedTypeDump.TypeMethod> virtualFunctions = VftableParser.AnalyzeVftable(process, module, exports, vftable);
+                        List<TypeDump.TypeMethod> virtualFunctions = VftableParser.AnalyzeVftable(process, module, exports, vftable);
 
-                        foreach (ManagedTypeDump.TypeMethod virtualFunction in virtualFunctions)
+                        foreach (TypeDump.TypeMethod virtualFunction in virtualFunctions)
                         {
                             bool exists = methods.Any(existingMethod =>
                                 existingMethod.UndecoratedFullName == virtualFunction.UndecoratedFullName);
@@ -496,7 +498,7 @@ namespace ScubaDiver
                         }
                     }
 
-                    ManagedTypeDump recusiveManagedTypeDump = new ManagedTypeDump()
+                    TypeDump recusiveTypeDump = new TypeDump()
                     {
                         Assembly = module.Name,
                         Type = typeInfo.Name,
@@ -504,7 +506,7 @@ namespace ScubaDiver
                         Constructors = constructors,
                         Fields = fields
                     };
-                    return recusiveManagedTypeDump;
+                    return recusiveTypeDump;
                 }
             }
 
@@ -513,9 +515,9 @@ namespace ScubaDiver
 
         private void DeconstructRttiType(Rtti.TypeInfo typeInfo,
             Rtti.ModuleInfo module,
-            List<ManagedTypeDump.TypeField> fields,
-            List<ManagedTypeDump.TypeMethod> constructors,
-            List<ManagedTypeDump.TypeMethod> methods,
+            List<TypeDump.TypeField> fields,
+            List<TypeDump.TypeMethod> constructors,
+            List<TypeDump.TypeMethod> methods,
             out UndecoratedSymbol vftable)
         {
             vftable = null;
@@ -547,7 +549,7 @@ namespace ScubaDiver
         }
 
         private void HandleTypeField(UndecoratedExportedField undecField, string vftableName,
-            List<ManagedTypeDump.TypeField> fields, ref UndecoratedSymbol vftable)
+            List<TypeDump.TypeField> fields, ref UndecoratedSymbol vftable)
         {
             // TODO: Fields could be exported as well..
             // we only expected the "vftable" field (not actually a field...) and methods/ctors right now
@@ -564,7 +566,7 @@ namespace ScubaDiver
                 vftable = undecField;
 
 
-                fields.Add(new ManagedTypeDump.TypeField()
+                fields.Add(new TypeDump.TypeField()
                 {
                     Name = "vftable",
                     TypeFullName = undecField.UndecoratedFullName,
@@ -577,7 +579,7 @@ namespace ScubaDiver
             }
 
             Logger.Debug(
-                $"[{nameof(GetManagedTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
+                $"[{nameof(GetTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
         }
 
         /// <summary>
@@ -641,30 +643,49 @@ namespace ScubaDiver
             }
 
             Predicate<string> assmFilter = Filter.CreatePredicate(rawAssemblyFilter);
-            Predicate<string> typeFilter = Filter.CreatePredicate(rawTypeFilter);
+            Predicate<string> typeNameFilter = Filter.CreatePredicate(rawTypeFilter);
+            Func<Rtti.TypeInfo, bool> typeFilter = ti => typeNameFilter(ti.Name);
 
             Dictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> output = new();
-            foreach (var kvp in _trickster.ScannedTypes)
+            foreach (var moduleToTypes in _trickster.ScannedTypes)
             {
-                var module = kvp.Key;
+                Rtti.ModuleInfo module = moduleToTypes.Key;
                 if (!assmFilter(module.Name))
                     continue;
 
-                IEnumerable<ScubaDiver.Rtti.TypeInfo> TypesDumperForModule()
-                {
-                    ScubaDiver.Rtti.TypeInfo[] typeInfos = kvp.Value;
+                Rtti.TypeInfo[] types = moduleToTypes.Value;
+                Dictionary<string, Rtti.TypeInfo> matches = types.Where(typeFilter).ToDictionary(ti => ti.Name);
 
-                    foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
+                // Collect 2nd class types
+                IReadOnlyList<DllExport> exports = GetExports(module.Name);
+                foreach (var dllExport in exports)
+                {
+                    var parts = dllExport.Name.Split("::");
+                    if(parts.Length <= 1)
+                        continue;
+
+                    if (parts[^1] != parts[^2])
+                        continue;
+
+                    int suffixLength = "::".Length + parts[^1].Length;
+                    string typeName = dllExport.Name[..^suffixLength];
+
+                    if (matches.ContainsKey(typeName))
                     {
-                        if (!typeFilter(typeInfo.Name))
-                            continue;
-                        yield return typeInfo;
+                        //  This is a first-class type, we already collected it.
+                        continue;
                     }
+
+                    // Defenitly NOT a first-class type!
+                    Console.WriteLine($"[!] Second-Class Type: {typeName}");
+                    Rtti.TypeInfo ti = new SecondClassTypeInfo(module.Name, typeName);
+
+                    matches[typeName] = ti;
                 }
 
-                IEnumerable<ScubaDiver.Rtti.TypeInfo> types = TypesDumperForModule();
-                if (types.Any())
-                    output[module] = types;
+                if (matches.Count > 0) 
+                    output[module] = matches.Values;
+
             }
 
             return output;
@@ -831,7 +852,7 @@ namespace ScubaDiver
             {
                 return QuickError("Calling a instance-less function is not implemented");
             }
-            ManagedTypeDump dumpedObjType = GetRttiType(request.TypeFullName);
+            TypeDump dumpedObjType = GetRttiType(request.TypeFullName);
             // Check if we have this objects in our pinned pool
             // TODO: Pull from freezer?
             nuint objAddress = (nuint)request.ObjAddress;
@@ -869,7 +890,7 @@ namespace ScubaDiver
                 Logger.Debug($"[MsvcDiver] Failed to Resolved method :/");
                 return QuickError($"Too many matches for {request.MethodName} in type {request.TypeFullName}. Got: {overloads.Count}");
             }
-            ManagedTypeDump.TypeMethod method = overloads.Single();
+            TypeDump.TypeMethod method = overloads.Single();
 
             Logger.Debug($"[MsvcDiver] Getting RTTI info objects from TypeFullName: {request.TypeFullName}");
             ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
@@ -922,7 +943,7 @@ namespace ScubaDiver
             //
             // Prepare invocation results for response
             //
-            ManagedTypeDump returnTypeDump = null;
+            TypeDump returnTypeDump = null;
             if (targetMethod.RetType.Contains("::") && /*Is a pointer */ targetMethod.RetType.EndsWith(" *"))
             {
                 string normalizedRetType = method.ReturnTypeName[..^2]; // Remove ' *' suffix
