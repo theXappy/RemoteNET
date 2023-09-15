@@ -1,11 +1,6 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
-using System.Threading.Channels;
-using Newtonsoft.Json.Linq;
-using ScubaDiver.API.Protocol;
 using ScubaDiver.API.Protocol.SimpleHttp;
 
 namespace Lifeboat;
