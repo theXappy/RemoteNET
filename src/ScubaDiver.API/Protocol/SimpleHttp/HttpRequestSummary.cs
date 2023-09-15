@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Linq;
 using System.Text;
 
 namespace ScubaDiver.API.Protocol.SimpleHttp
@@ -52,7 +53,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 
         public override string ToString()
         {
-            return $"HTTP Request. Method: {Method}, URL: {Url}";
+            return $"HTTP Request. Method: {Method}, URL: {Url}, Query: {{ {(string.Join(",", QueryString.AllKeys.Select(key => $"{key}={QueryString[key]}")))} }}";
         }
     }
 }

@@ -155,6 +155,10 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 StringBuilder responseBuilder = new StringBuilder();
                 responseBuilder.Append($"HTTP/1.1 {((int)summary.StatusCode)} {summary.StatusCode}\r\n");
                 responseBuilder.Append("Connection: close\r\n"); // Trying to cause Web browsers to release the connection.
+                foreach (var header in summary.OtherHeaders)
+                {
+                    responseBuilder.Append($"{header.Key}: {header.Value}\r\n"); // Trying to cause Web browsers to release the connection.
+                }
 
                 if (summary.Body != null && summary.Body.Length > 0)
                 {
@@ -226,13 +230,21 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 string[] headerLines = headers.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
                 string contentType = "text/plain"; // Default content type
 
+                Dictionary<string, string> otherHeaders = new Dictionary<string, string>();
                 foreach (var headerLine in headerLines)
                 {
                     string[] headerParts = headerLine.Split(':');
-                    if (headerParts.Length == 2 && headerParts[0].Trim().ToLower() == "content-type")
+                    if (headerParts.Length == 2)
                     {
-                        contentType = headerParts[1].Trim();
-                        break;
+                        if (headerParts[0].Trim().ToLower() == "content-type")
+                        {
+                            contentType = headerParts[1].Trim();
+                            break;
+                        }
+                        else
+                        {
+                            otherHeaders[headerParts[0]] = headerParts[1].Trim();
+                        }
                     }
                 }
 
@@ -263,7 +275,8 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 {
                     StatusCode = (HttpStatusCode)statusCode,
                     ContentType = contentType,
-                    Body = body
+                    Body = body,
+                    OtherHeaders = otherHeaders
                 };
 
                 return (bodyStart + 1) + contentLength;
