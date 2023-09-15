@@ -8,34 +8,26 @@ using ScubaDiver.API.Utils;
 using NtApiDotNet.Win32;
 using System.IO;
 using ScubaDiver.Rtti;
-using System.Threading;
 using ScubaDiver.API.Interactions;
 using ScubaDiver.API;
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
-using Microsoft.VisualBasic;
-using ScubaDiver.API.Hooking;
 using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.Hooking;
-using ModuleInfo = Microsoft.Diagnostics.Runtime.ModuleInfo;
-using TypeInfo = System.Reflection.TypeInfo;
-using System.Reflection;
 using Windows.Win32.Foundation;
-using Microsoft.Diagnostics.Runtime.Utilities;
-using Newtonsoft.Json.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text.RegularExpressions;
-using ScubaDiver.Demangle.Demangle.Core.Collections;
 
 namespace ScubaDiver
 {
     public class MsvcDiver : DiverBase
     {
-        private Dictionary<ModuleInfo, TypeInfo[]> scannedModules = new Dictionary<ModuleInfo, TypeInfo[]>();
+        private TricksterWrapper _tricksterWrapper = null;
+        private ExportsMaster _exportsMaster = null;
 
         public MsvcDiver(IRequestsListener listener) : base(listener)
         {
             _responseBodyCreators["/gc"] = MakeGcResponse;
+
+            _exportsMaster = new ExportsMaster();
+            _tricksterWrapper = new TricksterWrapper(_exportsMaster);
         }
 
         public override void Start()
@@ -54,7 +46,7 @@ namespace ScubaDiver
         protected string MakeGcResponse(ScubaDiverMessage req)
         {
             Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
-            List<UndecoratedModule> undecModules = GetUndecoratedModules();
+            List<UndecoratedModule> undecModules = _tricksterWrapper.GetUndecoratedModules();
             Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Init'ing GC");
             try
             {
@@ -71,89 +63,6 @@ namespace ScubaDiver
         }
 
 
-        private Dictionary<string, UndecoratedModule> _undecModeulesCache = new Dictionary<string, UndecoratedModule>();
-        private List<UndecoratedModule> GetUndecoratedModules()
-        {
-            UndecoratedModule GenerateUndecoratedModule(Rtti.ModuleInfo moduleInfo, Rtti.TypeInfo[] types)
-            {
-                // Getting all exports, type funcs and typeless
-                List<DllExport> allExports = new List<DllExport>(GetExports(moduleInfo.Name));
-
-                UndecoratedModule module = new UndecoratedModule(moduleInfo.Name);
-
-                // Now iterate all first-class Types
-                foreach (Rtti.TypeInfo typeInfo in types)
-                {
-                    // Find all exported members of the first-class type
-                    IEnumerable<UndecoratedSymbol> methods = GetExportedTypeMembers(moduleInfo, typeInfo.Name);
-                    foreach (var symbol in methods)
-                    {
-                        if (symbol is UndecoratedExportedFunc undecFunc)
-                        {
-                            // Store aside as a member of this type
-                            module.AddTypeFunction(typeInfo, undecFunc);
-
-                            // Removing type func from allExports
-                            allExports.Remove(undecFunc.Export);
-                        }
-                    }
-                }
-
-                // This list should now hold only typeless symbols. Which means C-style, non-class-associated funcs/variables or
-                // second-class types' members.
-                foreach (DllExport export in allExports)
-                {
-                    if (!export.TryUndecorate(moduleInfo, out UndecoratedSymbol output))
-                        continue;
-
-                    if (output is not UndecoratedFunction undecFunc)
-                    {
-                        Logger.Debug("Typless-export which isn't a function is discarded. Undecorated name: " + output.UndecoratedFullName);
-                        continue;
-                    }
-
-                    module.AddTypelessFunction(export.Name, undecFunc);
-                }
-
-                // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
-                if (_trickster.OperatorNewFuncs.TryGetValue(moduleInfo, out nuint[] operatorNewAddresses))
-                {
-                    foreach (nuint operatorNewAddr in operatorNewAddresses)
-                    {
-                        UndecoratedFunction undecFunction =
-                            new UndecoratedInternalFunction(
-                                undecoratedName: "operator new",
-                                undecoratedFullName: "operator new",
-                                decoratedName: "operator new",
-                                (long)operatorNewAddr, 1,
-                                moduleInfo);
-                        module.AddTypelessFunction("operator new", undecFunction);
-                    }
-                }
-
-                return module;
-            }
-
-            RefreshRuntime();
-            _trickster.ScanOperatorNewFuncs();
-            Dictionary<Rtti.ModuleInfo, Rtti.TypeInfo[]> modulesAndTypes = _trickster.ScannedTypes;
-
-            List<UndecoratedModule> output = new();
-            foreach (KeyValuePair<Rtti.ModuleInfo, Rtti.TypeInfo[]> kvp in modulesAndTypes)
-            {
-                var module = kvp.Key;
-                if (!_undecModeulesCache.TryGetValue(module.Name, out UndecoratedModule undecModule))
-                {
-                    // Generate the undecorated module and save in cache
-                    undecModule = GenerateUndecoratedModule(module, kvp.Value);
-                    _undecModeulesCache[module.Name] = undecModule;
-                }
-                // store this module for the output
-                output.Add(undecModule);
-            }
-
-            return output;
-        }
 
         private List<SafeHandle> _injectedDlls = new List<SafeHandle>();
         protected override string MakeInjectDllResponse(ScubaDiverMessage req)
@@ -186,7 +95,7 @@ namespace ScubaDiver
             RefreshRuntime();
 
             List<DomainsDump.AvailableDomain> available = new();
-            var modules = _trickster.ModulesParsed
+            var modules = _tricksterWrapper.GetModules()
                 .Select(m => m.Name)
                 .Where(m => !string.IsNullOrWhiteSpace(m))
                 .ToList();
@@ -206,24 +115,13 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(dd);
         }
 
-        private Trickster _trickster = null;
+        
 
         protected override void RefreshRuntime()
         {
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Refreshing runtime!");
-            if (_trickster != null)
-            {
-                _trickster.Dispose();
-                _trickster = null;
-            }
-            _trickster = new Trickster(Process.GetCurrentProcess());
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Scanning types...");
-            _trickster.ScanTypes();
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Reading Regions...");
-            _trickster.ReadRegions();
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Refreshing runtime!");
+            _tricksterWrapper.Refresh();
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_tricksterWrapper.GetModules().Count}");
         }
 
         protected override Action HookFunction(FunctionHookRequest request, HarmonyWrapper.HookCallback patchCallback)
@@ -243,7 +141,7 @@ namespace ScubaDiver
 
 
             Rtti.TypeInfo typeInfo = typeInfos.Single();
-            List<UndecoratedSymbol> members = GetExportedTypeMembers(module, typeInfo.Name).ToList();
+            List<UndecoratedSymbol> members = _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name).ToList();
             UndecoratedSymbol vftable = members.FirstOrDefault(member => member.UndecoratedName.EndsWith("`vftable'"));
 
             
@@ -251,9 +149,8 @@ namespace ScubaDiver
             List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
             if (vftable != null)
             {
-                HANDLE process = _trickster._processHandle;
-                IReadOnlyList<DllExport> exports = GetExports(module.Name);
-                virtualFuncs = VftableParser.AnalyzeVftable(process, module, exports, vftable);
+
+                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), module, _exportsMaster.GetExports(module.Name), vftable);
 
                 // Remove duplicates - the methods which are both virtual and exported.
                 virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
@@ -385,33 +282,21 @@ namespace ScubaDiver
 
         protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
-            if (_trickster == null || !_trickster.ScannedTypes.Any())
+            if (_tricksterWrapper.RefreshRequired())
             {
                 RefreshRuntime();
             }
 
             string assembly = req.QueryString.Get("assembly");
-            List<ScubaDiver.Rtti.ModuleInfo> matchingAssemblies = _trickster.ScannedTypes.Keys.Where(assm => assm.Name == assembly).ToList();
-            if (matchingAssemblies.Count == 0)
-            {
-                // No exact matches, widen search to any assembly *containing* the query
-                matchingAssemblies = _trickster.ScannedTypes.Keys.Where(module =>
-                {
-                    try
-                    {
-                        return module.Name?.Contains(assembly) == true;
-                    }
-                    catch { }
+            ParseFullTypeName(assembly +"!*", out string assemblyFilter, out _);
+            Predicate<string> assmFilter = Filter.CreatePredicate(assemblyFilter);
 
-                    return false;
-                }).ToList();
-            }
-
+            IEnumerable<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules().Where(um => assmFilter(um.Name));
             List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
-            if (matchingAssemblies.Count != 0)
+            if (matchingAssemblies.Any())
             {
                 var assm = matchingAssemblies.Single();
-                var rawTypes = GetTypeInfos(assm.Name, "*").Single().Value;
+                IEnumerable<Rtti.TypeInfo> rawTypes = assm.Types;
                 foreach (var type in rawTypes)
                 {
                     types.Add(new TypesDump.TypeIdentifiers()
@@ -486,10 +371,10 @@ namespace ScubaDiver
 
                     if (vftable != null)
                     {
-                        HANDLE process = _trickster._processHandle;
-                        IReadOnlyList<DllExport> exports = GetExports(module.Name);
+                        HANDLE process = _tricksterWrapper.GetProcessHandle();
+                        IReadOnlyList<DllExport> exports = _exportsMaster.GetExports(module.Name);
                         List<UndecoratedFunction> virtualFunctionsInternal = VftableParser.AnalyzeVftable(process, module, exports, vftable);
-                        List<TypeDump.TypeMethod> virtualFunctions = virtualFunctionsInternal.Select(VftableParser.ConvertToTypeMethod).ToList();
+                        List<TypeDump.TypeMethod> virtualFunctions = virtualFunctionsInternal.Select(VftableParser.ConvertToTypeMethod).Where(x => x != null).ToList();
 
                         foreach (TypeDump.TypeMethod virtualFunction in virtualFunctions)
                         {
@@ -530,7 +415,7 @@ namespace ScubaDiver
             string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
             string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
             string vftableName = $"{typeInfo.Name}::`vftable'"; // Constructing NameSpace::ClassName::`vftable
-            foreach (UndecoratedSymbol dllExport in GetExportedTypeMembers(module, typeInfo.Name))
+            foreach (UndecoratedSymbol dllExport in _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name))
             {
                 if (dllExport is UndecoratedFunction undecFunc)
                 {
@@ -587,43 +472,19 @@ namespace ScubaDiver
                 $"[{nameof(GetTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
         }
 
-        /// <summary>
-        /// Get a specific method of a specific type, which is exported from the given module.
-        /// </summary>
-        protected IEnumerable<UndecoratedSymbol> GetExportedTypeMembers(Rtti.ModuleInfo module, string typeFullName)
-        {
-            string membersPrefix = $"{typeFullName}::";
-            IReadOnlyList<UndecoratedSymbol> exports = GetUndecoratedExports(module);
-            foreach (UndecoratedSymbol symb in exports)
-            {
-                if (symb.UndecoratedFullName.StartsWith(membersPrefix))
-                {
-                    yield return symb;
-                }
-            }
-        }
-        protected IEnumerable<UndecoratedFunction> GetExportedTypeFunctions(Rtti.ModuleInfo module, string typeFullName)
-        {
-            foreach (UndecoratedSymbol symbol in GetExportedTypeMembers(module, typeFullName))
-            {
-                if (symbol is UndecoratedFunction undecFunc)
-                {
-                    yield return undecFunc;
-                }
-            }
-        }
+     
 
         private FirstClassTypeInfo ResolveTypeFromVftableAddress(nuint address)
         {
-            foreach (var kvp in _trickster.ScannedTypes)
+            foreach (var kvp in _tricksterWrapper.GetDecoratedModules())
             {
                 var module = kvp.Key;
                 if (address < module.BaseAddress || address > (module.BaseAddress + module.Size))
                     continue;
 
-                ScubaDiver.Rtti.TypeInfo[] typeInfos = kvp.Value;
+                var typeInfos = kvp.Value;
 
-                foreach (ScubaDiver.Rtti.TypeInfo typeInfo in typeInfos)
+                foreach (var typeInfo in typeInfos)
                 {
                     if (typeInfo is FirstClassTypeInfo firstClassTypeInfo && firstClassTypeInfo.VftableAddress == address)
                         return firstClassTypeInfo;
@@ -640,21 +501,20 @@ namespace ScubaDiver
 
         private IReadOnlyDictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
         {
-            if (_trickster == null || !_trickster.ScannedTypes.Any())
+            if (_tricksterWrapper.RefreshRequired())
             {
                 RefreshRuntime();
             }
 
             Predicate<string> assmNameFilter = Filter.CreatePredicate(rawAssemblyFilter);
-            Func<Rtti.ModuleInfo, bool> assmFilter = mi => assmNameFilter(mi.Name);
             Predicate<string> typeNameFilter = Filter.CreatePredicate(rawTypeFilter);
             Func<Rtti.TypeInfo, bool> typeFilter = ti => typeNameFilter(ti.Name);
 
             Dictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> output = new();
-            foreach (Rtti.ModuleInfo module in _trickster.ScannedTypes.Keys.Where(assmFilter))
+            foreach (UndecoratedModule module in _tricksterWrapper.GetUndecoratedModules(assmNameFilter))
             {
-                Rtti.TypeInfo[] types = _trickster.ScannedTypes[module];
-                Dictionary<string, List<Rtti.TypeInfo>> matches = new Dictionary<string, List<Rtti.TypeInfo>>();
+                IEnumerable<Rtti.TypeInfo> types = module.Types;
+                    Dictionary<string, List<Rtti.TypeInfo>> matches = new Dictionary<string, List<Rtti.TypeInfo>>();
                 void AddOrUpdate(Rtti.TypeInfo ti)
                 {
                     string key = ti.Name;
@@ -668,10 +528,10 @@ namespace ScubaDiver
                 }
 
                 // Collect 2nd class types
-                IReadOnlyList<DllExport> exports = GetExports(module.Name);
+                IReadOnlyList<DllExport> exports = _exportsMaster.GetExports(module.Name);
                 foreach (DllExport dllExport in exports)
                 {
-                    if (!dllExport.TryUndecorate(module, out UndecoratedSymbol undecSymbol))
+                    if (!dllExport.TryUndecorate(module.Module, out UndecoratedSymbol undecSymbol))
                         continue;
 
                     string undecExportName = undecSymbol.UndecoratedFullName;
@@ -696,7 +556,7 @@ namespace ScubaDiver
                 }
 
                 if (matches.Count > 0)
-                    output[module] = matches.Values.SelectMany(list => list);
+                    output[module.Module] = matches.Values.SelectMany(list => list);
 
             }
 
@@ -719,30 +579,8 @@ namespace ScubaDiver
             return false;
         }
 
-        private Dictionary<string, List<DllExport>> _exportsCache = new Dictionary<string, List<DllExport>>();
-        private IReadOnlyList<DllExport> GetExports(string moduleName)
-        {
-            if (!_exportsCache.ContainsKey(moduleName))
-            {
-                var lib = SafeLoadLibraryHandle.GetModuleHandle(moduleName);
-                _exportsCache[moduleName] = lib.Exports.ToList();
-            }
-            return _exportsCache[moduleName];
-        }
 
-        private Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>> _undecExportsCache = new Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>>();
-        private IReadOnlyList<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo)
-        {
-            if (!_undecExportsCache.ContainsKey(modInfo))
-            {
-                IReadOnlyList<DllExport> exports = GetExports(modInfo.Name);
-                IEnumerable<UndecoratedSymbol> undecExports = exports
-                    .Select(exp => exp.TryUndecorate(modInfo, out var undecExp) ? undecExp : null)
-                    .Where(exp => exp != null);
-                _undecExportsCache[modInfo] = undecExports.ToList();
-            }
-            return _undecExportsCache[modInfo];
-        }
+
 
         protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
@@ -761,23 +599,19 @@ namespace ScubaDiver
             };
 
             IEnumerable<FirstClassTypeInfo> allClassesToScanFor = Array.Empty<FirstClassTypeInfo>();
-            foreach (var moduleTypesKvp in _trickster.ScannedTypes)
+            foreach (var undecModule in _tricksterWrapper.GetUndecoratedModules(assmFilter))
             {
-                var module = moduleTypesKvp.Key;
-                if (!assmFilter(module.Name))
-                    continue;
-
                 IEnumerable<FirstClassTypeInfo> currModuleClasses =
-                    moduleTypesKvp.Value.OfType<FirstClassTypeInfo>();
+                    undecModule.Types.OfType<FirstClassTypeInfo>();
                 if (!string.IsNullOrEmpty(rawTypeFilter) && rawTypeFilter != "*")
                     currModuleClasses = currModuleClasses.Where(ti => typeFilter(ti.Name));
 
-                Logger.Debug($"[{DateTime.Now}] Trickster aggregating types from {module.Name}");
+                Logger.Debug($"[{DateTime.Now}] Trickster aggregating types from {undecModule.Name}");
                 allClassesToScanFor = allClassesToScanFor.Concat(currModuleClasses);
             }
 
             Logger.Debug($"[{DateTime.Now}] Starting Trickster Scan for class instances.");
-            Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, allClassesToScanFor);
+            Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = _tricksterWrapper.Scan(allClassesToScanFor);
             Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {addresses.SelectMany(kvp => kvp.Value).Count()} results");
             foreach (var typeInstancesKvp in addresses)
             {
@@ -940,7 +774,7 @@ namespace ScubaDiver
             Rtti.ModuleInfo module = typeInfos.Keys.Single();
             Rtti.TypeInfo typeInfo = typeInfos[module].Single();
 
-            List<UndecoratedFunction> typeFuncs = GetExportedTypeFunctions(module, typeInfo.Name).ToList();
+            List<UndecoratedFunction> typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, typeInfo.Name).ToList();
             UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.DecoratedName);
             Logger.Debug($"[MsvcDiver] FOUND the target function: {targetMethod}");
 
@@ -1104,74 +938,4 @@ namespace ScubaDiver
         }
 
     }
-
-    public class UndecoratedMethodGroup : List<UndecoratedFunction>
-    {
-    }
-
-    public class UndecoratedType : Dictionary<string, UndecoratedMethodGroup>
-    {
-        public void AddOrCreate(string methodName, UndecoratedFunction func) => GetOrAddGroup(methodName).Add(func);
-
-        private UndecoratedMethodGroup GetOrAddGroup(string method)
-        {
-            if (!ContainsKey(method))
-                this[method] = new UndecoratedMethodGroup();
-            return this[method];
-        }
-    }
-
-    public class UndecoratedModule
-    {
-        public string Name { get; private set; }
-
-        private Dictionary<Rtti.TypeInfo, UndecoratedType> _types;
-        private Dictionary<string, UndecoratedMethodGroup> _typelessFunctions;
-
-        public UndecoratedModule(string name)
-        {
-            Name = name;
-            _types = new Dictionary<Rtti.TypeInfo, UndecoratedType>();
-            _typelessFunctions = new Dictionary<string, UndecoratedMethodGroup>();
-        }
-
-        public IEnumerable<Rtti.TypeInfo> Type => _types.Keys;
-
-        public bool TryGetType(Rtti.TypeInfo type, out UndecoratedType res)
-            => _types.TryGetValue(type, out res);
-
-
-        public void AddTypeFunction(Rtti.TypeInfo type, UndecoratedFunction func)
-        {
-            var undType = GetOrAdd(type);
-            if (!undType.ContainsKey(func.UndecoratedFullName))
-                undType[func.UndecoratedFullName] = new UndecoratedMethodGroup();
-            undType[func.UndecoratedFullName].Add(func);
-        }
-
-        public bool TryGetTypeFunc(Rtti.TypeInfo type, string undecMethodName, out UndecoratedMethodGroup res)
-        {
-            res = null;
-            return TryGetType(type, out var undType) && undType.TryGetValue(undecMethodName, out res);
-        }
-        public void AddTypelessFunction(string decoratedMethodName, UndecoratedFunction func)
-        {
-            if (!_typelessFunctions.ContainsKey(decoratedMethodName))
-                _typelessFunctions[decoratedMethodName] = new UndecoratedMethodGroup();
-            _typelessFunctions[decoratedMethodName].Add(func);
-        }
-        public bool TryGetTypelessFunc(string decoratedMethodName, out UndecoratedMethodGroup res)
-        {
-            return _typelessFunctions.TryGetValue(decoratedMethodName, out res);
-        }
-
-        private UndecoratedType GetOrAdd(Rtti.TypeInfo type)
-        {
-            if (!_types.ContainsKey(type))
-                _types[type] = new UndecoratedType();
-            return _types[type];
-        }
-    }
-
-    public record NativeObject(nuint Address, ScubaDiver.Rtti.TypeInfo TypeInfo);
 }

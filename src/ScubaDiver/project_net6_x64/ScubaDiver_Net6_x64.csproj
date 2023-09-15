@@ -39,6 +39,12 @@
 		<Compile Include="..\MsvcPrimitives\UndecoratedInternalFunction.cs" Link="MsvcPrimitives\UndecoratedInternalFunction.cs" />
 		<Compile Include="..\MsvcPrimitives\VftableParser.cs" Link="MsvcPrimitives\VftableParser.cs" />
 		<Compile Include="..\MsvcPrimitives\NativeDelegatesFactory.cs" Link="MsvcPrimitives\NativeDelegatesFactory.cs" />
+		<Compile Include="..\MsvcPrimitives\ExportsMaster.cs" Link="MsvcPrimitives\ExportsMaster.cs" />
+		<Compile Include="..\MsvcPrimitives\NativeObject.cs" Link="MsvcPrimitives\NativeObject.cs" />
+		<Compile Include="..\MsvcPrimitives\TricksterWrapper.cs" Link="MsvcPrimitives\TricksterWrapper.cs" />
+		<Compile Include="..\MsvcPrimitives\UndecoratedMethodGroup.cs" Link="MsvcPrimitives\UndecoratedMethodGroup.cs" />
+		<Compile Include="..\MsvcPrimitives\UndecoratedModule.cs" Link="MsvcPrimitives\UndecoratedModule.cs" />
+		<Compile Include="..\MsvcPrimitives\UndecoratedType.cs" Link="MsvcPrimitives\UndecoratedType.cs" />
 		<Compile Include="..\MsvcDiver.cs" />
 		<Compile Include="..\MsvcOffensiveGC.cs" />
 		<Compile Include="..\HttpRequestsListener.cs" />
