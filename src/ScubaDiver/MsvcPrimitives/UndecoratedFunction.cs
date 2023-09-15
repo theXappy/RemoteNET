@@ -1,4 +1,5 @@
-﻿using ScubaDiver.Rtti;
+﻿using System.Linq;
+using ScubaDiver.Rtti;
 
 namespace ScubaDiver;
 
@@ -31,4 +32,16 @@ public abstract class UndecoratedFunction : UndecoratedSymbol
     }
 
     public override string ToString() => UndecoratedFullName;
+
+    public override int GetHashCode() => Address.GetHashCode();
+
+    public override bool Equals(object obj)
+    {
+        if (obj is not UndecoratedFunction undec)
+        {
+            return false;
+        }
+
+        return Address == undec.Address;
+    }
 }
