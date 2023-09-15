@@ -261,7 +261,7 @@ namespace ScubaDiver
             var allFuncs = exportedFuncs.Concat(virtualFuncs);
 
             // Find all methods with the requested name
-            var overloads = allFuncs.Where(method => method.UndecoratedName = methodName);
+            var overloads = allFuncs.Where(method => method.UndecoratedName == methodName);
             // Find the specific overload with the right argument types
             UndecoratedFunction methodToHook = overloads.SingleOrDefault(method =>
                 method.ArgTypes.Skip(1).SequenceEqual(request.ParametersTypeFullNames));
