@@ -50,14 +50,10 @@ namespace ScubaDiver
 
 
         private MsvcOffensiveGC gc;
-
         protected string MakeGcResponse(ScubaDiverMessage req)
         {
             Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
-
             List<UndecoratedModule> undecModules = GetUndecoratedModules();
-
-
             Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Init'ing GC");
             try
             {
@@ -83,24 +79,29 @@ namespace ScubaDiver
                 List<DllExport> allExports = new List<DllExport>(GetExports(moduleInfo.Name));
 
                 UndecoratedModule module = new UndecoratedModule(moduleInfo.Name);
+
+                // Now iterate all first-class Types
                 foreach (Rtti.TypeInfo typeInfo in types)
                 {
+                    // Find all exported members of the first-class type
                     IEnumerable<UndecoratedSymbol> methods = GetExportedTypeMembers(moduleInfo, typeInfo.Name);
                     foreach (var symbol in methods)
                     {
-                        // Removing type funcs from allExports
                         if (symbol is UndecoratedExportedFunc undecFunc)
                         {
+                            // Store aside as a member of this type
                             module.AddTypeFunction(typeInfo, undecFunc);
+
+                            // Removing type func from allExports
                             allExports.Remove(undecFunc.Export);
                         }
                     }
                 }
 
-                // This list should now hold only typeless symbols...
+                // This list should now hold only typeless symbols. Which means C-style, non-class-associated funcs/variables or
+                // second-class types' members.
                 foreach (DllExport export in allExports)
                 {
-                    // TODO: ... Then why the fuck am I trying to undecorate??
                     if (!export.TryUndecorate(moduleInfo, out UndecoratedSymbol output))
                         continue;
 
