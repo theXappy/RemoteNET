@@ -438,12 +438,7 @@ namespace ScubaDiver
                 return QuickError("Failed to deserialize body");
             }
 
-            return MakeTypeResponse(request);
-        }
-
-        public string MakeTypeResponse(TypeDumpRequest dumpRequest)
-        {
-            TypeDump dump = GetRttiType(dumpRequest.TypeFullName, dumpRequest.Assembly);
+            TypeDump dump = GetRttiType(request.TypeFullName, request.Assembly);
             if (dump != null)
                 return JsonConvert.SerializeObject(dump);
 
