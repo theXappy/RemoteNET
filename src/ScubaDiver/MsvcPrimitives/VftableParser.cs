@@ -20,9 +20,9 @@ public static class VftableParser
     /// Assuming all function (3 in the example above) are exported, we'd find their names in <see cref="mangledExports"/>
     /// and return them together with their names.
     /// </summary>
-    public static List<TypeDump.TypeMethod> AnalyzeVftable(HANDLE process, ModuleInfo module, IReadOnlyList<DllExport> exportsList, UndecoratedSymbol vftable)
+    public static List<UndecoratedFunction> AnalyzeVftable(HANDLE process, ModuleInfo module, IReadOnlyList<DllExport> exportsList, UndecoratedSymbol vftable)
     {
-        List<TypeDump.TypeMethod> virtualMethods = new List<TypeDump.TypeMethod>();
+        List<UndecoratedFunction> virtualMethods = new List<UndecoratedFunction>();
 
         using var scanner = new RttiScanner(
             process,
@@ -63,13 +63,8 @@ public static class VftableParser
             if (undecSymbol is not UndecoratedFunction undecFunc) 
                 continue;
 
-            // Converting to type method (parsing parameters)
-            TypeDump.TypeMethod m = ConvertToTypeMethod(undecFunc);
-            if (m == null) 
-                continue;
-
             // Found a new virtual method for our type!
-            virtualMethods.Add(m);
+            virtualMethods.Add(undecFunc);
         }
 
         if (nextVftableFound)
@@ -78,7 +73,7 @@ public static class VftableParser
         }
 
         Logger.Debug($"[AnalyzeVftable] Next vftable not found starting at {vftable.UndecoratedName}");
-        return new List<TypeDump.TypeMethod>();
+        return new();
 
         bool IsVftableAddress(nuint addr)
         {
