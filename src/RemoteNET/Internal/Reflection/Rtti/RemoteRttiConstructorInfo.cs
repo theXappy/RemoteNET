@@ -15,7 +15,7 @@ public class RemoteRttiConstructorInfo : ConstructorInfo
 
     public override Type DeclaringType { get; }
 
-    public override string Name => ".ctor";
+    public override string Name => DeclaringType.Name;
 
     public override Type ReflectedType => throw new NotImplementedException();
 
@@ -49,7 +49,11 @@ public class RemoteRttiConstructorInfo : ConstructorInfo
         throw new NotImplementedException();
     }
 
-    public override ParameterInfo[] GetParameters() => _paramInfos;
+    public override ParameterInfo[] GetParameters()
+    {
+        // Skipping 'this'
+        return _paramInfos.Skip(1).ToArray();
+    }
 
     public override object Invoke(BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
     {
@@ -59,13 +63,7 @@ public class RemoteRttiConstructorInfo : ConstructorInfo
 
     public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
     {
-        // Empiricly it seems that invoking a ctor on an existing object should return null.
-        if (obj == null)
-        {
-            // Last chace - If this overload was used but no real object given lets redirect to normal Invoke (this also happens with norma 'ConstructorInfo's)
-            return Invoke(invokeAttr, binder, parameters, culture);
-        }
-        return null;
+        return UnmanagedRemoteFunctionsInvokeHelper.Invoke(this.App as UnmanagedRemoteApp, DeclaringType, Name, obj, parameters);
     }
 
     public override bool IsDefined(Type attributeType, bool inherit)

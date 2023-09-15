@@ -38,7 +38,16 @@ namespace RemoteNET.RttiReflection
             _name = fullTypeName;
             _namespace = string.Empty;
 
-            int scopeResolutionIndex = fullTypeName.IndexOf("::");
+            // Since the generic part might contain subsequent types & we want to ignore their '::'s, we limit
+            // our search in the string to the point where the generic part starts.
+            // Example: std::vector<std::float>
+            int startOfGenericPart = fullTypeName.IndexOf('<');
+            if (startOfGenericPart == -1)
+                startOfGenericPart = fullTypeName.Length - 1;
+
+            // Namespace is everything but the last part after the last '::'
+            // Example: std::somethingelse::realclass
+            int scopeResolutionIndex = fullTypeName.LastIndexOf("::", startIndex: startOfGenericPart);
             if (scopeResolutionIndex != -1)
             {
                 _namespace = fullTypeName.Substring(0, scopeResolutionIndex);
