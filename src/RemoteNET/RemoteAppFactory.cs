@@ -123,7 +123,7 @@ namespace RemoteNET
                 scubaDiverArgs += "reverse";
 
                 // AFAIK, UWP apps run in network isolation. This means they'll have a hard time running a TCP/HTTP listener.
-                // So for those cases we're running Lifeboar, a reverse proxy, and interacting with the diver through it.
+                // So for those cases we're running Lifeboat, a reverse proxy, and interacting with the diver through it.
                 ProcessStartInfo psi = new ProcessStartInfo(kit.LifeboatExePath, diverPort.ToString());
                 psi.UseShellExecute = true;
                 psi.WindowStyle = ProcessWindowStyle.Hidden;
