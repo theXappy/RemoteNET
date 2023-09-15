@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Reflection;
 using RemoteNET.Internal.Reflection.DotNet;
@@ -16,7 +17,7 @@ namespace RemoteNET.RttiReflection
     {
         public static ObjectOrRemoteAddress CreateRemoteParameter(object parameter)
         {
-            if(parameter == null)
+            if (parameter == null)
             {
                 return ObjectOrRemoteAddress.Null;
             }
@@ -80,13 +81,32 @@ namespace RemoteNET.RttiReflection
             }
             else
             {
-                // obj is NOT null. Make sure it's a RemoteObject.
-                if (!(obj is UnmanagedRemoteObject ro))
+                switch (obj)
                 {
-                    throw new NotImplementedException(
-                        $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(UnmanagedRemoteObject)} targets at the moment.");
+                    // obj is NOT null. Make sure it's a RemoteObject.
+                    case UnmanagedRemoteObject ro:
+                        (hasResults, oora) = ro.InvokeMethod(funcName, remoteParams);
+                        break;
+                    case IntPtr ptr:
+                        {
+                            ulong remoteAddr = (ulong)ptr.ToInt64();
+                            InvocationResults invokeRes = app.Communicator.InvokeMethod(remoteAddr,
+                                declaringType.FullName,
+                                funcName,
+                                Array.Empty<string>(),
+                                remoteParams);
+
+                            (hasResults, oora) = (false, null);
+                            if (!invokeRes.VoidReturnType)
+                            {
+                                (hasResults, oora) = (true, invokeRes.ReturnedObjectOrAddress);
+                            }
+                            break;
+                        }
+                    default:
+                        throw new NotImplementedException(
+                            $"{nameof(RemoteMethodInfo)}.{nameof(Invoke)} only supports {nameof(UnmanagedRemoteObject)} targets at the moment.");
                 }
-                (hasResults, oora) = ro.InvokeMethod(funcName, remoteParams);
             }
 
             if (!hasResults)
@@ -105,6 +125,6 @@ namespace RemoteNET.RttiReflection
                 return ro.Dynamify();
             }
         }
-        
+
     }
 }
