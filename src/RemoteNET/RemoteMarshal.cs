@@ -12,6 +12,7 @@ public class RemoteMarshal
     private readonly MethodInfo _remoteFree;
     private readonly MethodInfo _remoteWrite;
     private readonly MethodInfo _remoteRead;
+    private readonly MethodInfo _remotePtrToStringAnsi;
 
     public RemoteMarshal(ManagedRemoteApp app)
     {
@@ -21,6 +22,7 @@ public class RemoteMarshal
         _remoteFree = _remoteMarshalType.GetMethod(nameof(FreeHGlobal), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
         _remoteWrite = _remoteMarshalType.GetMethod(nameof(Copy), (BindingFlags)0xffff, new[] { typeof(byte[]), typeof(int), typeof(IntPtr), typeof(int) });
         _remoteRead = _remoteMarshalType.GetMethod(nameof(Copy), (BindingFlags)0xffff, new[] { typeof(IntPtr), typeof(byte[]), typeof(int), typeof(int) });
+        _remotePtrToStringAnsi = _remoteMarshalType.GetMethod(nameof(PtrToStringAnsi), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
     }
 
     public IntPtr AllocHGlobal(int cb)
@@ -60,4 +62,11 @@ public class RemoteMarshal
     public void Read(IntPtr source, byte[] destination, int startIndex, int length)
         => Copy(source, destination, startIndex, length);
 
+    public string? PtrToStringAnsi(IntPtr ptr)
+    {
+        if(ptr == IntPtr.Zero)
+            return null;
+
+        return _remotePtrToStringAnsi.Invoke(null, new object[1] {ptr}) as string;
+    }
 }
