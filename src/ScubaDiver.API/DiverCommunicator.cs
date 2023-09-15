@@ -25,7 +25,7 @@ namespace ScubaDiver.API
     /// <summary>
     /// Communicates with a diver in a remote process
     /// </summary>
-    public class DiverCommunicator
+    public class DiverCommunicator : IDisposable
     {
         readonly object _withErrors = NewtonsoftProxy.JsonSerializerSettingsWithErrors;
 
@@ -34,46 +34,65 @@ namespace ScubaDiver.API
 
         private int? _process_id = null;
         private CallbacksListener _listener;
+        private object _httpClientLock = new object();
+        private ConcurrentHttpClient? _httpClient;
 
         public DiverCommunicator(string hostname, int diverPort)
         {
             _hostname = hostname;
             DiverPort = diverPort;
             _listener = new CallbacksListener(this);
+
+
         }
         public DiverCommunicator(IPAddress ipa, int diverPort) : this(ipa.ToString(), diverPort) { }
         public DiverCommunicator(IPEndPoint ipe) : this(ipe.Address, ipe.Port) { }
 
-        private int _requestId = 1;
+        private void Init()
+        {
+            if (_httpClient != null)
+                return;
+            lock (_httpClientLock)
+            {
+                if (_httpClient == null)
+                {
+                    TcpClient tcpClient = new TcpClient();
+                    if (IPAddress.TryParse(_hostname, out IPAddress? ip))
+                    {
+                        tcpClient.Connect(new IPEndPoint(ip, DiverPort));
+                    }
+                    else
+                    {
+                        tcpClient.Connect(_hostname, DiverPort);
+                    }
+
+                    _httpClient = new ConcurrentHttpClient(tcpClient);
+                }
+            }
+        }
+
         private string SendRequest(string path, Dictionary<string, string> queryParams = null, string jsonBody = null)
         {
+            Init();
+
             queryParams ??= new();
 
-            TcpClient client = new TcpClient();
-            if (IPAddress.TryParse(_hostname, out IPAddress? ip))
-            {
-                client.Connect(new IPEndPoint(ip, DiverPort));
-            }
-            else
-            {
-                client.Connect(_hostname, DiverPort);
-            }
-
             HttpRequestSummary reqSummary = HttpRequestSummary.FromJson(path, queryParams, jsonBody);
-            SimpleHttpProtocolParser.WriteRequest(client, reqSummary);
-            HttpResponseSummary response = SimpleHttpProtocolParser.ReadResponse(client);
-
-            // Done with the client. Peacefully close the TCP connection
-            try
-            {
-                client.Close();
-            }
-            catch { }
+            HttpResponseSummary response = _httpClient.Send(reqSummary);
 
             if (response == null)
             {
                 throw new Exception(
                     $"Failed to read response, connection closed prematurely");
+            }
+
+            if (response.StatusCode != HttpStatusCode.OK)
+            {
+                lock (_httpClientLock)
+                {
+                    _httpClient.Dispose();
+                    _httpClient = null;
+                }
             }
 
             string body = Encoding.UTF8.GetString(response.Body);
@@ -84,6 +103,7 @@ namespace ScubaDiver.API
                 if (errMessage != null)
                     throw new RemoteException(errMessage.Error, errMessage.StackTrace);
             }
+
 
             return body;
         }
@@ -484,5 +504,9 @@ namespace ScubaDiver.API
 
         public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args);
 
+        public void Dispose()
+        {
+            _httpClient.Dispose();
+        }
     }
 }
