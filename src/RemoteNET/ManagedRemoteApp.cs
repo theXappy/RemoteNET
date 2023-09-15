@@ -272,6 +272,7 @@ namespace RemoteNET
         public override void Dispose()
         {
             _managedCommunicator?.KillDiver();
+            _managedCommunicator.Dispose();
             _managedCommunicator = null;
             _procWithDiver = null;
         }
