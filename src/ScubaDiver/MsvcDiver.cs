@@ -584,14 +584,12 @@ namespace ScubaDiver
         protected IEnumerable<UndecoratedSymbol> GetExportedTypeMembers(Rtti.ModuleInfo module, string typeFullName)
         {
             string membersPrefix = $"{typeFullName}::";
-            IReadOnlyList<DllExport> exports = GetExports(module.Name);
-
-            foreach (DllExport dllExport in exports)
+            IReadOnlyList<UndecoratedSymbol> exports = GetUndecoratedExports(module);
+            foreach (UndecoratedSymbol symb in exports)
             {
-                if (dllExport.TryUndecorate(module, out UndecoratedSymbol output) &&
-                    output.UndecoratedFullName.StartsWith(membersPrefix))
+                if (symb.UndecoratedFullName.StartsWith(membersPrefix))
                 {
-                    yield return output;
+                    yield return symb;
                 }
             }
         }
