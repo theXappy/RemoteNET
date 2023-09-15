@@ -867,11 +867,12 @@ namespace ScubaDiver
                 Logger.Debug("[MsvcDiver] Invoking without parameters");
             }
 
-            // Search the method with the matching signature
-            var overloads = dumpedObjType.Methods
+            // Search the method/ctor with the matching signature
+            List<TypeDump.TypeMethod> overloads = dumpedObjType.Methods.Concat(dumpedObjType.Constructors)
                 .Where(m => m.Name == request.MethodName)
                 .Where(m => m.Parameters.Count == paramsList.Count + 1) // TODO: Check types
                 .ToList();
+
             if (overloads.Count == 0)
             {
                 Debugger.Launch();
