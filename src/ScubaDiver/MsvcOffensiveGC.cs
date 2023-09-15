@@ -68,7 +68,7 @@ namespace ScubaDiver
             void ProcessSingleModule(UndecoratedModule module,
                 Dictionary<TypeInfo, List<UndecoratedFunction>> workingDict)
             {
-                foreach (TypeInfo type in module.Type)
+                foreach (TypeInfo type in module.Types)
                 {
                     string ctorName = GetCtorName(type);
                     if (!module.TryGetTypeFunc(type, ctorName, out var ctors))
@@ -99,7 +99,7 @@ namespace ScubaDiver
             void ProcessSingleModule(UndecoratedModule module,
                 Dictionary<TypeInfo, List<UndecoratedFunction>> workingDict)
             {
-                foreach (TypeInfo type in module.Type)
+                foreach (TypeInfo type in module.Types)
                 {
                     string ctorName = GetDtorName(type);
                     if (!module.TryGetTypeFunc(type, ctorName, out var dtors))
@@ -124,7 +124,7 @@ namespace ScubaDiver
             void ProcessSingleModule(UndecoratedModule module,
                 Dictionary<long, UndecoratedFunction> workingDict)
             {
-                foreach (TypeInfo type in module.Type)
+                foreach (TypeInfo type in module.Types)
                 {
                     string methondName = $"{type.Name}::__autoclassinit2";
                     if (!module.TryGetTypeFunc(type, methondName, out var methodGroup))
