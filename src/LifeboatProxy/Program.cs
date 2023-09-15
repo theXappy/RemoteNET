@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
 using System.Net;
-using System.Text;
 using System.Threading.Tasks;
-using ScubaDiver.API.Protocol;
 using ScubaDiver.API.Protocol.SimpleHttp;
 
 namespace LifeboatProxy
