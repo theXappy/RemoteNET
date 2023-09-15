@@ -21,5 +21,7 @@ namespace RemoteNET
             TypeFullName = typeName;
             Assembly = assembly;
         }
+
+        public override string ToString() => $"[{Runtime}] {Assembly}!{TypeFullName}";
     }
 }
