@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -32,10 +33,10 @@ public static class RnetRequestsListenerFactory
 
 public class RnetReverseRequestsListener : IRequestsListener
 {
-    private readonly ManualResetEvent _stayAlive = new(true);
+    private readonly ManualResetEvent _bootstrapStayAlive = new(true);
     private int _port;
-    private TcpClient _client;
-    private Task _task = null;
+    private TcpClient _bootstrapClient;
+    private Task _bootstrapTask = null;
 
     public event EventHandler<ScubaDiverMessage> RequestReceived;
 
@@ -46,26 +47,26 @@ public class RnetReverseRequestsListener : IRequestsListener
 
     public void Start()
     {
-        _stayAlive.Set();
-        _client = new TcpClient();
+        _bootstrapStayAlive.Set();
+        _bootstrapClient = new TcpClient();
         var ipe = new IPEndPoint(IPAddress.Parse("127.0.0.1"), _port);
-        _client.Connect(ipe);
-        _task = Task.Run(Dispatcher);
+        _bootstrapClient.Connect(ipe);
+        _bootstrapTask = Task.Run(BootstrapDispatcher);
     }
 
     public void Stop()
     {
-        _client.Close();
-        _stayAlive.Reset();
+        _bootstrapClient.Close();
+        _bootstrapStayAlive.Reset();
     }
 
-    private void Dispatcher()
+    private void BootstrapDispatcher()
     {
-        var client = _client;
+        var client = _bootstrapClient;
 
         // Introduce ourselves to the proxy
         HttpRequestSummary intro =
-            HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver\"}");
+            HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver_bootstrap\"}");
         SimpleHttpProtocolParser.WriteRequest(client, intro);
 
         var introResp = SimpleHttpProtocolParser.ReadResponse(client);
@@ -75,15 +76,77 @@ public class RnetReverseRequestsListener : IRequestsListener
         string listeningUrl = $"http://127.0.0.1:{_port}/";
         Logger.Debug($"[RnetReverseRequestsListener] Connected. Proxy should be available at: {listeningUrl}");
 
-        while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
+        List<TcpClient> aliveConsumers = new List<TcpClient>();
+
+        while (_bootstrapStayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
             var request = SimpleHttpProtocolParser.ReadRequest(client);
             if (request == null)
                 continue;
 
+            if (request.Url != "/spawn_new_connection")
+            {
+                Console.WriteLine($"Forbidden URL at bootstrapper socket: {request.Url}");
+                continue;
+            }
+
+            Console.WriteLine("[!] New spawn_new_connection request");
+
+            // Local port decided for us by the proxy. This is its way to find us later.
+            int port = int.Parse(request.QueryString["port"]);
+            TcpClient consumerClient = new TcpClient(new IPEndPoint(IPAddress.Parse("127.0.0.1"), port));
+            Console.WriteLine($"[+++] Adding {consumerClient.Client.RemoteEndPoint} to live list");
+            aliveConsumers.Add(consumerClient);
+
+            var ipe = new IPEndPoint(IPAddress.Parse("127.0.0.1"), _port);
+            consumerClient.Connect(ipe);
+            Task consumerTask = Task.Run(() => Dispatcher(consumerClient));
+            consumerTask.ContinueWith(t =>
+            {
+                Console.WriteLine($"[XXX] Removing {consumerClient.Client.RemoteEndPoint} from live list");
+                return aliveConsumers.Remove(consumerClient);
+            });
+        }
+    }
+
+    private void Dispatcher(TcpClient client)
+    {
+        // Introduce ourselves to the proxy
+        HttpRequestSummary intro =
+            HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver\"}");
+        SimpleHttpProtocolParser.WriteRequest(client, intro);
+        client.GetStream().Flush();
+
+        HttpResponseSummary introResp = null;
+        try
+        {
+            introResp = SimpleHttpProtocolParser.ReadResponse(client);
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine("ERROR!!!!!!!!!");
+            Console.WriteLine(ex);
+            Console.WriteLine(ex.StackTrace);
+            Debugger.Launch();
+        }
+
+        if (introResp == null || !introResp.BodyString.Contains("\"status\":\"OK\""))
+            throw new Exception("Diver couldn't register at Lifeboat");
+
+        while (_bootstrapStayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
+        {
+            HttpRequestSummary request = SimpleHttpProtocolParser.ReadRequest(client);
+            if (request == null)
+                continue;
+
             void RespondFunc(string body)
             {
-                var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body);
+                Dictionary<string, string> headers = new Dictionary<string, string>();
+                string requestId = request.QueryString.Get("requestId");
+                if (!string.IsNullOrWhiteSpace(requestId))
+                    headers["requestId"] = requestId;
+
+                var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body, headers);
                 SimpleHttpProtocolParser.WriteResponse(client, resp);
             }
 
@@ -98,9 +161,9 @@ public class RnetReverseRequestsListener : IRequestsListener
     {
         try
         {
-            _task.Wait();
+            _bootstrapTask.Wait();
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             Logger.Debug($"[RnetReverseRequestsListener] WaitForExit() -- Dispatcher task exited with exception. Ex: " + e);
             return;
@@ -109,7 +172,7 @@ public class RnetReverseRequestsListener : IRequestsListener
 
     public void Dispose()
     {
-        _stayAlive?.Dispose();
+        _bootstrapStayAlive?.Dispose();
         RequestReceived = null;
     }
 
@@ -166,6 +229,11 @@ public class RnetRequestsListener : IRequestsListener
 
             void RespondFunc(string body)
             {
+                Dictionary<string, string> headers = new Dictionary<string, string>();
+                string requestId = request.QueryString.Get("requestId");
+                if (!string.IsNullOrWhiteSpace(requestId))
+                    headers["requestId"] = requestId;
+
                 var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body);
                 SimpleHttpProtocolParser.WriteResponse(client, resp);
             }
