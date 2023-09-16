@@ -1,3 +1,3 @@
 namespace ScubaDiver;
 
-public record NativeObject(nuint Address, ScubaDiver.Rtti.TypeInfo TypeInfo);
+public record NativeObject(nuint Address, Rtti.TypeInfo TypeInfo);

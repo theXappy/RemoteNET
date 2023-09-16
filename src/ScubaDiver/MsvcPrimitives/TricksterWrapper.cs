@@ -40,41 +40,41 @@ public class TricksterWrapper
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
     }
 
-    public bool TryGetOperatorNew(Rtti.ModuleInfo moduleInfo, out nuint[] operatorNewAddresses)
+    public bool TryGetOperatorNew(ModuleInfo moduleInfo, out nuint[] operatorNewAddresses)
     {
         return _trickster.OperatorNewFuncs.TryGetValue(moduleInfo, out operatorNewAddresses);
     }
 
-    public Dictionary<Rtti.ModuleInfo, Rtti.TypeInfo[]> GetDecoratedModules()
+    public Dictionary<ModuleInfo, TypeInfo[]> GetDecoratedModules()
     {
         return _trickster.ScannedTypes;
     }
-    public Rtti.TypeInfo[] GetAllTypes()
+    public TypeInfo[] GetAllTypes()
     {
         return GetDecoratedModules().SelectMany(x => x.Value).ToArray();
     }
 
-    public List<Rtti.ModuleInfo> GetModules() => _trickster.ModulesParsed;
-    public List<Rtti.ModuleInfo> GetModules(Predicate<string> filter) => _trickster.ModulesParsed.Where(a => filter(a.Name)).ToList();
-    public List<Rtti.ModuleInfo> GetModules(string name) => GetModules(s => s == name);
+    public List<ModuleInfo> GetModules() => _trickster.ModulesParsed;
+    public List<ModuleInfo> GetModules(Predicate<string> filter) => _trickster.ModulesParsed.Where(a => filter(a.Name)).ToList();
+    public List<ModuleInfo> GetModules(string name) => GetModules(s => s == name);
 
     private Dictionary<string, UndecoratedModule> _undecModeulesCache = new Dictionary<string, UndecoratedModule>();
     public List<UndecoratedModule> GetUndecoratedModules(Predicate<string> filter) => GetUndecoratedModules().Where(a => filter(a.Name)).ToList();
     public List<UndecoratedModule> GetUndecoratedModules()
     {
-        UndecoratedModule GenerateUndecoratedModule(Rtti.ModuleInfo moduleInfo, Rtti.TypeInfo[] types)
+        UndecoratedModule GenerateUndecoratedModule(ModuleInfo moduleInfo, TypeInfo[] types)
         {
             // Getting all exports, type funcs and typeless
-            List<DllExport> allExports = new List<DllExport>(_exports.GetExports(moduleInfo.Name));
+            List<UndecoratedSymbol> allExports = _exports.GetUndecoratedExports(moduleInfo).ToList();
 
             UndecoratedModule module = new UndecoratedModule(moduleInfo.Name, moduleInfo);
 
             // Now iterate all first-class Types
-            foreach (Rtti.TypeInfo typeInfo in types)
+            foreach (TypeInfo typeInfo in types)
             {
                 // Find all exported members of the first-class type
                 IEnumerable<UndecoratedSymbol> methods = _exports.GetExportedTypeMembers(moduleInfo, typeInfo.Name);
-                foreach (var symbol in methods)
+                foreach (UndecoratedSymbol symbol in methods)
                 {
                     if (symbol is UndecoratedExportedFunc undecFunc)
                     {
@@ -82,25 +82,22 @@ public class TricksterWrapper
                         module.AddTypeFunction(typeInfo, undecFunc);
 
                         // Removing type func from allExports
-                        allExports.Remove(undecFunc.Export);
+                        allExports.Remove(undecFunc);
                     }
                 }
             }
 
             // This list should now hold only typeless symbols. Which means C-style, non-class-associated funcs/variables or
             // second-class types' members.
-            foreach (DllExport export in allExports)
+            foreach (var export in allExports)
             {
-                if (!export.TryUndecorate(moduleInfo, out UndecoratedSymbol output))
-                    continue;
-
-                if (output is not UndecoratedFunction undecFunc)
+                if (export is not UndecoratedFunction undecFunc)
                 {
-                    Logger.Debug("Typless-export which isn't a function is discarded. Undecorated name: " + output.UndecoratedFullName);
+                    Logger.Debug("Typless-export which isn't a function is discarded. Undecorated name: " + export.UndecoratedFullName);
                     continue;
                 }
 
-                module.AddTypelessFunction(export.Name, undecFunc);
+                module.AddTypelessFunction(undecFunc);
             }
 
             // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
@@ -115,7 +112,7 @@ public class TricksterWrapper
                             decoratedName: "operator new",
                             (long)operatorNewAddr, 1,
                             moduleInfo);
-                    module.AddTypelessFunction("operator new", undecFunction);
+                    module.AddTypelessFunction(undecFunction);
                 }
             }
 
@@ -123,10 +120,10 @@ public class TricksterWrapper
         }
 
         Refresh();
-        Dictionary<Rtti.ModuleInfo, Rtti.TypeInfo[]> modulesAndTypes = GetDecoratedModules();
+        Dictionary<ModuleInfo, TypeInfo[]> modulesAndTypes = GetDecoratedModules();
 
         List<UndecoratedModule> output = new();
-        foreach (KeyValuePair<Rtti.ModuleInfo, Rtti.TypeInfo[]> kvp in modulesAndTypes)
+        foreach (KeyValuePair<ModuleInfo, TypeInfo[]> kvp in modulesAndTypes)
         {
             var module = kvp.Key;
             if (!_undecModeulesCache.TryGetValue(module.Name, out UndecoratedModule undecModule))

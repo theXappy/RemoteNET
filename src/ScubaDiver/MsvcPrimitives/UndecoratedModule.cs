@@ -5,18 +5,18 @@ namespace ScubaDiver;
 public class UndecoratedModule
 {
     public string Name { get; private set; }
-    public Rtti.ModuleInfo Module { get; private set; }
+    public Rtti.ModuleInfo ModuleInfo { get; private set; }
 
     private Dictionary<Rtti.TypeInfo, UndecoratedType> _types;
     private Dictionary<string, UndecoratedMethodGroup> _typelessFunctions;
 
 
-    public UndecoratedModule(string name, Rtti.ModuleInfo module)
+    public UndecoratedModule(string name, Rtti.ModuleInfo moduleInfo)
     {
         Name = name;
         _types = new Dictionary<Rtti.TypeInfo, UndecoratedType>();
         _typelessFunctions = new Dictionary<string, UndecoratedMethodGroup>();
-        Module = module;
+        ModuleInfo = moduleInfo;
     }
 
     public IEnumerable<Rtti.TypeInfo> Types => _types.Keys;
@@ -38,8 +38,9 @@ public class UndecoratedModule
         res = null;
         return TryGetType(type, out var undType) && undType.TryGetValue(undecMethodName, out res);
     }
-    public void AddTypelessFunction(string decoratedMethodName, UndecoratedFunction func)
+    public void AddTypelessFunction(UndecoratedFunction func)
     {
+        string decoratedMethodName = func.DecoratedName;
         if (!_typelessFunctions.ContainsKey(decoratedMethodName))
             _typelessFunctions[decoratedMethodName] = new UndecoratedMethodGroup();
         _typelessFunctions[decoratedMethodName].Add(func);

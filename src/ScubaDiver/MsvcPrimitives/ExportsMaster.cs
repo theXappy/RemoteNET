@@ -7,7 +7,7 @@ namespace ScubaDiver;
 public class ExportsMaster
 {
     private Dictionary<string, List<DllExport>> _exportsCache = new();
-    public IReadOnlyList<DllExport> GetExports(string moduleName)
+    private IReadOnlyList<DllExport> GetExports(string moduleName)
     {
         if (!_exportsCache.ContainsKey(moduleName))
         {
@@ -18,7 +18,7 @@ public class ExportsMaster
     }
 
     private Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>> _undecExportsCache = new Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>>();
-    private IReadOnlyList<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo)
+    public IReadOnlyList<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo)
     {
         if (!_undecExportsCache.ContainsKey(modInfo))
         {

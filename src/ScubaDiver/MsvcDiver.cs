@@ -115,7 +115,7 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(dd);
         }
 
-        
+
 
         protected override void RefreshRuntime()
         {
@@ -134,23 +134,23 @@ namespace ScubaDiver
             if (modulesToTypes.Count != 1)
                 QuickError($"Expected exactly 1 match for module, got {modulesToTypes.Count}");
 
-            Rtti.ModuleInfo module = modulesToTypes.Keys.Single();
-            Rtti.TypeInfo[] typeInfos = modulesToTypes[module].ToArray();
+            ModuleInfo module = modulesToTypes.Keys.Single();
+            TypeInfo[] typeInfos = modulesToTypes[module].ToArray();
             if (typeInfos.Length != 1)
                 QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
 
 
-            Rtti.TypeInfo typeInfo = typeInfos.Single();
+            TypeInfo typeInfo = typeInfos.Single();
             List<UndecoratedSymbol> members = _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name).ToList();
             UndecoratedSymbol vftable = members.FirstOrDefault(member => member.UndecoratedName.EndsWith("`vftable'"));
 
-            
+
             List<UndecoratedFunction> exportedFuncs = members.OfType<UndecoratedFunction>().ToList();
             List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
             if (vftable != null)
             {
 
-                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), module, _exportsMaster.GetExports(module.Name), vftable);
+                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), module, _exportsMaster.GetUndecoratedExports(module), vftable);
 
                 // Remove duplicates - the methods which are both virtual and exported.
                 virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
@@ -288,7 +288,7 @@ namespace ScubaDiver
             }
 
             string assembly = req.QueryString.Get("assembly");
-            ParseFullTypeName(assembly +"!*", out string assemblyFilter, out _);
+            ParseFullTypeName(assembly + "!*", out string assemblyFilter, out _);
             Predicate<string> assmFilter = Filter.CreatePredicate(assemblyFilter);
 
             IEnumerable<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules().Where(um => assmFilter(um.Name));
@@ -296,7 +296,7 @@ namespace ScubaDiver
             if (matchingAssemblies.Any())
             {
                 var assm = matchingAssemblies.Single();
-                IEnumerable<Rtti.TypeInfo> rawTypes = assm.Types;
+                IEnumerable<TypeInfo> rawTypes = assm.Types;
                 foreach (var type in rawTypes)
                 {
                     types.Add(new TypesDump.TypeIdentifiers()
@@ -358,10 +358,11 @@ namespace ScubaDiver
         private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
             var typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
-            foreach (KeyValuePair<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> moduleAndTypes in typeInfos)
+            foreach (KeyValuePair<ModuleInfo, IEnumerable<TypeInfo>> moduleAndTypes in typeInfos)
             {
-                Rtti.ModuleInfo module = moduleAndTypes.Key;
-                foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
+                ModuleInfo module = moduleAndTypes.Key;
+                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module);
+                foreach (TypeInfo typeInfo in moduleAndTypes.Value)
                 {
                     UndecoratedSymbol vftable;
                     List<TypeDump.TypeField> fields = new();
@@ -372,7 +373,6 @@ namespace ScubaDiver
                     if (vftable != null)
                     {
                         HANDLE process = _tricksterWrapper.GetProcessHandle();
-                        IReadOnlyList<DllExport> exports = _exportsMaster.GetExports(module.Name);
                         List<UndecoratedFunction> virtualFunctionsInternal = VftableParser.AnalyzeVftable(process, module, exports, vftable);
                         List<TypeDump.TypeMethod> virtualFunctions = virtualFunctionsInternal.Select(VftableParser.ConvertToTypeMethod).Where(x => x != null).ToList();
 
@@ -403,8 +403,8 @@ namespace ScubaDiver
             return null;
         }
 
-        private void DeconstructRttiType(Rtti.TypeInfo typeInfo,
-            Rtti.ModuleInfo module,
+        private void DeconstructRttiType(TypeInfo typeInfo,
+            ModuleInfo module,
             List<TypeDump.TypeField> fields,
             List<TypeDump.TypeMethod> constructors,
             List<TypeDump.TypeMethod> methods,
@@ -472,7 +472,7 @@ namespace ScubaDiver
                 $"[{nameof(GetTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
         }
 
-     
+
 
         private FirstClassTypeInfo ResolveTypeFromVftableAddress(nuint address)
         {
@@ -499,7 +499,7 @@ namespace ScubaDiver
             return null;
         }
 
-        private IReadOnlyDictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
+        private IReadOnlyDictionary<ModuleInfo, IEnumerable<TypeInfo>> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
         {
             if (_tricksterWrapper.RefreshRequired())
             {
@@ -508,32 +508,29 @@ namespace ScubaDiver
 
             Predicate<string> assmNameFilter = Filter.CreatePredicate(rawAssemblyFilter);
             Predicate<string> typeNameFilter = Filter.CreatePredicate(rawTypeFilter);
-            Func<Rtti.TypeInfo, bool> typeFilter = ti => typeNameFilter(ti.Name);
+            Func<TypeInfo, bool> typeFilter = ti => typeNameFilter(ti.Name);
 
-            Dictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> output = new();
+            Dictionary<ModuleInfo, IEnumerable<TypeInfo>> output = new();
             foreach (UndecoratedModule module in _tricksterWrapper.GetUndecoratedModules(assmNameFilter))
             {
-                IEnumerable<Rtti.TypeInfo> types = module.Types;
-                    Dictionary<string, List<Rtti.TypeInfo>> matches = new Dictionary<string, List<Rtti.TypeInfo>>();
-                void AddOrUpdate(Rtti.TypeInfo ti)
+                IEnumerable<TypeInfo> types = module.Types;
+                Dictionary<string, List<TypeInfo>> matches = new Dictionary<string, List<TypeInfo>>();
+                void AddOrUpdate(TypeInfo ti)
                 {
                     string key = ti.Name;
                     if (!matches.ContainsKey(key))
-                        matches[key] = new List<Rtti.TypeInfo>();
+                        matches[key] = new List<TypeInfo>();
                     matches[key].Add(ti);
                 }
-                foreach (Rtti.TypeInfo typeInfo in types.Where(typeFilter))
+                foreach (TypeInfo typeInfo in types.Where(typeFilter))
                 {
                     AddOrUpdate(typeInfo);
                 }
 
                 // Collect 2nd class types
-                IReadOnlyList<DllExport> exports = _exportsMaster.GetExports(module.Name);
-                foreach (DllExport dllExport in exports)
+                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module.ModuleInfo);
+                foreach (UndecoratedSymbol undecSymbol in exports)
                 {
-                    if (!dllExport.TryUndecorate(module.Module, out UndecoratedSymbol undecSymbol))
-                        continue;
-
                     string undecExportName = undecSymbol.UndecoratedFullName;
                     if (!IsCtorName(undecExportName, out int lastDoubleColonIndex))
                         continue;
@@ -550,13 +547,13 @@ namespace ScubaDiver
                     }
 
                     // Definitely NOT a first-class type!
-                    Rtti.TypeInfo ti = new SecondClassTypeInfo(module.Name, fullTypeName);
+                    TypeInfo ti = new SecondClassTypeInfo(module.Name, fullTypeName);
 
                     AddOrUpdate(ti);
                 }
 
                 if (matches.Count > 0)
-                    output[module.Module] = matches.Values.SelectMany(list => list);
+                    output[module.ModuleInfo] = matches.Values.SelectMany(list => list);
 
             }
 
@@ -677,7 +674,7 @@ namespace ScubaDiver
             {
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
-                Rtti.TypeInfo typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                TypeInfo typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
                 if (typeInfo == null)
                 {
                     throw new Exception("Failed to resolve vftable of target to any RTTI type.");
@@ -770,9 +767,9 @@ namespace ScubaDiver
 
             Logger.Debug($"[MsvcDiver] Getting RTTI info objects from TypeFullName: {request.TypeFullName}");
             ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
-            IReadOnlyDictionary<Rtti.ModuleInfo, IEnumerable<Rtti.TypeInfo>> typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
-            Rtti.ModuleInfo module = typeInfos.Keys.Single();
-            Rtti.TypeInfo typeInfo = typeInfos[module].Single();
+            IReadOnlyDictionary<ModuleInfo, IEnumerable<TypeInfo>> typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
+            ModuleInfo module = typeInfos.Keys.Single();
+            TypeInfo typeInfo = typeInfos[module].Single();
 
             List<UndecoratedFunction> typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, typeInfo.Name).ToList();
             UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.DecoratedName);
@@ -863,7 +860,7 @@ namespace ScubaDiver
                 long vftable = Marshal.ReadInt64(new IntPtr((long)results.Value));
                 Console.WriteLine($"vftable: {vftable:x16}");
                 Console.WriteLine("Trying to resolve vftable to type...");
-                Rtti.TypeInfo retTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                TypeInfo retTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
                 Console.WriteLine($"Trying to resolve vftable to type... Got back: {retTypeInfo}");
 
                 if (retTypeInfo != null)

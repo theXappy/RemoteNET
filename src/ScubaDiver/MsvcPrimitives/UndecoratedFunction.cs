@@ -17,6 +17,19 @@ public abstract class UndecoratedSymbol
         UndecoratedName = undecName;
         UndecoratedFullName = undecFullName;
     }
+
+    public override int GetHashCode() => Address.GetHashCode();
+
+    public override bool Equals(object obj)
+    {
+        if (obj is not UndecoratedFunction undec)
+        {
+            return false;
+        }
+
+        return Address == undec.Address &&
+               DecoratedName == undec.DecoratedName;
+    }
 }
 
 public abstract class UndecoratedFunction : UndecoratedSymbol
@@ -32,16 +45,4 @@ public abstract class UndecoratedFunction : UndecoratedSymbol
     }
 
     public override string ToString() => UndecoratedFullName;
-
-    public override int GetHashCode() => Address.GetHashCode();
-
-    public override bool Equals(object obj)
-    {
-        if (obj is not UndecoratedFunction undec)
-        {
-            return false;
-        }
-
-        return Address == undec.Address;
-    }
 }
