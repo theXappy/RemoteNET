@@ -20,7 +20,7 @@ public static class VftableParser
     /// Assuming all function (3 in the example above) are exported, we'd find their names in <see cref="mangledExports"/>
     /// and return them together with their names.
     /// </summary>
-    public static List<UndecoratedFunction> AnalyzeVftable(HANDLE process, ModuleInfo module, IReadOnlyList<DllExport> exportsList, UndecoratedSymbol vftable)
+    public static List<UndecoratedFunction> AnalyzeVftable(HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exportsList, UndecoratedSymbol vftable)
     {
         List<UndecoratedFunction> virtualMethods = new List<UndecoratedFunction>();
 
@@ -29,7 +29,7 @@ public static class VftableParser
             module.BaseAddress,
             module.Size);
 
-        Dictionary<nuint, DllExport> exports = exportsList
+        Dictionary<nuint, UndecoratedSymbol> exports = exportsList
                                                 .DistinctBy(exp => exp.Address)
                                                 .ToDictionary(exp => (nuint)exp.Address);
 
@@ -51,14 +51,8 @@ public static class VftableParser
             if (!readNext)
                 break;
 
-            if (!exports.TryGetValue(entryContent, out DllExport exportInfo))
+            if (!exports.TryGetValue(entryContent, out UndecoratedSymbol undecSymbol))
                 continue;
-
-            if (!exportInfo.TryUndecorate(module, out UndecoratedSymbol undecSymbol))
-            {
-                Logger.Debug($"[AnalyzeVftable] Failed to undecorate. Name: {exportInfo.Name}");
-                continue;
-            }
 
             if (undecSymbol is not UndecoratedFunction undecFunc) 
                 continue;
@@ -77,9 +71,7 @@ public static class VftableParser
 
         bool IsVftableAddress(nuint addr)
         {
-            if (!exports.TryGetValue(addr, out DllExport exportInfo))
-                return false;
-            if (!exportInfo.TryUndecorate(module, out UndecoratedSymbol undecoratedExport))
+            if (!exports.TryGetValue(addr, out UndecoratedSymbol undecoratedExport))
                 return false;
             return undecoratedExport.UndecoratedName.EndsWith("`vftable'");
         }
