@@ -6,8 +6,9 @@ namespace ScubaDiver;
 
 public class ExportsMaster
 {
+
     private Dictionary<string, List<DllExport>> _exportsCache = new();
-    private IReadOnlyList<DllExport> GetExports(string moduleName)
+    private IReadOnlyList<DllExport> GetExportsInner(string moduleName)
     {
         if (!_exportsCache.ContainsKey(moduleName))
         {
@@ -17,12 +18,13 @@ public class ExportsMaster
         return _exportsCache[moduleName];
     }
 
-    private Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>> _undecExportsCache = new Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>>();
-    public IReadOnlyList<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo)
+
+    private Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>> _undecExportsCache = new();
+    public IReadOnlyList<UndecoratedSymbol> GetExports(Rtti.ModuleInfo modInfo)
     {
         if (!_undecExportsCache.ContainsKey(modInfo))
         {
-            IReadOnlyList<DllExport> exports = GetExports(modInfo.Name);
+            IReadOnlyList<DllExport> exports = GetExportsInner(modInfo.Name);
             IEnumerable<UndecoratedSymbol> undecExports = exports
                 .Select(exp => exp.TryUndecorate(modInfo, out var undecExp) ? undecExp : null)
                 .Where(exp => exp != null);
@@ -37,24 +39,11 @@ public class ExportsMaster
     public IEnumerable<UndecoratedSymbol> GetExportedTypeMembers(Rtti.ModuleInfo module, string typeFullName)
     {
         string membersPrefix = $"{typeFullName}::";
-        IReadOnlyList<UndecoratedSymbol> exports = GetUndecoratedExports(module);
-        foreach (UndecoratedSymbol symb in exports)
-        {
-            if (symb.UndecoratedFullName.StartsWith(membersPrefix))
-            {
-                yield return symb;
-            }
-        }
+        return GetExports(module).Where(sym => sym.UndecoratedFullName.StartsWith(membersPrefix));
     }
     public IEnumerable<UndecoratedFunction> GetExportedTypeFunctions(Rtti.ModuleInfo module, string typeFullName)
     {
-        foreach (UndecoratedSymbol symbol in GetExportedTypeMembers(module, typeFullName))
-        {
-            if (symbol is UndecoratedFunction undecFunc)
-            {
-                yield return undecFunc;
-            }
-        }
+        return GetExportedTypeMembers(module, typeFullName).OfType<UndecoratedFunction>();
     }
 
 }
