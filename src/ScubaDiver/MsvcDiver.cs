@@ -150,7 +150,7 @@ namespace ScubaDiver
             if (vftable != null)
             {
 
-                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), module, _exportsMaster.GetUndecoratedExports(module), vftable);
+                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), module, _exportsMaster.GetExports(module), vftable);
 
                 // Remove duplicates - the methods which are both virtual and exported.
                 virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
@@ -361,7 +361,7 @@ namespace ScubaDiver
             foreach (KeyValuePair<ModuleInfo, IEnumerable<TypeInfo>> moduleAndTypes in typeInfos)
             {
                 ModuleInfo module = moduleAndTypes.Key;
-                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module);
+                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module);
                 foreach (TypeInfo typeInfo in moduleAndTypes.Value)
                 {
                     UndecoratedSymbol vftable;
@@ -528,7 +528,7 @@ namespace ScubaDiver
                 }
 
                 // Collect 2nd class types
-                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module.ModuleInfo);
+                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module.ModuleInfo);
                 foreach (UndecoratedSymbol undecSymbol in exports)
                 {
                     string undecExportName = undecSymbol.UndecoratedFullName;

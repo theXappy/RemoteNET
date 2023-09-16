@@ -65,7 +65,7 @@ public class TricksterWrapper
         UndecoratedModule GenerateUndecoratedModule(ModuleInfo moduleInfo, TypeInfo[] types)
         {
             // Getting all exports, type funcs and typeless
-            List<UndecoratedSymbol> allExports = _exports.GetUndecoratedExports(moduleInfo).ToList();
+            List<UndecoratedSymbol> allExports = _exports.GetExports(moduleInfo).ToList();
 
             UndecoratedModule module = new UndecoratedModule(moduleInfo.Name, moduleInfo);
 
