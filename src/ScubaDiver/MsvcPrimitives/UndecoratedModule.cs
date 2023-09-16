@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ScubaDiver.Rtti;
 
 namespace ScubaDiver;
 
@@ -7,6 +8,7 @@ public class UndecoratedModule
     public string Name { get; private set; }
     public Rtti.ModuleInfo ModuleInfo { get; private set; }
 
+    private Dictionary<string, Rtti.TypeInfo> _namesToTypes;
     private Dictionary<Rtti.TypeInfo, UndecoratedType> _types;
     private Dictionary<string, UndecoratedMethodGroup> _typelessFunctions;
 
@@ -23,6 +25,8 @@ public class UndecoratedModule
 
     public bool TryGetType(Rtti.TypeInfo type, out UndecoratedType res)
         => _types.TryGetValue(type, out res);
+    public bool TryGetType(string name, out UndecoratedType res)
+        => _namesToTypes.TryGetValue(name, out TypeInfo type) & _types.TryGetValue(type, out res);
 
 
     public void AddTypeFunction(Rtti.TypeInfo type, UndecoratedFunction func)
@@ -52,6 +56,9 @@ public class UndecoratedModule
 
     private UndecoratedType GetOrAdd(Rtti.TypeInfo type)
     {
+        if(!_namesToTypes.ContainsKey(type.Name))
+            _namesToTypes[type.Name] = type;
+
         if (!_types.ContainsKey(type))
             _types[type] = new UndecoratedType();
         return _types[type];

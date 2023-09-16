@@ -130,7 +130,7 @@ namespace ScubaDiver
             string methodName = request.MethodName;
 
             ParseFullTypeName(rawTypeFilter, out var rawAssemblyFilter, out rawTypeFilter);
-            var modulesToTypes = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
+            var modulesToTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
             if (modulesToTypes.Count != 1)
                 QuickError($"Expected exactly 1 match for module, got {modulesToTypes.Count}");
 
@@ -274,41 +274,36 @@ namespace ScubaDiver
             return hookCallbackResults.ReturnedObjectOrAddress;
         }
 
-
-
-
-
-
-
         protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
-            if (_tricksterWrapper.RefreshRequired())
-            {
-                RefreshRuntime();
-            }
-
-            string assembly = req.QueryString.Get("assembly");
-            ParseFullTypeName(assembly + "!*", out string assemblyFilter, out _);
+            string assemblyFilter = req.QueryString.Get("assembly");
             Predicate<string> assmFilter = Filter.CreatePredicate(assemblyFilter);
 
-            IEnumerable<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules().Where(um => assmFilter(um.Name));
+            List<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules(assmFilter).ToList();
             List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
-            if (matchingAssemblies.Any())
+            if (matchingAssemblies.Count == 0)
             {
-                var assm = matchingAssemblies.Single();
-                IEnumerable<TypeInfo> rawTypes = assm.Types;
-                foreach (var type in rawTypes)
+                return QuickError($"No modules matched the filter '{assmFilter}'");
+            }
+            if (matchingAssemblies.Count > 1)
+            {
+                string assembliesList = string.Join(", ", matchingAssemblies.Select(x=>x.Name).ToArray());
+                return QuickError(
+                    $"Too many modules matched the filter '{assmFilter}'. Found {matchingAssemblies.Count} ({assembliesList})");
+            }
+
+            UndecoratedModule assm = matchingAssemblies.Single();
+            foreach (TypeInfo type in assm.Types)
+            {
+                types.Add(new TypesDump.TypeIdentifiers()
                 {
-                    types.Add(new TypesDump.TypeIdentifiers()
-                    {
-                        TypeName = $"{assm.Name}!{type.Name}"
-                    });
-                }
+                    TypeName = $"{assm.Name}!{type.Name}"
+                });
             }
 
             TypesDump dump = new()
             {
-                AssemblyName = assembly,
+                AssemblyName = assm.Name,
                 Types = types
             };
 
@@ -357,8 +352,8 @@ namespace ScubaDiver
 
         private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
-            var typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
-            foreach (KeyValuePair<ModuleInfo, IEnumerable<TypeInfo>> moduleAndTypes in typeInfos)
+            var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
+            foreach (KeyValuePair<ModuleInfo, IEnumerable<TypeInfo>> moduleAndTypes in modulesAndTypes)
             {
                 ModuleInfo module = moduleAndTypes.Key;
                 IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module);
@@ -476,7 +471,7 @@ namespace ScubaDiver
 
         private FirstClassTypeInfo ResolveTypeFromVftableAddress(nuint address)
         {
-            foreach (var kvp in _tricksterWrapper.GetDecoratedModules())
+            foreach (var kvp in _tricksterWrapper.GetDecoratedTypes())
             {
                 var module = kvp.Key;
                 if (address < module.BaseAddress || address > (module.BaseAddress + module.Size))
@@ -498,86 +493,6 @@ namespace ScubaDiver
             // Address was not in range of any of the modules...
             return null;
         }
-
-        private IReadOnlyDictionary<ModuleInfo, IEnumerable<TypeInfo>> GetTypeInfos(string rawAssemblyFilter, string rawTypeFilter)
-        {
-            if (_tricksterWrapper.RefreshRequired())
-            {
-                RefreshRuntime();
-            }
-
-            Predicate<string> assmNameFilter = Filter.CreatePredicate(rawAssemblyFilter);
-            Predicate<string> typeNameFilter = Filter.CreatePredicate(rawTypeFilter);
-            Func<TypeInfo, bool> typeFilter = ti => typeNameFilter(ti.Name);
-
-            Dictionary<ModuleInfo, IEnumerable<TypeInfo>> output = new();
-            foreach (UndecoratedModule module in _tricksterWrapper.GetUndecoratedModules(assmNameFilter))
-            {
-                IEnumerable<TypeInfo> types = module.Types;
-                Dictionary<string, List<TypeInfo>> matches = new Dictionary<string, List<TypeInfo>>();
-                void AddOrUpdate(TypeInfo ti)
-                {
-                    string key = ti.Name;
-                    if (!matches.ContainsKey(key))
-                        matches[key] = new List<TypeInfo>();
-                    matches[key].Add(ti);
-                }
-                foreach (TypeInfo typeInfo in types.Where(typeFilter))
-                {
-                    AddOrUpdate(typeInfo);
-                }
-
-                // Collect 2nd class types
-                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module.ModuleInfo);
-                foreach (UndecoratedSymbol undecSymbol in exports)
-                {
-                    string undecExportName = undecSymbol.UndecoratedFullName;
-                    if (!IsCtorName(undecExportName, out int lastDoubleColonIndex))
-                        continue;
-
-                    // Remember that we might be searching with a filter!
-                    string fullTypeName = undecExportName[..lastDoubleColonIndex];
-                    if (!typeNameFilter(fullTypeName))
-                        continue;
-
-                    if (matches.ContainsKey(fullTypeName))
-                    {
-                        // This is a previously found first-class/second-class type.
-                        continue;
-                    }
-
-                    // Definitely NOT a first-class type!
-                    TypeInfo ti = new SecondClassTypeInfo(module.Name, fullTypeName);
-
-                    AddOrUpdate(ti);
-                }
-
-                if (matches.Count > 0)
-                    output[module.ModuleInfo] = matches.Values.SelectMany(list => list);
-
-            }
-
-            return output;
-        }
-
-        private bool IsCtorName(string fullName, out int lastDoubleColonIndex)
-        {
-            lastDoubleColonIndex = fullName.LastIndexOf("::");
-            if (lastDoubleColonIndex == -1)
-                return false;
-
-            string className = fullName.Substring(lastDoubleColonIndex + 2 /* :: */);
-            // Check if this class is in a namespace.
-            if (fullName.EndsWith($"::{className}::{className}"))
-                return true;
-            // Edge case: A class outside any namespace.
-            if (fullName == $"{className}::{className}")
-                return true;
-            return false;
-        }
-
-
-
 
         protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
@@ -767,9 +682,9 @@ namespace ScubaDiver
 
             Logger.Debug($"[MsvcDiver] Getting RTTI info objects from TypeFullName: {request.TypeFullName}");
             ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
-            IReadOnlyDictionary<ModuleInfo, IEnumerable<TypeInfo>> typeInfos = GetTypeInfos(rawAssemblyFilter, rawTypeFilter);
-            ModuleInfo module = typeInfos.Keys.Single();
-            TypeInfo typeInfo = typeInfos[module].Single();
+            var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
+            ModuleInfo module = modulesAndTypes.Keys.Single();
+            TypeInfo typeInfo = modulesAndTypes[module].Single();
 
             List<UndecoratedFunction> typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, typeInfo.Name).ToList();
             UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.DecoratedName);
