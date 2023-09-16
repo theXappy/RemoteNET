@@ -496,7 +496,8 @@ namespace ScubaDiver
 
         protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
-            // TODO: Can't figure out why, but results stay the same between calls if trickster isn't refreshed.
+            // Since trickster works on copied memory, we must refresh it so it copies again
+            // the updated heap's state between invocations.
             RefreshRuntime();
 
             string rawFilter = arg.QueryString.Get("type_filter");
