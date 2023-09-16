@@ -6,7 +6,6 @@ namespace ScubaDiver;
 
 public class ExportsMaster
 {
-
     private Dictionary<string, List<DllExport>> _exportsCache = new();
     private IReadOnlyList<DllExport> GetExportsInner(string moduleName)
     {

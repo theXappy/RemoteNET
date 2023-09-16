@@ -62,63 +62,6 @@ public class TricksterWrapper
     public List<UndecoratedModule> GetUndecoratedModules(Predicate<string> filter) => GetUndecoratedModules().Where(a => filter(a.Name)).ToList();
     public List<UndecoratedModule> GetUndecoratedModules()
     {
-        UndecoratedModule GenerateUndecoratedModule(ModuleInfo moduleInfo, TypeInfo[] types)
-        {
-            // Getting all exports, type funcs and typeless
-            List<UndecoratedSymbol> allExports = _exports.GetExports(moduleInfo).ToList();
-
-            UndecoratedModule module = new UndecoratedModule(moduleInfo.Name, moduleInfo);
-
-            // Now iterate all first-class Types
-            foreach (TypeInfo typeInfo in types)
-            {
-                // Find all exported members of the first-class type
-                IEnumerable<UndecoratedSymbol> methods = _exports.GetExportedTypeMembers(moduleInfo, typeInfo.Name);
-                foreach (UndecoratedSymbol symbol in methods)
-                {
-                    if (symbol is UndecoratedExportedFunc undecFunc)
-                    {
-                        // Store aside as a member of this type
-                        module.AddTypeFunction(typeInfo, undecFunc);
-
-                        // Removing type func from allExports
-                        allExports.Remove(undecFunc);
-                    }
-                }
-            }
-
-            // This list should now hold only typeless symbols. Which means C-style, non-class-associated funcs/variables or
-            // second-class types' members.
-            foreach (var export in allExports)
-            {
-                if (export is not UndecoratedFunction undecFunc)
-                {
-                    Logger.Debug("Typless-export which isn't a function is discarded. Undecorated name: " + export.UndecoratedFullName);
-                    continue;
-                }
-
-                module.AddTypelessFunction(undecFunc);
-            }
-
-            // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
-            if (TryGetOperatorNew(moduleInfo, out nuint[] operatorNewAddresses))
-            {
-                foreach (nuint operatorNewAddr in operatorNewAddresses)
-                {
-                    UndecoratedFunction undecFunction =
-                        new UndecoratedInternalFunction(
-                            undecoratedName: "operator new",
-                            undecoratedFullName: "operator new",
-                            decoratedName: "operator new",
-                            (long)operatorNewAddr, 1,
-                            moduleInfo);
-                    module.AddTypelessFunction(undecFunction);
-                }
-            }
-
-            return module;
-        }
-
         Refresh();
         Dictionary<ModuleInfo, TypeInfo[]> modulesAndTypes = GetDecoratedModules();
 
@@ -137,6 +80,63 @@ public class TricksterWrapper
         }
 
         return output;
+    }
+
+    private UndecoratedModule GenerateUndecoratedModule(ModuleInfo moduleInfo, TypeInfo[] types)
+    {
+        // Getting all exports, type funcs and typeless
+        List<UndecoratedSymbol> allExports = _exports.GetExports(moduleInfo).ToList();
+
+        UndecoratedModule module = new UndecoratedModule(moduleInfo.Name, moduleInfo);
+
+        // Now iterate all first-class Types
+        foreach (TypeInfo typeInfo in types)
+        {
+            // Find all exported members of the first-class type
+            IEnumerable<UndecoratedSymbol> methods = _exports.GetExportedTypeMembers(moduleInfo, typeInfo.Name);
+            foreach (UndecoratedSymbol symbol in methods)
+            {
+                if (symbol is not UndecoratedExportedFunc undecFunc) 
+                    continue;
+
+                // Store aside as a member of this type
+                module.AddTypeFunction(typeInfo, undecFunc);
+
+                // Removing type func from allExports
+                allExports.Remove(undecFunc);
+            }
+        }
+
+        // This list should now hold only typeless symbols. Which means C-style, non-class-associated funcs/variables or
+        // second-class types' members.
+        foreach (UndecoratedSymbol export in allExports)
+        {
+            if (export is not UndecoratedFunction undecFunc)
+            {
+                Logger.Debug("Typless-export which isn't a function is discarded. Undecorated name: " + export.UndecoratedFullName);
+                continue;
+            }
+
+            module.AddTypelessFunction(undecFunc);
+        }
+
+        // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
+        if (TryGetOperatorNew(moduleInfo, out nuint[] operatorNewAddresses))
+        {
+            foreach (nuint operatorNewAddr in operatorNewAddresses)
+            {
+                UndecoratedFunction undecFunction =
+                    new UndecoratedInternalFunction(
+                        undecoratedName: "operator new",
+                        undecoratedFullName: "operator new",
+                        decoratedName: "operator new",
+                        (long)operatorNewAddr, 1,
+                        moduleInfo);
+                module.AddTypelessFunction(undecFunction);
+            }
+        }
+
+        return module;
     }
 
     public bool RefreshRequired()

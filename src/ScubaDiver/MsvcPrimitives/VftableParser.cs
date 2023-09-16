@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using NtApiDotNet.Win32;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver;
 using ScubaDiver.Rtti;
@@ -17,7 +16,7 @@ public static class VftableParser
     /// 2) ChildClass::Add      --{ Overridden method 
     /// 3) ParentClass::Remove  --{ Non-overridden method
     ///
-    /// Assuming all function (3 in the example above) are exported, we'd find their names in <see cref="mangledExports"/>
+    /// Assuming all function (3 in the example above) are exported, we'd find their names in <see cref="exportsList"/>
     /// and return them together with their names.
     /// </summary>
     public static List<UndecoratedFunction> AnalyzeVftable(HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exportsList, UndecoratedSymbol vftable)
@@ -29,7 +28,7 @@ public static class VftableParser
             module.BaseAddress,
             module.Size);
 
-        Dictionary<nuint, UndecoratedSymbol> exports = exportsList
+        Dictionary<nuint, UndecoratedSymbol> exportsDict = exportsList
                                                 .DistinctBy(exp => exp.Address)
                                                 .ToDictionary(exp => (nuint)exp.Address);
 
@@ -38,7 +37,7 @@ public static class VftableParser
         for (int i = 0; i < 100; i++)
         {
             // Check if this address is some other type's vftable address.
-            // (Not checking the first one, since it OUR vftable)
+            // (Not checking the first one, since it's OUR vftable)
             nuint nextEntryAddress = (nuint)(vftable.Address + (i * IntPtr.Size));
             if (i != 0 && IsVftableAddress(nextEntryAddress))
             {
@@ -51,7 +50,7 @@ public static class VftableParser
             if (!readNext)
                 break;
 
-            if (!exports.TryGetValue(entryContent, out UndecoratedSymbol undecSymbol))
+            if (!exportsDict.TryGetValue(entryContent, out UndecoratedSymbol undecSymbol))
                 continue;
 
             if (undecSymbol is not UndecoratedFunction undecFunc) 
@@ -71,7 +70,7 @@ public static class VftableParser
 
         bool IsVftableAddress(nuint addr)
         {
-            if (!exports.TryGetValue(addr, out UndecoratedSymbol undecoratedExport))
+            if (!exportsDict.TryGetValue(addr, out UndecoratedSymbol undecoratedExport))
                 return false;
             return undecoratedExport.UndecoratedName.EndsWith("`vftable'");
         }
