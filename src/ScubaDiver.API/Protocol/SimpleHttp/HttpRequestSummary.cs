@@ -15,6 +15,12 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
         public byte[] Body { get; set; }
         public string BodyString => Encoding.UTF8.GetString(Body);
 
+        public string RequestId
+        {
+            get => QueryString.Get("requestId");
+            set => QueryString["requestId"] = value;
+        }
+
         public HttpRequestSummary()
         {
             QueryString = new NameValueCollection();
