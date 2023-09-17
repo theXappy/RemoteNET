@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using Reko.Core;
 using RemoteNET.Common;
 using RemoteNET.Internal;
 using RemoteNET.RttiReflection;

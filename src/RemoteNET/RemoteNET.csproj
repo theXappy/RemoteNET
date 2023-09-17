@@ -27,7 +27,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\RemoteNET.Common\RemoteNET.Common.csproj" />
-		<ProjectReference Include="..\RemoteNET.RttiReflection\RemoteNET.RttiReflection.csproj" />
 		<ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
 	</ItemGroup>
 
@@ -71,8 +70,8 @@
 				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
 			</CopyOperations>
 		</ItemGroup>
-		<Message Text="[~] Copying resources" Importance="high"/>
-		<Message Text="[~] Resources List: @(CopyOperations)" Importance="high"/>
+		<Message Text="[~] Copying resources" Importance="high" />
+		<Message Text="[~] Resources List: @(CopyOperations)" Importance="high" />
 		<Copy SourceFiles="@(CopyOperations)" DestinationFolder="%(CopyOperations.DestinationFolder)" />
 	</Target>
 	
@@ -92,23 +91,20 @@
 				<ZipFileName>$(ProjectDir)\Resources\DetoursNet.zip</ZipFileName>
 			</ZipOperations>
 		</ItemGroup>
-		<ZipDirectory
-			SourceDirectory="@(ZipOperations)"
-			DestinationFile="%(ZipOperations.ZipFileName)"
-			Overwrite="true" />
+		<ZipDirectory SourceDirectory="@(ZipOperations)" DestinationFile="%(ZipOperations.ZipFileName)" Overwrite="true" />
 	</Target>
 
 	<Target Name="DeleteDebugSymbolFile" AfterTargets="Build">
 		<ItemGroup>
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.exe"/>
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.dll"/>
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.pdb"/>
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.json"/>
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.zip"/>
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.exe" />
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.dll" />
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.pdb" />
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.json" />
+			<FilesToDelete Include="$(ProjectDir)\Resources\*.zip" />
 		</ItemGroup>
-		<Message Text="[~] Cleaning up copied Resources" Importance="high"/>
-		<Message Text="[~] Deleting Files: @(FilesToDelete)" Importance="high"/>
-		<Delete Files="@(FilesToDelete)"/>
+		<Message Text="[~] Cleaning up copied Resources" Importance="high" />
+		<Message Text="[~] Deleting Files: @(FilesToDelete)" Importance="high" />
+		<Delete Files="@(FilesToDelete)" />
 	</Target>
 
 	<ItemGroup>
