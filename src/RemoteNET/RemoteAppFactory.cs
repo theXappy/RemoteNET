@@ -55,7 +55,7 @@ namespace RemoteNET
                     // Everything's fine, we can continue with the existing diver
                     break;
                 case DiverState.Corpse:
-                    if(unmanagedState == DiverState.Alive)
+                    if (unmanagedState == DiverState.Alive)
                         break;
                     throw new Exception("Failed to connect to remote app. It seems like the diver had already been injected but it is not responding to HTTP requests.\n" +
                                         "It's suggested to restart the target app and retry.");
@@ -129,7 +129,7 @@ namespace RemoteNET
                 psi.WindowStyle = ProcessWindowStyle.Hidden;
                 psi.CreateNoWindow = true;
                 Process.Start(psi);
-                psi = new ProcessStartInfo(kit.LifeboatExePath, (diverPort + 2).ToString());
+                psi = new ProcessStartInfo(kit.LifeboatExePath, /*pid*/ diverPort + " " + /*offset*/ "2" );
                 psi.UseShellExecute = true;
                 psi.WindowStyle = ProcessWindowStyle.Hidden;
                 psi.CreateNoWindow = true;
