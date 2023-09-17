@@ -135,16 +135,22 @@ namespace ScubaDiver.Demangle.Demangle
 
             public StringBuilder VisitSignature(SerializedSignature signature)
             {
-                if (!string.IsNullOrEmpty(signature.Convention))
-                    sb.AppendFormat("{0} ", signature.Convention);
                 if (!string.IsNullOrEmpty(modifier))
                     sb.AppendFormat("{0}: ", modifier);
                 if (signature.ReturnValue != null && signature.ReturnValue.Type != null)
                 {
+                    // void __cdecl
                     signature.ReturnValue.Type.Accept(this);
+                    sb.Append(" ");
+                    if (!string.IsNullOrEmpty(signature.Convention))
+                        sb.AppendFormat("{0}", signature.Convention);
                 }
                 else
                 {
+                    // __cdecl myFunc
+                    if (!string.IsNullOrEmpty(signature.Convention))
+                        sb.AppendFormat("{0}", signature.Convention);
+                    sb.Append(" ");
                     sb.Append(name);
                 }
                 sb.Append("(");
@@ -159,7 +165,6 @@ namespace ScubaDiver.Demangle.Demangle
                 sb.Append(")");
                 return sb;
             }
-
             public List<RestarizedParameter> HackArgs(SerializedSignature signature)
             {
                 List<RestarizedParameter> output = new List<RestarizedParameter>();
@@ -198,14 +203,9 @@ namespace ScubaDiver.Demangle.Demangle
             {
                 if (typeReference.Scope != null)
                 {
-                    if (typeReference.Scope.Length == 1)
+                    for (var i = 0; i < typeReference.Scope.Length; i++)
                     {
-                        sb.Append(typeReference.Scope[0]);
-                        sb.Append("::");
-                    }
-                    else
-                    {
-                        // SS: Multiple Scope? Not expected...
+                        sb.Append($"{typeReference.Scope[i]}::");
                     }
                 }
                 sb.Append(typeReference.TypeName);

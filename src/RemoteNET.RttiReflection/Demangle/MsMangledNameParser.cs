@@ -65,14 +65,14 @@ namespace Reko.Environments.Windows
         public string? Scope;
         private bool isConstuctor;
 
-        public (string?,SerializedType?,SerializedType?) Parse()
+        public (string?, SerializedType?, SerializedType?) Parse()
         {
             Expect('?');
             string? basicName = ParseBasicName();
             if (basicName is null)
                 return (null, null, null);
             (string, SerializedType?, SerializedType?) typeCode;
-            var compoundArgs =     new List<Argument_v1>();
+            var compoundArgs = new List<Argument_v1>();
             if (PeekAndDiscard('@'))
             {
                 typeCode = ParseUnqualifiedTypeCode(basicName);
@@ -101,7 +101,7 @@ namespace Reko.Environments.Windows
         private void Expect(char ch)
         {
             if (str[i++] != ch)
-                Error("Expected '{0}' but found '{1}'.", ch, str[i-1]);
+                Error("Expected '{0}' but found '{1}'.", ch, str[i - 1]);
         }
 
         private bool PeekAndDiscard(char ch)
@@ -139,7 +139,7 @@ namespace Reko.Environments.Windows
 
         private class TemplateParser
         {
-            private  MsMangledNameParser outer;
+            private MsMangledNameParser outer;
 
             public TemplateParser(MsMangledNameParser outer)
             {
@@ -163,7 +163,16 @@ namespace Reko.Environments.Windows
             {
                 if (PeekAndDiscard('$'))
                 {
-                    ParseNonTypeTemplateArgument();
+                    var q = ParseNonTypeTemplateArgument();
+                    if (q != null)
+                    {
+                        types.Add(q);
+                        // SS: This is a hack :(
+                        if (q is SerializedSignature)
+                        {
+                            break;
+                        }
+                    }
                 }
                 else
                 {
@@ -176,26 +185,45 @@ namespace Reko.Environments.Windows
             return types;
         }
 
-        private void ParseNonTypeTemplateArgument()
+        private SerializedType? ParseNonTypeTemplateArgument()
         {
             switch (str[i++])
             {
-            case '0':
-                if ('0' <= str[i] && str[i] <= '9')
-                {
-                    ++i;
-                }
-                else
-                {
-                    while (str[i++] != '@')
-                        ;
-                }
-                break;  // Integer value.
-            case '2': throw new NotSupportedException();    // real value
-            case 'D': throw new NotSupportedException();    // Anonymous
-            default: Dump(i); Error("Unknown template argument {0}.", str[i - 1]); break;
+                case '0':
+                    if ('0' <= str[i] && str[i] <= '9')
+                    {
+                        ++i;
+                    }
+                    else
+                    {
+                        while (str[i++] != '@')
+                            ;
+                    }
+
+                    return null;
+                    break; // Integer value.
+                case '2': throw new NotSupportedException(); // real value
+                case 'D': throw new NotSupportedException(); // Anonymous
+                case '$':
+                    {
+                        string name = ParseAtName();
+                        if (name == "A6AXXZ") // TODO: SS: This is not an implementation >:(
+                            return new SerializedSignature()
+                            {
+                                Convention = "__cdecl",
+                                ReturnValue = new Argument_v1() { Type = new VoidType_v1() },
+                                Arguments = new Argument_v1[1] { new Argument_v1() { Type = new VoidType_v1() }}
+                            };
+                        throw new NotSupportedException();
+                    }
+
+                default:
+                    Dump(i);
+                    Error("Unknown template argument {0}.", str[i - 1]);
+                    return null; // Dummy, 'Error' above throws.
             }
         }
+
 
         /// <summary>
         /// Reads a qualification followed by '@'.
@@ -238,6 +266,48 @@ namespace Reko.Environments.Windows
             return qualifiers.ToArray();
         }
 
+        /// <summary>
+        /// Reads a qualification followed by '@'.
+        /// </summary>
+        /// <returns></returns>
+        public TypeReference_v1 ParseQualificationAsType()
+        {
+            var qualifiers = new List<string>();
+            SerializedType[]? typeArgs = null;
+            while (i < str.Length && !PeekAndDiscard('@'))
+            {
+                string name = ParseAtName();
+                if (name.StartsWith("?$"))
+                {
+                    name = name.Substring(2);
+                    namesSeen.Add(name);
+                    var oldNames = namesSeen;
+                    if (templateNamesSeen == null)
+                    {
+                        templateNamesSeen = new List<string> { name };
+                    }
+                    else
+                        templateNamesSeen.Add(name);
+                    namesSeen = templateNamesSeen;
+                    typeArgs = ParseTemplateArguments().ToArray(); ///$TODO: what to do about these if they're nested?
+                    namesSeen = oldNames;
+                }
+                else
+                {
+                    namesSeen.Add(name);
+                }
+                qualifiers.Insert(0, name);
+            }
+            var tr = new TypeReference_v1
+            {
+                TypeName = qualifiers.Last(),
+                Scope = qualifiers.Take(qualifiers.Count - 1).ToArray(),
+                TypeArguments = typeArgs
+            };
+            return tr;
+        }
+
+
         public (string, SerializedType?, SerializedType?) ParseQualifiedTypeCode(string basicName, string[] qualification, List<Argument_v1> compoundArgs)
         {
             this.compoundArgs = new List<Argument_v1>();
@@ -245,48 +315,48 @@ namespace Reko.Environments.Windows
             SerializedSignature? sig = null;
             switch (str[i++])
             {
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-                return (
-                    basicName,
-                    ParseDataTypeCode(compoundArgs),
-                    CreateEnclosingType(Scope));
-            case '6':   // Compiler-generated static
-                //$TODO: deal with const/volatile modifier
-                ParseStorageClass();
-                break;
-            case 'A': sig = ParseInstanceMethod("private"); break;
-            case 'B': sig = ParseInstanceMethod("private far"); break;
-            case 'C': sig = ParseStaticMethod("private static"); break;
-            case 'D': sig = ParseStaticMethod("private static far"); break;
-            case 'E': sig = ParseInstanceMethod("private virtual"); break;
-            case 'F': sig = ParseInstanceMethod("private virtual far"); break;
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                    return (
+                        basicName,
+                        ParseDataTypeCode(compoundArgs),
+                        CreateEnclosingType(Scope));
+                case '6':   // Compiler-generated static
+                            //$TODO: deal with const/volatile modifier
+                    ParseStorageClass();
+                    break;
+                case 'A': sig = ParseInstanceMethod("private"); break;
+                case 'B': sig = ParseInstanceMethod("private far"); break;
+                case 'C': sig = ParseStaticMethod("private static"); break;
+                case 'D': sig = ParseStaticMethod("private static far"); break;
+                case 'E': sig = ParseInstanceMethod("private virtual"); break;
+                case 'F': sig = ParseInstanceMethod("private virtual far"); break;
 
-            case 'I': sig = ParseInstanceMethod("protected"); break;
-            case 'J': sig = ParseInstanceMethod("protected far"); break;
-            case 'K': sig = ParseStaticMethod("protected static"); break;
-            case 'L': sig = ParseStaticMethod("protected static far"); break;
-            case 'M': sig = ParseInstanceMethod("protected virtual"); break;
-            case 'N': sig = ParseInstanceMethod("protected virtual far"); break;
+                case 'I': sig = ParseInstanceMethod("protected"); break;
+                case 'J': sig = ParseInstanceMethod("protected far"); break;
+                case 'K': sig = ParseStaticMethod("protected static"); break;
+                case 'L': sig = ParseStaticMethod("protected static far"); break;
+                case 'M': sig = ParseInstanceMethod("protected virtual"); break;
+                case 'N': sig = ParseInstanceMethod("protected virtual far"); break;
 
-            case 'Q': sig = ParseInstanceMethod("public"); break;
-            case 'R': sig = ParseInstanceMethod("public far"); break;
-            case 'S': sig = ParseStaticMethod("public static"); break;
-            case 'T': sig = ParseStaticMethod("public static far"); break;
-            case 'U': sig = ParseInstanceMethod("public virtual"); break;
-            case 'V': sig = ParseInstanceMethod("public virtual far"); break;
+                case 'Q': sig = ParseInstanceMethod("public"); break;
+                case 'R': sig = ParseInstanceMethod("public far"); break;
+                case 'S': sig = ParseStaticMethod("public static"); break;
+                case 'T': sig = ParseStaticMethod("public static far"); break;
+                case 'U': sig = ParseInstanceMethod("public virtual"); break;
+                case 'V': sig = ParseInstanceMethod("public virtual far"); break;
 
-            case 'Y': sig = ParseGlobalFunction( ""); break;
-            case 'Z': sig = ParseGlobalFunction( "far"); break;
-            default: throw new NotImplementedException(string.Format("Character '{0}' not supported", str[i - 1]));
+                case 'Y': sig = ParseGlobalFunction(""); break;
+                case 'Z': sig = ParseGlobalFunction("far"); break;
+                default: throw new NotImplementedException(string.Format("Character '{0}' not supported", str[i - 1]));
 
             }
             return (
                 basicName,
                 sig,
-                sig != null 
+                sig != null
                     ? sig.EnclosingType
                     : CreateEnclosingType(Scope));
         }
@@ -342,11 +412,11 @@ namespace Reko.Environments.Windows
             {
                 switch (str[i++])
                 {
-                case 'A': return Qualifier.None;
-                case 'B': return Qualifier.Const;
-                case 'C': return Qualifier.Volatile;
-                case 'D': return Qualifier.Const | Qualifier.Volatile;
-                default: throw new FormatException($"Unexpected return qualifier {str[i - 1]}.");
+                    case 'A': return Qualifier.None;
+                    case 'B': return Qualifier.Const;
+                    case 'C': return Qualifier.Volatile;
+                    case 'D': return Qualifier.Const | Qualifier.Volatile;
+                    default: throw new FormatException($"Unexpected return qualifier {str[i - 1]}.");
                 }
             }
             return Qualifier.None;
@@ -362,13 +432,13 @@ namespace Reko.Environments.Windows
         {
             switch (str[i++])
             {
-            case 'A': return "";
-            case 'B': return "volatile";
-            case 'C': return "const";
-            case 'Z': return "__executable";
-            default:
-                Error("Unknown storage class code '{0}'.", str[i - 1]);
-                return null;
+                case 'A': return "";
+                case 'B': return "volatile";
+                case 'C': return "const";
+                case 'Z': return "__executable";
+                default:
+                    Error("Unknown storage class code '{0}'.", str[i - 1]);
+                    return null;
             }
         }
 
@@ -380,14 +450,14 @@ namespace Reko.Environments.Windows
             }
             switch (str[i++])
             {
-            case 'A': return "";
-            case 'B': return "volatile";
-            case 'C': return "const";
-            case 'E': return "__ptr64";
-            case 'F': return "__unaligned";
-            default:
-                Error("Unknown 'this' storage class code '{0}'.", str[i - 1]);
-                return null;
+                case 'A': return "";
+                case 'B': return "volatile";
+                case 'C': return "const";
+                case 'E': return "__ptr64";
+                case 'F': return "__unaligned";
+                default:
+                    Error("Unknown 'this' storage class code '{0}'.", str[i - 1]);
+                    return null;
             }
         }
 
@@ -459,81 +529,83 @@ namespace Reko.Environments.Windows
         {
             switch (str[i++])
             {
-            case '0':
-                this.isConstuctor = true;
-                return "{0}";
-            case '1': return "~{0}";
-            case '2': return "operator new";
-            case '3': return "operator delete";
-            case '4': return "operator =";
-            case '5': return "operator >>";
-            case '6': return "operator <<";
-            case '8': return "operator ==";
-            case '9': return "operator !=";
-            case 'A': return "operator []";
-            case 'B': return "operator returntype";
-            case 'C': return "operator ->";
-            case 'D': return "operator *";
-            case 'E': return "operator ++";
-            case 'F': return "operator --";
-            case 'G': return "operator -";
-            case 'H': return "operator + ";
-            case 'I': return "operator &";
-            case 'J': return "operator ->*";
-            case 'K': return "operator /";
-            case 'L': return "operator %";
-            case 'M': return "operator <";
-            case 'N': return "operator <=";
-            case 'O': return "operator >";
-            case 'P': return "operator >=";
-            case 'Q': return "operator,";
-            case 'R': return "operator ()";
-            case 'S': return "operator ~";
-            case 'T': return "operator ^";
-            case 'U': return "operator |";
-            case 'V': return "operator &&";
-            case 'W': return "operator ||";
-            case 'X': return "operator *=";
-            case 'Y': return "operator +=";
-            case 'Z': return "operator -=";
-            case '_':
-                switch (str[i++])
-                {
-                case '0': return "operator /=";
-                case '1': return "operator %="; 
-                case '2': return "operator >>=";
-                case '3': return "operator <<=";
-                case '4': return "operator &=";
-                case '5': return "operator |=";
-                case '6': return "operator ^=";
-                case '7': return "`vftable'"; 
-                case '8': return "`vbtable'";
-                case '9': return "`vcall'";
-                case 'A': return "typeof";
-                case 'B': return "`local static guard'";
-                case 'D': return "`vbase destructor'";
-                case 'E': return "`vector deleting destructor'";
-                case 'F': return "`default constructor closure'";
-                case 'G': return "`scalar deleting destructor'";
-                case 'H': return "`vector constructor iterator'";
-                case 'I': return "`vector destructor iterator'";
-                case 'J': return "`vector vbase constructor iterator'";
-                case 'K': return "`virtual displacement map'";
-                case 'L': return "`eh vector constructor iterator'";
-                case 'M': return "`eh vector destructor iterator'";
-                case 'N': return "`eh vector vbase constructor iterator'";
-                case 'O': return "`copy constructor closure'";
-                case 'P': return "`udt returning'";
-                case 'R': throw new NotSupportedException("RTTI Codes not supported yet");
-                case 'S': return "`local vftable'";
-                case 'T': return "`local vftable constructor closure'";
-                case 'U': return "operator new[]";
-                case 'V': return "operator delete[]";
-                default: Error("Unknown operator code '_{0}'.", str[i - 1]);
+                case '0':
+                    this.isConstuctor = true;
+                    return "{0}";
+                case '1': return "~{0}";
+                case '2': return "operator new";
+                case '3': return "operator delete";
+                case '4': return "operator =";
+                case '5': return "operator >>";
+                case '6': return "operator <<";
+                case '8': return "operator ==";
+                case '9': return "operator !=";
+                case 'A': return "operator []";
+                case 'B': return "operator returntype";
+                case 'C': return "operator ->";
+                case 'D': return "operator *";
+                case 'E': return "operator ++";
+                case 'F': return "operator --";
+                case 'G': return "operator -";
+                case 'H': return "operator + ";
+                case 'I': return "operator &";
+                case 'J': return "operator ->*";
+                case 'K': return "operator /";
+                case 'L': return "operator %";
+                case 'M': return "operator <";
+                case 'N': return "operator <=";
+                case 'O': return "operator >";
+                case 'P': return "operator >=";
+                case 'Q': return "operator,";
+                case 'R': return "operator ()";
+                case 'S': return "operator ~";
+                case 'T': return "operator ^";
+                case 'U': return "operator |";
+                case 'V': return "operator &&";
+                case 'W': return "operator ||";
+                case 'X': return "operator *=";
+                case 'Y': return "operator +=";
+                case 'Z': return "operator -=";
+                case '_':
+                    switch (str[i++])
+                    {
+                        case '0': return "operator /=";
+                        case '1': return "operator %=";
+                        case '2': return "operator >>=";
+                        case '3': return "operator <<=";
+                        case '4': return "operator &=";
+                        case '5': return "operator |=";
+                        case '6': return "operator ^=";
+                        case '7': return "`vftable'";
+                        case '8': return "`vbtable'";
+                        case '9': return "`vcall'";
+                        case 'A': return "typeof";
+                        case 'B': return "`local static guard'";
+                        case 'D': return "`vbase destructor'";
+                        case 'E': return "`vector deleting destructor'";
+                        case 'F': return "`default constructor closure'";
+                        case 'G': return "`scalar deleting destructor'";
+                        case 'H': return "`vector constructor iterator'";
+                        case 'I': return "`vector destructor iterator'";
+                        case 'J': return "`vector vbase constructor iterator'";
+                        case 'K': return "`virtual displacement map'";
+                        case 'L': return "`eh vector constructor iterator'";
+                        case 'M': return "`eh vector destructor iterator'";
+                        case 'N': return "`eh vector vbase constructor iterator'";
+                        case 'O': return "`copy constructor closure'";
+                        case 'P': return "`udt returning'";
+                        case 'R': throw new NotSupportedException("RTTI Codes not supported yet");
+                        case 'S': return "`local vftable'";
+                        case 'T': return "`local vftable constructor closure'";
+                        case 'U': return "operator new[]";
+                        case 'V': return "operator delete[]";
+                        default:
+                            Error("Unknown operator code '_{0}'.", str[i - 1]);
+                            return null;
+                    }
+                default:
+                    Error("Unknown operator code '{0}'.", str[i - 1]);
                     return null;
-                }
-            default: Error("Unknown operator code '{0}'.", str[i - 1]);
-                return null;
             }
         }
 
@@ -541,19 +613,20 @@ namespace Reko.Environments.Windows
         {
             switch (str[i++])
             {
-            case 'A': return "__cdecl";
-            case 'C': return "__pascal";
-            case 'E': return "__thiscall";
-            case 'G': return "__stdcall";
-            case 'I': return "__fastcall";
-            case 'K': return "";
-            case 'M': return "__clrcall";
-            case 'O': return "__eabi";
-            default: Error("Unknown calling convention code '{0}'.", str[i - 1]);
-                return null;
+                case 'A': return "__cdecl";
+                case 'C': return "__pascal";
+                case 'E': return "__thiscall";
+                case 'G': return "__stdcall";
+                case 'I': return "__fastcall";
+                case 'K': return "";
+                case 'M': return "__clrcall";
+                case 'O': return "__eabi";
+                default:
+                    Error("Unknown calling convention code '{0}'.", str[i - 1]);
+                    return null;
             }
         }
-        
+
         public Argument_v1[] ParseArgumentList()
         {
             var args = new List<Argument_v1>();
@@ -563,7 +636,7 @@ namespace Reko.Environments.Windows
                 {
                     if (PeekAndDiscard('Z'))    // Ellipses ('...')
                     {
-                        args.Add(new Argument_v1 { Name="...", Type=new VoidType_v1() });
+                        args.Add(new Argument_v1 { Name = "...", Type = new VoidType_v1() });
                         break;      // Ellipses can only be the last arg, so arglist is done!
                     }
                     var arg = ParseDataTypeCode(this.compoundArgs);
@@ -580,73 +653,73 @@ namespace Reko.Environments.Windows
             {
                 switch (str[i++])
                 {
-                case 'A': break;
-                case 'B': /* const */ break;
-                default: Error("Expected 'A' or 'B', but saw '{0}'.", str[i - 1]); break;
+                    case 'A': break;
+                    case 'B': /* const */ break;
+                    default: Error("Expected 'A' or 'B', but saw '{0}'.", str[i - 1]); break;
                 }
             }
             switch (str[i++])
             {
-            case '0': return compoundArgs[0].Type;
-            case '1': return compoundArgs[1].Type;
-            case '2': return compoundArgs[2].Type;
-            case '3': return compoundArgs[3].Type;
-            case '4': return compoundArgs[4].Type;
-            case '5': return compoundArgs[5].Type;
-            case '6': return compoundArgs[6].Type;
-            case '7': return compoundArgs[7].Type;
-            case '8': return compoundArgs[8].Type;
-            case '9': return compoundArgs[9].Type;
-            case 'A': return ParsePointer(compoundArgs, Qualifier.None);        //$TODO: really is a lvalue reference but is implemented as a pointer on Win32...
-            case 'B': return ParsePointer(compoundArgs, Qualifier.Volatile);    //$TODO: really is a volatile lvalue reference but is implemented as a pointer on Win32...
-            case 'C': return new PrimitiveType_v1(Domain.Character | Domain.SignedInt, 1);
-            case 'D': return new PrimitiveType_v1(Domain.Character, 1);
-            case 'E': return new PrimitiveType_v1(Domain.Character | Domain.UnsignedInt, 1);
-            case 'F': return new PrimitiveType_v1(Domain.SignedInt, 2);
-            case 'G': return new PrimitiveType_v1(Domain.UnsignedInt, 2);
-            case 'H': return new PrimitiveType_v1(Domain.SignedInt, 4);
-            case 'I': return new PrimitiveType_v1(Domain.UnsignedInt, 4);
-            case 'J': return new PrimitiveType_v1(Domain.SignedInt, 4);      // 'long' on Win32 is actually 4 bytes
-            case 'K': return new PrimitiveType_v1(Domain.UnsignedInt, 4);  // 'long' on Win32 is actually 4 bytes
-            case 'M': return new PrimitiveType_v1(Domain.Real, 4);
-            case 'N': return new PrimitiveType_v1(Domain.Real, 8);
-            case 'O': return new PrimitiveType_v1(Domain.Real, 10);
-            case 'P': return ParsePointer(compoundArgs, Qualifier.None);    // pointer
-            case 'Q': return ParsePointer(compoundArgs, Qualifier.Const);    // const pointer
-            case 'R': return ParsePointer(compoundArgs, Qualifier.Volatile);    // volatile pointer
-            case 'T': return ParseStructure(compoundArgs);  // union 
-            case 'U': return ParseStructure(compoundArgs); // struct (see below)
-            case 'V': return ParseStructure(compoundArgs); // class (see below)
-            case 'W': return ParseEnum(compoundArgs);
-            case 'X': return new VoidType_v1();      // void (as in 'void return value', 'X' terminates argument list)
-            case 'Y': return ParseStructure(compoundArgs); // cointerface (see below)
-            case '_':
-                PrimitiveType_v1 prim;
-                switch (str[i++])
-                {
-                case 'J': prim = new PrimitiveType_v1(Domain.SignedInt, 8); break;   // __int64
-                case 'K': prim = new PrimitiveType_v1(Domain.UnsignedInt, 8); break; // unsigned __int64
-                case 'N': prim = new PrimitiveType_v1(Domain.Boolean, 1); break;     // bool
-                case 'W': prim = new PrimitiveType_v1(Domain.Character, 2); break;   // wchar_t
-                default: Error("Unsupported type code '_{0}'.", str[i - 1]); return null;
-                }
-                compoundArgs.Add(new Argument_v1 { Type = prim });
-                return prim;
-            case '$':
-                switch (str[i++])
-                {
+                case '0': return compoundArgs[0].Type;
+                case '1': return compoundArgs[1].Type;
+                case '2': return compoundArgs[2].Type;
+                case '3': return compoundArgs[3].Type;
+                case '4': return compoundArgs[4].Type;
+                case '5': return compoundArgs[5].Type;
+                case '6': return compoundArgs[6].Type;
+                case '7': return compoundArgs[7].Type;
+                case '8': return compoundArgs[8].Type;
+                case '9': return compoundArgs[9].Type;
+                case 'A': return ParsePointer(compoundArgs, Qualifier.None);        //$TODO: really is a lvalue reference but is implemented as a pointer on Win32...
+                case 'B': return ParsePointer(compoundArgs, Qualifier.Volatile);    //$TODO: really is a volatile lvalue reference but is implemented as a pointer on Win32...
+                case 'C': return new PrimitiveType_v1(Domain.Character | Domain.SignedInt, 1);
+                case 'D': return new PrimitiveType_v1(Domain.Character, 1);
+                case 'E': return new PrimitiveType_v1(Domain.Character | Domain.UnsignedInt, 1);
+                case 'F': return new PrimitiveType_v1(Domain.SignedInt, 2);
+                case 'G': return new PrimitiveType_v1(Domain.UnsignedInt, 2);
+                case 'H': return new PrimitiveType_v1(Domain.SignedInt, 4);
+                case 'I': return new PrimitiveType_v1(Domain.UnsignedInt, 4);
+                case 'J': return new PrimitiveType_v1(Domain.SignedInt, 4);      // 'long' on Win32 is actually 4 bytes
+                case 'K': return new PrimitiveType_v1(Domain.UnsignedInt, 4);  // 'long' on Win32 is actually 4 bytes
+                case 'M': return new PrimitiveType_v1(Domain.Real, 4);
+                case 'N': return new PrimitiveType_v1(Domain.Real, 8);
+                case 'O': return new PrimitiveType_v1(Domain.Real, 10);
+                case 'P': return ParsePointer(compoundArgs, Qualifier.None);    // pointer
+                case 'Q': return ParsePointer(compoundArgs, Qualifier.Const);    // const pointer
+                case 'R': return ParsePointer(compoundArgs, Qualifier.Volatile);    // volatile pointer
+                case 'T': return ParseStructure(compoundArgs);  // union 
+                case 'U': return ParseStructure(compoundArgs); // struct (see below)
+                case 'V': return ParseStructure(compoundArgs); // class (see below)
+                case 'W': return ParseEnum(compoundArgs);
+                case 'X': return new VoidType_v1();      // void (as in 'void return value', 'X' terminates argument list)
+                case 'Y': return ParseStructure(compoundArgs); // cointerface (see below)
+                case '_':
+                    PrimitiveType_v1 prim;
+                    switch (str[i++])
+                    {
+                        case 'J': prim = new PrimitiveType_v1(Domain.SignedInt, 8); break;   // __int64
+                        case 'K': prim = new PrimitiveType_v1(Domain.UnsignedInt, 8); break; // unsigned __int64
+                        case 'N': prim = new PrimitiveType_v1(Domain.Boolean, 1); break;     // bool
+                        case 'W': prim = new PrimitiveType_v1(Domain.Character, 2); break;   // wchar_t
+                        default: Error("Unsupported type code '_{0}'.", str[i - 1]); return null;
+                    }
+                    compoundArgs.Add(new Argument_v1 { Type = prim });
+                    return prim;
                 case '$':
                     switch (str[i++])
                     {
-                    case 'Q': return ParsePointer(compoundArgs, Qualifier.None); //$ rvalue reference
+                        case '$':
+                            switch (str[i++])
+                            {
+                                case 'Q': return ParsePointer(compoundArgs, Qualifier.None); //$ rvalue reference
+                            }
+                            Error("Unsupported type code '$${0}'.", str[i - 1]); return null;
+                        default:
+                            Error("Unsupported type code '$${0}'.", str[i - 1]); return null;
                     }
-                    Error("Unsupported type code '$${0}'.", str[i - 1]); return null;
                 default:
-                    Error("Unsupported type code '$${0}'.", str[i - 1]); return null;
-                }
-            default:
-                Error("Unsupported type code '{0}'.", str[i - 1]);
-                return null;
+                    Error("Unsupported type code '{0}'.", str[i - 1]);
+                    return null;
             }
         }
 
@@ -660,13 +733,13 @@ namespace Reko.Environments.Windows
             }
             switch (str[i++])
             {
-            case 'A': type = ParseDataTypeCode(new List<Argument_v1>()); break;       //$BUG: assumes 32-bitness
-            case 'B': type = Qualify(ParseDataTypeCode(new List<Argument_v1>()), Qualifier.Const); break;       // const ptr
-            case 'C': type = Qualify(ParseDataTypeCode(new List<Argument_v1>()), Qualifier.Volatile); break;       // volatile ptr
-            case 'D': type = Qualify(ParseDataTypeCode(new List<Argument_v1>()), Qualifier.Const|Qualifier.Volatile); break;       // const volatile ptr
-            case '6': type = ParseFunctionTypeCode(); break;     // fn ptr
-            case '8': return ParseMemberFunctionPointerCode(size, compoundArgs);
-            default: Error("Unsupported pointer code 'P{0}'.", str[i - 1]); return null;
+                case 'A': type = ParseDataTypeCode(new List<Argument_v1>()); break;       //$BUG: assumes 32-bitness
+                case 'B': type = Qualify(ParseDataTypeCode(new List<Argument_v1>()), Qualifier.Const); break;       // const ptr
+                case 'C': type = Qualify(ParseDataTypeCode(new List<Argument_v1>()), Qualifier.Volatile); break;       // volatile ptr
+                case 'D': type = Qualify(ParseDataTypeCode(new List<Argument_v1>()), Qualifier.Const | Qualifier.Volatile); break;       // const volatile ptr
+                case '6': type = ParseFunctionTypeCode(); break;     // fn ptr
+                case '8': return ParseMemberFunctionPointerCode(size, compoundArgs);
+                default: Error("Unsupported pointer code 'P{0}'.", str[i - 1]); return null;
             }
             SerializedType pType = new PointerType_v1
             {
@@ -688,12 +761,7 @@ namespace Reko.Environments.Windows
 
         public TypeReference_v1 ParseStructure(List<Argument_v1> compoundArgs)
         {
-            var q = ParseQualification();
-            var tr = new TypeReference_v1
-            {
-                TypeName = q.Last(),
-                Scope = q.Take(q.Length - 1).ToArray()
-            };
+            var tr = ParseQualificationAsType();
             compoundArgs.Add(new Argument_v1 { Type = tr });
             return tr;
         }
@@ -704,15 +772,15 @@ namespace Reko.Environments.Windows
             Domain domain;
             switch (str[i++])
             {
-            case '0': size = 1; domain = Domain.Character; break;
-            case '1': size = 1; domain = Domain.Character|Domain.UnsignedInt; break;
-            case '2': size = 2; domain = Domain.SignedInt; break;
-            case '3': size = 2; domain = Domain.UnsignedInt; break;
-            case '4': size = 4; domain = Domain.SignedInt; break;
-            case '5': size = 4; domain = Domain.UnsignedInt; break;
-            case '6': size = 4; domain = Domain.SignedInt; break;
-            case '7': size = 4; domain = Domain.UnsignedInt; break;
-            default: Error("Unknown enum code {0}.", str[i - 1]); return null;
+                case '0': size = 1; domain = Domain.Character; break;
+                case '1': size = 1; domain = Domain.Character | Domain.UnsignedInt; break;
+                case '2': size = 2; domain = Domain.SignedInt; break;
+                case '3': size = 2; domain = Domain.UnsignedInt; break;
+                case '4': size = 4; domain = Domain.SignedInt; break;
+                case '5': size = 4; domain = Domain.UnsignedInt; break;
+                case '6': size = 4; domain = Domain.SignedInt; break;
+                case '7': size = 4; domain = Domain.UnsignedInt; break;
+                default: Error("Unknown enum code {0}.", str[i - 1]); return null;
             }
             var n = ParseQualification();
             var e = new SerializedEnumType(size, domain, n.Last());
