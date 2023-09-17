@@ -19,14 +19,11 @@ public static class RnetRequestsListenerFactory
 {
     public static IRequestsListener Create(ushort port, bool reverse)
     {
-        Logger.Debug("[RnetRequestsListenerFactory] Create()");
         if (reverse)
         {
-            Logger.Debug("[RnetRequestsListenerFactory] Create() - Reverse Listener");
             return new RnetReverseRequestsListener(port);
         }
 
-        Logger.Debug("[RnetRequestsListenerFactory] Create() - Normal Listener");
         return new RnetRequestsListener(port);
     }
 }
@@ -66,7 +63,7 @@ public class RnetReverseRequestsListener : IRequestsListener
 
         // Introduce ourselves to the proxy
         HttpRequestSummary intro =
-            HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver_bootstrap\"}");
+            HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver\"}");
         SimpleHttpProtocolParser.WriteRequest(client, intro);
 
         var introResp = SimpleHttpProtocolParser.ReadResponse(client);
@@ -76,68 +73,18 @@ public class RnetReverseRequestsListener : IRequestsListener
         string listeningUrl = $"http://127.0.0.1:{_port}/";
         Logger.Debug($"[RnetReverseRequestsListener] Connected. Proxy should be available at: {listeningUrl}");
 
-        List<TcpClient> aliveConsumers = new List<TcpClient>();
-
-        while (_bootstrapStayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
-        {
-            var request = SimpleHttpProtocolParser.ReadRequest(client);
-            if (request == null)
-                continue;
-
-            if (request.Url != "/spawn_new_connection")
-            {
-                Console.WriteLine($"Forbidden URL at bootstrapper socket: {request.Url}");
-                continue;
-            }
-
-            Console.WriteLine("[!] New spawn_new_connection request");
-
-            // Local port decided for us by the proxy. This is its way to find us later.
-            int port = int.Parse(request.QueryString["port"]);
-            TcpClient consumerClient = new TcpClient(new IPEndPoint(IPAddress.Parse("127.0.0.1"), port));
-            Console.WriteLine($"[+++] Adding {consumerClient.Client.RemoteEndPoint} to live list");
-            aliveConsumers.Add(consumerClient);
-
-            var ipe = new IPEndPoint(IPAddress.Parse("127.0.0.1"), _port);
-            consumerClient.Connect(ipe);
-            Task consumerTask = Task.Run(() => Dispatcher(consumerClient));
-            consumerTask.ContinueWith(t =>
-            {
-                Console.WriteLine($"[XXX] Removing {consumerClient.Client.RemoteEndPoint} from live list");
-                return aliveConsumers.Remove(consumerClient);
-            });
-        }
+        Dispatcher(client);
     }
 
     private void Dispatcher(TcpClient client)
     {
-        // Introduce ourselves to the proxy
-        HttpRequestSummary intro =
-            HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver\"}");
-        SimpleHttpProtocolParser.WriteRequest(client, intro);
-        client.GetStream().Flush();
-
-        HttpResponseSummary introResp = null;
-        try
-        {
-            introResp = SimpleHttpProtocolParser.ReadResponse(client);
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine("ERROR!!!!!!!!!");
-            Console.WriteLine(ex);
-            Console.WriteLine(ex.StackTrace);
-            Debugger.Launch();
-        }
-
-        if (introResp == null || !introResp.BodyString.Contains("\"status\":\"OK\""))
-            throw new Exception("Diver couldn't register at Lifeboat");
-
         while (_bootstrapStayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
             HttpRequestSummary request = SimpleHttpProtocolParser.ReadRequest(client);
             if (request == null)
+            {
                 continue;
+            }
 
             void RespondFunc(string body)
             {
