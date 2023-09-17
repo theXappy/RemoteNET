@@ -62,7 +62,7 @@ public class RemoteMarshal
     public void Read(IntPtr source, byte[] destination, int startIndex, int length)
         => Copy(source, destination, startIndex, length);
 
-    public string? PtrToStringAnsi(IntPtr ptr)
+    public string PtrToStringAnsi(IntPtr ptr)
     {
         if(ptr == IntPtr.Zero)
             return null;

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
+		<TargetFramework>net7.0-windows</TargetFramework>
 		<NoWin32Manifest>true</NoWin32Manifest>
 		<Company>theXappy</Company>
 		<Description>Examine, create and interact with remote objects in other .NET processes.</Description>
@@ -12,9 +12,9 @@
 		<PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
 		<PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
-		<Version>1.0.2.4</Version>
-		<AssemblyVersion>1.0.2.4</AssemblyVersion>
-		<FileVersion>1.0.2.4</FileVersion>
+		<Version>1.0.2.13</Version>
+		<AssemblyVersion>1.0.2.13</AssemblyVersion>
+		<FileVersion>1.0.2.13</FileVersion>
 		<LangVersion>Latest</LangVersion>
 	</PropertyGroup>
 

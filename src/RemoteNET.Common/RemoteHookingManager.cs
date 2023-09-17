@@ -50,7 +50,7 @@ namespace RemoteNET.Common
         {
             // Wrapping the callback which uses `dynamic`s in a callback that handles `ObjectOrRemoteAddresses`
             // and converts them to DROs
-            LocalHookCallback wrappdHook = WrapCallback(hookAction);
+            LocalHookCallback wrappedHook = WrapCallback(hookAction);
 
             // Look for MethodHooks object for the given REMOTE OBJECT
             if (!_callbacksToProxies.ContainsKey(methodToHook))
@@ -66,7 +66,7 @@ namespace RemoteNET.Common
             // 
             if(!methodHooks.ContainsKey(hookAction))
             {
-                methodHooks.Add(hookAction, new PositionedLocalHook(hookAction, wrappdHook, pos));
+                methodHooks.Add(hookAction, new PositionedLocalHook(hookAction, wrappedHook, pos));
             }
             else
             {
@@ -74,7 +74,7 @@ namespace RemoteNET.Common
             }
 
             var parametersTypeFullNames = methodToHook.GetParameters().Select(prm => prm.ParameterType.FullName).ToList();
-            return _app.Communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappdHook, parametersTypeFullNames);
+            return _app.Communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappedHook, parametersTypeFullNames);
         }
 
         private LocalHookCallback WrapCallback(HookAction callback)
@@ -95,7 +95,7 @@ namespace RemoteNET.Common
                             RemoteObject roInstance = this._app.GetRemoteObject(oora);
                             o = roInstance.Dynamify();
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             // HACK: If we failed to resolve a remote object, we just return it's pointer as a long...
                             o = oora.RemoteAddress;

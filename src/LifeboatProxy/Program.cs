@@ -35,6 +35,8 @@ namespace LifeboatProxy
 
         static async Task HandleContextAsync(HttpListenerContext context, string targetHost, int targetManagedPort, int targetUnmanagedPort)
         {
+            if (context == null || context.Request == null || context.Request.Url == null)
+                throw new ArgumentException("HandleContextAsync received and invalid 'context' argument");
             string requestUrl = context.Request.Url.AbsolutePath;
             Console.WriteLine($"Received request: {requestUrl}");
 
@@ -54,7 +56,9 @@ namespace LifeboatProxy
             SimpleHttpProtocolParser.WriteRequest(targetClient, r);
             Console.WriteLine($"Forwarded request: {requestUrl}");
 
-            HttpResponseSummary resp = SimpleHttpProtocolParser.ReadResponse(targetClient);
+            HttpResponseSummary? resp = SimpleHttpProtocolParser.ReadResponse(targetClient);
+            if (resp == null)
+                throw new Exception("Response is NULL");
             byte[] respBody = resp.Body;
             context.Response.OutputStream.Write(respBody);
             context.Response.Close();
@@ -67,7 +71,15 @@ namespace LifeboatProxy
             foreach (var key in queryString.AllKeys)
             {
                 var value = queryString[key];
-                queryParameters[key] = value;
+                if (key == null || value == null)
+                {
+                    throw new Exception(
+                        "Either Key or Value was null when iterating Keys in input QueryString");
+                }
+                else
+                {
+                    queryParameters[key] = value;
+                }
             }
 
             return queryParameters;

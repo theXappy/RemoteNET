@@ -43,19 +43,19 @@ namespace ScubaDiver
         }
 
 
-        private MsvcOffensiveGC gc;
+        //private MsvcOffensiveGC gc;
         protected string MakeGcResponse(ScubaDiverMessage req)
         {
             throw new NotImplementedException(
                 "Offensive GC is turned off until 'new' operator searching is re-enabled.");
 
             //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
-            //List<UndecoratedModule> undecModules = _tricksterWrapper.GetUndecoratedModules();
-            //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Init'ing GC");
+            //List<UndecoratedModule> undecoratedModules = _tricksterWrapper.GetUndecoratedModules();
+            //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Initialization GC");
             //try
             //{
             //    gc = new MsvcOffensiveGC();
-            //    gc.Init(undecModules);
+            //    gc.Init(undecoratedModules);
             //}
             //catch (Exception e)
             //{
@@ -294,9 +294,9 @@ namespace ScubaDiver
         protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
             string assemblyFilter = req.QueryString.Get("assembly");
-            Predicate<string> assmFilter = Filter.CreatePredicate(assemblyFilter);
+            Predicate<string> assemblyFilterPredicate = Filter.CreatePredicate(assemblyFilter);
 
-            List<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules(assmFilter).ToList();
+            List<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate).ToList();
             List<TypesDump.TypeIdentifiers> types = new();
             if (matchingAssemblies.Count == 0)
             {
@@ -309,18 +309,18 @@ namespace ScubaDiver
                     $"Too many modules matched the filter '{assemblyFilter}'. Found {matchingAssemblies.Count} ({assembliesList})");
             }
 
-            UndecoratedModule assm = matchingAssemblies.Single();
-            foreach (TypeInfo type in assm.Types)
+            UndecoratedModule module = matchingAssemblies.Single();
+            foreach (TypeInfo type in module.Types)
             {
                 types.Add(new TypesDump.TypeIdentifiers()
                 {
-                    TypeName = $"{assm.Name}!{type.Name}"
+                    TypeName = $"{module.Name}!{type.Name}"
                 });
             }
 
             TypesDump dump = new()
             {
-                AssemblyName = assm.Name,
+                AssemblyName = module.Name,
                 Types = types
             };
 
@@ -430,12 +430,12 @@ namespace ScubaDiver
             string vftableName = $"{typeInfo.Name}::`vftable'"; // Constructing NameSpace::ClassName::`vftable
             foreach (UndecoratedSymbol dllExport in _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name))
             {
-                if (dllExport is UndecoratedFunction undecFunc)
+                if (dllExport is UndecoratedFunction undecoratedFunc)
                 {
-                    var typeMethod = VftableParser.ConvertToTypeMethod(undecFunc);
+                    var typeMethod = VftableParser.ConvertToTypeMethod(undecoratedFunc);
                     if (typeMethod == null)
                     {
-                        Logger.Debug($"[MsvcDiver] Failed to convert UndecoratedFunction: {undecFunc.UndecoratedFullName}. Skipping.");
+                        Logger.Debug($"[MsvcDiver] Failed to convert UndecoratedFunction: {undecoratedFunc.UndecoratedFullName}. Skipping.");
                         continue;
                     }
 
@@ -551,11 +551,11 @@ namespace ScubaDiver
             foreach (var typeInstancesKvp in addresses)
             {
                 FirstClassTypeInfo typeInfo = typeInstancesKvp.Key;
-                foreach (nuint addr in typeInstancesKvp.Value)
+                foreach (nuint address in typeInstancesKvp.Value.Select(l => (nuint)l))
                 {
                     HeapDump.HeapObject ho = new HeapDump.HeapObject()
                     {
-                        Address = addr,
+                        Address = address,
                         MethodTable = typeInfo.VftableAddress, // TODO: Send XOR'd value instead?
                         Type = typeInfo.FullTypeName
                     };
@@ -619,7 +619,6 @@ namespace ScubaDiver
                 }
 
                 // TODO: Actual Pin
-                ulong pinAddr = 0x0;
 
                 ObjectDump od = new ObjectDump()
                 {
@@ -657,7 +656,6 @@ namespace ScubaDiver
 
             // Need to figure target instance and the target type.
             // In case of a static call the target instance stays null.
-            object instance = null;
             if (request.ObjAddress == 0)
             {
                 return QuickError("Calling a instance-less function is not implemented");
@@ -803,8 +801,6 @@ namespace ScubaDiver
 
                 if (retTypeInfo != null)
                 {
-                    ulong pinAddr = 0x0;
-
                     returnValue = ObjectOrRemoteAddress.FromToken(results.Value, retTypeInfo.FullTypeName);
                 }
                 else
@@ -840,7 +836,6 @@ namespace ScubaDiver
                     {
                         return param.RemoteAddress;
                     }
-                    break;
             }
 
             Debugger.Launch();
