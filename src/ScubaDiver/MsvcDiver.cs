@@ -11,6 +11,7 @@ using ScubaDiver.Rtti;
 using ScubaDiver.API.Interactions;
 using ScubaDiver.API;
 using System.Runtime.InteropServices;
+using System.Threading;
 using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.Hooking;
 using Windows.Win32.Foundation;
@@ -45,21 +46,24 @@ namespace ScubaDiver
         private MsvcOffensiveGC gc;
         protected string MakeGcResponse(ScubaDiverMessage req)
         {
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
-            List<UndecoratedModule> undecModules = _tricksterWrapper.GetUndecoratedModules();
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Init'ing GC");
-            try
-            {
-                gc = new MsvcOffensiveGC();
-                gc.Init(undecModules);
-            }
-            catch (Exception e)
-            {
-                Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Exception: " + e);
-            }
+            throw new NotImplementedException(
+                "Offensive GC is turned off until 'new' operator searching is re-enabled.");
 
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} OUT!");
-            return "{\"status\":\"ok\"}";
+            //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
+            //List<UndecoratedModule> undecModules = _tricksterWrapper.GetUndecoratedModules();
+            //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Init'ing GC");
+            //try
+            //{
+            //    gc = new MsvcOffensiveGC();
+            //    gc.Init(undecModules);
+            //}
+            //catch (Exception e)
+            //{
+            //    Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Exception: " + e);
+            //}
+
+            //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} OUT!");
+            //return "{\"status\":\"ok\"}";
         }
 
 
@@ -95,14 +99,15 @@ namespace ScubaDiver
             RefreshRuntime();
 
             List<DomainsDump.AvailableDomain> available = new();
-            var modules = _tricksterWrapper.GetModules()
+            var modules = _tricksterWrapper.GetModules();
+            var moduleNames = modules
                 .Select(m => m.Name)
                 .Where(m => !string.IsNullOrWhiteSpace(m))
                 .ToList();
             var dom = new DomainsDump.AvailableDomain()
             {
                 Name = "dummy_domain",
-                AvailableModules = modules
+                AvailableModules = moduleNames
             };
             available.Add(dom);
 
@@ -119,9 +124,14 @@ namespace ScubaDiver
 
         protected override void RefreshRuntime()
         {
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Refreshing runtime!");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] Refreshing runtime!");
+            if (!_tricksterWrapper.RefreshRequired())
+            {
+                Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] Refreshing avoided...");
+                return;
+            }
             _tricksterWrapper.Refresh();
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_tricksterWrapper.GetModules().Count}");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] DONE refreshing runtime. Num Modules: {_tricksterWrapper.GetModules().Count}");
         }
 
         protected override Action HookFunction(FunctionHookRequest request, HarmonyWrapper.HookCallback patchCallback)
@@ -263,7 +273,7 @@ namespace ScubaDiver
                 }
                 else // Not primitive
                 {
-                    Console.WriteLine($"Unexpected non native argument to hooked method. Type: {remoteParams[i].GetType().FullName}");
+                    Logger.Debug($"Unexpected non native argument to hooked method. Type: {remoteParams[i].GetType().FullName}");
                     throw new Exception($"Unexpected non native argument to hooked method. Type: {remoteParams[i].GetType().FullName}");
                 }
             }
@@ -279,17 +289,24 @@ namespace ScubaDiver
             string assemblyFilter = req.QueryString.Get("assembly");
             Predicate<string> assmFilter = Filter.CreatePredicate(assemblyFilter);
 
+            Logger.Debug($"[MakeTypesResponse] Calling GetUndecoratedModules for assembly filter: {assemblyFilter}     <<<<<<-------------------------");
+            Stopwatch sw = Stopwatch.StartNew();
             List<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules(assmFilter).ToList();
+            sw.Stop();
+            Logger.Debug($"[MakeTypesResponse] Calling GetUndecoratedModules for assembly filter: {assemblyFilter} finished. Took {sw.ElapsedMilliseconds} ms");
+
+            Logger.Debug($"[MakeTypesResponse] Starting rest of method... ");
+            sw = Stopwatch.StartNew();
             List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
             if (matchingAssemblies.Count == 0)
             {
-                return QuickError($"No modules matched the filter '{assmFilter}'");
+                return QuickError($"No modules matched the filter '{assemblyFilter}'");
             }
             if (matchingAssemblies.Count > 1)
             {
                 string assembliesList = string.Join(", ", matchingAssemblies.Select(x=>x.Name).ToArray());
                 return QuickError(
-                    $"Too many modules matched the filter '{assmFilter}'. Found {matchingAssemblies.Count} ({assembliesList})");
+                    $"Too many modules matched the filter '{assemblyFilter}'. Found {matchingAssemblies.Count} ({assembliesList})");
             }
 
             UndecoratedModule assm = matchingAssemblies.Single();
@@ -307,6 +324,8 @@ namespace ScubaDiver
                 Types = types
             };
 
+            sw.Stop();
+            Logger.Debug($"[MakeTypesResponse] Finished rest of method. Took {sw.ElapsedMilliseconds} ms");
             return JsonConvert.SerializeObject(dump);
         }
 
@@ -352,7 +371,14 @@ namespace ScubaDiver
 
         private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
+            Logger.Debug($"[GetTypeDump] Querying for rawAssemblyFilter: {rawAssemblyFilter}, rawTypeFilter: {rawTypeFilter}");
+            Stopwatch sw = Stopwatch.StartNew();
             var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
+            sw.Stop();
+            Logger.Debug($"[GetTypeDump] Finished Querying for rawAssemblyFilter: {rawAssemblyFilter}, rawTypeFilter: {rawTypeFilter}, took {sw.ElapsedMilliseconds} ms");
+
+            Logger.Debug($"[GetTypeDump] Creating TypeDump...]");
+            sw = Stopwatch.StartNew();
             foreach (KeyValuePair<ModuleInfo, IEnumerable<TypeInfo>> moduleAndTypes in modulesAndTypes)
             {
                 ModuleInfo module = moduleAndTypes.Key;
@@ -378,7 +404,7 @@ namespace ScubaDiver
                             if (exists)
                                 continue;
 
-                            Console.WriteLine($"[GetManagedTypeDump] Found new method for type {typeInfo.Name}, Method Name: {virtualFunction.UndecoratedFullName}");
+                            Logger.Debug($"[GetManagedTypeDump] Found new method for type {typeInfo.Name}, Method Name: {virtualFunction.UndecoratedFullName}");
                             methods.Add(virtualFunction);
                         }
                     }
@@ -391,6 +417,8 @@ namespace ScubaDiver
                         Constructors = constructors,
                         Fields = fields
                     };
+                    sw.Stop();
+                    Logger.Debug($"[GetTypeDump] Creating TypeDump finished. Took {sw.ElapsedMilliseconds} ms]");
                     return recusiveTypeDump;
                 }
             }
@@ -417,7 +445,7 @@ namespace ScubaDiver
                     var typeMethod = VftableParser.ConvertToTypeMethod(undecFunc);
                     if (typeMethod == null)
                     {
-                        Console.WriteLine($"[MsvcDiver] Failed to convert UndecoratedFunction: {undecFunc.UndecoratedFullName}. Skipping.");
+                        Logger.Debug($"[MsvcDiver] Failed to convert UndecoratedFunction: {undecFunc.UndecoratedFullName}. Skipping.");
                         continue;
                     }
 
@@ -709,19 +737,19 @@ namespace ScubaDiver
             invocationArgs[0] = objAddress;
             for (int i = 0; i < paramsList.Count; i++)
             {
-                Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Decoding parameter #{i} (skipping 'this').");
+                Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Decoding parameter #{i} (skipping 'this').");
                 var decodedParam = paramsList[i];
-                Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Decoded parameter #{i}, Is Null: {decodedParam == null}");
+                Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Decoded parameter #{i}, Is Null: {decodedParam == null}");
                 nuint nuintParam = 0;
                 if (decodedParam != null)
                 {
-                    Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Decoded parameter #{i}, Result Managed Type: {decodedParam?.GetType().Name}");
-                    Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Casting parameter #{i} to nuint");
+                    Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Decoded parameter #{i}, Result Managed Type: {decodedParam?.GetType().Name}");
+                    Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Casting parameter #{i} to nuint");
                     nuintParam = (nuint)(Convert.ToUInt64(decodedParam));
                 }
 
                 invocationArgs[i + 1] = nuintParam;
-                Console.WriteLine($"[MsvcDiver] Invoking {targetMethod}, Done with parameter #{i}");
+                Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Done with parameter #{i}");
             }
 
             //
@@ -758,7 +786,7 @@ namespace ScubaDiver
             }
             else
             {
-                Console.WriteLine($"[MsvcDiver] Invoking {targetMethod} result with a not-null OBJECT address");
+                Logger.Debug($"[MsvcDiver] Invoking {targetMethod} result with a not-null OBJECT address");
 
                 // Pinning results TODO
                 string normalizedRetType = targetMethod.RetType;
@@ -766,18 +794,18 @@ namespace ScubaDiver
                 normalizedRetType = normalizedRetType.EndsWith('*') ? normalizedRetType[..^1] : normalizedRetType;
                 normalizedRetType = normalizedRetType.TrimEnd(' ');
 
-                Console.WriteLine(
+                Logger.Debug(
                     $"[MsvcDiver] Trying to result the type of the returned object. Normalized return type from signature: {normalizedRetType}");
                 ParseFullTypeName(normalizedRetType, out string retTypeRawAssemblyFilter, out string retTypeRawTypeFilter);
 
 
-                Console.WriteLine($"Dumping vftable (8 bytes) at the results address: 0x{results.Value:x16}");
+                Logger.Debug($"Dumping vftable (8 bytes) at the results address: 0x{results.Value:x16}");
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)results.Value));
-                Console.WriteLine($"vftable: {vftable:x16}");
-                Console.WriteLine("Trying to resolve vftable to type...");
+                Logger.Debug($"vftable: {vftable:x16}");
+                Logger.Debug("Trying to resolve vftable to type...");
                 TypeInfo retTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
-                Console.WriteLine($"Trying to resolve vftable to type... Got back: {retTypeInfo}");
+                Logger.Debug($"Trying to resolve vftable to type... Got back: {retTypeInfo}");
 
                 if (retTypeInfo != null)
                 {
@@ -787,7 +815,7 @@ namespace ScubaDiver
                 }
                 else
                 {
-                    Console.WriteLine("FAILED to resolve vftable to type. returning as nuint.");
+                    Logger.Debug("FAILED to resolve vftable to type. returning as nuint.");
                     returnValue = ObjectOrRemoteAddress.FromObj(results);
                 }
             }

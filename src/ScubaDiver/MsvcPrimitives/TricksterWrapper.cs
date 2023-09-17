@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Windows.Win32.Foundation;
-using NtApiDotNet.Win32;
 using ScubaDiver.Rtti;
 using ScubaDiver.API.Utils;
-using System.Reflection;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
+using System.Reflection;
 
 namespace ScubaDiver;
 
@@ -37,10 +36,19 @@ public class TricksterWrapper
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Reading Regions...");
         _trickster.ReadRegions();
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators...");
-        _trickster.ScanOperatorNewFuncs();
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
+        // TODO: Searching new is a heavy operation & only used for Offensive GC. Removed for now.
+        //Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators...");
+        //_trickster.ScanOperatorNewFuncs();
+        _trickster.OperatorNewFuncs = new Dictionary<ModuleInfo, nuint[]>();
+        //Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
+
+        // Update "identifiers"
+        Process p = Process.GetCurrentProcess();
+        _lastRefreshModulesCount = p.Modules.Count;
+        _lastRefreshModules = p.Modules.Cast<ProcessModule>()
+            .Select(pModule => pModule.ModuleName)
+            .ToHashSet();
     }
 
     public bool TryGetOperatorNew(ModuleInfo moduleInfo, out nuint[] operatorNewAddresses)
@@ -53,16 +61,28 @@ public class TricksterWrapper
         return _trickster.ScannedTypes;
     }
 
-    public List<ModuleInfo> GetModules() => _trickster.ModulesParsed;
-    public List<ModuleInfo> GetModules(Predicate<string> filter) => _trickster.ModulesParsed.Where(a => filter(a.Name)).ToList();
+    public List<ModuleInfo> GetModules() => _trickster.UnmanagedModules;
+    public List<ModuleInfo> GetModules(Predicate<string> filter) => _trickster.UnmanagedModules.Where(a => filter(a.Name)).ToList();
     public List<ModuleInfo> GetModules(string name) => GetModules(s => s == name);
 
     private Dictionary<string, UndecoratedModule> _undecModeulesCache = new Dictionary<string, UndecoratedModule>();
     public List<UndecoratedModule> GetUndecoratedModules() => GetUndecoratedModules(_ => true);
     public List<UndecoratedModule> GetUndecoratedModules(Predicate<string> moduleNameFilter)
     {
-        Refresh();
         Dictionary<ModuleInfo, TypeInfo[]> modulesAndTypes = GetDecoratedTypes();
+        if (!modulesAndTypes.Any(m => moduleNameFilter(m.Key.Name)))
+        {
+            // No modules pass the filter... Try again after a refresh.
+            Logger.Debug("[GetUndecoratedModules] [~-~-~-~-~-~->>>>] Hopefully rare refresh flow hit !");
+            Logger.Debug("[GetUndecoratedModules] [~-~-~-~-~-~->>>>] Existing:");
+            foreach (var key in modulesAndTypes.Keys.OrderBy(mi => mi.Name))
+            {
+                Logger.Debug($"[GetUndecoratedModules] [~-~-~-~-~-~->>>>] *** {key.Name}");
+            }
+            Logger.Debug("[GetUndecoratedModules] [~-~-~-~-~-~->>>>] =========");
+            Refresh();
+            modulesAndTypes = GetDecoratedTypes();
+        }
 
         List<UndecoratedModule> output = new();
         foreach (KeyValuePair<ModuleInfo, TypeInfo[]> kvp in modulesAndTypes)
@@ -75,6 +95,7 @@ public class TricksterWrapper
             // Check in the cache if we already processed this module
             if (!_undecModeulesCache.TryGetValue(module.Name, out UndecoratedModule undecModule))
             {
+                Logger.Debug($"[GetUndecoratedModules] Module {module.Name} is not in cache (Cache size: {_undecModeulesCache.Count})");
                 // Unprocessed module. Processing now...
                 // Generate the undecorated module and save in cache
                 undecModule = GenerateUndecoratedModule(module, kvp.Value);
@@ -147,7 +168,7 @@ public class TricksterWrapper
         {
             if (export is not UndecoratedFunction undecFunc)
             {
-                Logger.Debug("Typeless-export which isn't a function is discarded. Undecorated name: " + export.UndecoratedFullName);
+                //Logger.Debug("Typeless-export which isn't a function is discarded. Undecorated name: " + export.UndecoratedFullName);
                 continue;
             }
 
@@ -209,9 +230,23 @@ public class TricksterWrapper
 
     }
 
+    private int _lastRefreshModulesCount = 0;
+    private HashSet<string> _lastRefreshModules = new HashSet<string>();
     public bool RefreshRequired()
     {
-        return _trickster == null || !_trickster.ScannedTypes.Any();
+        if (_trickster == null || !_trickster.ScannedTypes.Any())
+            return true;
+
+        Process p = Process.GetCurrentProcess();
+        if (p.Modules.Count != _lastRefreshModulesCount)
+            return true;
+        var currModules = p.Modules.Cast<ProcessModule>()
+            .Select(pModule => pModule.ModuleName)
+            .ToHashSet();
+        if (!currModules.SetEquals(_lastRefreshModules))
+            return true;
+
+        return false;
     }
 
     public HANDLE GetProcessHandle()

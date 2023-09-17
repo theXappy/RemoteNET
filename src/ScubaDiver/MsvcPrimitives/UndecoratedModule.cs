@@ -16,6 +16,7 @@ public class UndecoratedModule
     public UndecoratedModule(string name, Rtti.ModuleInfo moduleInfo)
     {
         Name = name;
+        _namesToTypes = new Dictionary<string, TypeInfo>();
         _types = new Dictionary<Rtti.TypeInfo, UndecoratedType>();
         _typelessFunctions = new Dictionary<string, UndecoratedMethodGroup>();
         ModuleInfo = moduleInfo;

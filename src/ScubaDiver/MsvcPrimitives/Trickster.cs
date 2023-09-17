@@ -7,10 +7,12 @@ using Windows.Win32.Foundation;
 using Windows.Win32.System.Threading;
 using Windows.Win32.System.Memory;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Xml.Linq;
+using System.Reflection;
 
 namespace ScubaDiver.Rtti;
 
@@ -112,7 +114,8 @@ public unsafe class Trickster : IDisposable
     public Dictionary<ModuleInfo, TypeInfo[]> ScannedTypes;
     public Dictionary<ModuleInfo, nuint[]> OperatorNewFuncs;
     public MemoryRegion[] Regions;
-    public List<ModuleInfo> ModulesParsed;
+
+    public List<ModuleInfo> UnmanagedModules;
 
     public Trickster(Process process)
     {
@@ -126,11 +129,12 @@ public unsafe class Trickster : IDisposable
 
         var modules = process.Modules;
         var managedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-        var managedAssembliesNames = managedAssemblies
+        var ManagedAssembliesLocations = managedAssemblies
             .Where(assm => !assm.IsDynamic)
             .Select(assm => assm.Location).ToList();
 
-        ModulesParsed = modules.Cast<ProcessModule>()
+        UnmanagedModules = modules.Cast<ProcessModule>()
+            .Where(pModule => !ManagedAssembliesLocations.Contains(pModule.FileName))
             .Select(pModule => new ModuleInfo(pModule.ModuleName, (nuint)(nint)pModule.BaseAddress, (nuint)(nint)pModule.ModuleMemorySize))
             .ToList();
 
@@ -206,6 +210,11 @@ public unsafe class Trickster : IDisposable
                     res[module] = Array.Empty<TypeInfo>();
                 res[module] = res[module].Concat(allModuleTypes).ToArray();
             }
+            else
+            {
+                // No types in this module. Might just be non-MSVC one so we add a dummy
+                res[module] = Array.Empty<TypeInfo>();
+            }
         }
 
         return res;
@@ -214,7 +223,7 @@ public unsafe class Trickster : IDisposable
     private Dictionary<ModuleInfo, List<ModuleSegment>> GetAllModulesSegments()
     {
         Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
-        foreach (ModuleInfo modInfo in ModulesParsed)
+        foreach (ModuleInfo modInfo in UnmanagedModules)
         {
             List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
             foreach (ModuleSegment moduleSegment in sections)
@@ -392,7 +401,7 @@ public unsafe class Trickster : IDisposable
         Dictionary<ModuleInfo, nuint[]> res = new();
 
         Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
-        foreach (ModuleInfo modInfo in ModulesParsed)
+        foreach (ModuleInfo modInfo in UnmanagedModules)
         {
             List<ModuleSegment> sections;
             try
@@ -514,13 +523,46 @@ public class ModuleSegment
 
 static class ProcessModuleExtensions
 {
+    // Import the necessary Windows API functions
+    [DllImport("kernel32.dll")]
+    public static extern uint GetModuleFileName(IntPtr hModule, [Out] char[] lpFileName, int nSize);
+
+    // Function to check if an IntPtr is valid
+    public static bool IsIntPtrValid(IntPtr intPtr)
+    {
+        char[] buffer = new char[256]; // Adjust the buffer size as needed
+        uint result = GetModuleFileName(intPtr, buffer, buffer.Length);
+
+        // If GetModuleFileName returns 0, it means the IntPtr is invalid
+        if (result == 0)
+        {
+            int error = Marshal.GetLastWin32Error();
+            if (error == 126 /* ERROR_MOD_NOT_FOUND */ || error == 0)
+            {
+                return false;
+            }
+            else
+            {
+                Logger.Debug($"<GetLastWin32Error == {error}>");
+            }
+        }
+
+        return true;
+    }
+
     public static List<ModuleSegment> ListSections(this ModuleInfo module)
     {
         // Get a pointer to the base address of the module
         IntPtr moduleHandle = new IntPtr((long)module.BaseAddress);
 
+        if (!IsIntPtrValid(moduleHandle))
+        {
+            Logger.Debug($"[ListSections] == WARNING == Module unloaded! Name: {module.Name} Address: {moduleHandle}");
+            return new List<ModuleSegment>();
+        }
+
         // Read the DOS header from the module
-        IMAGE_DOS_HEADER dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(moduleHandle);
+            IMAGE_DOS_HEADER dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(moduleHandle);
 
         // Read the PE header from the module
         IntPtr peHeader = new IntPtr(moduleHandle.ToInt64() + dosHeader.e_lfanew);
