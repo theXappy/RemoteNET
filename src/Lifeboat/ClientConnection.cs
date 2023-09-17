@@ -24,56 +24,54 @@ namespace Lifeboat
 
         private void Work()
         {
+            Console.WriteLine("[Client Worker] Started");
             while (true)
             {
                 try
                 {
-                    Console.WriteLine($"[ClientConnection][@@@] Reading next request...");
                     HttpRequestSummary req = SimpleHttpProtocolParser.ReadRequest(_client);
                     if (req == null)
                     {
-                        Console.WriteLine($"[ClientConnection] Parser returned NULL for request. Stopping loop.");
                         break;
                     }
-                    Console.WriteLine($"[ClientConnection][@@@] Next request found! URL: {req.Url} , ID: {req.RequestId}");
-                    Console.WriteLine($"[ClientConnection][@@@] Sending request to diver connection... ");
+
                     _diver.SendAsync(req).ContinueWith(HandleResponse);
+                }
+                catch (IOException)
+                {
+                    // Probably just a client disconnect
+                    break;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ClientConnection] Error in worker loop. Ex: {ex}");
+                    Console.WriteLine($"[Client Worker] Error in worker loop. Ex: {ex}");
                     break;
                 }
             }
 
-            Console.WriteLine($"[ClientConnection] Closing client");
+            Console.WriteLine($"[Client Worker] Closing client");
             try
             {
                 _client.Close();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ClientConnection] Error closing client. Ex: {ex}");
             }
-
             Alive = false;
+            Console.WriteLine("[Client Worker] Finished");
         }
 
         private void HandleResponse(Task<HttpResponseSummary> task)
         {
-            Console.WriteLine($"[ClientConnection][@@@] Got back response from diver! Request ID: {task.Result.RequestId}");
             lock (_writeLock)
             {
-                Console.WriteLine($"[ClientConnection][@@@] Acquired Writer Lock! Request ID: {task.Result.RequestId}");
                 try
                 {
-                    Console.WriteLine($"[ClientConnection][@@@] Sending response to client... Request ID: {task.Result.RequestId}");
                     SimpleHttpProtocolParser.WriteResponse(_client, task.Result);
-                    Console.WriteLine($"[ClientConnection][@@@] Sent response to client. Request ID: {task.Result.RequestId}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ClientConnection] Error in writer. Ex: {ex}");
+                    Console.WriteLine($"[ClientConnection] Error while writing a response to a client. Ex: {ex}");
                 }
             }
         }
