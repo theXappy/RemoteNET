@@ -95,7 +95,7 @@ namespace RemoteNET
                 DynamicRemoteObject[] droParameters = new DynamicRemoteObject[args.Length];
                 for (int i = 0; i < args.Length; i++)
                 {
-                    RemoteObject ro = _app.GetRemoteObject(args[i].RemoteAddress, args[i].Type);
+                    RemoteObject ro = _app.GetRemoteObject(args[i]);
                     DynamicRemoteObject dro = ro.Dynamify() as DynamicRemoteObject;
 
                     droParameters[i] = dro;

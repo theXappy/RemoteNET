@@ -89,7 +89,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 {
                     // I only support managed here because I don't think I'll implement "Field Infos" for unmanaged
                     // objects any time soon.
-                    var remoteObject = App.GetRemoteObject(oora.RemoteAddress, oora.Type);
+                    var remoteObject = App.GetRemoteObject(oora);
                     return remoteObject.Dynamify();
                 }
                 else if (oora.IsNull)

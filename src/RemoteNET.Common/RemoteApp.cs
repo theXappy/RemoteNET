@@ -40,7 +40,8 @@ namespace RemoteNET
         public virtual Type GetRemoteType(TypeDump typeDump) => GetRemoteType(typeDump.Type, typeDump.Assembly);
 
 
-        public abstract RemoteObject  GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null);
+        public abstract RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null);
+        public virtual RemoteObject GetRemoteObject(ObjectOrRemoteAddress oora) => GetRemoteObject(oora.RemoteAddress, oora.Type);
         public virtual RemoteObject GetRemoteObject(CandidateObject candidate) => GetRemoteObject(candidate.Address, candidate.TypeFullName, candidate.HashCode);
 
         /// <summary>

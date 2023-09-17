@@ -47,7 +47,7 @@ namespace RemoteNET.Internal
                 }
                 else if (item.IsRemoteAddress)
                 {
-                    return __ra.GetRemoteObject(item.RemoteAddress, item.Type).Dynamify();
+                    return __ra.GetRemoteObject(item).Dynamify();
                 }
                 else
                 {
