@@ -93,7 +93,7 @@ public static class VftableParser
         else
         {
             Logger.Debug(
-                $"[{nameof(ConvertToTypeMethod)}] Failed to parse function's argumenst. Undecorated name: {undecFunc.UndecoratedFullName}");
+                $"[{nameof(ConvertToTypeMethod)}] Failed to parse function's arguments. Undecorated name: {undecFunc.UndecoratedFullName} \r\nDecorated: {undecFunc.DecoratedName}");
             return null;
         }
 
