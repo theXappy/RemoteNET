@@ -459,7 +459,7 @@ namespace ScubaDiver.Tester
                             Console.WriteLine($"Methods");
                             foreach (var method in res.GetMethods())
                             {
-                                Console.WriteLine("Method: " + (method as RemoteRttiMethodInfo).UndecoratedSignature);
+                                Console.WriteLine("Method: " + (method as IRttiMethodBase).UndecoratedSignature);
                             }
                         }
                         break;
