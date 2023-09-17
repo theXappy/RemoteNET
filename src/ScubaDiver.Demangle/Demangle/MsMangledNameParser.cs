@@ -235,7 +235,16 @@ namespace ScubaDiver.Demangle.Demangle
             {
                 if (PeekAndDiscard('$'))
                 {
-                    ParseNonTypeTemplateArgument();
+                    var q = ParseNonTypeTemplateArgument();
+                    if (q != null)
+                    {
+                        types.Add(q);
+                        // SS: This is a hack :(
+                        if (q is SerializedSignature)
+                        {
+                            break;
+                        }
+                    }
                 }
                 else
                 {
@@ -248,7 +257,7 @@ namespace ScubaDiver.Demangle.Demangle
             return types;
         }
 
-        private void ParseNonTypeTemplateArgument()
+        private SerializedType? ParseNonTypeTemplateArgument()
         {
             switch (str[i++])
             {
@@ -262,10 +271,29 @@ namespace ScubaDiver.Demangle.Demangle
                         while (str[i++] != '@')
                             ;
                     }
-                    break;  // Integer value.
-                case '2': throw new NotSupportedException();    // real value
-                case 'D': throw new NotSupportedException();    // Anonymous
-                default: Dump(i); Error("Unknown template argument {0}.", str[i - 1]); break;
+
+                    return null;
+                    break; // Integer value.
+                case '2': throw new NotSupportedException(); // real value
+                case 'D': throw new NotSupportedException(); // Anonymous
+                case '$':
+                    {
+                        // TODO: SS: This is not an implementation. This is an atrocity >:(
+                        string name = ParseAtName();
+                        if (name == "A6AXXZ")
+                            return new SerializedSignature()
+                            {
+                                Convention = "__cdecl",
+                                ReturnValue = new Argument_v1() { Type = new VoidType_v1() },
+                                Arguments = new Argument_v1[1] { new Argument_v1() { Type = new VoidType_v1() } }
+                            };
+                        throw new NotSupportedException();
+                    }
+
+                default:
+                    Dump(i);
+                    Error("Unknown template argument {0}.", str[i - 1]);
+                    return null; // Dummy, 'Error' above throws.
             }
         }
 
@@ -308,6 +336,47 @@ namespace ScubaDiver.Demangle.Demangle
                 TypeArguments = typeArgs
             };
             return qualifiers.ToArray();
+        }
+
+        /// <summary>
+        /// Reads a qualification followed by '@'.
+        /// </summary>
+        /// <returns></returns>
+        public TypeReference_v1 ParseQualificationAsType()
+        {
+            var qualifiers = new List<string>();
+            SerializedType[]? typeArgs = null;
+            while (i < str.Length && !PeekAndDiscard('@'))
+            {
+                string name = ParseAtName();
+                if (name.StartsWith("?$"))
+                {
+                    name = name.Substring(2);
+                    namesSeen.Add(name);
+                    var oldNames = namesSeen;
+                    if (templateNamesSeen == null)
+                    {
+                        templateNamesSeen = new List<string> { name };
+                    }
+                    else
+                        templateNamesSeen.Add(name);
+                    namesSeen = templateNamesSeen;
+                    typeArgs = ParseTemplateArguments().ToArray(); ///$TODO: what to do about these if they're nested?
+                    namesSeen = oldNames;
+                }
+                else
+                {
+                    namesSeen.Add(name);
+                }
+                qualifiers.Insert(0, name);
+            }
+            var tr = new TypeReference_v1
+            {
+                TypeName = qualifiers.Last(),
+                Scope = qualifiers.Take(qualifiers.Count - 1).ToArray(),
+                TypeArguments = typeArgs
+            };
+            return tr;
         }
 
         public (string, SerializedType?, SerializedType?) ParseQualifiedTypeCode(string basicName, string[] qualification, List<Argument_v1> compoundArgs)
@@ -764,12 +833,7 @@ namespace ScubaDiver.Demangle.Demangle
 
         public TypeReference_v1 ParseStructure(List<Argument_v1> compoundArgs)
         {
-            var q = ParseQualification();
-            var tr = new TypeReference_v1
-            {
-                TypeName = q.Last(),
-                Scope = q.Take(q.Length - 1).ToArray()
-            };
+            var tr = ParseQualificationAsType();
             compoundArgs.Add(new Argument_v1 { Type = tr });
             return tr;
         }

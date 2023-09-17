@@ -130,16 +130,22 @@ namespace RemoteNET.RttiReflection.Demangle
 
             public StringBuilder VisitSignature(SerializedSignature signature)
             {
-                if (!string.IsNullOrEmpty(signature.Convention))
-                    sb.AppendFormat("{0} ", signature.Convention);
                 if (!string.IsNullOrEmpty(modifier))
                     sb.AppendFormat("{0}: ", modifier);
                 if (signature.ReturnValue != null && signature.ReturnValue.Type != null)
                 {
+                    // void __cdecl
                     signature.ReturnValue.Type.Accept(this);
+                    sb.Append(" ");
+                    if (!string.IsNullOrEmpty(signature.Convention))
+                        sb.AppendFormat("{0}", signature.Convention);
                 }
                 else
                 {
+                    // __cdecl myFunc
+                    if (!string.IsNullOrEmpty(signature.Convention))
+                        sb.AppendFormat("{0}", signature.Convention);
+                    sb.Append(" ");
                     sb.Append(name);
                 }
                 sb.Append("(");
@@ -190,6 +196,13 @@ namespace RemoteNET.RttiReflection.Demangle
 
             public StringBuilder VisitTypeReference(TypeReference_v1 typeReference)
             {
+                if (typeReference.Scope != null)
+                {
+                    for (var i = 0; i < typeReference.Scope.Length; i++)
+                    {
+                        sb.Append($"{typeReference.Scope[i]}::");
+                    }
+                }
                 sb.Append(typeReference.TypeName);
                 if (name != null)
                     sb.AppendFormat(" {0}", name);
