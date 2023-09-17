@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using ScubaDiver.API.Protocol.SimpleHttp;
@@ -7,14 +8,16 @@ namespace Lifeboat;
 
 public class Program
 {
-    static bool HandleCommandLineArgs(string[] args, out int diverPort)
+    static bool HandleCommandLineArgs(string[] args, out int pid, out int diverPort)
     {
+        pid = 0;
         diverPort = 0;
+        string helpText = "Usage: lifeboat.exe <pid with diver> <port offset (optional)>";
 
         // Check for -h flag
         if (args.Contains("-h"))
         {
-            Console.WriteLine("Usage: program.exe <diverPort>");
+            Console.WriteLine(helpText);
             return false;
         }
 
@@ -22,16 +25,31 @@ public class Program
         if (args.Length < 1)
         {
             Console.WriteLine("Error: not enough arguments provided.");
-            Console.WriteLine("Usage: program.exe <diverPort>");
+            Console.WriteLine(helpText);
             return false;
         }
 
         // Attempt to parse arguments
-        if (!int.TryParse(args[0], out diverPort))
+        if (!int.TryParse(args[0], out pid))
         {
-            Console.WriteLine("Error: invalid argument(s).");
-            Console.WriteLine("Usage: program.exe <diverPort>");
+            Console.WriteLine("Error: invalid argument 'pid'.");
+            Console.WriteLine(helpText);
             return false;
+        }
+        diverPort = pid;
+
+        // Attempt to offset (optional)
+        // Offset is optional anyway...
+        if (args.Length > 1)
+        {
+            if (!int.TryParse(args[1], out int offset))
+            {
+                Console.WriteLine("Error: invalid argument 'offset'.");
+                Console.WriteLine(helpText);
+                return false;
+
+            }
+            diverPort += offset;
         }
 
         return true;
@@ -62,11 +80,47 @@ public class Program
         Console.WriteLine("  \\  Lifeboat    < < <       |   ");
         Console.WriteLine("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 
-        if (!HandleCommandLineArgs(args, out int port))
+        if (!HandleCommandLineArgs(args, out int pid, out int port))
             return;
+
+        BindToTargetProcess(pid);
 
         HandleConnections(port);
     }
+
+    public static void BindToTargetProcess(int targetProcessId)
+    {
+        try
+        {
+            // Attach to the target process.
+            Process targetProcess = Process.GetProcessById(targetProcessId);
+
+            // Create a thread to monitor the target process.
+            Thread monitoringThread = new Thread(() =>
+            {
+                // Wait for the target process to exit.
+                targetProcess.WaitForExit();
+
+                // The target process has exited, so exit the current process.
+                Environment.Exit(0);
+            });
+
+            // Set the thread as a background thread so that it exits when the main thread exits.
+            monitoringThread.IsBackground = true;
+
+            // Start monitoring the target process.
+            monitoringThread.Start();
+        }
+        catch (ArgumentException)
+        {
+            Console.WriteLine($"Process with PID {targetProcessId} not found.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error binding to target process: {ex.Message}");
+        }
+    }
+
 
     public static void HandleConnections(int port)
     {
