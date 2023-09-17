@@ -2,13 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
-using Reko.Core.Serialization;
 using RemoteNET.Common;
 using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
-using Reko.Environments.Windows;
-using RemoteNET.RttiReflection.Demangle;
 
 namespace RemoteNET.RttiReflection
 {
