@@ -202,7 +202,7 @@ namespace ScubaDiver
                             if (arg != 0)
                             {
                                 string cString = Marshal.PtrToStringAnsi(new IntPtr((long)arg));
-                                argsToForward[i] = cString;
+                                argsToForward[i] = new CharStar(arg, cString);
                             }
                             else
                             {
@@ -270,6 +270,13 @@ namespace ScubaDiver
                 {
                     // TODO: Freeze?
                     remoteParams[i] = ObjectOrRemoteAddress.FromToken(nativeObj.Address, nativeObj.TypeInfo.FullTypeName);
+                }
+                else if (parameter is CharStar charStar)
+                {
+                    // TODO: Freeze?
+                    var oora = ObjectOrRemoteAddress.FromToken(charStar.Address, typeof(CharStar).FullName);
+                    oora.EncodedObject = charStar.Value;
+                    remoteParams[i] = oora;
                 }
                 else // Not primitive
                 {

@@ -26,6 +26,6 @@ public class RemoteCharStar : RemoteObject
 
     public override Type GetRemoteType()
     {
-        return typeof(CharStar);
+        return typeof(ScubaDiver.API.CharStar);
     }
 }
