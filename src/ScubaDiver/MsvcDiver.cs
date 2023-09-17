@@ -454,20 +454,16 @@ namespace ScubaDiver
         private void HandleTypeField(UndecoratedExportedField undecField, string vftableName,
             List<TypeDump.TypeField> fields, ref UndecoratedSymbol vftable)
         {
-            // TODO: Fields could be exported as well..
-            // we only expected the "vftable" field (not actually a field...) and methods/ctors right now
-
+            // vftable gets a sepcial treatment because we need it outside this func.
             if (undecField.UndecoratedFullName == vftableName)
             {
                 if (vftable != null)
                 {
                     Logger.Debug(
-                        $"Duplicate vftable export found. Old: {vftable.UndecoratedFullName} , New: {undecField.UndecoratedFullName}");
+                        $"Duplicate vftable export found. Old: {vftable.UndecoratedFullName} (0x{vftable.Address:X16}) , " +
+                        $"New: {undecField.UndecoratedFullName} (0x{undecField.Address:X16}) ,");
                     return;
                 }
-
-                vftable = undecField;
-
 
                 fields.Add(new TypeDump.TypeField()
                 {
@@ -478,11 +474,19 @@ namespace ScubaDiver
 
                 // Keep vftable aside so we can also gather functions from it
                 vftable = undecField;
-                return;
+            }
+            else
+            {
+                fields.Add(new TypeDump.TypeField()
+                {
+                    Name = undecField.UndecoratedName,
+                    TypeFullName = undecField.UndecoratedFullName,
+                    Visibility = "Public"
+                });
             }
 
-            Logger.Debug(
-                $"[{nameof(GetTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
+            //Logger.Debug(
+            //    $"[{nameof(GetTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
         }
 
 
