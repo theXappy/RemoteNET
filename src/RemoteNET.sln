@@ -74,6 +74,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DetoursNetCLR", "detours_bu
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DetoursNetRuntime", "detours_build\detours.net\DetoursNetRuntime\DetoursNetRuntime.vcxproj", "{B6E8EB3E-4269-38B6-9B92-2E5B5731E88F}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoteNET.Tests", "RemoteNET.Tests\RemoteNET.Tests.csproj", "{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed = Debug|Mixed
@@ -274,6 +276,14 @@ Global
 		{B6E8EB3E-4269-38B6-9B92-2E5B5731E88F}.Release|Mixed.Build.0 = RelWithDebInfo|x64
 		{B6E8EB3E-4269-38B6-9B92-2E5B5731E88F}.RelWithDebInfo|Mixed.ActiveCfg = RelWithDebInfo|x64
 		{B6E8EB3E-4269-38B6-9B92-2E5B5731E88F}.RelWithDebInfo|Mixed.Build.0 = RelWithDebInfo|x64
+		{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}.Debug|Mixed.ActiveCfg = Debug|Any CPU
+		{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}.Debug|Mixed.Build.0 = Debug|Any CPU
+		{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}.MinSizeRel|Mixed.ActiveCfg = Debug|Any CPU
+		{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}.MinSizeRel|Mixed.Build.0 = Debug|Any CPU
+		{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}.Release|Mixed.ActiveCfg = Release|Any CPU
+		{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}.Release|Mixed.Build.0 = Release|Any CPU
+		{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}.RelWithDebInfo|Mixed.ActiveCfg = Release|Any CPU
+		{34AD5E44-7F16-4A11-BF6F-4CBB6AF76880}.RelWithDebInfo|Mixed.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
