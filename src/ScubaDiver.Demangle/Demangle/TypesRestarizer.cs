@@ -93,6 +93,8 @@ namespace ScubaDiver.Demangle.Demangle
             {
                 var n = name;
                 name = null;
+                if (pointer == null || pointer.DataType == null)
+                    throw new ArgumentNullException("VisitPointer received a null argument");
                 pointer.DataType.Accept(this);
                 // SS: Removed a space before the *
                 sb.AppendFormat("*");
@@ -106,6 +108,8 @@ namespace ScubaDiver.Demangle.Demangle
             {
                 var n = name;
                 name = null;
+                if (reference == null || reference.Referent == null)
+                    throw new ArgumentNullException("VisitReference received null as argument");
                 reference.Referent.Accept(this);
                 sb.AppendFormat(" ^");
                 name = n;
@@ -117,6 +121,8 @@ namespace ScubaDiver.Demangle.Demangle
             public StringBuilder VisitMemberPointer(MemberPointer_v1 memptr)
             {
                 var n = name;
+                if (memptr == null || memptr.DeclaringClass == null)
+                    throw new ArgumentNullException("VisitMemberPointer received a null argument");
                 memptr.DeclaringClass.Accept(this);
                 sb.Append("::*");
                 sb.Append(n);
@@ -155,11 +161,15 @@ namespace ScubaDiver.Demangle.Demangle
                 }
                 sb.Append("(");
                 string sep = "";
+                if (signature.Arguments == null)
+                    throw new ArgumentNullException("VisitSignature received signature.Arguments = null");
                 foreach (var arg in signature.Arguments)
                 {
                     sb.Append(sep);
                     sep = ", ";
-                    this.name = arg.Name;
+                    name = arg.Name;
+                    if (arg.Type == null)
+                        throw new ArgumentNullException("VisitSignature received signature.Arguments where one of the arguments arg.Type = null");
                     arg.Type.Accept(this);
                 }
                 sb.Append(")");
@@ -167,6 +177,9 @@ namespace ScubaDiver.Demangle.Demangle
             }
             public List<RestarizedParameter> HackArgs(SerializedSignature signature)
             {
+                if (signature == null || signature.Arguments == null)
+                    throw new ArgumentNullException("HackArgs received a null signature argument");
+
                 List<RestarizedParameter> output = new List<RestarizedParameter>();
                 foreach (Argument_v1 arg in signature.Arguments)
                 {
@@ -178,6 +191,8 @@ namespace ScubaDiver.Demangle.Demangle
             {
                 sb = new StringBuilder();
                 this.name = arg.Name;
+                if (arg == null || arg.Type == null)
+                    throw new ArgumentNullException("HackArg received a null argument");
                 arg.Type.Accept(this);
                 return new RestarizedParameter(sb.ToString(), arg);
             }
@@ -268,7 +283,11 @@ namespace ScubaDiver.Demangle.Demangle
         {
             var p = new MsMangledNameParser(mangledFuncSig);
             var sp = p.Parse();
-            return RestarizeParameters(sp.Item2 as SerializedSignature);
+            if (sp.Item2 is not SerializedSignature sig)
+            {
+                throw new Exception("MsMangledNameParser.Parse's return value did not contain a SerializedSignature");
+            }
+            return RestarizeParameters(sig);
         }
         public static List<RestarizedParameter> RestarizeParameters(SerializedSignature parsedSig)
         {

@@ -55,10 +55,10 @@ namespace ScubaDiver.Demangle.Demangle
             this.templateNamesSeen = null!;
         }
 
-        public string? Modifier;
-        public string? ClassName;
-        public string? Scope;
-        private bool isConstuctor;
+        public string? Modifier { get; set; }
+        public string? ClassName { get; set; }
+        public string? Scope { get; set; }
+        private bool _isConstructor;
 
         public static bool IsFunction(string str)
         {
@@ -273,7 +273,6 @@ namespace ScubaDiver.Demangle.Demangle
                     }
 
                     return null;
-                    break; // Integer value.
                 case '2': throw new NotSupportedException(); // real value
                 case 'D': throw new NotSupportedException(); // Anonymous
                 case '$':
@@ -540,7 +539,7 @@ namespace ScubaDiver.Demangle.Demangle
             if (PeekAndDiscard('@'))
             {
                 // C++ ctors have no explicit return type!
-                if (isConstuctor)
+                if (_isConstructor)
                 {
                     // C++ constructor implicitly returns pointer to
                     // initialised object
@@ -602,7 +601,7 @@ namespace ScubaDiver.Demangle.Demangle
             switch (str[i++])
             {
                 case '0':
-                    this.isConstuctor = true;
+                    this._isConstructor = true;
                     return "{0}";
                 case '1': return "~{0}";
                 case '2': return "operator new";

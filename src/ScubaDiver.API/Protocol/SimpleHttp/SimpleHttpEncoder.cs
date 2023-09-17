@@ -84,7 +84,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 };
                 return bodyStart + contentLength;
             }
-            catch(Exception ex )
+            catch(Exception)
             {
                 return 0;
             }

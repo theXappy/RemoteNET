@@ -111,11 +111,7 @@ namespace RemoteNET.Internal
 
             public override int GetHashCode()
             {
-                int hashCode = -734779080;
-                hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(_name);
-                hashCode = hashCode * -1521134295 + EqualityComparer<DynamicRemoteObject>.Default.GetHashCode(_parent);
-                hashCode = hashCode * -1521134295 + EqualityComparer<Type[]>.Default.GetHashCode(_genericArguments);
-                return hashCode;
+                return HashCode.Combine(_name, _parent, _genericArguments);
             }
 
             // Functions to turn our base method into a "generic" one - with specific arguments
@@ -142,15 +138,17 @@ namespace RemoteNET.Internal
             public DynamicRemoteMethod this[Type t1, Type t2, Type t3, Type t4, Type t5] => this[t1, t2, t3, t4][t5];
         }
 
+
+#pragma warning disable IDE1006 // Naming Styles
         public RemoteApp __ra;
         public RemoteObject __ro;
         public RemoteTypeBase __type;
-
 
         private IEnumerable<MemberInfo> __ongoingMembersDumper = null;
         private IEnumerator<MemberInfo> __ongoingMembersDumperEnumerator = null;
         private List<MemberInfo> __membersInner = null;
         public IEnumerable<MemberInfo> __members => MindFuck();
+#pragma warning restore IDE1006 // Naming Styles
 
         public DynamicRemoteObject(RemoteApp ra, RemoteObject ro)
         {
@@ -540,6 +538,7 @@ namespace RemoteNET.Internal
 
 
         #region Array Casting
+#pragma warning disable IDE1006 // Naming Styles
         private static T[] __cast_to_array<T>(DynamicRemoteObject dro)
         {
             dynamic dyn = dro;
@@ -549,6 +548,7 @@ namespace RemoteNET.Internal
                 array[i] = dyn[i];
             return array;
         }
+#pragma warning restore IDE1006 // Naming Styles
 
         public static implicit operator bool[](DynamicRemoteObject dro) => __cast_to_array<bool>(dro);
         public static implicit operator byte[](DynamicRemoteObject dro) => __cast_to_array<byte>(dro);

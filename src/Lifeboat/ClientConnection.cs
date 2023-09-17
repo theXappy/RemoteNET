@@ -54,9 +54,11 @@ namespace Lifeboat
             {
                 _client.Close();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                // ignored
             }
+
             Alive = false;
             Console.WriteLine("[Client Worker] Finished");
         }

@@ -50,7 +50,7 @@ public static class DllExportExt
                     var parser = new MsMangledNameParser(input.Name);
                     (_, sig, _) = parser.Parse();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     //Logger.Debug($"Failed to demangle name of function, Raw: {input.Name}, Exception: " + ex.Message);
                     return (null, null);

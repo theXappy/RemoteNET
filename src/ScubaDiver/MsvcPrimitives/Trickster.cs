@@ -13,6 +13,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Xml.Linq;
 using System.Reflection;
+// ReSharper disable UnusedMember.Global
+// ReSharper disable InconsistentNaming
+// ReSharper disable IdentifierTypo
 
 namespace ScubaDiver.Rtti;
 
@@ -591,6 +594,7 @@ static class ProcessModuleExtensions
     }
 }
 
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value 0
 [StructLayout(LayoutKind.Sequential)]
 struct IMAGE_DOS_HEADER
 {
@@ -685,8 +689,9 @@ struct IMAGE_SECTION_HEADER
     public uint SizeOfRawData;
     public uint PointerToRawData;
     public uint PointerToRelocations;
-    public uint PointerToLinenumbers;
+    public uint PointerToLineNumbers;
     public ushort NumberOfRelocations;
-    public ushort NumberOfLinenumbers;
+    public ushort NumberOfLineNumbers;
     public uint Characteristics;
 }
+#pragma warning restore CS0649 // Field 'IMAGE_DATA_DIRECTORY.Size' is never assigned to, and will always have its default value 0

@@ -72,7 +72,7 @@ public class Program
         client.GetStream().Flush();
     }
 
-    static async Task Main(string[] args)
+    static void Main(string[] args)
     {
         Console.WriteLine("                __/___            ");
         Console.WriteLine("          _____/______|           ");

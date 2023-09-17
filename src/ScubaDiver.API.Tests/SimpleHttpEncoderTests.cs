@@ -90,7 +90,7 @@ namespace ScubaDiver.API.Tests
                 {
                     ["param"] = "value"
                 },
-                Body = null
+                Body = Array.Empty<byte>()
             };
 
             // Act

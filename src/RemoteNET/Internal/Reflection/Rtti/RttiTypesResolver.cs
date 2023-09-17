@@ -26,7 +26,7 @@ public class RttiTypesResolver
         _cache[new Tuple<string, string>(assemblyName, typeFullName)] = type;
     }
 
-    public Type? Resolve(string assemblyName, string typeFullName)
+    public Type Resolve(string assemblyName, string typeFullName)
     {
         // Start by searching cache
         if (_cache.TryGetValue(new Tuple<string, string>(assemblyName, typeFullName), out Type resolvedType))
@@ -40,7 +40,7 @@ public class RttiTypesResolver
         // Filter assemblies but avoid filtering for "mscorlib" because it's the devil
         if (assemblyName?.Equals("mscorlib") == false)
         {
-            assemblies = assemblies.Where(assm => assm.FullName.Contains(assemblyName ?? ""));
+            assemblies = assemblies.Where(assembly => assembly.FullName.Contains(assemblyName ?? ""));
         }
         foreach (Assembly assembly in assemblies)
         {

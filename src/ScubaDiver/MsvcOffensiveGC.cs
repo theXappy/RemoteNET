@@ -12,9 +12,9 @@ namespace ScubaDiver
     {
         // From https://github.com/gperftools/gperftools/issues/715
         // [x64] operator new(ulong size)
-        private string kMangledNew64 = "??2@YAPEAX_K@Z";
+        //private string kMangledNew64 = "??2@YAPEAX_K@Z";
         // [x64] operator new(ulong size, struct std::nothrow_t const &obj)
-        private string kMangledNewNothrow64 = "??2@YAPEAX_KAEBUnothrow_t@std@@@z";
+        //private string kMangledNewNothrow64 = "??2@YAPEAX_KAEBUnothrow_t@std@@@z";
 
         private string operatorNewName = "operator new";
 
@@ -168,9 +168,9 @@ namespace ScubaDiver
             }
 
             Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new's. attempted to hook: {attemptedOperatorNews} funcs");
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new' s. attempted to hook: {attemptedOperatorNews} funcs");
             Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new's.. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new' s. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
 
         private static HashSet<string> _alreadyHookedDecorated = new HashSet<string>();
@@ -261,20 +261,18 @@ namespace ScubaDiver
         private void HookAutoClassInit2Funcs(Dictionary<long, UndecoratedFunction> initMethods)
         {
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] HookAutoClassInit2Funcs DISABLED!");
-            return;
-
 
             // Hook all __autoclassinit2
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2. Count: {initMethods.Count}");
-            foreach (var kvp in initMethods)
-            {
-                UndecoratedFunction autoClassInit2 = kvp.Value;
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedFullName}");
-                DetoursNetWrapper.Instance.AddHook(kvp.Value, UnifiedAutoClassInit2);
-            }
+            //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2. Count: {initMethods.Count}");
+            //foreach (var kvp in initMethods)
+            //{
+            //    UndecoratedFunction autoClassInit2 = kvp.Value;
+            //    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedFullName}");
+            //    DetoursNetWrapper.Instance.AddHook(kvp.Value, UnifiedAutoClassInit2);
+            //}
 
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+            //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
+            //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
 
 
@@ -282,9 +280,9 @@ namespace ScubaDiver
         // | Ctors Hooking |
         // +---------------+
 
-        public static bool UnifiedCtor(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overridenReturnValue)
+        public static bool UnifiedCtor(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overriddenReturnValue)
         {
-            overridenReturnValue = 0;
+            overriddenReturnValue = 0;
 
             object first = args.FirstOrDefault();
             if (first is nuint self)
@@ -297,9 +295,9 @@ namespace ScubaDiver
             }
             return false; // Skip original
         }
-        public static bool UnifiedDtor(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overridenReturnValue)
+        public static bool UnifiedDtor(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overriddenReturnValue)
         {
-            overridenReturnValue = 0;
+            overriddenReturnValue = 0;
 
             object first = args.FirstOrDefault();
             if (first is nuint self)
@@ -318,9 +316,9 @@ namespace ScubaDiver
         // | __autoclassinit2 Hooking |
         // +--------------------------+
 
-        public static bool UnifiedAutoClassInit2(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overridenReturnValue)
+        public static bool UnifiedAutoClassInit2(DetoursMethodGenerator.DetoursTrampoline secret, object[] args, out nuint overriddenReturnValue)
         {
-            overridenReturnValue = 0;
+            overriddenReturnValue = 0;
 
             Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}");
             object first = args.FirstOrDefault();
@@ -338,9 +336,9 @@ namespace ScubaDiver
 
         private delegate nuint OperatorNewType(nuint size);
 
-        public static bool UnifiedOperatorNew(DetoursMethodGenerator.DetoursTrampoline trampoline, object[] args, out nuint overridenReturnValue)
+        public static bool UnifiedOperatorNew(DetoursMethodGenerator.DetoursTrampoline trampoline, object[] args, out nuint overriddenReturnValue)
         {
-            overridenReturnValue = 0;
+            overriddenReturnValue = 0;
 
             //Console.WriteLine($"[UnifiedOperatorNew] Secret: {secret}, Args: {args.Length}");
             object first = args.FirstOrDefault();
@@ -350,9 +348,9 @@ namespace ScubaDiver
                 OperatorNewType opNew = trampoline.GetRealMethod<OperatorNewType>();
 
                 // Invoking original ctor
-                overridenReturnValue = opNew(size);
-                if(overridenReturnValue != 0)
-                    RegisterSize(overridenReturnValue, size);
+                overriddenReturnValue = opNew(size);
+                if(overriddenReturnValue != 0)
+                    RegisterSize(overriddenReturnValue, size);
                 return true; // Skip original method
             }
             else
@@ -367,41 +365,41 @@ namespace ScubaDiver
         // +---------------------------+
         // | Class Sizes Match  Making |
         // +---------------------------+
-        private static LRUCache<nuint, nuint> _addrToSize = new LRUCache<nuint, nuint>(100);
-        private static object _addrToSizeLock = new();
-        private static Dictionary<string, nuint> ClassSizes = new Dictionary<string, nuint>();
-        private static object ClassSizesLock = new();
-        public IReadOnlyDictionary<string, nuint> GetFindings() => ClassSizes;
+        private static readonly LRUCache<nuint, nuint> _addressToSize = new LRUCache<nuint, nuint>(100);
+        private static readonly object _addressToSizeLock = new();
+        private static readonly Dictionary<string, nuint> _classSizes = new Dictionary<string, nuint>();
+        private static readonly object ClassSizesLock = new();
+        public IReadOnlyDictionary<string, nuint> GetFindings() => _classSizes;
 
-        public static void RegisterSize(nuint addr, nuint size)
+        public static void RegisterSize(nuint address, nuint size)
         {
-            lock (_addrToSizeLock)
+            lock (_addressToSizeLock)
             {
-                _addrToSize.AddOrUpdate(addr, size);
+                _addressToSize.AddOrUpdate(address, size);
             }
         }
 
-        public static void RegisterClassName(nuint addr, string className)
+        public static void RegisterClassName(nuint address, string className)
         {
             // Check if we already found the size of this class
             lock (ClassSizesLock)
             {
-                if (ClassSizes.ContainsKey(className))
+                if (_classSizes.ContainsKey(className))
                     return;
             }
 
             // Check recent "allocations"
             bool res;
             nuint size;
-            lock (_addrToSizeLock)
+            lock (_addressToSizeLock)
             {
-                res = _addrToSize.TryGetValue(addr, true, out size);
+                res = _addressToSize.TryGetValue(address, true, out size);
             }
 
             if (res)
             {
                 // Found a match!
-                ClassSizes[className] = size;
+                _classSizes[className] = size;
                 Logger.Debug($"[MsvcOffensiveGC][MatchMaking] Found size of class. Name: {className}, Size: {size} bytes");
             }
         }
@@ -466,7 +464,7 @@ namespace ScubaDiver
             }
 
             // If the key is not found in the cache, return default value for TValue
-            value = default(TValue);
+            value = default;
             return false;
         }
 
