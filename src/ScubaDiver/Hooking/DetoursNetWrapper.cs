@@ -106,6 +106,6 @@ public class DetoursNetWrapper
             return (nuint)res;
 
         // Could be a void-returning method. I hope this doesn't break anything.
-        return (nuint)0x0BBB_BBBB_BBAD_C0DE;
+        return (nuint)0xBBAD_C0DE;
     }
 }

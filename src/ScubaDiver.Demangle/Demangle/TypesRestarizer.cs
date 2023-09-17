@@ -9,8 +9,8 @@ namespace ScubaDiver.Demangle.Demangle
         private class TestSerializedTypeRenderer : ISerializedTypeVisitor<StringBuilder>
         {
             private StringBuilder sb;
-            private string name;
-            private string modifier;
+            private string? name;
+            private string? modifier;
 
             public TestSerializedTypeRenderer(StringBuilder sb)
             {

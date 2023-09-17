@@ -24,7 +24,7 @@ public class SimpleHttpProtocolParserTests
         string parsedRequest = Encoding.ASCII.GetString(outputData);
         string expectedRequest = "GET /example HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, World!";
 
-        Assert.AreEqual(expectedRequest, parsedRequest);
+        Assert.That(expectedRequest, Is.EqualTo(parsedRequest));
     }
 
 
@@ -47,7 +47,7 @@ public class SimpleHttpProtocolParserTests
         string parsedRequest = Encoding.ASCII.GetString(outputData);
         string expectedRequest = "GET /example HTTP/1.1\r\nContent-Length: 13\r\n\r\nHello, World!";
 
-        Assert.AreEqual(expectedRequest, parsedRequest);
+        Assert.That(expectedRequest, Is.EqualTo(parsedRequest));
     }
 
     [Test]
@@ -71,14 +71,14 @@ public class SimpleHttpProtocolParserTests
         byte[] outputData = output1.ToArray();
         string parsedRequest1 = Encoding.ASCII.GetString(outputData);
         string expectedRequest1 = "GET /first HTTP/1.1\r\nContent-Length: 8\r\n\r\nRequest1";
-        Assert.AreEqual(expectedRequest1, parsedRequest1);
+        Assert.That(expectedRequest1, Is.EqualTo(parsedRequest1));
 
         // Assert Request 2
         output2.Seek(0, SeekOrigin.Begin);
         outputData = output2.ToArray();
         string parsedRequest2 = Encoding.ASCII.GetString(outputData);
         string expectedRequest2 = "POST /second HTTP/1.1\r\nContent-Length: 8\r\n\r\nRequest2";
-        Assert.AreEqual(expectedRequest2, parsedRequest2);
+        Assert.That(expectedRequest2, Is.EqualTo(parsedRequest2));
     }
 
     [Test]

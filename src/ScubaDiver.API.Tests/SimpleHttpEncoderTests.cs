@@ -25,11 +25,11 @@ namespace ScubaDiver.API.Tests
             int consumedBytes = SimpleHttpEncoder.TryParseHttpRequest(requestData, out HttpRequestSummary summary);
 
             // Assert
-            Assert.AreEqual(true, consumedBytes > 0);
-            Assert.AreEqual("GET", summary.Method);
-            Assert.AreEqual("/path/to/resource", summary.Url);
-            Assert.AreEqual(1, summary.QueryString.Count);
-            Assert.AreEqual("value", summary.QueryString["param"]);
+            Assert.That(consumedBytes, Is.GreaterThan(0));
+            Assert.That(summary.Method, Is.EqualTo("GET"));
+            Assert.That(summary.Url, Is.EqualTo("/path/to/resource"));
+            Assert.That(summary.QueryString.Count, Is.EqualTo(1));
+            Assert.That(summary.QueryString["param"], Is.EqualTo("value"));
             CollectionAssert.AreEqual(new byte[] { 48, 49, 50, 51, 52, 53, 54, 55, 56, 57 }, summary.Body);
         }
         [Test]
@@ -47,12 +47,12 @@ namespace ScubaDiver.API.Tests
             int consumedBytes = SimpleHttpEncoder.TryParseHttpRequest(requestData, out HttpRequestSummary summary);
 
             // Assert
-            Assert.AreEqual(true, consumedBytes > 0);
-            Assert.AreEqual("GET", summary.Method);
-            Assert.AreEqual("/path/to/resource", summary.Url);
-            Assert.AreEqual(2, summary.QueryString.Count);
-            Assert.AreEqual("value", summary.QueryString["param"]);
-            Assert.AreEqual("lol", summary.QueryString["param2"]);
+            Assert.That(consumedBytes > 0, Is.True);
+            Assert.That(summary.Method, Is.EqualTo("GET"));
+            Assert.That(summary.Url, Is.EqualTo("/path/to/resource"));
+            Assert.That(summary.QueryString.Count, Is.EqualTo(2));
+            Assert.That(summary.QueryString["param"], Is.EqualTo("value"));
+            Assert.That(summary.QueryString["param2"], Is.EqualTo("lol"));
             CollectionAssert.AreEqual(new byte[] { 48, 49, 50, 51, 52, 53, 54, 55, 56, 57 }, summary.Body);
         }
 
@@ -71,10 +71,10 @@ namespace ScubaDiver.API.Tests
             int consumedBytes = SimpleHttpEncoder.TryParseHttpRequest(requestData, out HttpRequestSummary summary);
 
             // Assert
-            Assert.AreEqual(true, consumedBytes > 0);
-            Assert.AreEqual("POST", summary.Method);
-            Assert.AreEqual("/api/data", summary.Url);
-            Assert.AreEqual(0, summary.QueryString.Count);
+            Assert.That(consumedBytes > 0, Is.True);
+            Assert.That(summary.Method, Is.EqualTo("POST"));
+            Assert.That(summary.Url, Is.EqualTo("/api/data"));
+            Assert.That(summary.QueryString.Count, Is.EqualTo(0));
             CollectionAssert.AreEqual(System.Text.Encoding.UTF8.GetBytes("Hello, world!"), summary.Body);
         }
 
@@ -101,9 +101,9 @@ namespace ScubaDiver.API.Tests
             int consumedBytes = SimpleHttpEncoder.TryParseHttpRequest(encodedBytes, out decodedSummary);
 
             // Assert
-            Assert.AreEqual(encodedBytes.Length, consumedBytes);
-            Assert.AreEqual(inputSummary.Method, decodedSummary.Method);
-            Assert.AreEqual(inputSummary.Url, decodedSummary.Url);
+            Assert.That(encodedBytes.Length, Is.EqualTo(consumedBytes));
+            Assert.That(inputSummary.Method, Is.EqualTo(decodedSummary.Method));
+            Assert.That(inputSummary.Url, Is.EqualTo(decodedSummary.Url));
             CollectionAssert.AreEqual(inputSummary.QueryString, decodedSummary.QueryString);
             CollectionAssert.AreEqual(Array.Empty<byte>(), decodedSummary.Body);
         }
@@ -138,10 +138,10 @@ namespace ScubaDiver.API.Tests
 
             // Assert
             Assert.IsTrue(encodeResult, "Encoding failed");
-            Assert.AreEqual(encodedBytes.Length, consumedBytes, "Unexpected consumed bytes");
-            Assert.AreEqual(inputSummary.Method, decodedSummary.Method);
-            Assert.AreEqual(inputSummary.Url, decodedSummary.Url);
-            Assert.AreEqual(inputSummary.QueryString, decodedSummary.QueryString);
+            Assert.That(encodedBytes.Length, Is.EqualTo(consumedBytes), "Unexpected consumed bytes");
+            Assert.That(inputSummary.Method, Is.EqualTo(decodedSummary.Method));
+            Assert.That(inputSummary.Url, Is.EqualTo(decodedSummary.Url));
+            Assert.That(inputSummary.QueryString, Is.EqualTo(decodedSummary.QueryString));
             CollectionAssert.AreEqual(inputSummary.Body, decodedSummary.Body);
         }
         // 
@@ -160,9 +160,9 @@ namespace ScubaDiver.API.Tests
             int consumedBytes = SimpleHttpEncoder.TryParseHttpResponse(requestData, out HttpResponseSummary summary);
 
             // Assert
-            Assert.AreEqual(true, consumedBytes > 0);
-            Assert.AreEqual(HttpStatusCode.OK, summary.StatusCode);
-            Assert.AreEqual("application/json", summary.ContentType);
+            Assert.That(consumedBytes > 0, Is.True);
+            Assert.That(summary.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(summary.ContentType, Is.EqualTo("application/json"));
             CollectionAssert.AreEqual(System.Text.Encoding.UTF8.GetBytes("{\"status\":\"OK\"}"), summary.Body);
         }
 
