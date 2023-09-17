@@ -16,6 +16,12 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 
         public const string JsonMimeType = "application/json";
 
+        public string RequestId
+        {
+            get => OtherHeaders["requestId"];
+            set => OtherHeaders["requestId"] = value;
+        }
+
 
         public static HttpResponseSummary FromJson(HttpStatusCode statusCode, string json, Dictionary<string, string>? otherHeaders = null)
         {
