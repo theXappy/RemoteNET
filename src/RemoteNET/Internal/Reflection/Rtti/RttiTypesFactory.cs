@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Reflection;
 using RemoteNET.Common;
 using RemoteNET.Internal.Reflection;
+using RemoteNET.Internal.Reflection.DotNet;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 
@@ -134,12 +135,16 @@ namespace RemoteNET.RttiReflection
         {
             AddGroupOfFunctions(app, typeDump, typeDump.Methods, output, areConstructors: false);
             AddGroupOfFunctions(app, typeDump, typeDump.Constructors, output, areConstructors: true);
-            //AddFields(app, managedTypeDump, output);
+            AddFields(app, typeDump.Fields, output);
         }
 
-        private void AddFields(RemoteApp app, TypeDump typeDump, RemoteRttiType output)
+        private void AddFields(RemoteApp app, List<TypeDump.TypeField> typeDumpFields, RemoteRttiType output)
         {
-            throw new NotImplementedException();
+            foreach (TypeDump.TypeField typeDumpField in typeDumpFields)
+            {
+                var fi = new RemoteFieldInfo(output, typeof(nuint), typeDumpField.Name);
+                output.AddField(fi);
+            }
         }
 
         private void AddGroupOfFunctions(RemoteApp app, TypeDump typeDump, List<TypeDump.TypeMethod> functions, RemoteRttiType declaringType, bool areConstructors)
@@ -147,7 +152,7 @@ namespace RemoteNET.RttiReflection
             foreach (TypeDump.TypeMethod func in functions)
             {
                 string? mangledName = func.DecoratedName;
-                if(string.IsNullOrEmpty(mangledName))
+                if (string.IsNullOrEmpty(mangledName))
                     mangledName = func.Name;
 
                 List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);

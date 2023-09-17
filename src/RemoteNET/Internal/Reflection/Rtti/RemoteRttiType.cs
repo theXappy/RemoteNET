@@ -19,8 +19,9 @@ namespace RemoteNET.RttiReflection
         public override string Name => _name;
         public override string FullName => $"{_assembly}!{_fullName}";
 
-        private List<MethodInfo> _methods = new List<MethodInfo>();
-        private List<ConstructorInfo> _ctors = new List<ConstructorInfo>();
+        private List<FieldInfo> _fields = new();
+        private List<MethodInfo> _methods = new();
+        private List<ConstructorInfo> _ctors = new();
         private Lazy<Type> _parent;
         public override Type BaseType => _parent?.Value;
         public RemoteApp App { get; set; }
@@ -62,6 +63,7 @@ namespace RemoteNET.RttiReflection
 
         public void AddConstructor(ConstructorInfo ci) => _ctors.Add(ci);
         public void AddMethod(MethodInfo mi) => _methods.Add(mi);
+        public void AddField(FieldInfo fi) => _fields.Add(fi);
         public void AddUnresolvedMember(string member) => UnresolvedMembers.Add(member);
 
         public override object[] GetCustomAttributes(bool inherit)
@@ -121,8 +123,7 @@ namespace RemoteNET.RttiReflection
 
         public override FieldInfo[] GetFields(BindingFlags bindingAttr)
         {
-            // Fields Not Supported
-            return Array.Empty<FieldInfo>();
+            return _fields.ToArray();
         }
 
         public override MemberInfo[] GetMembers(BindingFlags bindingAttr) => GetMembersInner(bindingAttr).ToArray();

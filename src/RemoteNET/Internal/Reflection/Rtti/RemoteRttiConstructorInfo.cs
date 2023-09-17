@@ -7,8 +7,12 @@ using RemoteNET.RttiReflection;
 
 namespace RemoteNET.Internal.Reflection;
 
-public class RemoteRttiConstructorInfo : ConstructorInfo
+public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
 {
+    public LazyRemoteTypeResolver LazyRetType => new LazyRemoteTypeResolver(typeof(void));
+    protected ParameterInfo[] _lazyParamInfosImpl;
+    public ParameterInfo[] LazyParamInfos => _lazyParamInfosImpl;
+
     public override MethodAttributes Attributes => throw new NotImplementedException();
 
     public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
@@ -19,13 +23,12 @@ public class RemoteRttiConstructorInfo : ConstructorInfo
 
     public override Type ReflectedType => throw new NotImplementedException();
 
-    private readonly ParameterInfo[] _paramInfos;
     private RemoteApp App => (DeclaringType as RemoteRttiType)?.App;
 
     public RemoteRttiConstructorInfo(Type declaringType, ParameterInfo[] paramInfos)
     {
         DeclaringType = declaringType;
-        _paramInfos = paramInfos;
+        _lazyParamInfosImpl = paramInfos;
     }
 
     public RemoteRttiConstructorInfo(RemoteRttiType declaringType, ConstructorInfo ci) :
@@ -52,7 +55,7 @@ public class RemoteRttiConstructorInfo : ConstructorInfo
     public override ParameterInfo[] GetParameters()
     {
         // Skipping 'this'
-        return _paramInfos.Skip(1).ToArray();
+        return _lazyParamInfosImpl.Skip(1).ToArray();
     }
 
     public override object Invoke(BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
@@ -73,7 +76,7 @@ public class RemoteRttiConstructorInfo : ConstructorInfo
 
     public override string ToString()
     {
-        string args = string.Join(", ", _paramInfos.Select(pi => pi.ParameterType.FullName));
+        string args = string.Join(", ", _lazyParamInfosImpl.Select(pi => pi.ParameterType.FullName));
         return $"Void {this.Name}({args})";
     }
 }
