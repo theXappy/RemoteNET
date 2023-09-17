@@ -73,13 +73,7 @@ public class TricksterWrapper
         if (!modulesAndTypes.Any(m => moduleNameFilter(m.Key.Name)))
         {
             // No modules pass the filter... Try again after a refresh.
-            Logger.Debug("[GetUndecoratedModules] [~-~-~-~-~-~->>>>] Hopefully rare refresh flow hit !");
-            Logger.Debug("[GetUndecoratedModules] [~-~-~-~-~-~->>>>] Existing:");
-            foreach (var key in modulesAndTypes.Keys.OrderBy(mi => mi.Name))
-            {
-                Logger.Debug($"[GetUndecoratedModules] [~-~-~-~-~-~->>>>] *** {key.Name}");
-            }
-            Logger.Debug("[GetUndecoratedModules] [~-~-~-~-~-~->>>>] =========");
+            Logger.Debug("[GetUndecoratedModules] Hopefully rare refresh flow hit.");
             Refresh();
             modulesAndTypes = GetDecoratedTypes();
         }
@@ -95,7 +89,6 @@ public class TricksterWrapper
             // Check in the cache if we already processed this module
             if (!_undecModeulesCache.TryGetValue(module.Name, out UndecoratedModule undecModule))
             {
-                Logger.Debug($"[GetUndecoratedModules] Module {module.Name} is not in cache (Cache size: {_undecModeulesCache.Count})");
                 // Unprocessed module. Processing now...
                 // Generate the undecorated module and save in cache
                 undecModule = GenerateUndecoratedModule(module, kvp.Value);
