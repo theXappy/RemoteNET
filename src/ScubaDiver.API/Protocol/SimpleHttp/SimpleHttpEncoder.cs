@@ -44,7 +44,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 }
 
                 string url = urlAndQuery.Substring(0, urlEnd);
-                NameValueCollection queryString = HttpUtility.ParseQueryString(new Uri("http://fake.com/"+urlAndQuery, UriKind.Absolute).Query);
+                NameValueCollection queryString = HttpUtility.ParseQueryString(new Uri("http://fake.com/" + urlAndQuery, UriKind.Absolute).Query);
 
                 int headersEnd = request.IndexOf("\r\n\r\n", firstLineEnd);
                 if (headersEnd == -1)
@@ -58,7 +58,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 if (contentLengthIndex != -1)
                 {
                     int valueStart = contentLengthIndex + "Content-Length:".Length;
-                    int valueEnd = request.IndexOf('\r', valueStart, (headersEnd+1) - valueStart);
+                    int valueEnd = request.IndexOf('\r', valueStart, (headersEnd + 1) - valueStart);
                     if (valueEnd == -1 || !int.TryParse(request.Substring(valueStart, valueEnd - valueStart).Trim(),
                             out contentLength))
                     {
@@ -82,10 +82,9 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                     QueryString = queryString,
                     Body = body
                 };
-
                 return bodyStart + contentLength;
             }
-            catch
+            catch(Exception ex )
             {
                 return 0;
             }
@@ -224,7 +223,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 {
                     return 0;
                 }
-                
+
                 // Extract headers and find Content-Type
                 string headers = response.Substring(firstLineEnd + 2, headersEnd - (firstLineEnd + 2));
                 string[] headerLines = headers.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
@@ -254,7 +253,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 if (contentLengthIndex != -1)
                 {
                     int valueStart = contentLengthIndex + "Content-Length:".Length;
-                    int valueEnd = response.IndexOf('\r', valueStart, (headersEnd+1) - valueStart);
+                    int valueEnd = response.IndexOf('\r', valueStart, (headersEnd + 1) - valueStart);
                     if (valueEnd == -1 || !int.TryParse(response.Substring(valueStart, valueEnd - valueStart).Trim(),
                             out contentLength))
                     {

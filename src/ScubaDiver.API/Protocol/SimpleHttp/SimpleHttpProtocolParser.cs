@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 
@@ -8,53 +9,51 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 {
     public class SimpleHttpProtocolParser
     {
-        public static HttpRequestSummary ReadRequest(TcpClient client) => Read<HttpRequestSummary>(client);
-        public static HttpResponseSummary ReadResponse(TcpClient client) => Read<HttpResponseSummary>(client);
+        public static HttpRequestSummary? ReadRequest(TcpClient client) => Read<HttpRequestSummary>(client);
+        public static HttpResponseSummary? ReadResponse(TcpClient client) => Read<HttpResponseSummary>(client);
 
         public static T Read<T>(TcpClient client)
         {
             object res;
             NetworkStream networkStream = client.GetStream();
+            MemoryStream memoryStream = new MemoryStream();
+
+            ReadHttpMessageFromStream(networkStream, memoryStream);
+            byte[] requestData = memoryStream.ToArray();
+
+            int numConsumed;
+            if (typeof(T) == typeof(HttpRequestSummary))
             {
-                MemoryStream memoryStream = new MemoryStream();
-                ReadHttpMessageFromStream(networkStream, memoryStream);
-
-                byte[] requestData = memoryStream.ToArray();
-
-                int numConsumed;
-                if (typeof(T) == typeof(HttpRequestSummary))
-                {
-                    numConsumed = SimpleHttpEncoder.TryParseHttpRequest(requestData, out HttpRequestSummary summary);
-                    res = summary;
-                }
-                else if (typeof(T) == typeof(HttpResponseSummary))
-                {
-                    numConsumed = SimpleHttpEncoder.TryParseHttpResponse(requestData, out HttpResponseSummary summary);
-                    res = summary;
-                }
-                else
-                {
-                    throw new NotSupportedException(
-                        $"{nameof(SimpleHttpProtocolParser)} only supports reading {nameof(HttpRequestSummary)} or {nameof(HttpResponseSummary)}");
-                }
-
-                if (numConsumed == 0)
-                {
-                    string request;
-                    try
-                    {
-                        request = Encoding.UTF8.GetString(requestData);
-                    }
-                    catch (Exception ex)
-                    {
-                        request = $"**Error decoding request: {ex}**";
-                    }
-
-                    throw new Exception($"SimpleHttpEncoder failed to parse request. Request: '{request}'");
-                }
-
-                return (T)res;
+                numConsumed = SimpleHttpEncoder.TryParseHttpRequest(requestData, out HttpRequestSummary summary);
+                res = summary;
             }
+            else if (typeof(T) == typeof(HttpResponseSummary))
+            {
+                numConsumed = SimpleHttpEncoder.TryParseHttpResponse(requestData, out HttpResponseSummary summary);
+                res = summary;
+            }
+            else
+            {
+                throw new NotSupportedException(
+                    $"{nameof(SimpleHttpProtocolParser)} only supports reading {nameof(HttpRequestSummary)} or {nameof(HttpResponseSummary)}");
+            }
+
+            if (numConsumed == 0)
+            {
+                string request;
+                try
+                {
+                    request = Encoding.UTF8.GetString(requestData);
+                }
+                catch (Exception ex)
+                {
+                    request = $"**Error decoding request: {ex}**";
+                }
+
+                throw new Exception($"SimpleHttpEncoder failed to parse request. Request: '{request}'");
+            }
+
+            return (T)res;
         }
 
         public static void ReadHttpMessageFromStream(Stream input, MemoryStream output)
