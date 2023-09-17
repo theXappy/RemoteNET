@@ -289,15 +289,8 @@ namespace ScubaDiver
             string assemblyFilter = req.QueryString.Get("assembly");
             Predicate<string> assmFilter = Filter.CreatePredicate(assemblyFilter);
 
-            Logger.Debug($"[MakeTypesResponse] Calling GetUndecoratedModules for assembly filter: {assemblyFilter}     <<<<<<-------------------------");
-            Stopwatch sw = Stopwatch.StartNew();
             List<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules(assmFilter).ToList();
-            sw.Stop();
-            Logger.Debug($"[MakeTypesResponse] Calling GetUndecoratedModules for assembly filter: {assemblyFilter} finished. Took {sw.ElapsedMilliseconds} ms");
-
-            Logger.Debug($"[MakeTypesResponse] Starting rest of method... ");
-            sw = Stopwatch.StartNew();
-            List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
+            List<TypesDump.TypeIdentifiers> types = new();
             if (matchingAssemblies.Count == 0)
             {
                 return QuickError($"No modules matched the filter '{assemblyFilter}'");
@@ -324,8 +317,6 @@ namespace ScubaDiver
                 Types = types
             };
 
-            sw.Stop();
-            Logger.Debug($"[MakeTypesResponse] Finished rest of method. Took {sw.ElapsedMilliseconds} ms");
             return JsonConvert.SerializeObject(dump);
         }
 
@@ -372,13 +363,8 @@ namespace ScubaDiver
         private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
             Logger.Debug($"[GetTypeDump] Querying for rawAssemblyFilter: {rawAssemblyFilter}, rawTypeFilter: {rawTypeFilter}");
-            Stopwatch sw = Stopwatch.StartNew();
             var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
-            sw.Stop();
-            Logger.Debug($"[GetTypeDump] Finished Querying for rawAssemblyFilter: {rawAssemblyFilter}, rawTypeFilter: {rawTypeFilter}, took {sw.ElapsedMilliseconds} ms");
 
-            Logger.Debug($"[GetTypeDump] Creating TypeDump...]");
-            sw = Stopwatch.StartNew();
             foreach (KeyValuePair<ModuleInfo, IEnumerable<TypeInfo>> moduleAndTypes in modulesAndTypes)
             {
                 ModuleInfo module = moduleAndTypes.Key;
@@ -404,7 +390,6 @@ namespace ScubaDiver
                             if (exists)
                                 continue;
 
-                            Logger.Debug($"[GetManagedTypeDump] Found new method for type {typeInfo.Name}, Method Name: {virtualFunction.UndecoratedFullName}");
                             methods.Add(virtualFunction);
                         }
                     }
@@ -417,8 +402,6 @@ namespace ScubaDiver
                         Constructors = constructors,
                         Fields = fields
                     };
-                    sw.Stop();
-                    Logger.Debug($"[GetTypeDump] Creating TypeDump finished. Took {sw.ElapsedMilliseconds} ms]");
                     return recusiveTypeDump;
                 }
             }
