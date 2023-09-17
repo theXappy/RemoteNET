@@ -140,6 +140,16 @@ namespace RemoteNET
             return remoteObject;
         }
 
+        public override RemoteObject GetRemoteObject(ObjectOrRemoteAddress oora)
+        {
+            if (oora.Type == typeof(CharStar).FullName)
+            {
+                return new RemoteCharStar(oora.RemoteAddress, oora.EncodedObject);
+            }
+
+            return GetRemoteObject(oora.RemoteAddress, oora.Type);
+        }
+
         //
         // Inject assemblies
         //

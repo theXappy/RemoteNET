@@ -116,7 +116,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
             else
             {
-                ManagedRemoteObject ro = app.GetRemoteObject(oora.RemoteAddress, oora.Type);
+                ManagedRemoteObject ro = app.GetRemoteObject(oora) as ManagedRemoteObject;
                 return ro.Dynamify();
             }
         }

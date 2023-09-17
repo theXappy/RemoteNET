@@ -47,7 +47,7 @@ namespace RemoteNET
             InvocationResults invoRes = _communicator.CreateObject(typeFullName, remoteParams);
 
             // Get proxy object
-            var remoteObject = _app.GetRemoteObject(invoRes.ReturnedObjectOrAddress.RemoteAddress, invoRes.ReturnedObjectOrAddress.Type);
+            var remoteObject = _app.GetRemoteObject(invoRes.ReturnedObjectOrAddress) as ManagedRemoteObject;
             return remoteObject;
         }
 
