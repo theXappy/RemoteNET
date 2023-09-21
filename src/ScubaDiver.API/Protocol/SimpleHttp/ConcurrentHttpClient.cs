@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Threading;
@@ -43,7 +43,18 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
         {
             while (true)
             {
-                var resp = SimpleHttpProtocolParser.Read<HttpResponseSummary>(_client);
+                HttpResponseSummary resp = null;
+                try
+                {
+                    resp = SimpleHttpProtocolParser.Read<HttpResponseSummary>(_client);
+                }
+                catch
+                {
+                    break;
+                }
+                if (resp == null)
+                    break;
+
                 if (!resp.OtherHeaders.TryGetValue("requestId", out string id))
                 {
                     throw new Exception("Responses reader: No request ID found in HTTP response! Response: " + resp);
