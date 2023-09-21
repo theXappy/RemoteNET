@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
@@ -506,7 +506,16 @@ namespace ScubaDiver.API
 
         public void Dispose()
         {
-            _httpClient.Dispose();
+            if (_httpClient != null)
+            {
+                try
+                {
+                    _httpClient.Dispose();
+                }
+                catch
+                {
+                }
+            }
         }
     }
 }
