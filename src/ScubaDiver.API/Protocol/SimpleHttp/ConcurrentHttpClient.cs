@@ -102,6 +102,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 _netStream.Dispose();
                 _reader.Dispose();
                 _writer.Dispose();
+                _requests.CompleteAdding();
                 _requests.Dispose();
             }
             catch
