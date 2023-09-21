@@ -100,7 +100,8 @@ namespace ScubaDiver.Tester
             Console.WriteLine("17. Inject dll");
             Console.WriteLine("18. Offensive GC");
             Console.WriteLine("19. Allocate-Write-Read buffer");
-            Console.WriteLine("20. Exit");
+            Console.WriteLine("20. Dump Managed Type Info");
+            Console.WriteLine("21. Exit");
             string input = Console.ReadLine();
             uint index;
             if (int.TryParse(input, out int userChoice))
@@ -503,6 +504,28 @@ namespace ScubaDiver.Tester
                         break;
                     }
                     case 20:
+                    {
+                        Console.WriteLine("Enter managed type name:");
+                        string typeName = Console.ReadLine().Trim();
+                        if (string.IsNullOrWhiteSpace(typeName))
+                        {
+                            // Assuming user wants all types
+                            Console.WriteLine("Can't be null or empty.");
+                            break;
+                        }
+
+                        var res = remoteApp.GetRemoteType(typeName);
+                        Console.WriteLine($"Name: " + res.Name);
+                        Console.WriteLine($"Full Name: " + res.FullName);
+                        Console.WriteLine($"Methods");
+                        foreach (var method in res.GetMethods())
+                        {
+                            Console.WriteLine("Method: " + method);
+                            Console.WriteLine("Method Ret Type: " + method.ReturnType);
+                        }
+                    }
+                        break;
+                    case 21:
                         // Exiting
                         return true;
                 }
