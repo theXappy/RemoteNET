@@ -33,7 +33,7 @@ namespace ScubaDiver.Utils
                 {
                     (bool anyErrors, var candidates) = _parentDiver.GetHeapObjects(heapObjType => heapObjType == typeof(AppDomain).FullName, true);
 
-                    if(anyErrors)
+                    if (anyErrors)
                     {
                         throw new Exception("GetHeapObjects returned anyErrors: True");
                     }
@@ -57,7 +57,7 @@ namespace ScubaDiver.Utils
                 }
 
                 // if we failed to find app domains in the sneaky way, use formal .NET APIs to at least get OUR domain.
-                if(useFallback)
+                if (useFallback)
                     _domains = new[] { AppDomain.CurrentDomain };
             }
             return _domains;
@@ -84,7 +84,7 @@ namespace ScubaDiver.Utils
                 string genericParams = typeFullName.Substring(typeFullName.LastIndexOf('<'));
                 int numOfParams = genericParams.Split(',').Length;
 
-                string nonGenericPart = typeFullName.Substring(0,typeFullName.LastIndexOf('<'));
+                string nonGenericPart = typeFullName.Substring(0, typeFullName.LastIndexOf('<'));
                 // TODO: Does this event work? it turns List<int> and List<string> both to List`1?
                 typeFullName = $"{nonGenericPart}`{numOfParams}";
             }
@@ -111,7 +111,7 @@ namespace ScubaDiver.Utils
             innerTypeName = innerTypeName.Substring(0, innerTypeName.IndexOf(',')).Trim();
 
             Type innerType = ResolveType(innerTypeName);
-            if(innerType == null)
+            if (innerType == null)
                 return null;
 
             Type nullable = typeof(Nullable<>);
