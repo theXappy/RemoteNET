@@ -38,12 +38,28 @@ namespace ScubaDiver.API.Interactions.Dumps
                     FullTypeName = pi.ParameterType.FullName;
                     if (IsGenericParameter &&
                         pi.ParameterType.GenericTypeArguments.Any() &&
+                        FullTypeName != null &&
                         FullTypeName.Contains('`'))
                     {
                         FullTypeName = FullTypeName.Substring(0, FullTypeName.IndexOf('`'));
                         FullTypeName += '<';
                         FullTypeName += String.Join(", ", (object[])pi.ParameterType.GenericTypeArguments);
                         FullTypeName += '>';
+                    }
+                    else if(FullTypeName == null)
+                    {
+                        if (IsGenericParameter &&
+                            pi.ParameterType.GenericTypeArguments.Any() &&
+                            TypeName != null &&
+                            TypeName.Contains('`'))
+                        {
+                            FullTypeName = pi.ParameterType.Namespace;
+                            FullTypeName += '.';
+                            FullTypeName += TypeName.Substring(0, TypeName.IndexOf('`'));
+                            FullTypeName += '<';
+                            FullTypeName += String.Join(", ", (object[])pi.ParameterType.GenericTypeArguments);
+                            FullTypeName += '>';
+                        }
                     }
                     Assembly = pi.ParameterType.Assembly.GetName().Name;
                 }
@@ -102,9 +118,10 @@ namespace ScubaDiver.API.Interactions.Dumps
                         string baseType = methodInfo.ReturnType.Name;
                         if (baseType.Contains('`'))
                             baseType = baseType.Substring(0, baseType.IndexOf('`'));
-                        ReturnTypeFullName ??= baseType + "<" +
+                        string genericizedType = baseType + "<" +
                                                String.Join(", ", (object[])methodInfo.ReturnType.GenericTypeArguments) +
                                                ">";
+                        ReturnTypeFullName = $"{methodInfo.ReturnType.Namespace}.{genericizedType}";
                     }
 
                     ReturnTypeAssembly = methodInfo.ReturnType.Assembly.GetName().Name;
