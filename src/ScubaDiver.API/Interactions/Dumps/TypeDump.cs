@@ -46,7 +46,7 @@ namespace ScubaDiver.API.Interactions.Dumps
                         FullTypeName += String.Join(", ", (object[])pi.ParameterType.GenericTypeArguments);
                         FullTypeName += '>';
                     }
-                    else if(FullTypeName == null)
+                    else if (FullTypeName == null)
                     {
                         if (IsGenericParameter &&
                             pi.ParameterType.GenericTypeArguments.Any() &&
@@ -87,6 +87,7 @@ namespace ScubaDiver.API.Interactions.Dumps
             public List<MethodParameter> Parameters { get; set; }
             public string ReturnTypeAssembly { get; set; }
             public string ReturnTypeName { get; set; }
+            public bool IsReturnTypeGenericParameter { get; set; }
 
             public TypeMethod()
             {
@@ -111,17 +112,29 @@ namespace ScubaDiver.API.Interactions.Dumps
                 Parameters = methodBase.GetParameters().Select(paramInfo => new MethodParameter(paramInfo)).ToList();
                 if (methodBase is MethodInfo methodInfo)
                 {
+                    IsReturnTypeGenericParameter = methodInfo.ReturnType.IsGenericParameter;
                     ReturnTypeName = methodInfo.ReturnType.Name;
                     ReturnTypeFullName = methodInfo.ReturnType.FullName;
                     if (ReturnTypeFullName == null)
                     {
-                        string baseType = methodInfo.ReturnType.Name;
-                        if (baseType.Contains('`'))
-                            baseType = baseType.Substring(0, baseType.IndexOf('`'));
-                        string genericizedType = baseType + "<" +
-                                               String.Join(", ", (object[])methodInfo.ReturnType.GenericTypeArguments) +
-                                               ">";
-                        ReturnTypeFullName = $"{methodInfo.ReturnType.Namespace}.{genericizedType}";
+                        Type retType = methodInfo.ReturnType;
+                        string baseType = retType.Name;
+                        if (retType.IsGenericParameter)
+                        {
+                            // Return type is "T"
+                            ReturnTypeFullName = baseType;
+                        }
+                        else
+                        {
+                            // Return type is List`1
+                            if (baseType.Contains('`'))
+                                baseType = baseType.Substring(0, baseType.IndexOf('`'));
+                            string genericizedType = baseType + "<" +
+                                                     String.Join(", ",
+                                                         (object[])methodInfo.ReturnType.GenericTypeArguments) +
+                                                     ">";
+                            ReturnTypeFullName = $"{methodInfo.ReturnType.Namespace}.{genericizedType}";
+                        }
                     }
 
                     ReturnTypeAssembly = methodInfo.ReturnType.Assembly.GetName().Name;
