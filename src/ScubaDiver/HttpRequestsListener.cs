@@ -181,7 +181,7 @@ public class RnetRequestsListener : IRequestsListener
                 if (!string.IsNullOrWhiteSpace(requestId))
                     headers["requestId"] = requestId;
 
-                var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body);
+                var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body, headers);
                 SimpleHttpProtocolParser.WriteResponse(client, resp);
             }
 
