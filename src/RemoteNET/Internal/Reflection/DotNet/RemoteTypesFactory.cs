@@ -363,7 +363,6 @@ namespace RemoteNET.Internal.Reflection.DotNet
                         return null;
                     }
                 });
-                LazyRemoteTypeResolver resolver = new LazyRemoteTypeResolver(factory, func.ReturnTypeAssembly, func.ReturnTypeFullName, func.ReturnTypeName);
 
                 if (areConstructors)
                 {
@@ -374,10 +373,13 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 else
                 {
                     Type[] genericArgs = func.GenericArgs.Select(arg => new DummyGenericType(arg)).ToArray();
+                    LazyRemoteTypeResolver retTypeResolver = new LazyRemoteTypeResolver(factory, func.ReturnTypeAssembly, func.ReturnTypeFullName, func.ReturnTypeName);
+                    if (func.IsReturnTypeGenericParameter)
+                        retTypeResolver = new LazyRemoteTypeResolver(new DummyGenericType(func.ReturnTypeName));
 
                     // Regular method
                     RemoteMethodInfo methodInfo =
-                        new RemoteMethodInfo(declaringType, resolver, func.Name, genericArgs, parameters.ToArray());
+                        new RemoteMethodInfo(declaringType, retTypeResolver, func.Name, genericArgs, parameters.ToArray());
                     declaringType.AddMethod(methodInfo);
                 }
             }

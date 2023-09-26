@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using RemoteNET.Common;
 
 namespace RemoteNET.Internal.Reflection.DotNet
@@ -91,15 +92,17 @@ namespace RemoteNET.Internal.Reflection.DotNet
 
         public override string ToString()
         {
-            try
+            StringBuilder sb = new StringBuilder();
+            sb.Append($"{_retType.TypeFullName ?? _retType.TypeName} ");
+            sb.Append($"{Name}");
+            if (ContainsGenericParameters)
             {
-                string args = string.Join(", ", _paramInfos.Select(pi => pi.ToString()));
-                return $"{_retType.TypeFullName ?? _retType.TypeName} {Name}({args})";
+                string generics = string.Join(", ", AssignedGenericArgs.Select(argType => argType.ToString()));
+                sb.Append($"<{generics}>");
             }
-            catch (Exception)
-            {
-                throw;
-            }
+            string args = string.Join(", ", _paramInfos.Select(pi => pi.ToString()));
+            sb.Append($"({args})");
+            return sb.ToString();
         }
     }
 }
