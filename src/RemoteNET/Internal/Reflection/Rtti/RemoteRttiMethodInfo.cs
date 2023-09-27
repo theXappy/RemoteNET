@@ -19,7 +19,9 @@ namespace RemoteNET.Internal.Reflection
 
         public override ICustomAttributeProvider ReturnTypeCustomAttributes => throw new NotImplementedException();
         public override string Name { get; }
-        public override Type DeclaringType { get; }
+
+        private LazyRemoteTypeResolver _actualDeclaringType;
+        public override Type DeclaringType => _actualDeclaringType.Value;
         public override Type ReturnType => LazyRetType.Value;
         public override Type ReflectedType => throw new NotImplementedException();
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
@@ -35,29 +37,18 @@ namespace RemoteNET.Internal.Reflection
 
         private RemoteApp App => (DeclaringType as RemoteRttiType)?.App;
 
-        public RemoteRttiMethodInfo(RemoteRttiType declaringType, MethodInfo mi) :
-            this(declaringType,
-                new LazyRemoteTypeResolver(mi.ReturnType),
-                mi.Name,
-                (mi as RemoteRttiMethodInfo)?.MangledName ?? mi.Name,
-                mi.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
-        {
-        }
-        public RemoteRttiMethodInfo(Type declaringType, LazyRemoteTypeResolver returnType, string name, string mangledName, ParameterInfo[] lazyParamInfos)
+
+        public RemoteRttiMethodInfo(LazyRemoteTypeResolver declaringType, LazyRemoteTypeResolver returnType, string name, string mangledName, ParameterInfo[] lazyParamInfos)
         {
             Name = name;
             MangledName = mangledName;
-            DeclaringType = declaringType;
+            _actualDeclaringType = declaringType;
             _lazyParamInfosImpl = lazyParamInfos;
             _lazyRetTypeImpl = returnType;
 
             AssignedGenericArgs = Type.EmptyTypes;
         }
 
-        public RemoteRttiMethodInfo(Type declaringType, Type returnType, string name, ParameterInfo[] paramInfos) :
-            this(declaringType, new LazyRemoteTypeResolver(returnType), name, name, paramInfos)
-        {
-        }
 
         public override MethodInfo MakeGenericMethod(params Type[] typeArguments)
         {

@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RemoteNET\RemoteNET.csproj" />
+    <ProjectReference Include="..\ScubaDiver\project_net6_x64\ScubaDiver_Net6_x64.csproj" />
   </ItemGroup>
 
 </Project>

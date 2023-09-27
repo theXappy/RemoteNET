@@ -133,8 +133,8 @@ namespace RemoteNET.RttiReflection
 
         private void AddMembers(RemoteApp app, TypeDump typeDump, RemoteRttiType output)
         {
-            AddGroupOfFunctions(app, typeDump, typeDump.Methods, output, areConstructors: false);
-            AddGroupOfFunctions(app, typeDump, typeDump.Constructors, output, areConstructors: true);
+            AddGroupOfFunctions(typeDump.Methods, output, areConstructors: false);
+            AddGroupOfFunctions(typeDump.Constructors, output, areConstructors: true);
             AddFields(app, typeDump.Fields, output);
         }
 
@@ -147,61 +147,87 @@ namespace RemoteNET.RttiReflection
             }
         }
 
-        private void AddGroupOfFunctions(RemoteApp app, TypeDump typeDump, List<TypeDump.TypeMethod> functions, RemoteRttiType declaringType, bool areConstructors)
+        private static void AddGroupOfFunctions(List<TypeDump.TypeMethod> functions, RemoteRttiType declaringType, bool areConstructors)
         {
             foreach (TypeDump.TypeMethod func in functions)
             {
-                string mangledName = func.DecoratedName;
-                if (string.IsNullOrEmpty(mangledName))
-                    mangledName = func.Name;
+                AddFunctionImpl(func, declaringType, areConstructors);
+            }
+        }
 
-                List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);
-                int i = 1;
-                foreach (TypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
-                {
-                    string fakeParamName = $"a{i}";
-                    i++;
-                    Lazy<Type> paramFactory = new Lazy<Type>(() =>
-                    {
-                        // TODO: Actual resolve
-                        return new DummyGenericType(restarizedParameter.FullTypeName);
-                    });
-                    LazyRemoteTypeResolver paramTypeResolver = new LazyRemoteTypeResolver(paramFactory,
-                                   //methodParameter.Assembly,
-                                   //methodParameter.FullTypeName,
-                                   //methodParameter.TypeName
-                                   null,
-                                   restarizedParameter.FullTypeName,
-                                   restarizedParameter.FullTypeName
-                                   );
-                    RemoteParameterInfo rpi = new RemoteParameterInfo(fakeParamName, paramTypeResolver);
-                    parameters.Add(rpi);
-                }
+        public static void AddFunctionImpl(TypeDump.TypeMethod func, RemoteRttiType declaringType, bool areConstructors)
+        {
+            string mangledName = func.DecoratedName;
+            if (string.IsNullOrEmpty(mangledName))
+                mangledName = func.Name;
 
-                Lazy<Type> returnTypeFactory = new Lazy<Type>(() =>
+            List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);
+            int i = 1;
+            foreach (TypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
+            {
+                string fakeParamName = $"a{i}";
+                i++;
+                Lazy<Type> paramFactory = new Lazy<Type>(() =>
                 {
                     // TODO: Actual resolve
-                    return new DummyRttiType(func.ReturnTypeFullName ?? func.ReturnTypeName);
+                    return new DummyGenericType(restarizedParameter.FullTypeName);
                 });
-                LazyRemoteTypeResolver returnTypeResolver = new LazyRemoteTypeResolver(returnTypeFactory,
+                LazyRemoteTypeResolver paramTypeResolver = new LazyRemoteTypeResolver(paramFactory,
+                    //methodParameter.Assembly,
+                    //methodParameter.FullTypeName,
+                    //methodParameter.TypeName
                     null,
-                    func.ReturnTypeFullName,
-                    func.ReturnTypeName);
+                    restarizedParameter.FullTypeName,
+                    restarizedParameter.FullTypeName
+                );
+                RemoteParameterInfo rpi = new RemoteParameterInfo(fakeParamName, paramTypeResolver);
+                parameters.Add(rpi);
+            }
 
-                if (areConstructors)
+            Lazy<Type> returnTypeFactory = new Lazy<Type>(() =>
+            {
+                // TODO: Actual resolve
+                return new DummyRttiType(func.ReturnTypeFullName ?? func.ReturnTypeName);
+            });
+            LazyRemoteTypeResolver returnTypeResolver = new LazyRemoteTypeResolver(returnTypeFactory,
+                null,
+                func.ReturnTypeFullName,
+                func.ReturnTypeName);
+
+            if (areConstructors)
+            {
+                // TODO: RTTI Constructors
+                RemoteRttiConstructorInfo ctorInfo =
+                    new RemoteRttiConstructorInfo(declaringType, parameters.ToArray());
+                declaringType.AddConstructor(ctorInfo);
+            }
+            else
+            {
+                // Regular method
+
+                // Actual declaring type might be one of the parents of the current type
+                LazyRemoteTypeResolver declaringTypeResolver = new LazyRemoteTypeResolver(declaringType);
+
+                // Not using declaringType.FullName because it contains the module name as well
+                string declaringTypeNameWithNamespace = $"{declaringType.Namespace}::{declaringType.Name}";
+                if (!func.UndecoratedFullName.StartsWith(declaringTypeNameWithNamespace))
                 {
-                    // TODO: RTTI Constructors
-                    RemoteRttiConstructorInfo ctorInfo =
-                        new RemoteRttiConstructorInfo(declaringType, parameters.ToArray());
-                    declaringType.AddConstructor(ctorInfo);
+                    string type = func.UndecoratedFullName.Substring(0, func.UndecoratedFullName.LastIndexOf("::"));
+                    Lazy<Type> declaringTypeFactory = new Lazy<Type>(() =>
+                    {
+                        // TODO: Actual resolve
+                        return new DummyRttiType(type);
+                    });
+                    declaringTypeResolver = new LazyRemoteTypeResolver(returnTypeFactory,
+                        null,
+                        type,
+                        type);
                 }
-                else
-                {
-                    // Regular method
-                    RemoteRttiMethodInfo methodInfo =
-                        new RemoteRttiMethodInfo(declaringType, returnTypeResolver, func.Name, mangledName, parameters.ToArray());
-                    declaringType.AddMethod(methodInfo);
-                }
+
+                RemoteRttiMethodInfo methodInfo =
+                    new RemoteRttiMethodInfo(declaringTypeResolver, returnTypeResolver, func.Name, mangledName,
+                        parameters.ToArray());
+                declaringType.AddMethod(methodInfo);
             }
 
         }
