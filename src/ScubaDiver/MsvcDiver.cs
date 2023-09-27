@@ -15,6 +15,8 @@ using System.Threading;
 using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.Hooking;
 using Windows.Win32.Foundation;
+using System.Reflection;
+using ScubaDiver.API.Hooking;
 
 namespace ScubaDiver
 {
@@ -145,15 +147,19 @@ namespace ScubaDiver
                 QuickError($"Expected exactly 1 match for module, got {modulesToTypes.Count}");
 
             ModuleInfo module = modulesToTypes.Keys.Single();
-            TypeInfo[] typeInfos = modulesToTypes[module].ToArray();
+            Rtti.TypeInfo[] typeInfos = modulesToTypes[module].ToArray();
             if (typeInfos.Length != 1)
                 QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
 
 
-            TypeInfo typeInfo = typeInfos.Single();
+            Rtti.TypeInfo typeInfo = typeInfos.Single();
             List<UndecoratedSymbol> members = _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name).ToList();
             UndecoratedSymbol vftable = members.FirstOrDefault(member => member.UndecoratedName.EndsWith("`vftable'"));
 
+            string hookPositionStr = request.HookPosition;
+            HarmonyPatchPosition hookPosition = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPositionStr);
+            if (!Enum.IsDefined(typeof(HarmonyPatchPosition), hookPosition))
+                throw new Exception("hook_position has an invalid or unsupported value");
 
             List<UndecoratedFunction> exportedFuncs = members.OfType<UndecoratedFunction>().ToList();
             List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
@@ -180,67 +186,20 @@ namespace ScubaDiver
 
             Logger.Debug("[MsvcDiver] Hook Method - Resolved Method");
             Logger.Debug($"[MsvcDiver] Hooking function {methodName}...");
-            DetoursNetWrapper.HookCallback hook =
-                (DetoursMethodGenerator.DetoursTrampoline tramp, object[] args, out nuint value) =>
-                {
-                    if (args.Length == 0)
-                        throw new Exception(
-                            "Bad arguments to unmanaged HookCallback. Expecting at least 1 (for 'this').");
-
-                    object self = new NativeObject((nuint)args.FirstOrDefault(), typeInfo);
-
-                    // Args without self
-                    object[] argsToForward = new object[args.Length - 1];
-                    for (int i = 0; i < argsToForward.Length; i++)
-                    {
-                        nuint arg = (nuint)args[i + 1];
-
-                        // If the argument is a pointer, indicate it with a NativeObject
-                        string argType = tramp.Target.ArgTypes[i + 1];
-                        if (argType == "char*" || argType == "char *")
-                        {
-                            if (arg != 0)
-                            {
-                                string cString = Marshal.PtrToStringAnsi(new IntPtr((long)arg));
-                                argsToForward[i] = new CharStar(arg, cString);
-                            }
-                            else
-                            {
-                                argsToForward[i] = arg;
-                            }
-                        }
-                        else if (argType.EndsWith('*'))
-                        {
-                            // TODO: SecondClassTypeInfo is abused here
-                            string fixedArgType = argType[..^1].Trim();
-                            argsToForward[i] = new NativeObject(arg,
-                                new SecondClassTypeInfo(module.Name, fixedArgType));
-                        }
-                        else
-                        {
-                            // Primitive or struct or something else crazy
-                            argsToForward[i] = arg;
-                        }
-                    }
 
 
-                    // TODO: We're currently ignoring the "skip original" return value because the callback
-                    // doesn't support setting the return value...
-                    patchCallback(self, argsToForward);
 
-                    value = 0;
-                    bool skipOriginal = false;
-                    return skipOriginal;
-                };
-            DetoursNetWrapper.Instance.AddHook(methodToHook, hook);
+            // TODO: Is "nuint" return type always right here?
+            DetoursNetWrapper.Instance.AddHook(typeInfo, methodToHook, patchCallback, hookPosition);
             Logger.Debug($"[MsvcDiver] Hooked function {methodName}!");
 
             Action unhook = (Action)(() =>
             {
-                DetoursNetWrapper.Instance.RemoveHook(methodToHook, hook);
+                DetoursNetWrapper.Instance.RemoveHook(methodToHook, patchCallback);
             });
             return unhook;
         }
+ 
 
         /// <summary>
         /// 
@@ -304,13 +263,13 @@ namespace ScubaDiver
             }
             if (matchingAssemblies.Count > 1)
             {
-                string assembliesList = string.Join(", ", matchingAssemblies.Select(x=>x.Name).ToArray());
+                string assembliesList = string.Join(", ", matchingAssemblies.Select(x => x.Name).ToArray());
                 return QuickError(
                     $"Too many modules matched the filter '{assemblyFilter}'. Found {matchingAssemblies.Count} ({assembliesList})");
             }
 
             UndecoratedModule module = matchingAssemblies.Single();
-            foreach (TypeInfo type in module.Types)
+            foreach (Rtti.TypeInfo type in module.Types)
             {
                 types.Add(new TypesDump.TypeIdentifiers()
                 {
@@ -372,11 +331,11 @@ namespace ScubaDiver
             Logger.Debug($"[GetTypeDump] Querying for rawAssemblyFilter: {rawAssemblyFilter}, rawTypeFilter: {rawTypeFilter}");
             var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
 
-            foreach (KeyValuePair<ModuleInfo, IEnumerable<TypeInfo>> moduleAndTypes in modulesAndTypes)
+            foreach (KeyValuePair<ModuleInfo, IEnumerable<Rtti.TypeInfo>> moduleAndTypes in modulesAndTypes)
             {
                 ModuleInfo module = moduleAndTypes.Key;
                 IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module);
-                foreach (TypeInfo typeInfo in moduleAndTypes.Value)
+                foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
                 {
                     UndecoratedSymbol vftable;
                     List<TypeDump.TypeField> fields = new();
@@ -416,7 +375,7 @@ namespace ScubaDiver
             return null;
         }
 
-        private void DeconstructRttiType(TypeInfo typeInfo,
+        private void DeconstructRttiType(Rtti.TypeInfo typeInfo,
             ModuleInfo module,
             List<TypeDump.TypeField> fields,
             List<TypeDump.TypeMethod> constructors,
@@ -612,7 +571,7 @@ namespace ScubaDiver
             {
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
-                TypeInfo typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                Rtti.TypeInfo typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
                 if (typeInfo == null)
                 {
                     throw new Exception("Failed to resolve vftable of target to any RTTI type.");
@@ -705,7 +664,7 @@ namespace ScubaDiver
             ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
             var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
             ModuleInfo module = modulesAndTypes.Keys.Single();
-            TypeInfo typeInfo = modulesAndTypes[module].Single();
+            Rtti.TypeInfo typeInfo = modulesAndTypes[module].Single();
 
             List<UndecoratedFunction> typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, typeInfo.Name).ToList();
             UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.DecoratedName);
@@ -796,7 +755,7 @@ namespace ScubaDiver
                 long vftable = Marshal.ReadInt64(new IntPtr((long)results.Value));
                 Logger.Debug($"vftable: {vftable:x16}");
                 Logger.Debug("Trying to resolve vftable to type...");
-                TypeInfo retTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                Rtti.TypeInfo retTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
                 Logger.Debug($"Trying to resolve vftable to type... Got back: {retTypeInfo}");
 
                 if (retTypeInfo != null)

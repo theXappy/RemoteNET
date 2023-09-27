@@ -1,9 +1,15 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Transactions;
 using DetoursNet;
+using ScubaDiver.API;
+using ScubaDiver.API.Hooking;
+using ScubaDiver.Rtti;
+using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 
 namespace ScubaDiver.Hooking;
 
@@ -13,50 +19,59 @@ public class DetoursNetWrapper
     public static DetoursNetWrapper Instance => _instance ??= new();
 
     /// <returns>Skip original</returns>
-    public delegate bool HookCallback(DetoursMethodGenerator.DetoursTrampoline tramp, object[] args, out nuint overridenReturnValue);
+    public delegate bool HookCallback(DetoursMethodGenerator.DetouredFuncInfo tramp, object[] args, out nuint overridenReturnValue);
 
-    private static readonly ConcurrentDictionary<MethodInfo, HookCallback> _actualHooks = new();
-    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<HookCallback, MethodInfo>> _hooksToGenMethod = new();
+    private ConcurrentDictionary<UndecoratedFunction, MethodInfo> _methodsToGenMethods = new ConcurrentDictionary<UndecoratedFunction, MethodInfo>();
 
-    private void AddToDicts(string decoratedTargetName, HookCallback callback, MethodInfo generateMethodInfo)
+    public bool AddHook(TypeInfo typeInfo, UndecoratedFunction methodToHook, HarmonyWrapper.HookCallback realCallback, HarmonyPatchPosition hookPosition)
     {
-        _actualHooks[generateMethodInfo] = callback;
-        if (!_hooksToGenMethod.TryGetValue(decoratedTargetName, out var hooksDict))
-        {
-            hooksDict = new ConcurrentDictionary<HookCallback, MethodInfo>();
-            _hooksToGenMethod[decoratedTargetName] = hooksDict;
-        }
-        hooksDict[callback] = generateMethodInfo;
-    }
-
-    private bool RemoveFromDicts(string decoratedTargetName, HookCallback callback, out MethodInfo generateMethodInfo)
-    {
-        generateMethodInfo = null;
-        bool res = false;
-        if (_hooksToGenMethod.TryGetValue(decoratedTargetName, out var hooksDict))
-        {
-            res = hooksDict.TryRemove(callback, out generateMethodInfo) || 
-                  _actualHooks.TryRemove(generateMethodInfo, out _);
-        }
-
-        return res;
-    }
-
-    public bool AddHook(UndecoratedFunction target, HookCallback callback)
-    {
-        if (target.NumArgs == null)
+        if (methodToHook.NumArgs == null)
         {
             // Can't read num of arguments, fuck it.
             return false;
         }
-        // TODO: Is "nuint" return type always right here?
-        var tramp = DetoursMethodGenerator.GenerateMethod(target, typeof(nuint), target.DecoratedName, SingeCallback);
+        DetoursMethodGenerator.DetouredFuncInfo tramp;
+        tramp = DetoursMethodGenerator.GetOrCreateMethod(typeInfo, methodToHook, typeof(nuint), methodToHook.DecoratedName);
+        switch (hookPosition)
+        {
+            case HarmonyPatchPosition.Prefix:
+                if (tramp.PreHook != null)
+                    throw new InvalidOperationException(
+                        $"Can not set 2 hooks on the same method ({methodToHook.UndecoratedFullName}) in the same position ({hookPosition})");
+                tramp.PreHook = realCallback;
+                break;
+            case HarmonyPatchPosition.Postfix:
+                if (tramp.PostHook != null)
+                    throw new InvalidOperationException(
+                        $"Can not set 2 hooks on the same method ({methodToHook.UndecoratedFullName}) in the same position ({hookPosition})");
+                tramp.PostHook = realCallback;
+                break;
+            case HarmonyPatchPosition.Finalizer:
+            default:
+                throw new ArgumentOutOfRangeException(nameof(hookPosition), hookPosition, null);
+        }
 
-        AddToDicts(target.DecoratedName, callback, tramp.GenerateMethodInfo);
+        if (_methodsToGenMethods.TryGetValue(methodToHook, out var existingMi))
+        {
+            if (existingMi != tramp.GenerateMethodInfo)
+            {
+                throw new Exception(
+                    "DetoursNetWrapper: Mismatch between stored generated MethodInfo and newly created generated MethodInfo");
+            }
+
+            // Method was already hooked and with the rgith Generated Method Info
+            // We just updated the pre/post properties
+            // So nothing else to do here!
+            return true;
+        }
+
+        // Method not *actually* hooked yet.
+        // Keep memo aside about it
+        _methodsToGenMethods[methodToHook] = tramp.GenerateMethodInfo;
+
 
         // First, try to hook with module name + export name (won't work for internal methods)
-        string moduleName = Path.GetFileNameWithoutExtension(target.Module.Name);
-        bool success = Loader.HookMethod(moduleName, target.DecoratedName,
+        bool success = Loader.HookMethod(typeInfo.ModuleName, methodToHook.DecoratedName,
             tramp.DelegateType,
             tramp.GenerateMethodInfo,
             tramp.GeneratedDelegate);
@@ -64,48 +79,47 @@ public class DetoursNetWrapper
             return true;
 
         // Fallback, Try directly with pointers
-        Console.WriteLine($"[DetoursNetWrapper] Hooking with LoadLibrary + GetProcAddress failed, trying direct pointers. Target: {target.Module.Name}!{target.UndecoratedFullName}");
-        IntPtr module = new IntPtr((long)target.Module.BaseAddress);
-        IntPtr targetFunc = new IntPtr(target.Address);
+        Console.WriteLine($"[DetoursNetWrapper] Hooking with LoadLibrary + GetProcAddress failed, trying direct pointers. Target: {methodToHook.Module.Name}!{methodToHook.UndecoratedFullName}");
+        IntPtr module = new IntPtr((long)methodToHook.Module.BaseAddress);
+        IntPtr targetFunc = new IntPtr(methodToHook.Address);
         success = Loader.HookMethod(module, targetFunc, tramp.DelegateType, tramp.GenerateMethodInfo, tramp.GeneratedDelegate);
 
         return success;
     }
 
-    public bool RemoveHook(UndecoratedFunction target, HookCallback callback)
+    public bool RemoveHook(UndecoratedFunction methodToUnhook, HarmonyWrapper.HookCallback callback)
     {
-        IntPtr module = new IntPtr((long)target.Module.BaseAddress);
-        IntPtr targetFunc = new IntPtr(target.Address);
+        IntPtr module = new IntPtr((long)methodToUnhook.Module.BaseAddress);
+        IntPtr targetFunc = new IntPtr(methodToUnhook.Address);
 
-        bool success = false;
-        if (RemoveFromDicts(target.DecoratedName, callback, out MethodInfo genMethodInfo))
+        if (!_methodsToGenMethods.TryGetValue(methodToUnhook, out MethodInfo genMethodInfo)) 
+            return false;
+
+        if (!DetoursMethodGenerator.TryGetMethod(methodToUnhook.DecoratedName,
+                out DetoursMethodGenerator.DetouredFuncInfo funcInfo)) 
+            return false;
+
+        if (funcInfo.PreHook == callback)
         {
-            success = Loader.UnHookMethod(module, targetFunc, genMethodInfo);
+            funcInfo.PreHook = null;
         }
-        return success;
+        else if (funcInfo.PostHook == callback)
+        {
+            funcInfo.PostHook = null;
+        }
+        else
+        {
+            throw new ArgumentException(
+                $"Trying to unhook a hook that doesn't match neither the pre nor post hooks. Func: {methodToUnhook.UndecoratedName}");
+        }
+
+        // Check if the hook is retired
+        if (funcInfo.PostHook == null && funcInfo.PreHook == null)
+        {
+            return Loader.UnHookMethod(module, targetFunc, genMethodInfo);
+        }
+        return true;
     }
 
-    private static nuint SingeCallback(DetoursMethodGenerator.DetoursTrampoline tramp, object[] args)
-    {
-        //Console.WriteLine($"[SingleCallback] Invoked for {tramp.Name} with {args.Length} arguments");
 
-        // Call hook
-        var hook = _actualHooks[tramp.GenerateMethodInfo];
-        bool skipOriginal = hook(tramp, args, out nuint overridenReturnValue);
-
-        if (skipOriginal)
-        {
-            return overridenReturnValue;
-        }
-
-        // Call original method
-        Delegate realMethod = DelegateStore.Real[tramp.GenerateMethodInfo];
-        object res = realMethod.DynamicInvoke(args);
-        //Console.WriteLine($"[SingleCallback] Original of {tramp.Name} returned {res}");
-        if (res != null)
-            return (nuint)res;
-
-        // Could be a void-returning method. I hope this doesn't break anything.
-        return (nuint)0xBBAD_C0DE;
-    }
 }
