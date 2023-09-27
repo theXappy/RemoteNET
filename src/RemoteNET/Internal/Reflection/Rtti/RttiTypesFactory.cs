@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using RemoteNET.Common;
 using RemoteNET.Internal.Reflection;
@@ -133,8 +134,8 @@ namespace RemoteNET.RttiReflection
 
         private void AddMembers(RemoteApp app, TypeDump typeDump, RemoteRttiType output)
         {
-            AddGroupOfFunctions(typeDump.Methods, output, areConstructors: false);
-            AddGroupOfFunctions(typeDump.Constructors, output, areConstructors: true);
+            AddGroupOfFunctions(app, typeDump, typeDump.Methods, output, areConstructors: false);
+            AddGroupOfFunctions(app, typeDump, typeDump.Constructors, output, areConstructors: true);
             AddFields(app, typeDump.Fields, output);
         }
 
@@ -147,15 +148,15 @@ namespace RemoteNET.RttiReflection
             }
         }
 
-        private static void AddGroupOfFunctions(List<TypeDump.TypeMethod> functions, RemoteRttiType declaringType, bool areConstructors)
+        private static void AddGroupOfFunctions(RemoteApp app, TypeDump typeDump, List<TypeDump.TypeMethod> functions, RemoteRttiType declaringType, bool areConstructors)
         {
             foreach (TypeDump.TypeMethod func in functions)
             {
-                AddFunctionImpl(func, declaringType, areConstructors);
+                AddFunctionImpl(app, typeDump, func, declaringType, areConstructors);
             }
         }
 
-        public static void AddFunctionImpl(TypeDump.TypeMethod func, RemoteRttiType declaringType, bool areConstructors)
+        public static void AddFunctionImpl(RemoteApp app, TypeDump typeDump, TypeDump.TypeMethod func, RemoteRttiType declaringType, bool areConstructors)
         {
             string mangledName = func.DecoratedName;
             if (string.IsNullOrEmpty(mangledName))
@@ -167,11 +168,7 @@ namespace RemoteNET.RttiReflection
             {
                 string fakeParamName = $"a{i}";
                 i++;
-                Lazy<Type> paramFactory = new Lazy<Type>(() =>
-                {
-                    // TODO: Actual resolve
-                    return new DummyGenericType(restarizedParameter.FullTypeName);
-                });
+                Lazy<Type> paramFactory = CreateTypeFactory(restarizedParameter.FullTypeName);
                 LazyRemoteTypeResolver paramTypeResolver = new LazyRemoteTypeResolver(paramFactory,
                     //methodParameter.Assembly,
                     //methodParameter.FullTypeName,
@@ -184,11 +181,7 @@ namespace RemoteNET.RttiReflection
                 parameters.Add(rpi);
             }
 
-            Lazy<Type> returnTypeFactory = new Lazy<Type>(() =>
-            {
-                // TODO: Actual resolve
-                return new DummyRttiType(func.ReturnTypeFullName ?? func.ReturnTypeName);
-            });
+            Lazy<Type> returnTypeFactory = CreateTypeFactory(func.ReturnTypeFullName ?? func.ReturnTypeName);
             LazyRemoteTypeResolver returnTypeResolver = new LazyRemoteTypeResolver(returnTypeFactory,
                 null,
                 func.ReturnTypeFullName,
@@ -213,12 +206,8 @@ namespace RemoteNET.RttiReflection
                 if (!func.UndecoratedFullName.StartsWith(declaringTypeNameWithNamespace))
                 {
                     string type = func.UndecoratedFullName.Substring(0, func.UndecoratedFullName.LastIndexOf("::"));
-                    Lazy<Type> declaringTypeFactory = new Lazy<Type>(() =>
-                    {
-                        // TODO: Actual resolve
-                        return new DummyRttiType(type);
-                    });
-                    declaringTypeResolver = new LazyRemoteTypeResolver(returnTypeFactory,
+                    Lazy<Type> declaringTypeFactory = CreateTypeFactory(type);
+                    declaringTypeResolver = new LazyRemoteTypeResolver(declaringTypeFactory,
                         null,
                         type,
                         type);
@@ -230,6 +219,31 @@ namespace RemoteNET.RttiReflection
                 declaringType.AddMethod(methodInfo);
             }
 
+            Lazy<Type> CreateTypeFactory(string fullTypeName)
+            {
+                return new Lazy<Type>(() =>
+                {
+                    var possibleParamTypes = app.QueryTypes(fullTypeName);
+                    var paramTypeInSameAssembly =
+                        possibleParamTypes.Where(t => t.Assembly == typeDump.Assembly).ToArray();
+                    if (paramTypeInSameAssembly.Length == 0)
+                    {
+                        return app.GetRemoteType(possibleParamTypes.Single());
+                    }
+
+                    if (paramTypeInSameAssembly.Length > 1)
+                    {
+                        string candidates =
+                            string.Join(", ",
+                                paramTypeInSameAssembly.Select(cand => $"{cand.Assembly}!{cand.TypeFullName}"));
+                        throw new Exception(
+                            $"Too many matches for the sub-type '{fullTypeName}' in the signature of {func.UndecoratedFullName} .\n" +
+                            $"Candidates: " + candidates);
+                    }
+
+                    return app.GetRemoteType(paramTypeInSameAssembly.Single());
+                });
+            }
         }
     }
 }
