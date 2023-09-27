@@ -33,7 +33,8 @@ namespace RemoteNET.Common
                 Position = pos;
             }
         }
-        private class MethodHooks : Dictionary<HookAction, PositionedLocalHook> { 
+        private class MethodHooks : Dictionary<HookAction, PositionedLocalHook>
+        {
         }
 
 
@@ -57,21 +58,18 @@ namespace RemoteNET.Common
             {
                 _callbacksToProxies[methodToHook] = new MethodHooks();
             }
-            else
-            {
-                throw new NotImplementedException("Setting multiple hooks on the same method is not implemented");
-            }
             MethodHooks methodHooks = _callbacksToProxies[methodToHook];
 
-            // 
-            if(!methodHooks.ContainsKey(hookAction))
-            {
-                methodHooks.Add(hookAction, new PositionedLocalHook(hookAction, wrappedHook, pos));
-            }
-            else
+            if (methodHooks.ContainsKey(hookAction))
             {
                 throw new NotImplementedException("Shouldn't use same hook for 2 patches of the same method");
             }
+            if (methodHooks.Any(existingHook => existingHook.Value.Position == pos))
+            {
+                throw new NotImplementedException("Can not set 2 hooks in the same position on a single target");
+            }
+
+            methodHooks.Add(hookAction, new PositionedLocalHook(hookAction, wrappedHook, pos));
 
             var parametersTypeFullNames = methodToHook.GetParameters().Select(prm => prm.ParameterType.FullName).ToList();
             return _app.Communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappedHook, parametersTypeFullNames);
@@ -181,22 +179,22 @@ namespace RemoteNET.Common
             HookAction postfix = null,
             HookAction finalizer = null)
         {
-            if(prefix == null &&
+            if (prefix == null &&
                 postfix == null &&
                 finalizer == null)
             {
                 throw new ArgumentException("No hooks defined.");
             }
 
-            if(prefix != null)
+            if (prefix != null)
             {
                 HookMethod(original, HarmonyPatchPosition.Prefix, prefix);
             }
-            if(postfix != null)
+            if (postfix != null)
             {
                 HookMethod(original, HarmonyPatchPosition.Postfix, postfix);
             }
-            if(finalizer != null)
+            if (finalizer != null)
             {
                 HookMethod(original, HarmonyPatchPosition.Finalizer, finalizer);
             }
