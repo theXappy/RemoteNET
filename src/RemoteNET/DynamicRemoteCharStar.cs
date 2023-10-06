@@ -1,3 +1,4 @@
+using RemoteNET.Internal;
 using System;
 using System.Diagnostics;
 using System.Dynamic;
@@ -90,4 +91,26 @@ public class DynamicRemoteCharStar : DynamicObject
     }
 
     public static implicit operator string(DynamicRemoteCharStar obj) => obj._innerString;
+
+
+    #region ToString / GetHashCode / Equals
+
+    public override string ToString()
+    {
+        return _innerString.ToString();
+    }
+
+    public override int GetHashCode()
+    {
+        // No "GetHashCode" method, target is not a .NET object
+        // TODO: Return token?
+        throw new NotImplementedException("Hashcode not implemented for non-managed objects");
+    }
+    public override bool Equals(object obj)
+    {
+        if (obj is DynamicRemoteCharStar drcs)
+            return drcs._innerString == _innerString;
+        return _innerString.Equals(obj);
+    }
+    #endregion
 }
