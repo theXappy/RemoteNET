@@ -199,7 +199,7 @@ namespace ScubaDiver
             });
             return unhook;
         }
- 
+
 
         /// <summary>
         /// 
@@ -245,7 +245,7 @@ namespace ScubaDiver
             }
 
             // Call callback at controller
-            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
+            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, remoteParams);
 
             return hookCallbackResults.ReturnedObjectOrAddress;
         }
@@ -328,7 +328,7 @@ namespace ScubaDiver
 
         private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
-            Logger.Debug($"[GetTypeDump] Querying for rawAssemblyFilter: {rawAssemblyFilter}, rawTypeFilter: {rawTypeFilter}");
+            //Logger.Debug($"[GetTypeDump] Querying for rawAssemblyFilter: {rawAssemblyFilter}, rawTypeFilter: {rawTypeFilter}");
             var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
 
             foreach (KeyValuePair<ModuleInfo, IEnumerable<Rtti.TypeInfo>> moduleAndTypes in modulesAndTypes)

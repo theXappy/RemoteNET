@@ -32,6 +32,10 @@ public class DetoursNetWrapper
         }
         DetoursMethodGenerator.DetouredFuncInfo tramp;
         tramp = DetoursMethodGenerator.GetOrCreateMethod(typeInfo, methodToHook, typeof(nuint), methodToHook.DecoratedName);
+        Logger.Debug($"[AddHook] tramp.Name = {tramp.Name} (ADDR: 0x{methodToHook.Address:x16})");
+        Logger.Debug($"[AddHook] |_ tramp.DeclaringClass = {tramp.DeclaringClass}");
+        Logger.Debug($"[AddHook] |_ methodToHook.DecoratedName = {methodToHook.DecoratedName}");
+        Logger.Debug($"[AddHook] |_ methodToHook.UndecoratedFullName = {methodToHook.UndecoratedFullName}");
         switch (hookPosition)
         {
             case HarmonyPatchPosition.Prefix:
@@ -95,7 +99,8 @@ public class DetoursNetWrapper
         if (!_methodsToGenMethods.TryGetValue(methodToUnhook, out MethodInfo genMethodInfo)) 
             return false;
 
-        if (!DetoursMethodGenerator.TryGetMethod(methodToUnhook.DecoratedName,
+        string key = $"{methodToUnhook.Module.Name}!{methodToUnhook.DecoratedName}";
+        if (!DetoursMethodGenerator.TryGetMethod(key,
                 out DetoursMethodGenerator.DetouredFuncInfo funcInfo)) 
             return false;
 
@@ -116,6 +121,8 @@ public class DetoursNetWrapper
         // Check if the hook is retired
         if (funcInfo.PostHook == null && funcInfo.PreHook == null)
         {
+            DetoursMethodGenerator.Remove(key);
+            _methodsToGenMethods.TryRemove(methodToUnhook, out _);
             return Loader.UnHookMethod(module, targetFunc, genMethodInfo);
         }
         return true;
