@@ -111,7 +111,8 @@ namespace ScubaDiver.Demangle.Demangle
                 if (reference == null || reference.Referent == null)
                     throw new ArgumentNullException("VisitReference received null as argument");
                 reference.Referent.Accept(this);
-                sb.AppendFormat(" ^");
+                // SS: Removed a space before the &
+                sb.AppendFormat("&");
                 name = n;
                 if (name != null)
                     sb.AppendFormat(" {0}", name);

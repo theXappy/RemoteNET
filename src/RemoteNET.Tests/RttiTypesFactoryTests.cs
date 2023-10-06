@@ -294,5 +294,27 @@ namespace RemoteNET.Tests
             Assert.That(childTypeLongName, Is.EqualTo(decTypeLongName));
             Assert.That(childType, Is.EqualTo(method.DeclaringType));
         }
+
+
+        [Test]
+        public void UndecoratingCosntRef()
+        {
+            // Arrange
+            ScubaDiver.Rtti.ModuleInfo module = new ModuleInfo("libPeek_lies.dll", 0xaabbccdd, 0xaabbccdd);
+            DllExport export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
+                .Single(c => c.GetParameters().Length == 5).Invoke(new object?[]
+                {
+                    "??0WClass@Peek@@QEAA@AEBV01@@Z", 1, 0xbbccddee, "a", "b"
+                }) as DllExport;
+
+
+            // Act
+            export.TryUndecorate(module, out var undecFunc);
+            var args = (undecFunc as UndecoratedExportedFunc).ArgTypes;
+
+            // Assert
+            var arg = args[1];
+            Assert.AreEqual("Peek::WClass&", arg);
+        }
     }
 }
