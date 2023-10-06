@@ -268,7 +268,7 @@ namespace ScubaDiver.API
             {
                 for (int i = 0; i < 5; i++)
                 {
-                    Console.WriteLine($"@@@ Trying to register try #{i + 1}");
+                    Debug.WriteLine($"[@@@][RegisterClient] Trying to register try #{i + 1}");
                     string body = SendRequest("register_client",
                         new Dictionary<string, string> { { "process_id", _process_id.Value.ToString() } });
                     if (body.Contains("{\"status\":\"OK\"}"))
@@ -278,7 +278,7 @@ namespace ScubaDiver.API
                     }
                     else if (body.Contains("{\"status\":\"reject"))
                     {
-                        Console.WriteLine($"@@@ Trying to register try #{i + 1} -- rejected (too early)");
+                        Debug.WriteLine($"[@@@][RegisterClient] Trying to register try #{i + 1} -- rejected (too early)");
                         // We're probably too early and the Diver didn't communicate with Lifeboat yet.
                         // sleep and re-try
                         Thread.Sleep(TimeSpan.FromSeconds(1));
@@ -287,7 +287,7 @@ namespace ScubaDiver.API
                     else
                     {
                         // Something weird with the respond
-                        Console.WriteLine("Unexpected response from Diver/Lifeboat when registering: " + body);
+                        Debug.WriteLine("[@@@][RegisterClient] Unexpected response from Diver/Lifeboat when registering: " + body);
                         return false;
                     }
                 }
