@@ -59,18 +59,31 @@ public static class DetoursMethodGenerator
         return _trampolines.TryGetValue(generatedMethodName, out detouredFuncInfo);
     }
 
+    public static void Remove(string generatedMethodName)
+    {
+        if (!TryGetMethod(generatedMethodName, out var detouredFuncInfo))
+            return;
+
+        if (detouredFuncInfo.PreHook != null || detouredFuncInfo.PostHook != null)
+            throw new Exception(
+                $"DetouredFuncInfo to remove still had one or more hooks. Func Name: {detouredFuncInfo.Name} Class: {detouredFuncInfo.DeclaringClass}");
+
+        _trampolines.Remove(generatedMethodName);
+    }
+
     public static DetouredFuncInfo GetOrCreateMethod(TypeInfo targetType, UndecoratedFunction targetMethod, Type retType, string generatedMethodName)
     {
         DetouredFuncInfo detouredFuncInfo;
 
-        if (!TryGetMethod(generatedMethodName, out detouredFuncInfo))
+        string key = $"{targetType.ModuleName}!{generatedMethodName}";
+        if (!TryGetMethod(key, out detouredFuncInfo))
         {
-            (var generatedMethodInfo, var generatedDelegate, var delType) = GenerateMethodForName(targetMethod.NumArgs.Value, retType, generatedMethodName);
+            (var generatedMethodInfo, var generatedDelegate, var delType) = GenerateMethodForName(targetMethod.NumArgs.Value, retType, key);
 
             detouredFuncInfo = new DetouredFuncInfo(targetType, targetMethod, generatedMethodName, generatedMethodInfo,
                 generatedDelegate, delType);
 
-            _trampolines[generatedMethodName] = detouredFuncInfo;
+            _trampolines[key] = detouredFuncInfo;
         }
 
         return detouredFuncInfo;

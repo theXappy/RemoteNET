@@ -765,7 +765,7 @@ namespace ScubaDiver
             }
 
             // Call callback at controller
-            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, remoteParams);
+            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, remoteParams);
 
             return hookCallbackResults.ReturnedObjectOrAddress;
         }

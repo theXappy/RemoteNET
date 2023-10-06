@@ -72,13 +72,14 @@ namespace ScubaDiver.API
             }
         }
 
-        public InvocationResults InvokeCallback(int token, string stackTrace,
+        public InvocationResults InvokeCallback(int token, string stackTrace, int threadId,
             params ObjectOrRemoteAddress[] args)
         {
             CallbackInvocationRequest invocReq = new()
             {
                 StackTrace = stackTrace,
                 Token = token,
+                ThreadID = threadId,
                 Parameters = args.ToList()
             };
             var requestJsonBody = JsonConvert.SerializeObject(invocReq);
