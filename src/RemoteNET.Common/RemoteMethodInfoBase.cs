@@ -10,18 +10,21 @@ public abstract class RemoteMethodInfoBase : MethodInfo
 
 public interface IRttiMethodBase
 {
+    LazyRemoteTypeResolver LazyDeclaringType { get; }
+
+
     LazyRemoteTypeResolver LazyRetType { get; }
     /// <summary>
     /// All C++ parameters of the function. First one is (likely) 'this'
     /// </summary>
-    ParameterInfo[] LazyParamInfos { get; }
+    LazyRemoteParameterResolver[] LazyParamInfos { get; }
     string Name { get; }
 
     public string UndecoratedSignature
     {
         get
         {
-            string args = string.Join(", ", LazyParamInfos.Select(pi => pi.ToString()));
+            string args = string.Join(", ", LazyParamInfos.Select(resolver => resolver.ToString()));
             return $"{LazyRetType.TypeFullName ?? LazyRetType.TypeName} {Name}({args})";
         }
     }

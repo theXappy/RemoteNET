@@ -2,6 +2,24 @@
 
 namespace RemoteNET.Common
 {
+    public class LazyRemoteParameterResolver
+    {
+        public LazyRemoteTypeResolver TypeResolver { get; set; }
+        public string Name { get; set; }
+
+        public LazyRemoteParameterResolver(LazyRemoteTypeResolver typeResolver, string name)
+        {
+            TypeResolver = typeResolver;
+            Name = name;
+        }
+
+        public override string ToString()
+        {
+            return $"{TypeResolver.TypeFullName} {Name}";
+        }
+    }
+
+
     public class LazyRemoteTypeResolver
     {
         private Lazy<Type> _factory;

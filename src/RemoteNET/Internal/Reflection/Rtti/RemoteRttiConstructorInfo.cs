@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -7,17 +8,20 @@ using RemoteNET.RttiReflection;
 
 namespace RemoteNET.Internal.Reflection;
 
+[DebuggerDisplay("Remote RTTI Constructor: {LazyRetType.TypeFullName} {Name}(...)")]
 public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
 {
     public LazyRemoteTypeResolver LazyRetType => new LazyRemoteTypeResolver(typeof(void));
-    protected ParameterInfo[] _lazyParamInfosImpl;
-    public ParameterInfo[] LazyParamInfos => _lazyParamInfosImpl;
+    protected LazyRemoteParameterResolver[] _lazyParamInfosImpl;
+    public LazyRemoteParameterResolver[] LazyParamInfos => _lazyParamInfosImpl;
 
     public override MethodAttributes Attributes => throw new NotImplementedException();
 
     public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
 
-    public override Type DeclaringType { get; }
+    protected LazyRemoteTypeResolver _lazyDeclaringType;
+    public LazyRemoteTypeResolver LazyDeclaringType => _lazyDeclaringType;
+    public override Type DeclaringType => LazyDeclaringType.Value;
 
     public override string Name => DeclaringType.Name;
 
@@ -25,16 +29,10 @@ public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
 
     private RemoteApp App => (DeclaringType as RemoteRttiType)?.App;
 
-    public RemoteRttiConstructorInfo(Type declaringType, ParameterInfo[] paramInfos)
+    public RemoteRttiConstructorInfo(LazyRemoteTypeResolver declaringType, LazyRemoteParameterResolver[] paramInfos)
     {
-        DeclaringType = declaringType;
+        _lazyDeclaringType = declaringType;
         _lazyParamInfosImpl = paramInfos;
-    }
-
-    public RemoteRttiConstructorInfo(RemoteRttiType declaringType, ConstructorInfo ci) :
-        this(declaringType,
-            ci.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
-    {
     }
 
     public override object[] GetCustomAttributes(bool inherit)
@@ -54,8 +52,16 @@ public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
 
     public override ParameterInfo[] GetParameters()
     {
-        // Skipping 'this'
-        return _lazyParamInfosImpl.Skip(1).ToArray();
+        // (-1) because we're skipping 'this'
+        ParameterInfo[] parameters = new ParameterInfo[_lazyParamInfosImpl.Length - 1];
+
+        for (int i = 1; i < _lazyParamInfosImpl.Length; i++)
+        {
+            LazyRemoteParameterResolver lazyResolver = _lazyParamInfosImpl[i];
+            parameters[i - 1] = new RemoteParameterInfo(lazyResolver.Name, lazyResolver.TypeResolver);
+        }
+
+        return parameters;
     }
 
     public override object Invoke(BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
@@ -76,7 +82,7 @@ public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
 
     public override string ToString()
     {
-        string args = string.Join(", ", _lazyParamInfosImpl.Select(pi => pi.ParameterType.FullName));
+        string args = string.Join(", ", _lazyParamInfosImpl.Select(pi => pi.TypeResolver.TypeFullName));
         return $"Void {this.Name}({args})";
     }
 }
