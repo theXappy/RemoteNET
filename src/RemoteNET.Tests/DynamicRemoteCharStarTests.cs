@@ -74,4 +74,15 @@ public class DynamicRemoteCharStarTests
         string convertedString = (string)proxy;
         Assert.AreEqual("Hello, world!", convertedString);
     }
+
+    [Test]
+    public void TestToStringConversion()
+    {
+        string initialString = "Hello, world!";
+        dynamic proxy = new DynamicRemoteCharStar(initialString);
+
+        // Explicit conversion from DynamicRemoteCharStar to string
+        string convertedString = proxy.ToString();
+        Assert.AreEqual("Hello, world!", convertedString);
+    }
 }
