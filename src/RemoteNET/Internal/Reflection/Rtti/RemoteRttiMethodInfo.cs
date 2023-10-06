@@ -9,19 +9,20 @@ using RemoteNET.RttiReflection;
 namespace RemoteNET.Internal.Reflection
 {
 
-    [DebuggerDisplay("Remote RTTI Method: {UndecoratedSignature}")]
+    [DebuggerDisplay("Remote RTTI Method: {LazyRetType.TypeFullName} {Name}(...)")]
     public class RemoteRttiMethodInfo : RemoteMethodInfoBase, IRttiMethodBase
     {
         protected LazyRemoteTypeResolver _lazyRetTypeImpl;
         public LazyRemoteTypeResolver LazyRetType => _lazyRetTypeImpl;
-        protected ParameterInfo[] _lazyParamInfosImpl;
-        public ParameterInfo[] LazyParamInfos => _lazyParamInfosImpl;
+        protected LazyRemoteParameterResolver[] _lazyParamInfosImpl;
+        public LazyRemoteParameterResolver[] LazyParamInfos => _lazyParamInfosImpl;
 
         public override ICustomAttributeProvider ReturnTypeCustomAttributes => throw new NotImplementedException();
         public override string Name { get; }
 
-        private LazyRemoteTypeResolver _actualDeclaringType;
-        public override Type DeclaringType => _actualDeclaringType.Value;
+        protected LazyRemoteTypeResolver _lazyDeclaringType;
+        public LazyRemoteTypeResolver LazyDeclaringType => _lazyDeclaringType;
+        public override Type DeclaringType => LazyDeclaringType.Value;
         public override Type ReturnType => LazyRetType.Value;
         public override Type ReflectedType => throw new NotImplementedException();
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
@@ -38,11 +39,16 @@ namespace RemoteNET.Internal.Reflection
         private RemoteApp App => (DeclaringType as RemoteRttiType)?.App;
 
 
-        public RemoteRttiMethodInfo(LazyRemoteTypeResolver declaringType, LazyRemoteTypeResolver returnType, string name, string mangledName, ParameterInfo[] lazyParamInfos)
+        public RemoteRttiMethodInfo(
+            LazyRemoteTypeResolver declaringType, 
+            LazyRemoteTypeResolver returnType, 
+            string name, 
+            string mangledName, 
+            LazyRemoteParameterResolver[] lazyParamInfos)
         {
             Name = name;
             MangledName = mangledName;
-            _actualDeclaringType = declaringType;
+            _lazyDeclaringType = declaringType;
             _lazyParamInfosImpl = lazyParamInfos;
             _lazyRetTypeImpl = returnType;
 
@@ -67,8 +73,16 @@ namespace RemoteNET.Internal.Reflection
 
         public override ParameterInfo[] GetParameters()
         {
-            // Skipping 'this'
-            return LazyParamInfos.Skip(1).ToArray();
+            // (-1) because we're skipping 'this'
+            ParameterInfo[] parameters = new ParameterInfo[_lazyParamInfosImpl.Length - 1];
+
+            for (int i = 1; i < _lazyParamInfosImpl.Length; i++)
+            {
+                LazyRemoteParameterResolver lazyResolver = _lazyParamInfosImpl[i];
+                parameters[i - 1] = new RemoteParameterInfo(lazyResolver.Name, lazyResolver.TypeResolver);
+            }
+
+            return parameters;
         }
 
         public override MethodImplAttributes GetMethodImplementationFlags()

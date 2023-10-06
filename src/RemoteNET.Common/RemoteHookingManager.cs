@@ -71,7 +71,19 @@ namespace RemoteNET.Common
 
             methodHooks.Add(hookAction, new PositionedLocalHook(hookAction, wrappedHook, pos));
 
-            var parametersTypeFullNames = methodToHook.GetParameters().Select(prm => prm.ParameterType.FullName).ToList();
+            List<string> parametersTypeFullNames;
+            if (methodToHook is IRttiMethodBase rttiMethod)
+            {
+                // Skipping 'this'
+                parametersTypeFullNames =
+                    rttiMethod.LazyParamInfos.Skip(1).Select(prm => prm.TypeResolver.TypeFullName).ToList();
+            }
+            else
+            {
+                parametersTypeFullNames =
+                    methodToHook.GetParameters().Select(prm => prm.ParameterType.FullName).ToList();
+            }
+
             return _app.Communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappedHook, parametersTypeFullNames);
         }
 

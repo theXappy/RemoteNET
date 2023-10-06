@@ -162,7 +162,7 @@ namespace RemoteNET.RttiReflection
             if (string.IsNullOrEmpty(mangledName))
                 mangledName = func.Name;
 
-            List<ParameterInfo> parameters = new List<ParameterInfo>(func.Parameters.Count);
+            List<LazyRemoteParameterResolver> parameters = new List<LazyRemoteParameterResolver>(func.Parameters.Count);
             int i = 1;
             foreach (TypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
             {
@@ -177,8 +177,9 @@ namespace RemoteNET.RttiReflection
                     restarizedParameter.FullTypeName,
                     restarizedParameter.FullTypeName
                 );
-                RemoteParameterInfo rpi = new RemoteParameterInfo(fakeParamName, paramTypeResolver);
-                parameters.Add(rpi);
+                LazyRemoteParameterResolver paramResolver =
+                    new LazyRemoteParameterResolver(paramTypeResolver, fakeParamName);
+                parameters.Add(paramResolver);
             }
 
             Lazy<Type> returnTypeFactory = CreateTypeFactory(func.ReturnTypeFullName ?? func.ReturnTypeName);
@@ -189,9 +190,10 @@ namespace RemoteNET.RttiReflection
 
             if (areConstructors)
             {
-                // TODO: RTTI Constructors
+                // TODO: RTTI ConstructorsType
+                LazyRemoteTypeResolver declaringTypeResolver = new LazyRemoteTypeResolver(declaringType);
                 RemoteRttiConstructorInfo ctorInfo =
-                    new RemoteRttiConstructorInfo(declaringType, parameters.ToArray());
+                    new RemoteRttiConstructorInfo(declaringTypeResolver, parameters.ToArray());
                 declaringType.AddConstructor(ctorInfo);
             }
             else
@@ -221,9 +223,28 @@ namespace RemoteNET.RttiReflection
 
             Lazy<Type> CreateTypeFactory(string fullTypeName)
             {
+
                 return new Lazy<Type>(() =>
                 {
-                    var possibleParamTypes = app.QueryTypes(fullTypeName);
+                    if (_shittyCache.TryGetValue(fullTypeName, out var t))
+                        return t;
+
+                    Debug.WriteLine($"[@@@][RttiTypeFactory] Trying to resolve non-cached sub-type: `{fullTypeName}`");
+
+                    var possibleParamTypes = app.QueryTypes(fullTypeName).ToArray();
+                    if (possibleParamTypes.Length == 0 && !fullTypeName.Contains('!'))
+                    {
+                        possibleParamTypes = app.QueryTypes($"*!{fullTypeName}").ToArray();
+                    }
+
+                    if (possibleParamTypes.Length == 0)
+                    {
+                        Type temp = new DummyRttiType(fullTypeName);
+                        _shittyCache[fullTypeName] = temp;
+                        return temp;
+                    }
+
+
                     var paramTypeInSameAssembly =
                         possibleParamTypes.Where(t => t.Assembly == typeDump.Assembly).ToArray();
                     if (paramTypeInSameAssembly.Length == 0)
@@ -245,5 +266,7 @@ namespace RemoteNET.RttiReflection
                 });
             }
         }
+
+        public static Dictionary<string, Type> _shittyCache = new Dictionary<string, Type>();
     }
 }
