@@ -46,11 +46,19 @@ public class FirstClassTypeInfo : TypeInfo
     public nuint XoredVftableAddress { get; }
     public nuint VftableAddress => XoredVftableAddress ^ XorMask; // A function-based property so the address isn't needlessly kept in memory.
     public nuint Offset { get; }
+    public List<nuint> XoredSecondaryVftableAddresses { get; }
+    public IEnumerable<nuint> SecondaryVftableAddresses => XoredSecondaryVftableAddresses.Select(x => x ^ XorMask);
 
     public FirstClassTypeInfo(string ModuleName, string Name, nuint VftableAddress, nuint Offset) : base(ModuleName, Name)
     {
         XoredVftableAddress = VftableAddress ^ XorMask;
         this.Offset = Offset;
+        XoredSecondaryVftableAddresses = new List<nuint>();
+    }
+
+    public void AddSecondaryVftable(nuint vftableAddress)
+    {
+        XoredSecondaryVftableAddresses.Add(vftableAddress ^ XorMask);
     }
 
     public override string ToString()
