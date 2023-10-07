@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net5.0</TargetFramework>
@@ -47,10 +47,9 @@
 				<DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
 			</CopyOperations>
 		</ItemGroup>
-		<Message Text="[~] $(ProjectName) - Copying to ScubaDiver folder" Importance="high"/>
-		<Message Text="[~] Files to copy: @(CopyOperations) dest: %(CopyOperations.DestinationFolder)" Importance="high"/>
-		<Copy SourceFiles="@(CopyOperations)"
-		      DestinationFolder="%(CopyOperations.DestinationFolder)" />
+		<Message Text="[~] $(ProjectName) - Copying to ScubaDiver folder" Importance="high" />
+		<Message Text="[~] Files to copy: @(CopyOperations) dest: %(CopyOperations.DestinationFolder)" Importance="high" />
+		<Copy SourceFiles="@(CopyOperations)" DestinationFolder="%(CopyOperations.DestinationFolder)" />
 	</Target>
 
 </Project>

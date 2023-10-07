@@ -106,8 +106,25 @@ public class TricksterWrapper
     {
         UndecoratedModule module = new UndecoratedModule(moduleInfo.Name, moduleInfo);
 
-        List<TypeInfo> allClassTypes = firstClassTypes.ToList();
-        HashSet<string> allClassTypesNames = allClassTypes.Select(x => x.Name).ToHashSet();
+        Dictionary<string, TypeInfo> allClassTypes = new();
+        foreach (TypeInfo curr in firstClassTypes)
+        {
+            FirstClassTypeInfo currFirstClassType = curr as FirstClassTypeInfo;
+
+            if (allClassTypes.TryGetValue(curr.FullTypeName, out TypeInfo collectedClassType))
+            {
+                (collectedClassType as FirstClassTypeInfo).AddSecondaryVftable(currFirstClassType.VftableAddress);
+            }
+            else
+            {
+                allClassTypes[curr.FullTypeName] = new FirstClassTypeInfo(
+                    currFirstClassType.ModuleName,
+                    currFirstClassType.Name,
+                    currFirstClassType.VftableAddress,
+                    currFirstClassType.Offset);
+            }
+        }
+        HashSet<string> allClassTypesNames = allClassTypes.Select(x => x.Value.Name).ToHashSet();
 
         // Collect 2nd-class types & removing ALL ctors from the exports list (for 1st or 2nd class types).
         // First, going over exports and looking for constructors.
@@ -132,13 +149,13 @@ public class TricksterWrapper
             // NEW 2nd-class type. Adding a new match!
             TypeInfo ti = new SecondClassTypeInfo(module.Name, fullTypeName);
             // Store aside as a member of this type
-            allClassTypes.Add(ti);
+            allClassTypes.Add(fullTypeName, ti);
             allClassTypesNames.Add(ti.Name);
         }
 
 
         // Now iterate all class Types & search any exports that match their names
-        foreach (TypeInfo typeInfo in allClassTypes)
+        foreach (TypeInfo typeInfo in allClassTypes.Values)
         {
             // Find all exported members of the type
             IEnumerable<UndecoratedSymbol> methods = _exports.GetExportedTypeMembers(moduleInfo, typeInfo.Name);

@@ -162,13 +162,19 @@ namespace RemoteNET.RttiReflection
             if (string.IsNullOrEmpty(mangledName))
                 mangledName = func.Name;
 
+            string moduleName = typeDump.Assembly;
+
             List<LazyRemoteParameterResolver> parameters = new List<LazyRemoteParameterResolver>(func.Parameters.Count);
             int i = 1;
             foreach (TypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
             {
+                // TODO: No support for methods with reference parameters for now.
+                if (restarizedParameter.FullTypeName.EndsWith('&'))
+                    return;
+
                 string fakeParamName = $"a{i}";
                 i++;
-                Lazy<Type> paramFactory = CreateTypeFactory(restarizedParameter.FullTypeName);
+                Lazy<Type> paramFactory = CreateTypeFactory(restarizedParameter.FullTypeName, moduleName);
                 LazyRemoteTypeResolver paramTypeResolver = new LazyRemoteTypeResolver(paramFactory,
                     //methodParameter.Assembly,
                     //methodParameter.FullTypeName,
@@ -182,7 +188,7 @@ namespace RemoteNET.RttiReflection
                 parameters.Add(paramResolver);
             }
 
-            Lazy<Type> returnTypeFactory = CreateTypeFactory(func.ReturnTypeFullName ?? func.ReturnTypeName);
+            Lazy<Type> returnTypeFactory = CreateTypeFactory(func.ReturnTypeFullName ?? func.ReturnTypeName, moduleName);
             LazyRemoteTypeResolver returnTypeResolver = new LazyRemoteTypeResolver(returnTypeFactory,
                 null,
                 func.ReturnTypeFullName,
@@ -208,7 +214,7 @@ namespace RemoteNET.RttiReflection
                 if (!func.UndecoratedFullName.StartsWith(declaringTypeNameWithNamespace))
                 {
                     string type = func.UndecoratedFullName.Substring(0, func.UndecoratedFullName.LastIndexOf("::"));
-                    Lazy<Type> declaringTypeFactory = CreateTypeFactory(type);
+                    Lazy<Type> declaringTypeFactory = CreateTypeFactory(type, moduleName);
                     declaringTypeResolver = new LazyRemoteTypeResolver(declaringTypeFactory,
                         null,
                         type,
@@ -221,26 +227,37 @@ namespace RemoteNET.RttiReflection
                 declaringType.AddMethod(methodInfo);
             }
 
-            Lazy<Type> CreateTypeFactory(string fullTypeName)
+            Lazy<Type> CreateTypeFactory(string namespaceAndTypeName, string moduleName)
             {
+                // Get rid of '*' in pointers so it's NOT treated as a wildcard
+                namespaceAndTypeName = namespaceAndTypeName.TrimEnd('*');
+                // If no module name is given, use a wildcard
+                moduleName ??= "*";
 
                 return new Lazy<Type>(() =>
                 {
-                    if (_shittyCache.TryGetValue(fullTypeName, out var t))
+                    if (_shittyCache.TryGetValue(namespaceAndTypeName, out var t))
                         return t;
 
-                    Debug.WriteLine($"[@@@][RttiTypeFactory] Trying to resolve non-cached sub-type: `{fullTypeName}`");
+                    Debug.WriteLine($"[@@@][RttiTypeFactory] Trying to resolve non-cached sub-type: `{namespaceAndTypeName}`");
 
-                    var possibleParamTypes = app.QueryTypes(fullTypeName).ToArray();
-                    if (possibleParamTypes.Length == 0 && !fullTypeName.Contains('!'))
+                    var possibleParamTypes = app.QueryTypes(namespaceAndTypeName).ToArray();
+                    if (possibleParamTypes.Length == 0 && !namespaceAndTypeName.Contains('!'))
                     {
-                        possibleParamTypes = app.QueryTypes($"*!{fullTypeName}").ToArray();
+                        // Try with given module name
+                        possibleParamTypes = app.QueryTypes($"{moduleName}!{namespaceAndTypeName}").ToArray();
+
+                        if (possibleParamTypes.Length == 0 && moduleName == "*")
+                        {
+                            // If we didn't figure using the given module name, let's extend the search using a wild card module name
+                            possibleParamTypes = app.QueryTypes($"*!{namespaceAndTypeName}").ToArray();
+                        }
                     }
 
                     if (possibleParamTypes.Length == 0)
                     {
-                        Type temp = new DummyRttiType(fullTypeName);
-                        _shittyCache[fullTypeName] = temp;
+                        Type temp = new DummyRttiType(namespaceAndTypeName);
+                        _shittyCache[namespaceAndTypeName] = temp;
                         return temp;
                     }
 
@@ -258,7 +275,7 @@ namespace RemoteNET.RttiReflection
                             string.Join(", ",
                                 paramTypeInSameAssembly.Select(cand => $"{cand.Assembly}!{cand.TypeFullName}"));
                         throw new Exception(
-                            $"Too many matches for the sub-type '{fullTypeName}' in the signature of {func.UndecoratedFullName} .\n" +
+                            $"Too many matches for the sub-type '{namespaceAndTypeName}' in the signature of {func.UndecoratedFullName} .\n" +
                             $"Candidates: " + candidates);
                     }
 

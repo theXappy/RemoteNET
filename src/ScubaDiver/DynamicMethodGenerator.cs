@@ -150,7 +150,7 @@ public static class DetoursMethodGenerator
         DetouredFuncInfo tramp = _trampolines[generatedMethodName];
 
         // Call prefix hook
-        bool skipOriginal = Hook(HarmonyPatchPosition.Prefix, tramp, args, out nuint overridenReturnValue);
+        bool skipOriginal = RunPath(HarmonyPatchPosition.Prefix, tramp, args, out nuint overridenReturnValue);
         if (!skipOriginal)
         {
             overridenReturnValue = 0;
@@ -164,13 +164,13 @@ public static class DetoursMethodGenerator
 
         // Call postfix hook
         // TODO: Pass real method's result to the hook
-        Hook(HarmonyPatchPosition.Postfix, tramp, args, out nuint _);
+        RunPath(HarmonyPatchPosition.Postfix, tramp, args, out nuint _);
 
         return overridenReturnValue;
     }
 
 
-    static bool Hook(HarmonyPatchPosition pos, DetouredFuncInfo tramp, object[] args, out nuint value)
+    static bool RunPath(HarmonyPatchPosition pos, DetouredFuncInfo tramp, object[] args, out nuint value)
     {
         if (args.Length == 0) throw new Exception("Bad arguments to unmanaged HookCallback. Expecting at least 1 (for 'this').");
 

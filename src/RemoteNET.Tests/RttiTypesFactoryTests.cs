@@ -297,7 +297,7 @@ namespace RemoteNET.Tests
 
 
         [Test]
-        public void UndecoratingCosntRef()
+        public void UndecoratingConstRef()
         {
             // Arrange
             ScubaDiver.Rtti.ModuleInfo module = new ModuleInfo("libPeek_lies.dll", 0xaabbccdd, 0xaabbccdd);
@@ -315,6 +315,36 @@ namespace RemoteNET.Tests
             // Assert
             var arg = args[1];
             Assert.AreEqual("Peek::WClass&", arg);
+        }
+
+        [Test]
+        public void UndecoratingConstRef_ParseType_NoMethod()
+        {
+            // Arrange
+            ScubaDiver.Rtti.ModuleInfo module = new ModuleInfo("libPeek_lies.dll", 0xaabbccdd, 0xaabbccdd);
+            DllExport export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
+                .Single(c => c.GetParameters().Length == 5).Invoke(new object?[]
+                {
+                    "??0WClass@Peek@@QEAA@AEBV01@@Z", 1, 0xbbccddee, "a", "b"
+
+                }) as DllExport;
+            export.TryUndecorate(module, out var undecFunc);
+            TypeDump.TypeMethod? func = VftableParser.ConvertToTypeMethod(undecFunc as UndecoratedFunction);
+            string childTypeLongName = "Peek::WClass";
+            TypeDump typeDump = new TypeDump()
+            {
+                Type = childTypeLongName,
+                Assembly = "libPeek_lies.dll"
+            };
+            RemoteRttiType childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
+            RemoteApp fakeApp = new FakeRemoteApp();
+
+            // Act
+            RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump, func, childType, false);
+
+            // Assert
+            // Expecting `AddFunctionImpl` to NOT add that function (not supported yet)
+            Assert.IsEmpty(childType.GetMethods());
         }
     }
 }

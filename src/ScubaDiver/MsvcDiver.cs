@@ -152,8 +152,22 @@ namespace ScubaDiver
                 QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
 
 
-            Rtti.TypeInfo typeInfo = typeInfos.Single();
+            Rtti.TypeInfo typeInfo;
+            try
+            {
+                typeInfo = typeInfos.Single();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message +
+                                    $".\n typeInfos: {String.Join(", ", typeInfos.Select(x => x.ToString()))}");
+            }
+
+            // Get all exported members of the requseted type
             List<UndecoratedSymbol> members = _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name).ToList();
+
+            // Find the first vftable within all members
+            // (TODO: Bug? How can I tell this is the "main" vftable?)
             UndecoratedSymbol vftable = members.FirstOrDefault(member => member.UndecoratedName.EndsWith("`vftable'"));
 
             string hookPositionStr = request.HookPosition;
@@ -341,24 +355,11 @@ namespace ScubaDiver
                     List<TypeDump.TypeField> fields = new();
                     List<TypeDump.TypeMethod> methods = new();
                     List<TypeDump.TypeMethod> constructors = new();
-                    DeconstructRttiType(typeInfo, module, fields, constructors, methods, out vftable);
+                    List<UndecoratedSymbol> vftables = new();
+                    DeconstructRttiType(typeInfo, module, fields, constructors, methods, vftables);
 
-                    if (vftable != null)
-                    {
-                        HANDLE process = _tricksterWrapper.GetProcessHandle();
-                        List<UndecoratedFunction> virtualFunctionsInternal = VftableParser.AnalyzeVftable(process, module, exports, vftable);
-                        List<TypeDump.TypeMethod> virtualFunctions = virtualFunctionsInternal.Select(VftableParser.ConvertToTypeMethod).Where(x => x != null).ToList();
-
-                        foreach (TypeDump.TypeMethod virtualFunction in virtualFunctions)
-                        {
-                            bool exists = methods.Any(existingMethod =>
-                                existingMethod.UndecoratedFullName == virtualFunction.UndecoratedFullName);
-                            if (exists)
-                                continue;
-
-                            methods.Add(virtualFunction);
-                        }
-                    }
+                    HANDLE process = _tricksterWrapper.GetProcessHandle();
+                    AnalyzeVftables(vftables, process, module, exports, methods);
 
                     TypeDump recusiveTypeDump = new TypeDump()
                     {
@@ -380,10 +381,8 @@ namespace ScubaDiver
             List<TypeDump.TypeField> fields,
             List<TypeDump.TypeMethod> constructors,
             List<TypeDump.TypeMethod> methods,
-            out UndecoratedSymbol vftable)
+            List<UndecoratedSymbol> vftables)
         {
-            vftable = null;
-
             string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
             string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
             string vftableName = $"{typeInfo.Name}::`vftable'"; // Constructing NameSpace::ClassName::`vftable
@@ -405,50 +404,85 @@ namespace ScubaDiver
                 }
                 else if (dllExport is UndecoratedExportedField undecField)
                 {
-                    HandleTypeField(undecField, vftableName, fields, ref vftable);
+                    bool isVftable = HandleVftable(undecField, vftableName, fields, vftables);
+                    if (isVftable)
+                        continue;
+                    HandleTypeField(undecField, fields);
                 }
             }
         }
 
-        private void HandleTypeField(UndecoratedExportedField undecField, string vftableName,
-            List<TypeDump.TypeField> fields, ref UndecoratedSymbol vftable)
+        private bool HandleVftable(UndecoratedExportedField undecField, string vftableName,
+            List<TypeDump.TypeField> fields,
+            List<UndecoratedSymbol> vftables)
         {
-            // vftable gets a sepcial treatment because we need it outside this func.
-            if (undecField.UndecoratedFullName == vftableName)
-            {
-                if (vftable != null)
-                {
-                    Logger.Debug(
-                        $"Duplicate vftable export found. Old: {vftable.UndecoratedFullName} (0x{vftable.Address:X16}) , " +
-                        $"New: {undecField.UndecoratedFullName} (0x{undecField.Address:X16}) ,");
-                    return;
-                }
+            // vftable gets a special treatment because we need it outside this func.
+            if (undecField.UndecoratedFullName != vftableName)
+                return false;
 
-                fields.Add(new TypeDump.TypeField()
-                {
-                    Name = "vftable",
-                    TypeFullName = undecField.UndecoratedFullName,
-                    Visibility = "Public"
-                });
-
-                // Keep vftable aside so we can also gather functions from it
-                vftable = undecField;
-            }
-            else
+            if (vftables.Count > 0)
             {
-                fields.Add(new TypeDump.TypeField()
-                {
-                    Name = undecField.UndecoratedName,
-                    TypeFullName = undecField.UndecoratedFullName,
-                    Visibility = "Public"
-                });
+                var mainVftable = vftables.First();
+                Logger.Debug(
+                    $"Secondary vftable export found. Old: {mainVftable.UndecoratedFullName} (0x{mainVftable.Address:X16}) , " +
+                    $"New: {undecField.UndecoratedFullName} (0x{undecField.Address:X16}) ,");
             }
 
-            //Logger.Debug(
-            //    $"[{nameof(GetTypeDump)}] Unexpected exported field. Undecorated name: {undecField.UndecoratedFullName}");
+            fields.Add(new TypeDump.TypeField()
+            {
+                Name = "vftable",
+                TypeFullName = undecField.UndecoratedFullName,
+                Visibility = "Public"
+            });
+
+            // Keep vftable aside so we can also gather functions from it
+            vftables.Add(undecField);
+            return true;
         }
 
+        private void HandleTypeField(UndecoratedExportedField undecField,
+            List<TypeDump.TypeField> fields)
+        {
+            fields.Add(new TypeDump.TypeField()
+            {
+                Name = undecField.UndecoratedName,
+                TypeFullName = undecField.UndecoratedFullName,
+                Visibility = "Public"
+            });
+        }
 
+        private void AnalyzeVftables(List<UndecoratedSymbol> vftables, HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports,
+            List<TypeDump.TypeMethod> methods)
+        {
+            foreach (UndecoratedSymbol vftable in vftables)
+            {
+                AnalyzeVftable(vftable, process, module, exports, methods);
+            }
+        }
+
+        private void AnalyzeVftable(UndecoratedSymbol vftable, HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports,
+            List<TypeDump.TypeMethod> methods)
+        {
+            // Parse functions from the vftable
+            List<UndecoratedFunction> virtualFunctionsInternal =
+                VftableParser.AnalyzeVftable(process, module, exports, vftable);
+
+            // Convert "Undecorated Functions" into "Type Methods"
+            IEnumerable<TypeDump.TypeMethod> virtualFunctions = virtualFunctionsInternal
+                .Select(VftableParser.ConvertToTypeMethod)
+                .Where(x => x != null);
+
+            // Filter out all the existing methods
+            foreach (TypeDump.TypeMethod virtualFunction in virtualFunctions)
+            {
+                bool exists = methods.Any(existingMethod =>
+                    existingMethod.UndecoratedFullName == virtualFunction.UndecoratedFullName);
+                if (exists)
+                    continue;
+
+                methods.Add(virtualFunction);
+            }
+        }
 
         private FirstClassTypeInfo ResolveTypeFromVftableAddress(nuint address)
         {
