@@ -183,6 +183,8 @@ namespace RemoteNET.Tests
 
             public override DiverCommunicator Communicator { get; }
             public override RemoteHookingManager HookingManager { get; }
+            public override RemoteMarshal Marshal { get; }
+
             public override IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter)
             {
                 var cands = new CandidateType[]

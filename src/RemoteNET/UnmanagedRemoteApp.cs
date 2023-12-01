@@ -19,17 +19,22 @@ namespace RemoteNET
         public RemoteActivator Activator => throw new NotImplementedException("Not yet");
 
         private DiverCommunicator _unmanagedCommunicator;
+        private readonly RemoteAppsHub _hub;
         public override DiverCommunicator Communicator => _unmanagedCommunicator;
         private RemoteHookingManager _hookingManager;
         public override RemoteHookingManager HookingManager => _hookingManager;
+        public override RemoteMarshal Marshal { get; }
 
         private List<string> _unmanagedModulesList;
 
-        public UnmanagedRemoteApp(Process procWithDiver, DiverCommunicator unmanagedCommunicator)
+        public UnmanagedRemoteApp(Process procWithDiver, DiverCommunicator unmanagedCommunicator, RemoteAppsHub hub)
         {
             _procWithDiver = procWithDiver;
             _unmanagedCommunicator = unmanagedCommunicator;
+            _hub = hub;
             _hookingManager = new RemoteHookingManager(this);
+            if(hub.TryGetValue(RuntimeType.Managed, out RemoteApp managedApp) && managedApp is ManagedRemoteApp castedManagedApp)
+                Marshal = new RemoteMarshal(castedManagedApp);
         }
 
         //
@@ -116,6 +121,30 @@ namespace RemoteNET
             return rtf.Create(this, dumpedType);
         }
 
+        /// <summary>
+        /// Gets a handle to a remote type
+        /// </summary>
+        /// <param name="methodTableAddress">Method Table Address to look for</param>
+        /// <returns></returns>
+        public Type GetRemoteType(long methodTableAddress)
+        {
+            // Easy case: Trying to resolve from cache or from local assemblies
+            var resolver = RttiTypesResolver.Instance;
+            Type res = resolver.Resolve(methodTableAddress);
+            if (res != null)
+            {
+                // Found in cache.
+                return res;
+            }
+
+            // Harder case: Dump the remote type. This takes much more time (includes dumping of depedent
+            // types) and should be avoided as much as possible.
+            RttiTypesFactory rtf =
+                new RttiTypesFactory(resolver, _unmanagedCommunicator);
+            var dumpedType = _unmanagedCommunicator.DumpType(methodTableAddress);
+            return rtf.Create(this, dumpedType);
+        }
+
         //
         // Getting Remote Objects
         //
@@ -143,7 +172,7 @@ namespace RemoteNET
         {
             if (oora.Type == typeof(CharStar).FullName)
             {
-                return new RemoteCharStar(oora.RemoteAddress, oora.EncodedObject);
+                return new RemoteCharStar(_hub[RuntimeType.Managed] as ManagedRemoteApp, oora.RemoteAddress, oora.EncodedObject);
             }
 
             return GetRemoteObject(oora.RemoteAddress, oora.Type);

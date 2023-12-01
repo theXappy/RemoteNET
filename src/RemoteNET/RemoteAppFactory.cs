@@ -67,17 +67,28 @@ namespace RemoteNET
             // Now register our program as a "client" of the diver
             string diverAddr = "127.0.0.1";
 
+            // ALWAYS connecting a managed app.
+            // Sometimes this will be the return value.
+            // Sometimes it'll just assist our Unmanaged App (which will be the return value)
+            RemoteAppsHub hub = new RemoteAppsHub();
+            DiverCommunicator managedCom = new DiverCommunicator(diverAddr, diverPort);
+            ManagedRemoteApp managedApp = null;
+            if (managedCom.RegisterClient())
+            {
+                managedApp = new ManagedRemoteApp(target, managedCom, hub);
+                hub[RuntimeType.Managed] = managedApp;
+            }
+
             switch (runtime)
             {
                 case RuntimeType.Managed:
-                    DiverCommunicator managedCom = new DiverCommunicator(diverAddr, diverPort);
-                    if (managedCom.RegisterClient())
-                        return new ManagedRemoteApp(target, managedCom);
+                    if(managedApp != null)
+                        return managedApp;
                     break;
                 case RuntimeType.Unmanaged:
                     DiverCommunicator unmanagedCom = new DiverCommunicator(diverAddr, diverPort + 2);
                     if (unmanagedCom.RegisterClient())
-                        return new UnmanagedRemoteApp(target, unmanagedCom);
+                        return new UnmanagedRemoteApp(target, unmanagedCom, hub);
                     break;
                 case RuntimeType.Unknown:
                 default:

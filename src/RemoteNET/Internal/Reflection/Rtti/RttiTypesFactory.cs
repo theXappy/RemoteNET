@@ -127,7 +127,7 @@ namespace RemoteNET.RttiReflection
             _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
 
             // Register at resolver
-            _resolver.RegisterType(typeDump.Assembly, typeDump.Type, output);
+            _resolver.RegisterType(output);
 
             return output;
         }
@@ -137,6 +137,11 @@ namespace RemoteNET.RttiReflection
             AddGroupOfFunctions(app, typeDump, typeDump.Methods, output, areConstructors: false);
             AddGroupOfFunctions(app, typeDump, typeDump.Constructors, output, areConstructors: true);
             AddFields(app, typeDump.Fields, output);
+
+            foreach (TypeDump.TypeMethodTable methodTable in typeDump.MethodTables)
+            {
+                output.AddVftable(methodTable.Name, methodTable.Address);
+            }
         }
 
         private void AddFields(RemoteApp app, List<TypeDump.TypeField> typeDumpFields, RemoteRttiType output)
@@ -230,6 +235,7 @@ namespace RemoteNET.RttiReflection
             Lazy<Type> CreateTypeFactory(string namespaceAndTypeName, string moduleName)
             {
                 // Get rid of '*' in pointers so it's NOT treated as a wildcard
+                string originalNamespaceAndTypeName = namespaceAndTypeName;
                 namespaceAndTypeName = namespaceAndTypeName.TrimEnd('*');
                 // If no module name is given, use a wildcard
                 moduleName ??= "*";
@@ -256,8 +262,11 @@ namespace RemoteNET.RttiReflection
 
                     if (possibleParamTypes.Length == 0)
                     {
-                        Type temp = new DummyRttiType(namespaceAndTypeName);
-                        _shittyCache[namespaceAndTypeName] = temp;
+                        // No luck here. This might be defined in a different module
+                        // OR and MORE LIKELY this is a pointer to some primitive.
+                        // for example char* or int**.
+                        Type temp = new DummyRttiType(originalNamespaceAndTypeName);
+                        _shittyCache[originalNamespaceAndTypeName] = temp;
                         return temp;
                     }
 

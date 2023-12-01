@@ -191,6 +191,20 @@ namespace ScubaDiver.API
 
             return results;
         }
+        public TypeDump DumpType(long methodTableAddress)
+        {
+            TypeDumpRequest dumpRequest = new()
+            {
+                MethodTableAddress = methodTableAddress
+            };
+            var requestJsonBody = JsonConvert.SerializeObject(dumpRequest);
+
+            string body = SendRequest("type", null, requestJsonBody);
+            TypeDump? results = JsonConvert.DeserializeObject<TypeDump>(body, _withErrors);
+
+            return results;
+        }
+
 
         public ObjectDump DumpObject(ulong address, string typeName, bool pinObject = false, int? hashcode = null)
         {
@@ -266,7 +280,7 @@ namespace ScubaDiver.API
 
             try
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 10; i++)
                 {
                     Debug.WriteLine($"[@@@][RegisterClient] Trying to register try #{i + 1}");
                     string body = SendRequest("register_client",

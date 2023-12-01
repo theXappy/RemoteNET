@@ -8,7 +8,7 @@ public class DynamicRemoteCharStarTests
     public void TestPropertyAccess()
     {
         string initialString = "Hello, world!";
-        dynamic proxy = new DynamicRemoteCharStar(initialString);
+        dynamic proxy = new DynamicRemoteCharStar(null, 0x100, initialString);
 
         // Test property access using dynamic proxy
         Assert.AreEqual(13, proxy.Length);
@@ -19,7 +19,7 @@ public class DynamicRemoteCharStarTests
     public void TestPropertyModification()
     {
         string initialString = "Hello, world!";
-        dynamic proxy = new DynamicRemoteCharStar(initialString);
+        dynamic proxy = new DynamicRemoteCharStar(null, 0x100, initialString);
 
         // Modify property using dynamic proxy
         proxy = proxy.Replace("world", "C#");
@@ -30,7 +30,7 @@ public class DynamicRemoteCharStarTests
     public void TestMethodInvocation()
     {
         string initialString = "Hello, world!";
-        dynamic proxy = new DynamicRemoteCharStar(initialString);
+        dynamic proxy = new DynamicRemoteCharStar(null, 0x100, initialString);
 
         // Invoke method using dynamic proxy
         proxy = proxy.ToUpper();
@@ -41,7 +41,7 @@ public class DynamicRemoteCharStarTests
     public void TestSubclassParameter()
     {
         string initialString = "Hello, world!";
-        dynamic proxy = new DynamicRemoteCharStar(initialString);
+        dynamic proxy = new DynamicRemoteCharStar(null, 0x100, initialString);
 
         // Invoke ToString method with a string parameter
         string formattedString = proxy.ToString(CultureInfo.InvariantCulture);
@@ -57,7 +57,7 @@ public class DynamicRemoteCharStarTests
     public void TestImplicitConversion()
     {
         string initialString = "Hello, world!";
-        dynamic proxy = new DynamicRemoteCharStar(initialString);
+        dynamic proxy = new DynamicRemoteCharStar(null, 0x100, initialString);
 
         // Implicit conversion from DynamicRemoteCharStar to string
         string convertedString = proxy;
@@ -68,7 +68,7 @@ public class DynamicRemoteCharStarTests
     public void TestExplicitConversion()
     {
         string initialString = "Hello, world!";
-        dynamic proxy = new DynamicRemoteCharStar(initialString);
+        dynamic proxy = new DynamicRemoteCharStar(null, 0x100, initialString);
 
         // Explicit conversion from DynamicRemoteCharStar to string
         string convertedString = (string)proxy;
@@ -79,7 +79,7 @@ public class DynamicRemoteCharStarTests
     public void TestToStringConversion()
     {
         string initialString = "Hello, world!";
-        dynamic proxy = new DynamicRemoteCharStar(initialString);
+        dynamic proxy = new DynamicRemoteCharStar(null, 0x100, initialString);
 
         // Explicit conversion from DynamicRemoteCharStar to string
         string convertedString = proxy.ToString();

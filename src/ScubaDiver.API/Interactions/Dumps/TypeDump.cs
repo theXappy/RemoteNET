@@ -233,6 +233,12 @@ namespace ScubaDiver.API.Interactions.Dumps
             }
         }
 
+        public class TypeMethodTable
+        {
+            public string Name { get; set; }
+            public long Address { get; set; }
+        }
+
         public string Type { get; set; }
         public string Assembly { get; set; }
 
@@ -241,6 +247,7 @@ namespace ScubaDiver.API.Interactions.Dumps
         public string ParentFullTypeName { get; set; }
         public string ParentAssembly { get; set; }
 
+        public List<TypeMethodTable> MethodTables { get; set; }
         public List<TypeMethod> Methods { get; set; }
         public List<TypeMethod> Constructors { get; set; }
         public List<TypeField> Fields { get; set; }

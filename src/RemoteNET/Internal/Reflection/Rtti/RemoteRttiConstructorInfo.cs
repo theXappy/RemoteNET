@@ -11,7 +11,7 @@ namespace RemoteNET.Internal.Reflection;
 [DebuggerDisplay("Remote RTTI Constructor: {LazyRetType.TypeFullName} {Name}(...)")]
 public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
 {
-    public LazyRemoteTypeResolver LazyRetType => new LazyRemoteTypeResolver(typeof(void));
+    public LazyRemoteTypeResolver LazyRetType => new LazyRemoteTypeResolver(new DummyRttiType("void"));
     protected LazyRemoteParameterResolver[] _lazyParamInfosImpl;
     public LazyRemoteParameterResolver[] LazyParamInfos => _lazyParamInfosImpl;
 

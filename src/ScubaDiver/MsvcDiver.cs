@@ -17,6 +17,7 @@ using ScubaDiver.Hooking;
 using Windows.Win32.Foundation;
 using System.Reflection;
 using ScubaDiver.API.Hooking;
+using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 
 namespace ScubaDiver
 {
@@ -180,7 +181,7 @@ namespace ScubaDiver
             if (vftable != null)
             {
 
-                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), module, _exportsMaster.GetExports(module), vftable);
+                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), module, _exportsMaster.GetExports(module), vftable.Address);
 
                 // Remove duplicates - the methods which are both virtual and exported.
                 virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
@@ -303,24 +304,80 @@ namespace ScubaDiver
         protected override string MakeTypeResponse(ScubaDiverMessage req)
         {
             string body = req.Body;
-
             if (string.IsNullOrEmpty(body))
             {
                 return QuickError("Missing body");
             }
 
-            TextReader textReader = new StringReader(body);
             var request = JsonConvert.DeserializeObject<TypeDumpRequest>(body);
             if (request == null)
             {
                 return QuickError("Failed to deserialize body");
             }
 
-            TypeDump dump = GetRttiType(request.TypeFullName, request.Assembly);
+            TypeDump dump;
+            if (request.MethodTableAddress != 0)
+            {
+                dump = GetTypeDump((nuint)request.MethodTableAddress);
+            }
+            else
+            {
+                dump = GetRttiType(request.TypeFullName, request.Assembly);
+            }
+
             if (dump != null)
                 return JsonConvert.SerializeObject(dump);
 
             return QuickError("Failed to find type in searched assemblies");
+        }
+
+        private TypeDump GetTypeDump(nuint methodTableAddress)
+        {
+            var modules = _tricksterWrapper.GetModules();
+            foreach (ModuleInfo module in modules)
+            {
+                if (module.BaseAddress > methodTableAddress ||
+                    methodTableAddress >= (module.BaseAddress + module.Size))
+                    continue;
+
+                var types = _tricksterWrapper.SearchTypes(module.Name, "*").Values.SingleOrDefault();
+                foreach (TypeInfo typeInfo in types)
+                {
+                    if (typeInfo is not FirstClassTypeInfo firstClassTypeInfo)
+                        continue;
+                    if (firstClassTypeInfo.VftableAddress != methodTableAddress)
+                        continue;
+
+                    IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module);
+                    return GenerateTypeDump(typeInfo, module, exports);
+                }
+            }
+
+            return null;
+        }
+
+        private TypeDump GenerateTypeDump(TypeInfo typeInfo, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports)
+        {
+            UndecoratedSymbol vftable;
+            List<TypeDump.TypeField> fields = new();
+            List<TypeDump.TypeMethod> methods = new();
+            List<TypeDump.TypeMethod> constructors = new();
+            List<TypeDump.TypeMethodTable> vftables = new();
+            DeconstructRttiType(typeInfo, module, fields, constructors, methods, vftables);
+
+            HANDLE process = _tricksterWrapper.GetProcessHandle();
+            AnalyzeVftables(vftables, process, module, exports, methods);
+
+            TypeDump recusiveTypeDump = new TypeDump()
+            {
+                Assembly = module.Name,
+                Type = typeInfo.Name,
+                Methods = methods,
+                Constructors = constructors,
+                Fields = fields,
+                MethodTables = vftables
+            };
+            return recusiveTypeDump;
         }
 
         private TypeDump GetRttiType(string rawTypeFilter, string assembly = null)
@@ -355,7 +412,7 @@ namespace ScubaDiver
                     List<TypeDump.TypeField> fields = new();
                     List<TypeDump.TypeMethod> methods = new();
                     List<TypeDump.TypeMethod> constructors = new();
-                    List<UndecoratedSymbol> vftables = new();
+                    List<TypeDump.TypeMethodTable> vftables = new();
                     DeconstructRttiType(typeInfo, module, fields, constructors, methods, vftables);
 
                     HANDLE process = _tricksterWrapper.GetProcessHandle();
@@ -367,7 +424,8 @@ namespace ScubaDiver
                         Type = typeInfo.Name,
                         Methods = methods,
                         Constructors = constructors,
-                        Fields = fields
+                        Fields = fields,
+                        MethodTables = vftables
                     };
                     return recusiveTypeDump;
                 }
@@ -381,7 +439,7 @@ namespace ScubaDiver
             List<TypeDump.TypeField> fields,
             List<TypeDump.TypeMethod> constructors,
             List<TypeDump.TypeMethod> methods,
-            List<UndecoratedSymbol> vftables)
+            List<TypeDump.TypeMethodTable> vftables)
         {
             string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
             string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
@@ -404,29 +462,38 @@ namespace ScubaDiver
                 }
                 else if (dllExport is UndecoratedExportedField undecField)
                 {
-                    bool isVftable = HandleVftable(undecField, vftableName, fields, vftables);
+                    bool isVftable = HandleVftable(undecField, vftableName, fields);
                     if (isVftable)
+                    {
+                        if (vftables.Count > 0)
+                        {
+                            var mainVftable = vftables.First();
+                            Logger.Debug(
+                                $"Secondary vftable export found. Old: {mainVftable.Name} (0x{mainVftable.Address:X16}) , " +
+                                $"New: {undecField.UndecoratedFullName} (0x{undecField.Address:X16}) ,");
+                        }
+
+                        // Keep vftable aside so we can also gather functions from it
+                        vftables.Add(new TypeDump.TypeMethodTable
+                        {
+                            Name = undecField.DecoratedName,
+                            Address = undecField.Address,
+                        });
                         continue;
+                    }
+
                     HandleTypeField(undecField, fields);
                 }
             }
         }
 
         private bool HandleVftable(UndecoratedExportedField undecField, string vftableName,
-            List<TypeDump.TypeField> fields,
-            List<UndecoratedSymbol> vftables)
+            List<TypeDump.TypeField> fields)
         {
             // vftable gets a special treatment because we need it outside this func.
             if (undecField.UndecoratedFullName != vftableName)
                 return false;
 
-            if (vftables.Count > 0)
-            {
-                var mainVftable = vftables.First();
-                Logger.Debug(
-                    $"Secondary vftable export found. Old: {mainVftable.UndecoratedFullName} (0x{mainVftable.Address:X16}) , " +
-                    $"New: {undecField.UndecoratedFullName} (0x{undecField.Address:X16}) ,");
-            }
 
             fields.Add(new TypeDump.TypeField()
             {
@@ -435,8 +502,6 @@ namespace ScubaDiver
                 Visibility = "Public"
             });
 
-            // Keep vftable aside so we can also gather functions from it
-            vftables.Add(undecField);
             return true;
         }
 
@@ -451,21 +516,21 @@ namespace ScubaDiver
             });
         }
 
-        private void AnalyzeVftables(List<UndecoratedSymbol> vftables, HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports,
+        private void AnalyzeVftables(List<TypeDump.TypeMethodTable> vftables, HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports,
             List<TypeDump.TypeMethod> methods)
         {
-            foreach (UndecoratedSymbol vftable in vftables)
+            foreach (TypeDump.TypeMethodTable vftable in vftables)
             {
                 AnalyzeVftable(vftable, process, module, exports, methods);
             }
         }
 
-        private void AnalyzeVftable(UndecoratedSymbol vftable, HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports,
+        private void AnalyzeVftable(TypeDump.TypeMethodTable vftable, HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports,
             List<TypeDump.TypeMethod> methods)
         {
             // Parse functions from the vftable
             List<UndecoratedFunction> virtualFunctionsInternal =
-                VftableParser.AnalyzeVftable(process, module, exports, vftable);
+                VftableParser.AnalyzeVftable(process, module, exports, vftable.Address);
 
             // Convert "Undecorated Functions" into "Type Methods"
             IEnumerable<TypeDump.TypeMethod> virtualFunctions = virtualFunctionsInternal
@@ -746,9 +811,9 @@ namespace ScubaDiver
             // Prepare invocation results for response
             //
             TypeDump returnTypeDump = null;
-            if (targetMethod.RetType.Contains("::") && /*Is a pointer */ targetMethod.RetType.EndsWith(" *"))
+            if (targetMethod.RetType.Contains("::") && /*Is a pointer */ targetMethod.RetType.EndsWith("*"))
             {
-                string normalizedRetType = method.ReturnTypeName[..^2]; // Remove ' *' suffix
+                string normalizedRetType = method.ReturnTypeName[..^1]; // Remove '*' suffix
                 returnTypeDump = GetRttiType(normalizedRetType);
             }
 
