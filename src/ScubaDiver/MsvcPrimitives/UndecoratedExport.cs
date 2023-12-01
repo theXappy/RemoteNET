@@ -20,7 +20,7 @@ public class UndecoratedExportedFunc : UndecoratedFunction
         {
             string[] args = _lazyArgTypes;
             if (args != null)
-                args = args.Prepend($"{ClassName} *").ToArray(); // TODO: Assuming instance method
+                args = args.Prepend($"{ClassName}*").ToArray(); // TODO: Assuming instance method
             return args;
         }
     }

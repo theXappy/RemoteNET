@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using RemoteNET.Common;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Reflection.DotNet;
 using ScubaDiver.API;
@@ -104,11 +103,11 @@ namespace RemoteNET
 
         public Process Process => _procWithDiver;
         public RemoteActivator Activator { get; private set; }
-        public RemoteMarshal Marshal { get; private set; }
+        public override RemoteMarshal Marshal { get; }
 
         public override DiverCommunicator Communicator => _managedCommunicator;
 
-        public ManagedRemoteApp(Process procWithDiver, DiverCommunicator managedCommunicator)
+        public ManagedRemoteApp(Process procWithDiver, DiverCommunicator managedCommunicator, RemoteAppsHub hub)
         {
             _procWithDiver = procWithDiver;
             _managedCommunicator = managedCommunicator;

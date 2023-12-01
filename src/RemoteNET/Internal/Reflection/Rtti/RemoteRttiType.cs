@@ -25,6 +25,8 @@ namespace RemoteNET.RttiReflection
         private Lazy<Type> _parent;
         public override Type BaseType => _parent?.Value;
         public RemoteApp App { get; set; }
+        private Dictionary<string, long> _methodTables = new();
+        public IReadOnlyDictionary<string, long> MethodTables => _methodTables;
         public List<string> UnresolvedMembers { get; private set; }
 
         public RemoteRttiType(RemoteApp app, string fullTypeName, string assemblyName)
@@ -65,6 +67,7 @@ namespace RemoteNET.RttiReflection
         public void AddMethod(MethodInfo mi) => _methods.Add(mi);
         public void AddField(FieldInfo fi) => _fields.Add(fi);
         public void AddUnresolvedMember(string member) => UnresolvedMembers.Add(member);
+        public void AddVftable(string name, long addr) => _methodTables.Add(name, addr);
 
         public override object[] GetCustomAttributes(bool inherit)
         {
