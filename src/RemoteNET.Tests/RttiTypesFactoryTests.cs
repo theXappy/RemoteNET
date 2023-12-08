@@ -214,6 +214,11 @@ namespace RemoteNET.Tests
                 return cands.Single(cand => $"{cand.Namespace}::{cand.Name}".Contains(typeFullName));
             }
 
+            public override Type GetRemoteType(long methodTableAddress)
+            {
+                throw new NotImplementedException();
+            }
+
             public override RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
             {
                 throw new NotImplementedException();
