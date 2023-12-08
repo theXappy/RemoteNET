@@ -126,7 +126,7 @@ namespace RemoteNET
         /// </summary>
         /// <param name="methodTableAddress">Method Table Address to look for</param>
         /// <returns></returns>
-        public Type GetRemoteType(long methodTableAddress)
+        public override Type GetRemoteType(long methodTableAddress)
         {
             // Easy case: Trying to resolve from cache or from local assemblies
             var resolver = RttiTypesResolver.Instance;
