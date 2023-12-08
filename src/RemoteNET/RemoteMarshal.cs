@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using ScubaDiver.API.Memory;
 
 namespace RemoteNET;
 
@@ -17,7 +18,7 @@ public class RemoteMarshal
     public RemoteMarshal(ManagedRemoteApp app)
     {
         _app = app;
-        _remoteMarshalType = _app.GetRemoteType(typeof(Marshal));
+        _remoteMarshalType = _app.GetRemoteType(typeof(SafeMarshal));
         _remoteAlloc = _remoteMarshalType.GetMethod(nameof(AllocHGlobal), (BindingFlags)0xffff, new[] { typeof(int) });
         _remoteFree = _remoteMarshalType.GetMethod(nameof(FreeHGlobal), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
         _remoteWrite = _remoteMarshalType.GetMethod(nameof(Copy), (BindingFlags)0xffff, new[] { typeof(byte[]), typeof(int), typeof(IntPtr), typeof(int) });
