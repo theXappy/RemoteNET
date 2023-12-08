@@ -805,7 +805,18 @@ namespace ScubaDiver
             //
             // Invoke target
             //
-            nuint? results = methodPtr.DynamicInvoke(invocationArgs) as nuint?;
+            nuint? results;
+            try
+            {
+                results = methodPtr.DynamicInvoke(invocationArgs) as nuint?;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug("[MakeInvokeResponse] Threw an exception and we CAUGHT it. Ex: " + ex);
+                throw new AggregateException(ex);
+            }
+
+            Logger.Debug("[MakeInvokeResponse] SUCCESS. Target didn't throw an exception.");
 
             //
             // Prepare invocation results for response
