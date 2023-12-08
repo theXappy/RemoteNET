@@ -210,6 +210,11 @@ namespace RemoteNET
             return rtf.Create(this, dumpedType);
         }
 
+        public override Type GetRemoteType(long methodTableAddress)
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary>
         /// Get a managed remote Enum
         /// </summary>

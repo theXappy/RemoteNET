@@ -32,6 +32,8 @@ public abstract class RemoteApp : IDisposable
     /// <returns></returns>
     public abstract Type GetRemoteType(string typeFullName, string assembly = null);
 
+    public abstract Type GetRemoteType(long methodTableAddress);
+
     /// <summary>
     /// Returns a handle to a remote type based on a given local type.
     /// </summary>
