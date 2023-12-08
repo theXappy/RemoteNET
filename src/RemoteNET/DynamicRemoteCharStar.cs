@@ -11,20 +11,20 @@ namespace RemoteNET;
 public class DynamicRemoteCharStar : DynamicObject
 {
     private readonly ManagedRemoteApp _app;
-    private ulong _addr;
+    public ulong Address { get; set; }
     private string _innerString;
 
-    public DynamicRemoteCharStar(ManagedRemoteApp app, ulong addr, string initialValue)
+    public DynamicRemoteCharStar(ManagedRemoteApp app, ulong address, string initialValue)
     {
         _app = app;
-        _addr = addr;
+        Address = address;
         _innerString = initialValue;
     }
 
     public byte[] ReadBytes(int num)
     {
         byte[] output = new byte[num];
-        _app.Marshal.Read(new IntPtr((long)_addr), output, 0, num);
+        _app.Marshal.Read(new IntPtr((long)Address), output, 0, num);
         return output;
     }
 
