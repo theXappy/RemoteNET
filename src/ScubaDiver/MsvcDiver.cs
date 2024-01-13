@@ -24,14 +24,14 @@ namespace ScubaDiver
     public class MsvcDiver : DiverBase
     {
         private TricksterWrapper _tricksterWrapper = null;
-        private ExportsMaster _exportsMaster = null;
+        private IReadOnlyExportsMaster _exportsMaster = null;
 
         public MsvcDiver(IRequestsListener listener) : base(listener)
         {
             _responseBodyCreators["/gc"] = MakeGcResponse;
 
-            _exportsMaster = new ExportsMaster();
-            _tricksterWrapper = new TricksterWrapper(_exportsMaster);
+            _tricksterWrapper = new TricksterWrapper();
+            _exportsMaster = _tricksterWrapper.ExportsMaster;
         }
 
         public override void Start()

@@ -4,7 +4,7 @@ using NtApiDotNet.Win32;
 
 namespace ScubaDiver;
 
-public class ExportsMaster
+public class ExportsMaster : IReadOnlyExportsMaster
 {
     private Dictionary<string, List<DllExport>> _exportsCache = new();
     private IReadOnlyList<DllExport> GetExportsInner(string moduleName)
