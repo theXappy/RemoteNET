@@ -14,11 +14,12 @@ public class TricksterWrapper
 {
     private Trickster _trickster;
     private ExportsMaster _exports;
+    public ExportsMaster ExportsMaster { get; set; }
 
-    public TricksterWrapper(ExportsMaster exports)
+    public TricksterWrapper()
     {
         _trickster = null;
-        _exports = exports;
+        _exports = new ExportsMaster();
     }
 
     public void Refresh()
