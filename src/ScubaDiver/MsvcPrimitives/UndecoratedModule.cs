@@ -32,7 +32,7 @@ public class UndecoratedModule
 
     public void AddTypeFunction(Rtti.TypeInfo type, UndecoratedFunction func)
     {
-        var undType = GetOrAdd(type);
+        UndecoratedType undType = GetOrAddType(type);
         if (!undType.ContainsKey(func.UndecoratedFullName))
             undType[func.UndecoratedFullName] = new UndecoratedMethodGroup();
         undType[func.UndecoratedFullName].Add(func);
@@ -55,7 +55,7 @@ public class UndecoratedModule
         return _typelessFunctions.TryGetValue(decoratedMethodName, out res);
     }
 
-    private UndecoratedType GetOrAdd(Rtti.TypeInfo type)
+    public UndecoratedType GetOrAddType(Rtti.TypeInfo type)
     {
         if(!_namesToTypes.ContainsKey(type.Name))
             _namesToTypes[type.Name] = type;

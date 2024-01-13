@@ -158,6 +158,9 @@ public class TricksterWrapper
         // Now iterate all class Types & search any exports that match their names
         foreach (TypeInfo typeInfo in allClassTypes.Values)
         {
+            // $#@!: Is this a hack?
+            module.GetOrAddType(typeInfo);
+
             // Find all exported members of the type
             IEnumerable<UndecoratedSymbol> methods = _exports.GetExportedTypeMembers(moduleInfo, typeInfo.Name);
             foreach (UndecoratedSymbol symbol in methods)
