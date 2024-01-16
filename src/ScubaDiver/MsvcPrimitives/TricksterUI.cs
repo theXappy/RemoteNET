@@ -65,7 +65,17 @@ public class TricksterUI {
     /// <returns></returns>
     public static Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(Trickster trickster, IEnumerable<FirstClassTypeInfo> typeInfos)
     {
-        Dictionary</*xored vftable*/ nuint, FirstClassTypeInfo> xoredVftableToType = typeInfos.ToDictionary(ti => ti.XoredVftableAddress);
+
+        Dictionary< /*xored vftable*/ nuint, FirstClassTypeInfo> xoredVftableToType = new();
+        foreach (var typeInfo in typeInfos)
+        {
+            if (xoredVftableToType.TryGetValue(typeInfo.XoredVftableAddress, out var old))
+            {
+                Logger.Debug($"[TricksterUI][Scan] Duplicate vftable. Value: 0x{typeInfo.VftableAddress:X16}, Mine: [ {typeInfo} ], Old: [ {old} ]");
+                continue;
+            }
+            xoredVftableToType[typeInfo.XoredVftableAddress] = typeInfo;
+        }
         IDictionary</*xored vftable*/ ulong, /*instance pointers*/ IReadOnlyCollection<ulong>> xoredVftablesToInstances = trickster.ScanRegions(xoredVftableToType.Keys, FirstClassTypeInfo.XorMask);
 
         Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> res = new();
