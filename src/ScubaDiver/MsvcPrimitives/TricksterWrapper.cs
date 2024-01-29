@@ -14,7 +14,7 @@ public class TricksterWrapper
 {
     private Trickster _trickster;
     private ExportsMaster _exports;
-    public ExportsMaster ExportsMaster { get; set; }
+    public ExportsMaster ExportsMaster => _exports;
 
     public TricksterWrapper()
     {
