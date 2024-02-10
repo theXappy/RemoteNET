@@ -219,7 +219,7 @@ namespace ScubaDiver
 
 
             // Preparing a proxy method that Harmony will invoke
-            HarmonyWrapper.HookCallback patchCallback = (obj, args) =>
+            HarmonyWrapper.HookCallback patchCallback = (object obj, object[] args, ref object _) =>
             {
                 object[] parameters = new object[args.Length + 1];
                 parameters[0] = obj;
