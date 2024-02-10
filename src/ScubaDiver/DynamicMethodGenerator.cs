@@ -220,18 +220,24 @@ public static class DetoursMethodGenerator
 
         bool skipOriginal = false;
         object newRetVal = null;
-        bool retValModified;
+        bool retValModified = false;
 
-        if (position == HarmonyPatchPosition.Prefix && hookedFunc.PreHook != null)
+        if (position == HarmonyPatchPosition.Prefix)
         {
-            skipOriginal = hookedFunc.PreHook(self, argsToForward, ref newRetVal);
-            retValModified = skipOriginal;
+            if (hookedFunc.PreHook != null)
+            {
+                skipOriginal = hookedFunc.PreHook(self, argsToForward, ref newRetVal);
+                retValModified = skipOriginal;
+            }
         }
-        else if (position == HarmonyPatchPosition.Postfix && hookedFunc.PostHook != null)
+        else if (position == HarmonyPatchPosition.Postfix)
         {
-            // Post hook can't ask to "Skip Original", it was already invoke.
-            // It can only signal to use if the return value changes.
-            retValModified = hookedFunc.PostHook(self, argsToForward, ref newRetVal);
+            if (hookedFunc.PostHook != null)
+            {
+                // Post hook can't ask to "Skip Original", it was already invoke.
+                // It can only signal to use if the return value changes.
+                retValModified = hookedFunc.PostHook(self, argsToForward, ref newRetVal);
+            }
         }
         else
         {
