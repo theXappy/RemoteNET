@@ -26,6 +26,8 @@ public record struct FunctionInfo(string mangledName, nuint address);
 
 public abstract class TypeInfo
 {
+    public static TypeInfo Dummy = new SecondClassTypeInfo("DummyModule", "DummyType");
+
     public string ModuleName { get; }
     public string Name { get; }
     public string FullTypeName => $"{ModuleName}!{Name}";

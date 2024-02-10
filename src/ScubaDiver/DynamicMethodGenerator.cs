@@ -90,6 +90,7 @@ public static class DetoursMethodGenerator
     }
 
 
+
     private static (MethodInfo, Delegate, Type) GenerateMethodForName(int numArguments, Type retType, string generatedMethodName)
     {
         // Create a dynamic method with the specified return type and parameter types
@@ -120,7 +121,7 @@ public static class DetoursMethodGenerator
         // Call the Unified method
         il.Emit(OpCodes.Ldstr, generatedMethodName);
         il.Emit(OpCodes.Ldloc, argsLocal); // Load the array
-        il.Emit(OpCodes.Call, typeof(DetoursMethodGenerator).GetMethod("Unified")); // Call the Unified method
+        il.Emit(OpCodes.Call, typeof(DetoursMethodGenerator).GetMethod(nameof(Unified))); // Call the Unified method
         // Return the result from the dynamic method
         il.Emit(OpCodes.Ret);
 
@@ -144,13 +145,18 @@ public static class DetoursMethodGenerator
         }
     }
 
-
+    /// <summary>
+    /// Unified patch entry point. Called by the Dynamic Method returned from <see cref="GenerateMethodForName"/>.
+    /// </summary>
+    /// <param name="generatedMethodName">The name of the generated Dynamic Method.</param>
+    /// <param name="args">Native arguments provided to the hooked function</param>
+    /// <returns>Result of the original function invocation, or return value if overriden by the prefix patch.</returns>
     public static nuint Unified(string generatedMethodName, params object[] args)
     {
         DetouredFuncInfo tramp = _trampolines[generatedMethodName];
 
         // Call prefix hook
-        bool skipOriginal = RunPath(HarmonyPatchPosition.Prefix, tramp, args, out nuint overridenReturnValue);
+        bool skipOriginal = RunPatchInPosition(HarmonyPatchPosition.Prefix, tramp, args, out nuint overridenReturnValue);
         if (!skipOriginal)
         {
             overridenReturnValue = 0;
@@ -164,17 +170,19 @@ public static class DetoursMethodGenerator
 
         // Call postfix hook
         // TODO: Pass real method's result to the hook
-        RunPath(HarmonyPatchPosition.Postfix, tramp, args, out nuint _);
+        RunPatchInPosition(HarmonyPatchPosition.Postfix, tramp, args, out nuint _);
 
         return overridenReturnValue;
     }
 
 
-    static bool RunPath(HarmonyPatchPosition pos, DetouredFuncInfo tramp, object[] args, out nuint value)
+    /// <returns>Boolean indicating 'skipOriginal'</returns>
+    static bool RunPatchInPosition(HarmonyPatchPosition position, DetouredFuncInfo hookedFunc, object[] args, out nuint overriddenReturnValue)
     {
+        overriddenReturnValue = 0;
         if (args.Length == 0) throw new Exception("Bad arguments to unmanaged HookCallback. Expecting at least 1 (for 'this').");
 
-        object self = new NativeObject((nuint)args.FirstOrDefault(), tramp.DeclaringClass);
+        object self = new NativeObject((nuint)args.FirstOrDefault(), hookedFunc.DeclaringClass);
 
         // Args without self
         object[] argsToForward = new object[args.Length - 1];
@@ -182,8 +190,7 @@ public static class DetoursMethodGenerator
         {
             nuint arg = (nuint)args[i + 1];
 
-            // If the argument is a pointer, indicate it with a NativeObject
-            string argType = tramp.Target.ArgTypes[i + 1];
+            string argType = hookedFunc.Target.ArgTypes[i + 1];
             if (argType == "char*" || argType == "char *")
             {
                 if (arg != 0)
@@ -198,9 +205,10 @@ public static class DetoursMethodGenerator
             }
             else if (argType.EndsWith('*'))
             {
+                // If the argument is a pointer, indicate it with a NativeObject
                 // TODO: SecondClassTypeInfo is abused here
                 string fixedArgType = argType[..^1].Trim();
-                argsToForward[i] = new NativeObject(arg, new SecondClassTypeInfo(tramp.DeclaringClass.ModuleName, fixedArgType));
+                argsToForward[i] = new NativeObject(arg, new SecondClassTypeInfo(hookedFunc.DeclaringClass.ModuleName, fixedArgType));
             }
             else
             {
@@ -210,35 +218,35 @@ public static class DetoursMethodGenerator
         }
 
 
-        // TODO: We're currently ignoring the "skip original" return value because the callback
-        // doesn't support setting the return value...
-        if (pos == HarmonyPatchPosition.Prefix)
+        bool skipOriginal = false;
+        object newRetVal = null;
+        bool retValModified;
+
+        if (position == HarmonyPatchPosition.Prefix && hookedFunc.PreHook != null)
         {
-            if (tramp.PreHook == null)
-            {
-                // Don't skip original if no hook
-                value = 0;
-                return false;
-            }
-            tramp.PreHook(self, argsToForward);
+            skipOriginal = hookedFunc.PreHook(self, argsToForward, ref newRetVal);
+            retValModified = skipOriginal;
         }
-        else if (pos == HarmonyPatchPosition.Postfix)
+        else if (position == HarmonyPatchPosition.Postfix && hookedFunc.PostHook != null)
         {
-            if (tramp.PostHook == null)
-            {
-                // Return value is meaningless in post hooks anyway
-                value = 0;
-                return false;
-            }
-            tramp.PostHook(self, argsToForward);
+            // Post hook can't ask to "Skip Original", it was already invoke.
+            // It can only signal to use if the return value changes.
+            retValModified = hookedFunc.PostHook(self, argsToForward, ref newRetVal);
         }
         else
         {
-            throw new Exception($"Unexpected hook position fired. Pos: {pos} , Method: {tramp.Name}");
+            throw new Exception($"Unexpected hook position fired. Pos: {position} , Method: {hookedFunc.Name}");
         }
 
-        value = 0;
-        bool skipOriginal = false;
+        if (retValModified)
+        {
+            if (newRetVal is not nuint newNuintRetVal)
+            {
+                throw new ArgumentException($"Return value from {position} hook was NOT an nuint. It was: {newRetVal}");
+            }
+            overriddenReturnValue = newNuintRetVal;
+        }
+
         return skipOriginal;
     }
 
