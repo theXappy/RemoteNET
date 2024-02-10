@@ -1,3 +1,6 @@
 [submodule "src/detours.net"]
 	path = src/detours.net
 	url = https://github.com/theXappy/detours.net.git
+[submodule "InjectableDotNetHost"]
+	path = InjectableDotNetHost
+	url = https://github.com/theXappy/InjectableDotNetHost.git
