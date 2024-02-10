@@ -16,11 +16,12 @@ namespace RemoteNET
 {
     public static class RemoteAppFactory
     {
-        public static RemoteApp Connect(string target, RuntimeType runtime)
+        public static RemoteApp Connect(string targetQuery, RuntimeType runtime)
         {
             try
             {
-                return Connect(ProcessHelper.GetSingleRoot(target), runtime);
+                Process target = ProcessHelper.GetSingleRoot(targetQuery);
+                return Connect(target, runtime);
             }
             catch (TooManyProcessesException tooManyProcsEx)
             {
