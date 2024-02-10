@@ -19,13 +19,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="InjectableDotNetHost.Injector" Version="1.0.7" />
 		<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
 		<PackageReference Include="System.IO.FileSystem.AccessControl" Version="5.0.0" />
 		<PackageReference Include="System.Security.AccessControl" Version="6.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\InjectableDotNetHost\src\InjectableDotNetHost.Injector\InjectableDotNetHost.Injector.csproj" />
 		<ProjectReference Include="..\RemoteNET.Common\RemoteNET.Common.csproj" />
 		<ProjectReference Include="..\ScubaDiver.API\ScubaDiver.API.csproj" />
 	</ItemGroup>
