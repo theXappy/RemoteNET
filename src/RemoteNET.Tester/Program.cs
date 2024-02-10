@@ -28,33 +28,16 @@ namespace ScubaDiver.Tester
         {
             string procName;
             ManagedRemoteApp remoteApp = null;
+            UnmanagedRemoteApp unmanRemoteApp;
+
             while (true)
             {
                 Console.WriteLine("Enter process name (or substring)");
                 procName = Console.ReadLine();
                 try
                 {
-                    remoteApp = (ManagedRemoteApp)RemoteAppFactory.Connect(procName, RuntimeType.Managed);
-                    if (remoteApp == null)
-                    {
-                        Console.WriteLine("Something went wrong, try again.");
-                        continue;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("ERROR: " + ex);
-                    continue;
-                }
-                break;
-            }
-            UnmanagedRemoteApp unmanRemoteApp = null;
-            //while (true)
-            for (int i = 0; i < 1; i++)
-            {
-                try
-                {
                     unmanRemoteApp = (UnmanagedRemoteApp)RemoteAppFactory.Connect(procName, RuntimeType.Unmanaged);
+
                     if (unmanRemoteApp == null)
                     {
                         Console.WriteLine("Something went wrong, try again.");
@@ -67,6 +50,19 @@ namespace ScubaDiver.Tester
                     continue;
                 }
                 break;
+            }
+
+            try
+            {
+                remoteApp = (ManagedRemoteApp)RemoteAppFactory.Connect(procName, RuntimeType.Managed);
+                if (remoteApp == null)
+                {
+                    Console.WriteLine("Something went wrong, try again.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("ERROR: " + ex);
             }
 
             List<ManagedRemoteObject> remoteObjects = new();
@@ -484,46 +480,46 @@ namespace ScubaDiver.Tester
                             break;
                         }
                     case 19:
-                    {
-                        Console.WriteLine("How many bytes do you want to allocate?");
-                        int num = int.Parse(Console.ReadLine());
-                        var res = remoteApp.Marshal.AllocHGlobal(num);
-                        Console.WriteLine($"Pointer: 0x{res:x16}");
-                        Console.WriteLine("Enter text to write:");
-                        string txt = Console.ReadLine();
-                        byte[] bytes = Encoding.ASCII.GetBytes(txt);
-
-                        // Write
-                        remoteApp.Marshal.Write(bytes, 0, res, bytes.Length);
-
-                        // Read
-                        byte[] newBytes = new byte[bytes.Length];
-                        remoteApp.Marshal.Read(res, newBytes, 0, newBytes.Length);
-                        Console.WriteLine("Read back:");
-                        Console.WriteLine(Encoding.ASCII.GetString(newBytes));
-                        break;
-                    }
-                    case 20:
-                    {
-                        Console.WriteLine("Enter managed type name:");
-                        string typeName = Console.ReadLine().Trim();
-                        if (string.IsNullOrWhiteSpace(typeName))
                         {
-                            // Assuming user wants all types
-                            Console.WriteLine("Can't be null or empty.");
+                            Console.WriteLine("How many bytes do you want to allocate?");
+                            int num = int.Parse(Console.ReadLine());
+                            var res = remoteApp.Marshal.AllocHGlobal(num);
+                            Console.WriteLine($"Pointer: 0x{res:x16}");
+                            Console.WriteLine("Enter text to write:");
+                            string txt = Console.ReadLine();
+                            byte[] bytes = Encoding.ASCII.GetBytes(txt);
+
+                            // Write
+                            remoteApp.Marshal.Write(bytes, 0, res, bytes.Length);
+
+                            // Read
+                            byte[] newBytes = new byte[bytes.Length];
+                            remoteApp.Marshal.Read(res, newBytes, 0, newBytes.Length);
+                            Console.WriteLine("Read back:");
+                            Console.WriteLine(Encoding.ASCII.GetString(newBytes));
                             break;
                         }
-
-                        var res = remoteApp.GetRemoteType(typeName);
-                        Console.WriteLine($"Name: " + res.Name);
-                        Console.WriteLine($"Full Name: " + res.FullName);
-                        Console.WriteLine($"Methods");
-                        foreach (var method in res.GetMethods())
+                    case 20:
                         {
-                            Console.WriteLine("Method: " + method);
-                            Console.WriteLine("Method Ret Type: " + method.ReturnType);
+                            Console.WriteLine("Enter managed type name:");
+                            string typeName = Console.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(typeName))
+                            {
+                                // Assuming user wants all types
+                                Console.WriteLine("Can't be null or empty.");
+                                break;
+                            }
+
+                            var res = remoteApp.GetRemoteType(typeName);
+                            Console.WriteLine($"Name: " + res.Name);
+                            Console.WriteLine($"Full Name: " + res.FullName);
+                            Console.WriteLine($"Methods");
+                            foreach (var method in res.GetMethods())
+                            {
+                                Console.WriteLine("Method: " + method);
+                                Console.WriteLine("Method Ret Type: " + method.ReturnType);
+                            }
                         }
-                    }
                         break;
                     case 21:
                         // Exiting
