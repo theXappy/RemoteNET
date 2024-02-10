@@ -116,10 +116,23 @@ namespace RemoteNET
             string scubaDiverDllPath = kit.ScubaDiverDllPath;
             string injectableDummy = kit.InjectableDummyPath;
 
+            string scubaDiverArgs = $"{diverPort}";
+            if (target.IsUwpApp())
+            {
+                MakeKitFilesUwpInjectable(remoteNetAppDataDir, scubaDiverDllPath, injectableDummy);
+                RunLifeboat(kit.LifeboatExePath, diverPort);
+
+                // Changing the ScubaDiver's argument so it knows to connect in "reverse"
+                // to the Lifeboat proxy.
+                scubaDiverArgs += "~";
+                scubaDiverArgs += "reverse";
+            }
+
             // If we have a native target, We try to host a .NET Core runtime inside.
             if (targetDotNetVer == "native")
             {
                 DotNetHostInjector hostInjector = new DotNetHostInjector(new DotNetHostInjectorOptions());
+
                 var results = hostInjector.Inject(target, injectableDummy, "InjectableDummy.DllMain, InjectableDummy");
                 Debug.WriteLine("hostInjector.Inject RESULTS: " + results);
                 if (!results.IsSuccess)
@@ -128,34 +141,12 @@ namespace RemoteNET
                         results.Error.Message);
             }
 
-            string scubaDiverArgs = $"{diverPort}";
-            if (target.IsUwpApp())
-            {
-                scubaDiverArgs += "~";
-                scubaDiverArgs += "reverse";
-
-                // AFAIK, UWP apps run in network isolation. This means they'll have a hard time running a TCP/HTTP listener.
-                // So for those cases we're running Lifeboat, a reverse proxy, and interacting with the diver through it.
-                ProcessStartInfo psi = new ProcessStartInfo(kit.LifeboatExePath, diverPort.ToString());
-                psi.UseShellExecute = true;
-                psi.WindowStyle = ProcessWindowStyle.Hidden;
-                psi.CreateNoWindow = true;
-                Process.Start(psi);
-                psi = new ProcessStartInfo(kit.LifeboatExePath, /*pid*/ diverPort + " " + /*offset*/ "2" );
-                psi.UseShellExecute = true;
-                psi.WindowStyle = ProcessWindowStyle.Hidden;
-                psi.CreateNoWindow = true;
-                Process.Start(psi);
-            }
-
-
             string adapterExecutionArg = string.Join("*", scubaDiverDllPath,
                 "ScubaDiver.DllEntry",
                 "EntryPoint",
                 scubaDiverArgs,
-                targetDotNetVer.ToString()
+                targetDotNetVer
             );
-
 
             var startInfo = new ProcessStartInfo(injectorPath, $"{target.Id} {adapterExecutionArg}");
             startInfo.WorkingDirectory = remoteNetAppDataDir;
@@ -189,8 +180,35 @@ namespace RemoteNET
                 readerThread.Start();
                 // TODO: Get results of injector
             }
+            Debug.WriteLine($"[RemoteAppFactory] Finished waiting on Injector. Finished: {injectorProc.HasExited}, Code: {injectorProc.ExitCode}");
         }
 
+        private static void MakeKitFilesUwpInjectable(string remoteNetAppDataDir, string scubaDiverDllPath,
+            string injectableDummy)
+        {
+            Debug.WriteLine("hostInjector.Inject Spotted a UWP app. Modifying permissions to allow UWP injections.");
+            PermissionsHelper.MakeUwpInjectable(remoteNetAppDataDir);
+            PermissionsHelper.MakeUwpInjectable(Path.GetDirectoryName(scubaDiverDllPath));
+            PermissionsHelper.MakeUwpInjectable(Path.GetDirectoryName(injectableDummy));
+        }
+
+        private static void RunLifeboat(string lifeboatExePath, ushort diverPort)
+        {
+            // AFAIK, UWP apps run in network isolation. This means they'll have a hard time running a TCP/HTTP listener.
+            // So for those cases we're running Lifeboat, a reverse proxy, and interacting with the diver through it.
+            ProcessStartInfo psi = new ProcessStartInfo(lifeboatExePath, diverPort.ToString());
+            psi.UseShellExecute = true;
+            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.CreateNoWindow = true;
+            Process.Start(psi);
+            psi = new ProcessStartInfo(lifeboatExePath, /*pid*/ diverPort + " " + /*offset*/ "2");
+            psi.UseShellExecute = true;
+            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.CreateNoWindow = true;
+            Process.Start(psi);
+        }
+
+        [DebuggerDisplay($"Kit ({nameof(RemoteNetAppDataDir)})")]
         public class InjectionToolKit
         {
             public string RemoteNetAppDataDir { get; set; }
