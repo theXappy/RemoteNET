@@ -474,8 +474,10 @@ namespace ScubaDiver.Tester
                         }
                         break;
                     case 18:
-                        {
-                            bool res = unmanRemoteApp.Communicator.StartOffensiveGC();
+                        { 
+                            Console.WriteLine("Module to Monitor:");
+                            string assembly = Console.ReadLine().Trim();
+                            bool res = unmanRemoteApp.Communicator.StartOffensiveGC(assembly);
                             Console.WriteLine("RES: " + res);
                             break;
                         }

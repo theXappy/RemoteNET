@@ -387,9 +387,9 @@ namespace ScubaDiver.API
             return res;
         }
 
-        public bool StartOffensiveGC()
+        public bool StartOffensiveGC(string assembly)
         {
-            var resJson = SendRequest("gc");
+            var resJson = SendRequest("gc", new Dictionary<string, string>() { ["assembly"] = assembly });
             return resJson.Contains("\"ok\"");
         }
 

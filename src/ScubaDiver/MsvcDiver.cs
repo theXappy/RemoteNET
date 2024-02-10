@@ -5,8 +5,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using ScubaDiver.API.Utils;
-using NtApiDotNet.Win32;
-using System.IO;
 using ScubaDiver.Rtti;
 using ScubaDiver.API.Interactions;
 using ScubaDiver.API;
@@ -15,7 +13,6 @@ using System.Threading;
 using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.Hooking;
 using Windows.Win32.Foundation;
-using System.Reflection;
 using ScubaDiver.API.Hooking;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 
@@ -46,32 +43,39 @@ namespace ScubaDiver
         }
 
 
-        //private MsvcOffensiveGC gc;
+        private MsvcOffensiveGC _offensiveGC = null;
         protected string MakeGcResponse(ScubaDiverMessage req)
         {
-            throw new NotImplementedException(
-                "Offensive GC is turned off until 'new' operator searching is re-enabled.");
+            string assemblyFilter = req.QueryString.Get("assembly");
+            if (assemblyFilter == null || assemblyFilter == "*")
+                return QuickError("'assembly' parameter can't be null or wildcard.");
 
-            //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
-            //List<UndecoratedModule> undecoratedModules = _tricksterWrapper.GetUndecoratedModules();
-            //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Initialization GC");
-            //try
-            //{
-            //    gc = new MsvcOffensiveGC();
-            //    gc.Init(undecoratedModules);
-            //}
-            //catch (Exception e)
-            //{
-            //    Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Exception: " + e);
-            //}
+            Predicate<string> assemblyFilterPredicate = Filter.CreatePredicate(assemblyFilter);
 
-            //Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} OUT!");
-            //return "{\"status\":\"ok\"}";
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
+            if (_offensiveGC == null)
+            {
+                if (_tricksterWrapper.RefreshRequired())
+                    _tricksterWrapper.Refresh();
+                _offensiveGC = new MsvcOffensiveGC();
+            }
+
+            List<UndecoratedModule> undecoratedModules = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate);
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Initialization GC");
+            try
+            {
+                _offensiveGC.HookModules(undecoratedModules);
+            }
+            catch (Exception e)
+            {
+                Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Exception: " + e);
+            }
+
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} OUT!");
+            return "{\"status\":\"ok\"}";
         }
 
-
-
-        private List<SafeHandle> _injectedDlls = new List<SafeHandle>();
+        private List<SafeHandle> _injectedDlls = new();
         protected override string MakeInjectDllResponse(ScubaDiverMessage req)
         {
             string dllPath = req.QueryString.Get("dll_path");
@@ -585,12 +589,6 @@ namespace ScubaDiver
 
             Predicate<string> assmFilter = Filter.CreatePredicate(rawAssemblyFilter);
             Predicate<string> typeFilter = Filter.CreatePredicate(rawTypeFilter);
-
-            HeapDump hd = new HeapDump()
-            {
-                Objects = new List<HeapDump.HeapObject>()
-            };
-
             IEnumerable<FirstClassTypeInfo> allClassesToScanFor = Array.Empty<FirstClassTypeInfo>();
             foreach (var undecModule in _tricksterWrapper.GetUndecoratedModules(assmFilter))
             {
@@ -603,6 +601,10 @@ namespace ScubaDiver
                 allClassesToScanFor = allClassesToScanFor.Concat(currModuleClasses);
             }
 
+            //
+            // Heap Search using Trickster
+            //
+            HeapDump output = new HeapDump();
             Logger.Debug($"[{DateTime.Now}] Starting Trickster Scan for class instances.");
             Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = _tricksterWrapper.Scan(allClassesToScanFor);
             Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {addresses.SelectMany(kvp => kvp.Value).Count()} results");
@@ -617,14 +619,37 @@ namespace ScubaDiver
                         MethodTable = typeInfo.VftableAddress, // TODO: Send XOR'd value instead?
                         Type = typeInfo.FullTypeName
                     };
-                    hd.Objects.Add(ho);
+                    output.Objects.Add(ho);
                 }
             }
 
-            string json = JsonConvert.SerializeObject(hd);
+            // Heap & Search using Offensive GC (if enabled)
+            if (_offensiveGC != null)
+            {
+                foreach (var kvp in _offensiveGC.ClassInstances.Where(kvp => assmFilter(kvp.Key)))
+                {
+                    string module = kvp.Key;
+                    foreach (var kvp2 in kvp.Value.Where(kvp2 => typeFilter(kvp2.Key)))
+                    {
+                        string className = kvp2.Key;
+                        foreach (nuint address in kvp2.Value)
+                        {
+                            HeapDump.HeapObject ho = new HeapDump.HeapObject()
+                            {
+                                Address = address,
+                                Type = $"{module}!{className}"
+                            };
+                            output.Objects.Add(ho);
+                        }
+                    }
+                }
+            }
+
+
+            string json = JsonConvert.SerializeObject(output);
 
             // Trying to get rid of the VFTable addresses from our heap.
-            hd.Objects.ForEach(heapObj => heapObj.MethodTable = 0xdeadc0de);
+            output.Objects.ForEach(heapObj => heapObj.MethodTable = 0xdeadc0de);
 
             return json;
 

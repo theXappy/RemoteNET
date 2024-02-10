@@ -12,6 +12,7 @@ namespace ScubaDiver.API.Interactions.Dumps
             public ulong MethodTable { get; set; }
         }
 
-        public List<HeapObject> Objects { get; set; }
+        public List<HeapObject> Objects { get; set; } = new();
+
     }
 }

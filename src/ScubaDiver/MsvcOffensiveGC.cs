@@ -10,8 +10,29 @@ using ScubaDiver.Demangle.Demangle.Core;
 
 namespace ScubaDiver
 {
-    class NamedDict<T> : Dictionary<string, T>
+    public class NamedDict<T> : Dictionary<string, T>
     {
+        public NamedDict<T> DeepCopy()
+        {
+            NamedDict<T> res = new NamedDict<T>();
+            if (typeof(T) == typeof(NamedDict<>))
+            {
+                var innerDeepCopy = typeof(NamedDict<>).GetMethod(nameof(DeepCopy));
+                foreach (KeyValuePair<string, T> keyValuePair in this)
+                {
+                    res[keyValuePair.Key] = (T)innerDeepCopy.Invoke(keyValuePair.Value, Array.Empty<object>());
+                }
+            }
+            else
+            {
+                // Easy mode
+                foreach (KeyValuePair<string, T> keyValuePair in this)
+                {
+                    res[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+            return res;
+        }
     }
 
     internal class MsvcOffensiveGC
@@ -28,17 +49,46 @@ namespace ScubaDiver
         // Object Tracking
         private static readonly object _classToInstancesLock = new();
         private static readonly NamedDict<NamedDict<HashSet<nuint>>> _moduleToClasses = new();
+        public IReadOnlyDictionary<string, IReadOnlyDictionary<string, HashSet<nuint>>> ClassInstances
+        {
+            get
+            {
+                lock (_classSizesLock)
+                {
+                    return _moduleToClasses.ToDictionary(kvp => kvp.Key,
+                            kvp =>
+                                (IReadOnlyDictionary<string, HashSet<nuint>>)kvp.Value.ToDictionary(
+                                    kvp2 => kvp2.Key,
+                                    kvp2 => new HashSet<nuint>(kvp2.Value)));
+                }
+            }
+        }
 
         // Size Match-Making
         private static readonly object _addressToSizeLock = new();
         private static readonly LRUCache<nuint, nuint> _addressToSize = new(100);
         private static readonly object _classSizesLock = new();
         private static readonly NamedDict<nuint> _classSizes = new();
-        public IReadOnlyDictionary<string, nuint> ClassSizes() => _classSizes;
-
-        public void Init(List<UndecoratedModule> modules)
+        public IReadOnlyDictionary<string, nuint> ClassSizes
         {
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(Init)} IN");
+            get
+            {
+                lock (_classSizesLock)
+                {
+                    return _classSizes.DeepCopy();
+                }
+            }
+        }
+
+        public void HookModule(UndecoratedModule module) => HookModules(new List<UndecoratedModule>() { module });
+
+        private List<UndecoratedModule> _alreadyHookedModules = new List<UndecoratedModule>();
+
+        public void HookModules(List<UndecoratedModule> modules)
+        {
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(HookModules)} IN");
+
+            modules = modules.Where(m => !_alreadyHookedModules.Contains(m)).ToList();
 
             Dictionary<long, UndecoratedFunction> initMethods = GetAutoClassInit2Funcs(modules);
             Dictionary<TypeInfo, List<UndecoratedFunction>> ctors = GetCtors(modules);
@@ -50,7 +100,9 @@ namespace ScubaDiver
             HookDtors(dtors);
             HookNewOperators(newOperators);
 
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(Init)} OUT");
+            _alreadyHookedModules.AddRange(modules);
+
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(HookModules)} OUT");
         }
 
         private Dictionary<string, List<UndecoratedFunction>> GetNewOperators(List<UndecoratedModule> modules)
@@ -220,6 +272,11 @@ namespace ScubaDiver
                 string fullTypeName = $"{type.ModuleName}!{type.Name}";
                 foreach (UndecoratedFunction ctor in kvp.Value)
                 {
+                    // This is a workaround for an unknown parsing bug.
+                    // Some ctors are parsed with no args list.
+                    if (ctor.ArgTypes == null)
+                        continue;
+
                     // TODO: Expend to ctors with multiple args
                     // NOTE: args are 0 but the 'this' argument is implied (Usually in ecx. Decompilers shows it as the first argument)
                     if (ctor.NumArgs > 4)
@@ -252,10 +309,9 @@ namespace ScubaDiver
             Logger.Debug(
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
-        public static bool UnifiedCtor(object unused, object[] args, ref object retValue)
+        public static bool UnifiedCtor(object selfObj, object[] args, ref object retValue)
         {
-            object first = args.FirstOrDefault();
-            if (first is NativeObject self)
+            if (selfObj is NativeObject self)
             {
                 RegisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
                 TryMatchClassToSize(self.Address, self.TypeInfo.Name);
@@ -366,10 +422,10 @@ namespace ScubaDiver
         {
             lock (_classToInstancesLock)
             {
-                if (!_moduleToClasses.TryGetValue(className, out var classToInstances))
+                if (!_moduleToClasses.TryGetValue(moduleName, out var classToInstances))
                 {
                     classToInstances = new NamedDict<HashSet<nuint>>();
-                    _moduleToClasses[className] = classToInstances;
+                    _moduleToClasses[moduleName] = classToInstances;
                 }
                 if (!classToInstances.TryGetValue(className, out var instancesList))
                 {
@@ -387,7 +443,7 @@ namespace ScubaDiver
         {
             lock (_classToInstancesLock)
             {
-                if (!_moduleToClasses.TryGetValue(className, out var classToInstances))
+                if (!_moduleToClasses.TryGetValue(moduleName, out var classToInstances))
                     return;
                 if (!classToInstances.TryGetValue(className, out var instancesList))
                     return;
