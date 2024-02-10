@@ -17,11 +17,11 @@ int main(int argc, char** argv)
 		printf("Usage: %s PID ARG_FOR_INJECTED_DLL", argv[0]);
 		return 1;
 	}
-	printf("Starting...\n");
+	// printf("Starting...\n");
 #ifdef _WIN64
-	printf("x64 Version\n");
+	// printf("x64 Version\n");
 #else
-	printf("x32 Version\n");
+	// printf("x32 Version\n");
 #endif
 
 	// Unmanaged Adapter
@@ -34,7 +34,7 @@ int main(int argc, char** argv)
 	mbstowcs_s(&convertedChars, adapterDllArg, MAX_PATH, argv[2], _TRUNCATE);
 
 
-	printf("UnmanagedAdapterDLL encoded argument: %ls\n", adapterDllArg);
+	// printf("UnmanagedAdapterDLL encoded argument: %ls\n", adapterDllArg);
 
 	DWORD Pid = atoi(argv[1]);
 #ifdef _WIN64
@@ -43,11 +43,13 @@ int main(int argc, char** argv)
 	strcat_s(DllName, "\\UnmanagedAdapterDLL.dll");
 #endif
 
-	printf("[.] Injecting UnmanagedAdapterDLL into %d\n", Pid);
-	InjectAndRunThenUnload(Pid, DllName, "AdapterEntryPoint", adapterDllArg);
+	// printf("[.] Injecting UnmanagedAdapterDLL into %d\n", Pid);
+	BOOL success = InjectAndRunThenUnload(Pid, DllName, "AdapterEntryPoint", adapterDllArg);
 
-	printf("[.] Done!");
+	// printf("[.] Done!");
 
-	return 0;
+	if (success)
+		return 0;
+	return 1;
 }
 

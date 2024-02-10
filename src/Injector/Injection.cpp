@@ -42,14 +42,14 @@ BOOL InjectAndRunThenUnload(DWORD ProcessId, const char * DllName, const std::st
 
 	if (!hKernel32)
 	{
-		cout << "Failed to get handle to kernel32 module" << endl;
+		// cout << "Failed to get handle to kernel32 module" << endl;
 		return false;
 	}
 
 
 	if (!ProcessId)
 	{
-		cout << "Specified Process not found" << endl;
+		// cout << "Specified Process not found" << endl;
 		return false;
 	}
 
@@ -57,10 +57,10 @@ BOOL InjectAndRunThenUnload(DWORD ProcessId, const char * DllName, const std::st
 
 	if (!Proc)
 	{
-		cout << "Process found, but OpenProcess() failed: " << GetLastError() << endl;
+		// cout << "Process found, but OpenProcess() failed: " << GetLastError() << endl;
 		return false;
 	}
-	cout << "[Injector] OpenProcess success" << endl;
+	// cout << "[Injector] OpenProcess success" << endl;
 
 	// LoadLibraryA needs a string as its argument, but it needs to be in
 	// the remote Process' memory space.
@@ -68,26 +68,26 @@ BOOL InjectAndRunThenUnload(DWORD ProcessId, const char * DllName, const std::st
 	LPVOID RemoteString = (LPVOID)VirtualAllocEx(Proc, NULL, StrLength,
 		MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	if (RemoteString == NULL) {
-		cout << "VirtualAllocEx Failed:" << GetLastError() << endl;
+		// cout << "VirtualAllocEx Failed:" << GetLastError() << endl;
 		return false;
 	}
 	bool remoteSrtWriteSucc = WriteProcessMemory(Proc, RemoteString, DllName, StrLength, NULL);
-	cout << "[Injector] calling WriteProcessMemory with remote string: " << DllName << endl;
+	// cout << "[Injector] calling WriteProcessMemory with remote string: " << DllName << endl;
 
-	cout << "[Injector] WriteProcessMemory returned " << remoteSrtWriteSucc << endl;
+	// cout << "[Injector] WriteProcessMemory returned " << remoteSrtWriteSucc << endl;
 
 	// Start a remote thread on the targeted Process, using LoadLibraryA
 	// as our entry point to load a custom dll. (The A is for Ansi)
 	EnsureCloseHandle LoadThread = CreateRemoteThread(Proc, NULL, NULL,
 		(LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "LoadLibraryA"),
 		RemoteString, NULL, NULL);
-	cout << "[Injector] CreateRemoteThread returned valid? " << LoadThread.IsValid() << endl;
+	// cout << "[Injector] CreateRemoteThread returned valid? " << LoadThread.IsValid() << endl;
 	WaitForSingleObject(LoadThread, INFINITE);
 
 	// Get the handle of the now loaded module
 	DWORD hLibModule;
 	GetExitCodeThread(LoadThread, &hLibModule);
-	cout << "[Injector] GetExitCodeThread returned hLibModule: " << hLibModule << endl;
+	// cout << "[Injector] GetExitCodeThread returned hLibModule: " << hLibModule << endl;
 
 	// Clean up the remote string
 	VirtualFreeEx(Proc, RemoteString, 0, MEM_RELEASE);
@@ -95,7 +95,7 @@ BOOL InjectAndRunThenUnload(DWORD ProcessId, const char * DllName, const std::st
 	// Call the function we wanted in the first place
 	if (CallExport(ProcessId, DllName, ExportName, ExportArgument) == -1) {
 		// something went wrong 
-		cout << "CallExport failed" << endl;
+		// cout << "CallExport failed" << endl;
 	}
 
 #ifdef _WIN64
@@ -122,16 +122,16 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 	EnsureCloseHandle Snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, ProcId));
 	if (Snapshot == INVALID_HANDLE_VALUE)
 	{
-		cout << "CallExport: Could not get module Snapshot for remote process." << endl;
+		// cout << "CallExport: Could not get module Snapshot for remote process." << endl;
 		int err = GetLastError();
-		cout << "Last Error:" << err ;
+		// cout << "Last Error:" << err ;
 		if (err == 299) {
-			cout << "(ERROR_PARTIAL_COPY, happens when trying to dump a 64bit process from 32bit injector)";
+			// cout << "(ERROR_PARTIAL_COPY, happens when trying to dump a 64bit process from 32bit injector)";
 		}
-		cout << endl;
+		// cout << endl;
 		return -1;
 	}
-	cout << "[Injector]  got module Snapshot for remote process " << endl;
+	// cout << "[Injector]  got module Snapshot for remote process " << endl;
 
 	// Get the HMODULE of the desired library
 	MODULEENTRY32W ModEntry = { sizeof(ModEntry) };
@@ -143,15 +143,15 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 		wstring ModuleTmp(ModuleName.begin(), ModuleName.end());
 		// For debug
 
-		cout << "[Injector]  Checking module: " << endl;
-		wcout << ExePath << endl;
+		// cout << "[Injector]  Checking module: " << endl;
+		// cout << ExePath << endl;
 		Found = (ExePath == ModuleTmp);
 		if (Found)
 			break;
 	}
 	if (!Found)
 	{
-		cout << "CallExport: Cound not find module in remote process." << endl;
+		// cout << "CallExport: Cound not find module in remote process." << endl;
 		return -1;
 	}
 
@@ -167,7 +167,7 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 		FALSE, ProcId));
 	if (!TargetProcess)
 	{
-		cout << "CallExport: Could not get handle to process." << endl;
+		// cout << "CallExport: Could not get handle to process." << endl;
 		return -1;
 	}
 
@@ -183,7 +183,7 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 		static_cast<HMODULE>(Module));
 	if (!pDosHeader || pDosHeader->e_magic != IMAGE_DOS_SIGNATURE)
 	{
-		cout << "CallExport: DOS PE header is invalid." << endl;
+		// cout << "CallExport: DOS PE header is invalid." << endl;
 		return -1;
 	}
 
@@ -192,7 +192,7 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 		reinterpret_cast<PCHAR>(Module) + pDosHeader->e_lfanew);
 	if (pNtHeader->Signature != IMAGE_NT_SIGNATURE)
 	{
-		cout << "CallExport: NT PE header is invalid." << endl;
+		// cout << "CallExport: NT PE header is invalid." << endl;
 		return -1;
 	}
 
@@ -206,7 +206,7 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 	// Symbol names could be missing entirely
 	if (pExportDir->AddressOfNames == NULL)
 	{
-		cout << "CallExport: Symbol names missing entirely." << endl;
+		// cout << "CallExport: Symbol names missing entirely." << endl;
 		return -1;
 	}
 
@@ -246,7 +246,7 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 	// Nothing found, throw exception
 	if (!pExportAddr)
 	{
-		cout << "CallExport: Could not find " << ExportName << "." << endl;
+		// cout << "CallExport: Could not find " << ExportName << "." << endl;
 		return -1;
 	}
 
@@ -264,7 +264,7 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 	LPVOID RemoteString = (LPVOID)VirtualAllocEx(Proc, NULL, StrNumBytes,
 		MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	if (RemoteString == NULL) {
-		cout << "VirtualAllocEx Failed" << endl;
+		// cout << "VirtualAllocEx Failed" << endl;
 		return -1;
 	}
 	WriteProcessMemory(Proc, RemoteString, ExportArgument, StrNumBytes, NULL);
@@ -274,7 +274,7 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 		(LPTHREAD_START_ROUTINE)pfnThreadRtn, RemoteString, NULL, NULL);
 	if (!Thread)
 	{
-		cout << "CallExport: Could not create thread in remote process." << endl;
+		// cout << "CallExport: Could not create thread in remote process." << endl;
 		return -1;
 	}
 
@@ -285,11 +285,11 @@ DWORD CallExport(DWORD ProcId, const std::string& ModuleName, const std::string&
 	DWORD ExitCode = 0;
 	if (!GetExitCodeThread(Thread, &ExitCode))
 	{
-		cout << "CallExport: Could not get thread exit code." << endl;
+		// cout << "CallExport: Could not get thread exit code." << endl;
 		return -1;
 	}
 
 	// Return thread exit code
-	cout << "CallExport: returning." << endl;
+	// cout << "CallExport: returning." << endl;
 	return ExitCode;
 }
