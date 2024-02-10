@@ -10,6 +10,10 @@ using ScubaDiver.Demangle.Demangle.Core;
 
 namespace ScubaDiver
 {
+    class NamedDict<T> : Dictionary<string, T>
+    {
+    }
+
     internal class MsvcOffensiveGC
     {
         // From https://github.com/gperftools/gperftools/issues/715
@@ -19,6 +23,18 @@ namespace ScubaDiver
         //private string kMangledNewNothrow64 = "??2@YAPEAX_KAEBUnothrow_t@std@@@z";
 
         private string operatorNewName = "operator new";
+        private static HashSet<string> _alreadyHookedDecorated = new();
+
+        // Object Tracking
+        private static readonly object _classToInstancesLock = new();
+        private static readonly NamedDict<NamedDict<HashSet<nuint>>> _moduleToClasses = new();
+
+        // Size Match-Making
+        private static readonly object _addressToSizeLock = new();
+        private static readonly LRUCache<nuint, nuint> _addressToSize = new(100);
+        private static readonly object _classSizesLock = new();
+        private static readonly NamedDict<nuint> _classSizes = new();
+        public IReadOnlyDictionary<string, nuint> ClassSizes() => _classSizes;
 
         public void Init(List<UndecoratedModule> modules)
         {
@@ -57,7 +73,6 @@ namespace ScubaDiver
 
             return res;
         }
-
         private Dictionary<TypeInfo, List<UndecoratedFunction>> GetCtors(List<UndecoratedModule> modules)
         {
             string GetCtorName(TypeInfo type)
@@ -120,7 +135,6 @@ namespace ScubaDiver
 
             return res;
         }
-
         private Dictionary<long, UndecoratedFunction> GetAutoClassInit2Funcs(List<UndecoratedModule> modules)
         {
             void ProcessSingleModule(UndecoratedModule module,
@@ -152,6 +166,7 @@ namespace ScubaDiver
             return res;
         }
 
+        // NEW OPERATORS
         private static void HookNewOperators(Dictionary<string, List<UndecoratedFunction>> newOperators)
         {
             // Hook all new operators
@@ -175,8 +190,7 @@ namespace ScubaDiver
             Logger.Debug(
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new' s. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
-
-        private static bool UnifiedOperatorNew(object instance, object[] args, ref object retValue)
+        private static bool UnifiedOperatorNew(object unused, object[] args, ref object retValue)
         {
             object first = args.FirstOrDefault();
             if (first is nuint size && retValue is nuint retNuint)
@@ -192,8 +206,9 @@ namespace ScubaDiver
 
             return false; // Don't skip original
         }
+        private delegate nuint OperatorNewType(nuint size);
 
-        private static HashSet<string> _alreadyHookedDecorated = new HashSet<string>();
+        // CTORs
         private static void HookCtors(Dictionary<TypeInfo, List<UndecoratedFunction>> ctors)
         {
             // Hook all ctors
@@ -237,6 +252,22 @@ namespace ScubaDiver
             Logger.Debug(
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
+        public static bool UnifiedCtor(object unused, object[] args, ref object retValue)
+        {
+            object first = args.FirstOrDefault();
+            if (first is NativeObject self)
+            {
+                RegisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
+                TryMatchClassToSize(self.Address, self.TypeInfo.Name);
+            }
+            else
+            {
+                Console.WriteLine($"[UnifiedCtor] Args: {args.Length}, Self: <ERROR!>");
+            }
+            return false;
+        }
+
+        // DTORS
         private static void HookDtors(Dictionary<TypeInfo, List<UndecoratedFunction>> dtors)
         {
             // Hook all ctors
@@ -267,7 +298,7 @@ namespace ScubaDiver
                         continue;
                     }
 
-                    DetoursNetWrapper.Instance.AddHook(type,  dtor, UnifiedDtor, HarmonyPatchPosition.Prefix);
+                    DetoursNetWrapper.Instance.AddHook(type, dtor, UnifiedDtor, HarmonyPatchPosition.Prefix);
                     attemptedHookedCtorsCount++;
                 }
             }
@@ -277,7 +308,23 @@ namespace ScubaDiver
             Logger.Debug(
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
+        public static bool UnifiedDtor(object selfObj, object[] args, ref object retValue)
+        {
+            if (selfObj is NativeObject self)
+            {
+                Logger.Debug($"[UnifiedDtor] Secret: {self.TypeInfo.Name}, Args: {args.Length}, Self: 0x{self.Address:x16}");
 
+                // TODO: Intercept dtors here to prevent de-allocation
+                DeregisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
+            }
+            else
+            {
+                Logger.Debug($"[UnifiedDtor] error Args: {args.Length}, Self: <ERROR!>");
+            }
+            return false; // Skip original
+        }
+
+        // AUTO CLASS INIT 2
         private void HookAutoClassInit2Funcs(Dictionary<long, UndecoratedFunction> initMethods)
         {
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] HookAutoClassInit2Funcs DISABLED!");
@@ -294,43 +341,6 @@ namespace ScubaDiver
             //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
             //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
-
-
-        // +---------------+
-        // | Ctors Hooking |
-        // +---------------+
-
-        public static bool UnifiedCtor(object instance, object[] args, ref object retValue)
-        {
-            object first = args.FirstOrDefault();
-            if (first is NativeObject self)
-            {
-                RegisterClassName(self.Address, self.TypeInfo.Name);
-            }
-            else
-            {
-                Console.WriteLine($"[UnifiedCtor] Args: {args.Length}, Self: <ERROR!>");
-            }
-            return false;
-        }
-        public static bool UnifiedDtor(object instance, object[] args, ref object retValue)
-        {
-            if (instance is NativeObject self)
-            {
-                Console.WriteLine($"[UnifiedDtor] Secret: {self.TypeInfo.Name}, Args: {args.Length}, Self: 0x{self.Address:x16}");
-            }
-            else
-            {
-                Console.WriteLine($"[UnifiedDtor] error Args: {args.Length}, Self: <ERROR!>");
-            }
-            return false; // Skip original
-        }
-
-
-        // +--------------------------+
-        // | __autoclassinit2 Hooking |
-        // +--------------------------+
-
         public static bool UnifiedAutoClassInit2(DetoursMethodGenerator.DetouredFuncInfo secret, object[] args, out nuint overriddenReturnValue)
         {
             overriddenReturnValue = 0;
@@ -345,21 +355,53 @@ namespace ScubaDiver
         }
 
 
-        // +----------------------+
-        // | Operator new Hooking |
-        // +----------------------+
+        // +-----------------+
+        // | Object Tracking |
+        // +-----------------+
 
-        private delegate nuint OperatorNewType(nuint size);
+        /// <summary>
+        /// Indicate a specific class instance was allocated at a given address.
+        /// </summary>
+        public static void RegisterClass(nuint address, string moduleName, string className)
+        {
+            lock (_classToInstancesLock)
+            {
+                if (!_moduleToClasses.TryGetValue(className, out var classToInstances))
+                {
+                    classToInstances = new NamedDict<HashSet<nuint>>();
+                    _moduleToClasses[className] = classToInstances;
+                }
+                if (!classToInstances.TryGetValue(className, out var instancesList))
+                {
+                    instancesList = new HashSet<nuint>();
+                    classToInstances[className] = instancesList;
+                }
+                instancesList.Add(address);
+            }
+        }
+
+        /// <summary>
+        /// Indicate a specific class instance was destroyed at a given address.
+        /// </summary>
+        public static void DeregisterClass(nuint address, string moduleName, string className)
+        {
+            lock (_classToInstancesLock)
+            {
+                if (!_moduleToClasses.TryGetValue(className, out var classToInstances))
+                    return;
+                if (!classToInstances.TryGetValue(className, out var instancesList))
+                    return;
+                instancesList.Remove(address);
+            }
+        }
 
         // +---------------------------+
         // | Class Sizes Match  Making |
         // +---------------------------+
-        private static readonly LRUCache<nuint, nuint> _addressToSize = new LRUCache<nuint, nuint>(100);
-        private static readonly object _addressToSizeLock = new();
-        private static readonly Dictionary<string, nuint> _classSizes = new Dictionary<string, nuint>();
-        private static readonly object ClassSizesLock = new();
-        public IReadOnlyDictionary<string, nuint> GetFindings() => _classSizes;
 
+        /// <summary>
+        /// Indicate a specific size was allocated at a given address.
+        /// </summary>
         public static void RegisterSize(nuint address, nuint size)
         {
             lock (_addressToSizeLock)
@@ -368,10 +410,14 @@ namespace ScubaDiver
             }
         }
 
-        public static void RegisterClassName(nuint address, string className)
+        /// <summary>
+        /// Given an address and the name of the class initalized there, check if a size was registered for that address.
+        /// If so, record that match.
+        /// </summary>
+        public static void TryMatchClassToSize(nuint address, string className)
         {
             // Check if we already found the size of this class
-            lock (ClassSizesLock)
+            lock (_classSizesLock)
             {
                 if (_classSizes.ContainsKey(className))
                     return;
@@ -390,82 +436,6 @@ namespace ScubaDiver
                 // Found a match!
                 _classSizes[className] = size;
                 Logger.Debug($"[MsvcOffensiveGC][MatchMaking] Found size of class. Name: {className}, Size: {size} bytes");
-            }
-        }
-    }
-    public class LRUCache<TKey, TValue>
-    {
-        private readonly int capacity;
-        private readonly Dictionary<TKey, LinkedListNode<CacheItem>> cache;
-        private readonly LinkedList<CacheItem> lruList;
-
-        public LRUCache(int capacity)
-        {
-            this.capacity = capacity;
-            cache = new Dictionary<TKey, LinkedListNode<CacheItem>>(capacity);
-            lruList = new LinkedList<CacheItem>();
-        }
-
-        public void AddOrUpdate(TKey key, TValue value)
-        {
-            if (cache.ContainsKey(key))
-            {
-                // If the key is already in the cache, update its value and move it to the front of the LRU list
-                LinkedListNode<CacheItem> node = cache[key];
-                node.Value.Value = value;
-                lruList.Remove(node);
-                lruList.AddFirst(node);
-            }
-            else
-            {
-                // If the key is not in the cache, create a new node and add it to the cache and the front of the LRU list
-                LinkedListNode<CacheItem> node = new LinkedListNode<CacheItem>(new CacheItem(key, value));
-                cache.Add(key, node);
-                lruList.AddFirst(node);
-
-                // If the cache exceeds the capacity, remove the least recently used item from the cache and the LRU list
-                if (cache.Count > capacity)
-                {
-                    LinkedListNode<CacheItem> lastNode = lruList.Last;
-                    cache.Remove(lastNode.Value.Key);
-                    lruList.RemoveLast();
-                }
-            }
-        }
-
-        public bool TryGetValue(TKey key, bool delete, out TValue value)
-        {
-            if (cache.TryGetValue(key, out LinkedListNode<CacheItem> node))
-            {
-                // If the key is found in the cache, move it to the front of the LRU list and return its value
-                lruList.Remove(node);
-                if (delete)
-                {
-                    cache.Remove(key);
-                }
-                else
-                {
-                    lruList.AddFirst(node);
-                }
-
-                value = node.Value.Value;
-                return true;
-            }
-
-            // If the key is not found in the cache, return default value for TValue
-            value = default;
-            return false;
-        }
-
-        private class CacheItem
-        {
-            public TKey Key { get; }
-            public TValue Value { get; set; }
-
-            public CacheItem(TKey key, TValue value)
-            {
-                Key = key;
-                Value = value;
             }
         }
     }
