@@ -12,9 +12,9 @@
 		<PackageTags>reverse-engineer;forensics;clrmd;remoting;low-level</PackageTags>
 		<PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
-		<Version>1.0.2.22</Version>
-		<AssemblyVersion>1.0.2.22</AssemblyVersion>
-		<FileVersion>1.0.2.22</FileVersion>
+		<Version>1.0.2.27</Version>
+		<AssemblyVersion>1.0.2.27</AssemblyVersion>
+		<FileVersion>1.0.2.27</FileVersion>
 		<LangVersion>Latest</LangVersion>
 	</PropertyGroup>
 
