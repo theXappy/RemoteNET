@@ -53,7 +53,7 @@
             <dependency id="Microsoft.CSharp" version="4.7.0" />
 			<dependency id="System.Security.AccessControl" version="6.0.0.0" />
 			<dependency id="System.IO.FileSystem.AccessControl" version="5.0.0.0" />
-			<dependency id="InjectableDotNetHost.Injector" version="1.0.9" />
+			<dependency id="InjectableDotNetHost.Injector" version="1.0.12" />
           </group>
         </dependencies>
 		
