@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace ScubaDiver;
@@ -76,5 +77,54 @@ public class LRUCache<TKey, TValue>
             Key = key;
             Value = value;
         }
+    }
+}
+
+class LimitedSizeDictionary<TKey, TValue>
+{
+    private Dictionary<TKey, TValue> _this;
+    Queue<TKey> queue;
+    int limit;
+
+    public LimitedSizeDictionary(int limit)
+    {
+        _this = new Dictionary<TKey, TValue>(limit + 1);
+        this.limit = limit;
+        queue = new Queue<TKey>(limit);
+    }
+
+    public void Add(TKey key, TValue value)
+    {
+        _this.Add(key, value);
+        if (queue.Count == limit)
+            this.Remove(queue.Dequeue());
+        queue.Enqueue(key);
+    }
+
+    public bool Remove(TKey key)
+    {
+        if (_this.Remove(key))
+        {
+            Queue<TKey> newQueue = new Queue<TKey>(limit);
+            foreach (TKey item in queue)
+                if (!_this.Comparer.Equals(item, key))
+                    newQueue.Enqueue(item);
+            queue = newQueue;
+            return true;
+        }
+
+        return false;
+    }
+
+    public bool Remove(TKey key, out TValue value)
+    {
+        _this.TryGetValue(key, out value);
+        return _this.Remove(key);
+    }
+
+    public void AddOrUpdate(TKey key, TValue value)
+    {
+        Remove(key);
+        Add(key, value);
     }
 }

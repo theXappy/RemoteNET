@@ -7,6 +7,8 @@ using DetoursNet;
 using ScubaDiver.API.Hooking;
 using ScubaDiver.Rtti;
 using ScubaDiver.Demangle.Demangle.Core;
+using ScubaDiver.Demangle.Demangle.Core.Types;
+using System.Net;
 
 namespace ScubaDiver
 {
@@ -66,7 +68,7 @@ namespace ScubaDiver
 
         // Size Match-Making
         private static readonly object _addressToSizeLock = new();
-        private static readonly LRUCache<nuint, nuint> _addressToSize = new(100);
+        private static readonly LimitedSizeDictionary<nuint, nuint> _addressToSize = new(100);
         private static readonly object _classSizesLock = new();
         private static readonly NamedDict<nuint> _classSizes = new();
         public IReadOnlyDictionary<string, nuint> ClassSizes
@@ -242,18 +244,17 @@ namespace ScubaDiver
             Logger.Debug(
                 $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new' s. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
-        private static bool UnifiedOperatorNew(object unused, object[] args, ref object retValue)
+        private static bool UnifiedOperatorNew(object sizeObj, object[] args, ref object retValue)
         {
-            object first = args.FirstOrDefault();
-            if (first is nuint size && retValue is nuint retNuint)
+            if (sizeObj is NativeObject sizeNativeObj && retValue is nuint retNuint)
             {
+                nuint size = sizeNativeObj.Address;
                 nuint allocatedObjAddress = retNuint;
                 RegisterSize(allocatedObjAddress, size);
             }
             else
             {
-                Console.WriteLine(
-                    $"[UnifiedOperatorNew] Args: {args.Length}, Size: <ERROR!>");
+                Logger.Debug($"[UnifiedOperatorNew] sizeObj: {sizeObj}");
             }
 
             return false; // Don't skip original
@@ -297,9 +298,9 @@ namespace ScubaDiver
                         continue;
                     }
 
-                    Console.WriteLine($"[{nameof(MsvcOffensiveGC)}] Hooking CTOR {ctor.UndecoratedFullName} with {ctor.NumArgs} args");
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking CTOR {ctor.UndecoratedFullName} with {ctor.NumArgs} args");
                     DetoursNetWrapper.Instance.AddHook(type, ctor, UnifiedCtor, HarmonyPatchPosition.Prefix);
-                    Console.WriteLine($"[{nameof(MsvcOffensiveGC)}] QUICK EXIT");
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] QUICK EXIT");
                     attemptedHookedCtorsCount++;
                 }
             }
@@ -313,12 +314,13 @@ namespace ScubaDiver
         {
             if (selfObj is NativeObject self)
             {
+                Logger.Debug($"[UnifiedCtor] self.TypeInfo.Name: {self.TypeInfo.Name}, Addr: 0x{self.Address:x16}");
                 RegisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
                 TryMatchClassToSize(self.Address, self.TypeInfo.Name);
             }
             else
             {
-                Console.WriteLine($"[UnifiedCtor] Args: {args.Length}, Self: <ERROR!>");
+                Logger.Debug($"[UnifiedCtor] Args: {args.Length}, Self: <ERROR!>");
             }
             return false;
         }
@@ -368,8 +370,6 @@ namespace ScubaDiver
         {
             if (selfObj is NativeObject self)
             {
-                Logger.Debug($"[UnifiedDtor] Secret: {self.TypeInfo.Name}, Args: {args.Length}, Self: 0x{self.Address:x16}");
-
                 // TODO: Intercept dtors here to prevent de-allocation
                 DeregisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
             }
@@ -401,11 +401,11 @@ namespace ScubaDiver
         {
             overriddenReturnValue = 0;
 
-            Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}");
+            Logger.Debug($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}");
             object first = args.FirstOrDefault();
-            Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Self: {(first is nuint ? $"0x{first:x16}" : "<ERROR!>")}");
+            Logger.Debug($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Self: {(first is nuint ? $"0x{first:x16}" : "<ERROR!>")}");
             object second = args.FirstOrDefault();
-            Console.WriteLine($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Size: {(second is nuint ? $"0x{second:x16}" : "<ERROR!>")}");
+            Logger.Debug($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Size: {(second is nuint ? $"0x{second:x16}" : "<ERROR!>")}");
 
             return false; // Don't skip original
         }
@@ -463,6 +463,7 @@ namespace ScubaDiver
             lock (_addressToSizeLock)
             {
                 _addressToSize.AddOrUpdate(address, size);
+                Logger.Debug($"[RegisterSize] Addr: 0x{address:x16}, Size: {size}");
             }
         }
 
@@ -472,26 +473,30 @@ namespace ScubaDiver
         /// </summary>
         public static void TryMatchClassToSize(nuint address, string className)
         {
-            // Check if we already found the size of this class
-            lock (_classSizesLock)
-            {
-                if (_classSizes.ContainsKey(className))
-                    return;
-            }
-
             // Check recent "allocations"
             bool res;
             nuint size;
             lock (_addressToSizeLock)
             {
-                res = _addressToSize.TryGetValue(address, true, out size);
+                res = _addressToSize.Remove(address, out size);
             }
+            Logger.Debug($"[TryMatchClassToSize] className: {className}, Addr: 0x{address:x16}, Results: {res}");
 
-            if (res)
+            // Check if we already found the size of this class
+            lock (_classSizesLock)
             {
-                // Found a match!
-                _classSizes[className] = size;
-                Logger.Debug($"[MsvcOffensiveGC][MatchMaking] Found size of class. Name: {className}, Size: {size} bytes");
+                if (_classSizes.ContainsKey(className))
+                {
+                    Logger.Debug($"[TryMatchClassToSize] Already matched size of className: {className}");
+                    return;
+                }
+
+                if (res)
+                {
+                    // Found a new match!
+                    _classSizes[className] = size;
+                    Logger.Debug($"[TryMatchClassToSize] Found size of class. Name: {className}, Size: {size} bytes");
+                }
             }
         }
     }
