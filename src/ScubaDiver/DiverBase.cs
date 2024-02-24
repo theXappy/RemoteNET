@@ -42,6 +42,7 @@ namespace ScubaDiver
                 {"/die", MakeDieResponse},
                 {"/register_client", MakeRegisterClientResponse},
                 {"/unregister_client", MakeUnregisterClientResponse},
+                {"/help", MakeHelpResponse},
                 // DLL Injection
                 {"/inject_assembly", MakeInjectAssemblyResponse},
                 {"/inject_dll", MakeInjectDllResponse},
@@ -63,6 +64,12 @@ namespace ScubaDiver
                 {"/unhook_method", MakeUnhookMethodResponse},
             };
             _remoteHooks = new ConcurrentDictionary<int, RegisteredManagedMethodHookInfo>();
+        }
+
+        private string MakeHelpResponse(ScubaDiverMessage arg)
+        {
+            var possibleCommands = _responseBodyCreators.Keys.ToList();
+            return JsonConvert.SerializeObject(possibleCommands);
         }
 
         public virtual void Start()

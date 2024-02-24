@@ -25,7 +25,8 @@ namespace ScubaDiver
 
         public MsvcDiver(IRequestsListener listener) : base(listener)
         {
-            _responseBodyCreators["/gc"] = MakeGcResponse;
+            _responseBodyCreators["/gc"] = MakeGcHookModuleResponse;
+            _responseBodyCreators["/gc_stats"] = MakeGcStatsResponse;
 
             _tricksterWrapper = new TricksterWrapper();
             _exportsMaster = _tricksterWrapper.ExportsMaster;
@@ -44,7 +45,7 @@ namespace ScubaDiver
 
 
         private MsvcOffensiveGC _offensiveGC = null;
-        protected string MakeGcResponse(ScubaDiverMessage req)
+        protected string MakeGcHookModuleResponse(ScubaDiverMessage req)
         {
             string assemblyFilter = req.QueryString.Get("assembly");
             if (assemblyFilter == null || assemblyFilter == "*")
@@ -52,7 +53,7 @@ namespace ScubaDiver
 
             Predicate<string> assemblyFilterPredicate = Filter.CreatePredicate(assemblyFilter);
 
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} IN!");
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcHookModuleResponse)} IN!");
             if (_offensiveGC == null)
             {
                 if (_tricksterWrapper.RefreshRequired())
@@ -61,18 +62,23 @@ namespace ScubaDiver
             }
 
             List<UndecoratedModule> undecoratedModules = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate);
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Initialization GC");
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcHookModuleResponse)} Initialization GC");
             try
             {
                 _offensiveGC.HookModules(undecoratedModules);
             }
             catch (Exception e)
             {
-                Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} Exception: " + e);
+                Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcHookModuleResponse)} Exception: " + e);
             }
 
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcResponse)} OUT!");
+            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcHookModuleResponse)} OUT!");
             return "{\"status\":\"ok\"}";
+        }
+        protected string MakeGcStatsResponse(ScubaDiverMessage req)
+        {
+            var classSizes = _offensiveGC.ClassSizes;
+            return JsonConvert.SerializeObject(classSizes);
         }
 
         private List<SafeHandle> _injectedDlls = new();
@@ -362,7 +368,9 @@ namespace ScubaDiver
 
         private TypeDump GenerateTypeDump(TypeInfo typeInfo, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports)
         {
+#pragma warning disable CS0168 // Variable is declared but never used
             UndecoratedSymbol vftable;
+#pragma warning restore CS0168 // Variable is declared but never used
             List<TypeDump.TypeField> fields = new();
             List<TypeDump.TypeMethod> methods = new();
             List<TypeDump.TypeMethod> constructors = new();
@@ -412,7 +420,9 @@ namespace ScubaDiver
                 IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module);
                 foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
                 {
+#pragma warning disable CS0168 // Variable is declared but never used
                     UndecoratedSymbol vftable;
+#pragma warning restore CS0168 // Variable is declared but never used
                     List<TypeDump.TypeField> fields = new();
                     List<TypeDump.TypeMethod> methods = new();
                     List<TypeDump.TypeMethod> constructors = new();
