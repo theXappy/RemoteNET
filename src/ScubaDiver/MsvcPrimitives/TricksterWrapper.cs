@@ -33,14 +33,16 @@ public class TricksterWrapper
         _trickster = new Trickster(Process.GetCurrentProcess());
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scanning types...");
         _trickster.ScanTypes();
+        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scanning types... Found {_trickster.ScannedTypes.Sum(x => x.Value.Length)} types in {_trickster.ScannedTypes.Count}");
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Done.");
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Reading Regions...");
         _trickster.ReadRegions();
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
         // TODO: Searching new is a heavy operation & only used for Offensive GC. Removed for now.
-        //Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators...");
-        //_trickster.ScanOperatorNewFuncs();
-        _trickster.OperatorNewFuncs = new Dictionary<ModuleInfo, nuint[]>();
+        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators...");
+        _trickster.ScanOperatorNewFuncs();
+        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators... Found {_trickster.OperatorNewFuncs.Count}");
+        //_trickster.OperatorNewFuncs = new Dictionary<ModuleInfo, nuint[]>();
         //Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
 

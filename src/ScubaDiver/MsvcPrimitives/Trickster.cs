@@ -411,11 +411,19 @@ public unsafe class Trickster : IDisposable
 
     private Dictionary<ModuleInfo, nuint[]> ScanOperatorNewFuncsCore()
     {
-        Dictionary<ModuleInfo, nuint[]> res = new();
+        // Start with any existing findings
+        OperatorNewFuncs ??= new Dictionary<ModuleInfo, nuint[]>();
+        Dictionary<ModuleInfo, nuint[]> res = new(OperatorNewFuncs);
 
         Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
         foreach (ModuleInfo modInfo in UnmanagedModules)
         {
+            if (res.ContainsKey(modInfo))
+            {
+                // Already processed this module. Modules don't "get" more new functions over time...
+                continue;
+            }
+
             List<ModuleSegment> sections;
             try
             {
@@ -439,19 +447,20 @@ public unsafe class Trickster : IDisposable
 
         foreach (var kvp in dataSegments)
         {
-            var module = kvp.Key;
+            ModuleInfo module = kvp.Key;
             var segments = kvp.Value;
+
+            if (!res.ContainsKey(module))
+                res[module] = Array.Empty<nuint>();
 
             foreach (ModuleSegment segment in segments)
             {
                 try
                 {
-                    var types = ScanOperatorNewFuncsCore(module.Name, module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
-                    if (types.Length > 0)
+                    var newFuncs = ScanOperatorNewFuncsCore(module.Name, module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
+                    if (newFuncs.Length > 0)
                     {
-                        if (!res.ContainsKey(module))
-                            res[module] = Array.Empty<nuint>();
-                        res[module] = res[module].Concat(types).ToArray();
+                        res[module] = res[module].Concat(newFuncs).ToArray();
                     }
                 }
                 catch (Exception ex)
