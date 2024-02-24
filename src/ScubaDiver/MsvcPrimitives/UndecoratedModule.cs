@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using ScubaDiver.Rtti;
 
 namespace ScubaDiver;
 
+[DebuggerDisplay("{Name} (UndecoratedModule)")]
 public class UndecoratedModule
 {
     public string Name { get; private set; }
