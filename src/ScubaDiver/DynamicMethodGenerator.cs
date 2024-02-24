@@ -156,30 +156,29 @@ public static class DetoursMethodGenerator
         DetouredFuncInfo tramp = _trampolines[generatedMethodName];
 
         // Call prefix hook
-        bool skipOriginal = RunPatchInPosition(HarmonyPatchPosition.Prefix, tramp, args, out nuint overridenReturnValue);
+        nuint retValue = 0;
+        bool skipOriginal = RunPatchInPosition(HarmonyPatchPosition.Prefix, tramp, args, ref retValue);
         if (!skipOriginal)
         {
-            overridenReturnValue = 0;
+            retValue = 0;
 
             // Call original method
             Delegate realMethod = DelegateStore.Real[tramp.GenerateMethodInfo];
             object res = realMethod.DynamicInvoke(args);
             if (res != null)
-                overridenReturnValue = (nuint)res;
+                retValue = (nuint)res;
         }
 
         // Call postfix hook
-        // TODO: Pass real method's result to the hook
-        RunPatchInPosition(HarmonyPatchPosition.Postfix, tramp, args, out nuint _);
+        RunPatchInPosition(HarmonyPatchPosition.Postfix, tramp, args, ref retValue);
 
-        return overridenReturnValue;
+        return retValue;
     }
 
 
     /// <returns>Boolean indicating 'skipOriginal'</returns>
-    static bool RunPatchInPosition(HarmonyPatchPosition position, DetouredFuncInfo hookedFunc, object[] args, out nuint overriddenReturnValue)
+    static bool RunPatchInPosition(HarmonyPatchPosition position, DetouredFuncInfo hookedFunc, object[] args, ref nuint retValue)
     {
-        overriddenReturnValue = 0;
         if (args.Length == 0) throw new Exception("Bad arguments to unmanaged HookCallback. Expecting at least 1 (for 'this').");
 
         object self = new NativeObject((nuint)args.FirstOrDefault(), hookedFunc.DeclaringClass);
@@ -219,7 +218,7 @@ public static class DetoursMethodGenerator
 
 
         bool skipOriginal = false;
-        object newRetVal = null;
+        object newRetVal = retValue;
         bool retValModified = false;
 
         if (position == HarmonyPatchPosition.Prefix)
@@ -250,7 +249,7 @@ public static class DetoursMethodGenerator
             {
                 throw new ArgumentException($"Return value from {position} hook was NOT an nuint. It was: {newRetVal}");
             }
-            overriddenReturnValue = newNuintRetVal;
+            retValue = newNuintRetVal;
         }
 
         return skipOriginal;
