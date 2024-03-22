@@ -30,8 +30,9 @@ There are 2 ways to get the library:
 5. `mkdir detours_build`
 6. `cd detours_build`
 7. `cmake ..\detours.net`
-8. Open `RemoteNET.sln` in Visual Studio
-9. Compile the RemoteNET project
+8. `msbuild ALL_BUILD.vcxproj`
+9. Open `RemoteNET.sln` in Visual Studio
+10. Compile the RemoteNET project
 
 ## Minimal Working Example
 To get the essence of how easy and usefull this library can be, see below a re-implementation of [denandz/KeeFarce](https://github.com/denandz/KeeFarce).  
