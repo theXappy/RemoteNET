@@ -200,7 +200,7 @@ namespace ScubaDiver.API
                     InvocationResults ir = new()
                     {
                         VoidReturnType = false,
-                        ReturnedObjectOrAddress = ObjectOrRemoteAddress.FromObj(hookContext.CallOriginal)
+                        ReturnedObjectOrAddress = ObjectOrRemoteAddress.FromObj(hookContext.skipOriginal)
                     };
 
                     body = JsonConvert.SerializeObject(ir);
