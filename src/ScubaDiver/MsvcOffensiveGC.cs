@@ -9,6 +9,7 @@ using ScubaDiver.Rtti;
 using ScubaDiver.Demangle.Demangle.Core;
 using ScubaDiver.Demangle.Demangle.Core.Types;
 using System.Net;
+using System.Drawing;
 
 namespace ScubaDiver
 {
@@ -92,7 +93,7 @@ namespace ScubaDiver
 
             modules = modules.Where(m => !_alreadyHookedModules.Contains(m)).ToList();
 
-            Dictionary<long, UndecoratedFunction> initMethods = GetAutoClassInit2Funcs(modules);
+            Dictionary<TypeInfo, UndecoratedFunction> initMethods = GetAutoClassInit2Funcs(modules);
             Dictionary<TypeInfo, List<UndecoratedFunction>> ctors = GetCtors(modules);
             Dictionary<TypeInfo, List<UndecoratedFunction>> dtors = GetDtors(modules);
             Dictionary<string, List<UndecoratedFunction>> newOperators = GetNewOperators(modules);
@@ -189,10 +190,10 @@ namespace ScubaDiver
 
             return res;
         }
-        private Dictionary<long, UndecoratedFunction> GetAutoClassInit2Funcs(List<UndecoratedModule> modules)
+        private Dictionary<TypeInfo, UndecoratedFunction> GetAutoClassInit2Funcs(List<UndecoratedModule> modules)
         {
             void ProcessSingleModule(UndecoratedModule module,
-                Dictionary<long, UndecoratedFunction> workingDict)
+                Dictionary<TypeInfo, UndecoratedFunction> workingDict)
             {
                 foreach (TypeInfo type in module.Types)
                 {
@@ -207,11 +208,11 @@ namespace ScubaDiver
                     }
 
                     var func = methodGroup.Single();
-                    workingDict[func.Address] = func;
+                    workingDict[type] = func;
                 }
             }
 
-            Dictionary<long, UndecoratedFunction> res = new();
+            Dictionary<TypeInfo, UndecoratedFunction> res = new();
             foreach (UndecoratedModule module in modules)
             {
                 ProcessSingleModule(module, res);
@@ -316,7 +317,7 @@ namespace ScubaDiver
             {
                 Logger.Debug($"[UnifiedCtor] self.TypeInfo.Name: {self.TypeInfo.Name}, Addr: 0x{self.Address:x16}");
                 RegisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
-                TryMatchClassToSize(self.Address, self.TypeInfo.Name);
+                TryMatchClassToSize(self.Address, self.TypeInfo.FullTypeName);
             }
             else
             {
@@ -381,31 +382,40 @@ namespace ScubaDiver
         }
 
         // AUTO CLASS INIT 2
-        private void HookAutoClassInit2Funcs(Dictionary<long, UndecoratedFunction> initMethods)
+        private void HookAutoClassInit2Funcs(Dictionary<TypeInfo, UndecoratedFunction> initMethods)
         {
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] HookAutoClassInit2Funcs DISABLED!");
-
             // Hook all __autoclassinit2
-            //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2. Count: {initMethods.Count}");
-            //foreach (var kvp in initMethods)
-            //{
-            //    UndecoratedFunction autoClassInit2 = kvp.Value;
-            //    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedFullName}");
-            //    DetoursNetWrapper.Instance.AddHook(kvp.Value, UnifiedAutoClassInit2);
-            //}
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2. Count: {initMethods.Count}");
+            foreach (var kvp in initMethods)
+            {
+                UndecoratedFunction autoClassInit2 = kvp.Value;
+                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedFullName}");
+                DetoursNetWrapper.Instance.AddHook(kvp.Key, kvp.Value, UnifiedAutoClassInit2, HarmonyPatchPosition.Prefix);
+            }
 
-            //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
-            //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
+            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
-        public static bool UnifiedAutoClassInit2(DetoursMethodGenerator.DetouredFuncInfo secret, object[] args, out nuint overriddenReturnValue)
-        {
-            overriddenReturnValue = 0;
 
-            Logger.Debug($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}");
-            object first = args.FirstOrDefault();
-            Logger.Debug($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Self: {(first is nuint ? $"0x{first:x16}" : "<ERROR!>")}");
-            object second = args.FirstOrDefault();
-            Logger.Debug($"[UnifiedAutoClassInit2] Secret: {secret.Name}, Args: {args.Length}, Size: {(second is nuint ? $"0x{second:x16}" : "<ERROR!>")}");
+        private bool UnifiedAutoClassInit2(object selfObj, object[] args, ref object retvalue)
+        {
+            if (selfObj is NativeObject self)
+            {
+                Logger.Debug($"[UnifiedAutoClassInit2] Secret: {self.TypeInfo.Name}, Args: {args.Length}");
+                nuint size = (nuint)args.FirstOrDefault();
+                Logger.Debug(
+                    $"[UnifiedAutoClassInit2] Secret: {self.TypeInfo.Name}, Args: {args.Length}, Self: 0x{size:x16}");
+                lock (_classSizesLock)
+                {
+                    // Found a new match!
+                    _classSizes[self.TypeInfo.FullTypeName] = size;
+                }
+            }
+
+            else
+            {
+                Logger.Debug($"[UnifiedAutoClassInit2] Args: {args.Length}, Self: <ERROR!>");
+            }
 
             return false; // Don't skip original
         }
@@ -471,7 +481,7 @@ namespace ScubaDiver
         /// Given an address and the name of the class initalized there, check if a size was registered for that address.
         /// If so, record that match.
         /// </summary>
-        public static void TryMatchClassToSize(nuint address, string className)
+        public static void TryMatchClassToSize(nuint address, string fullTypeClassName)
         {
             // Check recent "allocations"
             bool res;
@@ -480,22 +490,22 @@ namespace ScubaDiver
             {
                 res = _addressToSize.Remove(address, out size);
             }
-            Logger.Debug($"[TryMatchClassToSize] className: {className}, Addr: 0x{address:x16}, Results: {res}");
+            Logger.Debug($"[TryMatchClassToSize] fullTypeClassName: {fullTypeClassName}, Addr: 0x{address:x16}, Results: {res}");
 
             // Check if we already found the size of this class
             lock (_classSizesLock)
             {
-                if (_classSizes.ContainsKey(className))
+                if (_classSizes.ContainsKey(fullTypeClassName))
                 {
-                    Logger.Debug($"[TryMatchClassToSize] Already matched size of className: {className}");
+                    Logger.Debug($"[TryMatchClassToSize] Already matched size of fullTypeClassName: {fullTypeClassName}");
                     return;
                 }
 
                 if (res)
                 {
                     // Found a new match!
-                    _classSizes[className] = size;
-                    Logger.Debug($"[TryMatchClassToSize] Found size of class. Name: {className}, Size: {size} bytes");
+                    _classSizes[fullTypeClassName] = size;
+                    Logger.Debug($"[TryMatchClassToSize] Found size of class. Full Name: {fullTypeClassName}, Size: {size} bytes");
                 }
             }
         }
