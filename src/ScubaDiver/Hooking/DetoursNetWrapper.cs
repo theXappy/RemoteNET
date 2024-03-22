@@ -32,10 +32,6 @@ public class DetoursNetWrapper
         }
         DetoursMethodGenerator.DetouredFuncInfo tramp;
         tramp = DetoursMethodGenerator.GetOrCreateMethod(typeInfo, methodToHook, typeof(nuint), methodToHook.DecoratedName);
-        Logger.Debug($"[AddHook] tramp.Name = {tramp.Name} (ADDR: 0x{methodToHook.Address:x16})");
-        Logger.Debug($"[AddHook] |_ tramp.DeclaringClass = {tramp.DeclaringClass}");
-        Logger.Debug($"[AddHook] |_ methodToHook.DecoratedName = {methodToHook.DecoratedName}");
-        Logger.Debug($"[AddHook] |_ methodToHook.UndecoratedFullName = {methodToHook.UndecoratedFullName}");
         switch (hookPosition)
         {
             case HarmonyPatchPosition.Prefix:
