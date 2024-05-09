@@ -25,12 +25,17 @@ public class TricksterWrapper
     public void Refresh()
     {
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Refreshing runtime!");
+        Dictionary<ModuleInfo, nuint[]> operatorNewFuncs = null;
         if (_trickster != null)
         {
+            operatorNewFuncs = _trickster.OperatorNewFuncs;
             _trickster.Dispose();
             _trickster = null;
         }
+
         _trickster = new Trickster(Process.GetCurrentProcess());
+        _trickster.OperatorNewFuncs = operatorNewFuncs;
+
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scanning types...");
         _trickster.ScanTypes();
         Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scanning types... Found {_trickster.ScannedTypes.Sum(x => x.Value.Length)} types in {_trickster.ScannedTypes.Count}");
