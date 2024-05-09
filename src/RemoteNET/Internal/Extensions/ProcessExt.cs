@@ -227,7 +227,7 @@ namespace RemoteNET.Internal.Extensions
             {
                 // That's a heuristic.
                 return process.Modules.Cast<ProcessModule>()
-                    .Any(m => m.ModuleName.ToLower() == "windows.ui.dll");
+                    .Any(m => m.ModuleName.ToLower() == "windows.ui.xaml.dll");
             }
             catch (Exception)
             {
