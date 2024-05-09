@@ -134,11 +134,12 @@ namespace ScubaDiver
         }
 
 
+        protected override void RefreshRuntime() => RefreshRuntimeInternal(false);
 
-        protected override void RefreshRuntime()
+        protected void RefreshRuntimeInternal(bool force)
         {
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] Refreshing runtime!");
-            if (!_tricksterWrapper.RefreshRequired())
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] Refreshing runtime! forced?");
+            if (!_tricksterWrapper.RefreshRequired() && !force)
             {
                 Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] Refreshing avoided...");
                 return;
@@ -592,7 +593,7 @@ namespace ScubaDiver
         {
             // Since trickster works on copied memory, we must refresh it so it copies again
             // the updated heap's state between invocations.
-            RefreshRuntime();
+            RefreshRuntimeInternal(true);
 
             string rawFilter = arg.QueryString.Get("type_filter");
             ParseFullTypeName(rawFilter, out var rawAssemblyFilter, out var rawTypeFilter);
