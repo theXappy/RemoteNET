@@ -7,6 +7,7 @@
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<LangVersion>latest</LangVersion>
 		<Platforms>AnyCPU;x86</Platforms>
+		<DefineConstants>NET_6</DefineConstants>
 		<GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
 	</PropertyGroup>
 
