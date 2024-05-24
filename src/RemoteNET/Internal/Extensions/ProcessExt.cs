@@ -194,6 +194,9 @@ namespace RemoteNET.Internal.Extensions
 
             switch (hostPolicyVersionInfo?.ProductMajorPart)
             {
+                case 8:
+                    return "net8.0-windows";
+
                 case 7:
                     return "net7.0-windows";
 
