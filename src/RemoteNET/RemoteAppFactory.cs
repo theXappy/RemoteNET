@@ -256,7 +256,8 @@ namespace RemoteNET
             bool isNetCore = targetDotNetVer != "net451";
             bool isNet5 = targetDotNetVer == "net5.0-windows";
             bool isNet6orUp = targetDotNetVer == "net6.0-windows" ||
-                              targetDotNetVer == "net7.0-windows";
+                              targetDotNetVer == "net7.0-windows" ||
+                              targetDotNetVer == "net8.0-windows";
             bool isNative = targetDotNetVer == "native";
 
 

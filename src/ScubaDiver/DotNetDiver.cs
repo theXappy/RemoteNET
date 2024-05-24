@@ -130,7 +130,17 @@ namespace ScubaDiver
                 // NOTE: This subprocess inherits handles to DLLs in the current process so it might "lock"
                 // both UnmanagedAdapterDLL.dll and ScubaDiver.dll
                 _dt = DataTarget.CreateSnapshotAndAttach(Process.GetCurrentProcess().Id);
-                _runtime = _dt.ClrVersions.Single().CreateRuntime();
+                try
+                {
+                    _runtime = _dt.ClrVersions.Single().CreateRuntime();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Exception while trying to find CLR runtime");
+                    Console.WriteLine(ex);
+                    Debugger.Launch();
+                    Debugger.Break();
+                }
             }
         }
 
