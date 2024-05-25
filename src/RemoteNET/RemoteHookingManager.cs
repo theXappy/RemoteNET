@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using RemoteNET.Common;
+using RemoteNET.Internal;
 using ScubaDiver.API;
 using ScubaDiver.API.Hooking;
 using ScubaDiver.API.Utils;
@@ -123,60 +124,11 @@ public class RemoteHookingManager
             droInstance = DecodeOora(instance);
 
 
-            object[] decodedParameters;
-            if (_isUnmanaged)
+            object[] decodedParameters = new object[args.Length];
+            for (int i = 0; i < decodedParameters.Length; i++)
             {
-                //
-                // PARSE UNMANAGED ARGUMENTS
-                //
-
-                decodedParameters = new object[args.Length];
-                for (int i = 0; i < decodedParameters.Length; i++)
-                {
-                    dynamic item = DecodeOora(args[i] as ObjectOrRemoteAddress);
-                    decodedParameters[i] = item;
-                }
-            }
-            else
-            {
-                //
-                // PARSE MANAGED ARGUMENTS
-                //
-
-                // Converting args to DROs/raw primitive types
-                if (args.Length != 1)
-                {
-                    throw new NotImplementedException("Unexpected arguments forwarded to callback from the diver.");
-                }
-
-                // We are expecting a single arg which is a REMOTE array of objects (object[]) and we need to flatten it
-                // into several (Dynamic) Remote Objects in a LOCAL array of objects.
-                RemoteObject ro = _app.GetRemoteObject(args[0]);
-                dynamic dro = ro.Dynamify();
-                if (!ro.GetRemoteType().IsArray)
-                {
-                    throw new NotImplementedException(
-                        "Unexpected arguments forwarded to callback from the diver -- single arg but not an array.");
-                }
-
-                int len = 0;
-                try
-                {
-                    len = (int)dro.Length;
-                }
-                catch (Exception e)
-                {
-                    Debug.WriteLine("ERROR ACCESSING ARRAY LEN: " + e);
-                }
-
-                decodedParameters = new object[len];
-                for (int i = 0; i < len; i++)
-                {
-                    // Since this object isn't really a local array (just a proxy of a remote one) the index
-                    // acceess causes a 'GetItem' function call and retrival of the remote object at the position
-                    dynamic item = dro[i];
-                    decodedParameters[i] = item;
-                }
+                dynamic item = DecodeOora(args[i] as ObjectOrRemoteAddress);
+                decodedParameters[i] = item;
             }
 
             // Call the callback with the proxied parameters (using DynamicRemoteObjects)
