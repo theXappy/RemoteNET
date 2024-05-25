@@ -232,7 +232,10 @@ namespace ScubaDiver
                 parameters[0] = obj;
                 Array.Copy(args, 0, parameters, 1, args.Length);
 
+                // Shift control to remote hook (Other process)
                 var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), parameters);
+
+                // Remote hook returned, examine it's return value.
                 bool skipOriginal = false;
                 if (res != null && !res.IsRemoteAddress)
                 {

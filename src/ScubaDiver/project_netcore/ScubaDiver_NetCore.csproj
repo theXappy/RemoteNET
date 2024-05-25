@@ -38,7 +38,7 @@
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-		<PackageReference Include="Lib.Harmony" Version="2.2.2" />
+		<PackageReference Include="Lib.Harmony" Version="2.3.3" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -55,10 +55,9 @@
 				<DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
 			</CopyOperations>
 		</ItemGroup>
-		<Message Text="[~] $(ProjectName) - Copying to ScubaDiver folder" Importance="high"/>
-		<Message Text="[~] Files to copy: @(CopyOperations) dest: %(CopyOperations.DestinationFolder)" Importance="high"/>
-		<Copy SourceFiles="@(CopyOperations)"
-		      DestinationFolder="%(CopyOperations.DestinationFolder)" />
+		<Message Text="[~] $(ProjectName) - Copying to ScubaDiver folder" Importance="high" />
+		<Message Text="[~] Files to copy: @(CopyOperations) dest: %(CopyOperations.DestinationFolder)" Importance="high" />
+		<Copy SourceFiles="@(CopyOperations)" DestinationFolder="%(CopyOperations.DestinationFolder)" />
 	</Target>
 
 </Project>
