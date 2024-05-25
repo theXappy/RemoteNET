@@ -597,7 +597,7 @@ namespace ScubaDiver
 
             Action unhookMethod = (Action)(() =>
             {
-                HarmonyWrapper.Instance.RemovePrefix(methodInfo);
+                HarmonyWrapper.Instance.UnhookAnyHookPosition(methodInfo);
             });
             return unhookMethod;
         }
