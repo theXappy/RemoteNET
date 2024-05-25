@@ -192,6 +192,17 @@ namespace RemoteNET.Internal.Extensions
                 }
             }
 
+            // SS: This is a HEURISTIC and it's *good enough* but more could be done here
+            // like check the DLLs versions (at least I hope we can get back the full module path...)
+            if (hostPolicyVersionInfo == null)
+            {
+                if (mscorlibSeen || clrDllSeen)
+                {
+                    return "net451";
+                }
+                return "native";
+            }
+
             switch (hostPolicyVersionInfo?.ProductMajorPart)
             {
                 case 8:
@@ -213,13 +224,7 @@ namespace RemoteNET.Internal.Extensions
                     return "netcoreapp3.0";
 
                 default:
-                    // SS: This is a HEURISTIC and it's *good enough* but more could be done here
-                    // like check the DLLs versions (at least I hope we can get back the full module path...)
-                    if (mscorlibSeen || clrDllSeen)
-                    {
-                        return "net451";
-                    }
-                    return "native";
+                    throw new NotSupportedException($"Unsupported .NET version: {hostPolicyVersionInfo.ProductMajorPart}. Please file a bug report.");
             }
 
         }
