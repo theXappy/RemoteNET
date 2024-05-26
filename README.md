@@ -9,7 +9,7 @@ Basically this library lets you mess with objects of any other .NET app without 
 
 
 ## **Supported Targets**  
-✅ .NET 5/6/7  
+✅ .NET 5/6/7/8  
 ✅ .NET Core 3.0/3.1  
 ✅ .NET Framework 4.5/4.6/4.7/4.8 (incl. subversions)  
 ✅ MSVC-compiled C++ (experimental)  
