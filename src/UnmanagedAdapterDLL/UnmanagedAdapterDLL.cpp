@@ -118,8 +118,8 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 	if (pClr != NULL)
 	{
 		if (consoleAllocated) {
-			DebugOut(L"[UnmanagedAdapter] Freeing temp console\n");
-			FreeConsole();
+			//DebugOut(L"[UnmanagedAdapter] Freeing temp console\n");
+			//FreeConsole();
 		}
 		DWORD result;
 		DebugOut(L"[UnmanagedAdapter] ExecuteInDefaultAppDomain(%s, %s, %s, %s)\n",
