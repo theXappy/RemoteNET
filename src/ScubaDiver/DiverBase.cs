@@ -89,13 +89,12 @@ namespace ScubaDiver
                 {
                     endpoint = registeredMethodHookInfo.Value.Endpoint;
                     ReverseCommunicator reverseCommunicator = new(endpoint);
-                    Logger.Debug($"[DiverBase] Checking if callback client at {endpoint} is alive. Token = {registeredMethodHookInfo.Key}. Type = Method Hook");
+                    //Logger.Debug($"[DiverBase] Checking if callback client at {endpoint} is alive. Token = {registeredMethodHookInfo.Key}. Type = Method Hook");
                     bool alive = reverseCommunicator.CheckIfAlive();
-                    Logger.Debug($"[DiverBase] Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) is alive = {alive}");
+                    //Logger.Debug($"[DiverBase] Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) is alive = {alive}");
                     if (!alive)
                     {
-                        Logger.Debug(
-                            $"[DiverBase] Dead Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) DROPPED!");
+                        Logger.Debug($"[DiverBase] Dead Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) DROPPED!");
                         _remoteHooks.TryRemove(registeredMethodHookInfo.Key, out _);
                     }
                 }

@@ -86,13 +86,12 @@ namespace ScubaDiver
                 {
                     endpoint = registeredMethodHookInfo.Value.Endpoint;
                     ReverseCommunicator reverseCommunicator = new(endpoint);
-                    Logger.Debug($"[DotNetDiver] Checking if callback client at {endpoint} is alive. Token = {registeredMethodHookInfo.Key}. Type = Method Hook");
+                    //Logger.Debug($"[DotNetDiver] Checking if callback client at {endpoint} is alive. Token = {registeredMethodHookInfo.Key}. Type = Method Hook");
                     bool alive = reverseCommunicator.CheckIfAlive();
-                    Logger.Debug($"[DotNetDiver] Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) is alive = {alive}");
+                    //Logger.Debug($"[DotNetDiver] Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) is alive = {alive}");
                     if (!alive)
                     {
-                        Logger.Debug(
-                            $"[DotNetDiver] Dead Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) DROPPED!");
+                        Logger.Debug($"[DotNetDiver] Dead Callback client at {endpoint} (Token = {registeredMethodHookInfo.Key}) DROPPED!");
                         _remoteHooks.TryRemove(registeredMethodHookInfo.Key, out _);
                     }
                 }
@@ -100,13 +99,12 @@ namespace ScubaDiver
                 {
                     endpoint = registeredEventHandlerInfo.Value.Endpoint;
                     ReverseCommunicator reverseCommunicator = new(endpoint);
-                    Logger.Debug($"[DotNetDiver] Checking if callback client at {endpoint} is alive. Token = {registeredEventHandlerInfo.Key}. Type = Event");
+                    //Logger.Debug($"[DotNetDiver] Checking if callback client at {endpoint} is alive. Token = {registeredEventHandlerInfo.Key}. Type = Event");
                     bool alive = reverseCommunicator.CheckIfAlive();
-                    Logger.Debug($"[DotNetDiver] Callback client at {endpoint} (Token = {registeredEventHandlerInfo.Key}) is alive = {alive}");
+                    //Logger.Debug($"[DotNetDiver] Callback client at {endpoint} (Token = {registeredEventHandlerInfo.Key}) is alive = {alive}");
                     if (!alive)
                     {
-                        Logger.Debug(
-                            $"[DotNetDiver] Dead Callback client at {endpoint} (Token = {registeredEventHandlerInfo.Key}) DROPPED!");
+                        Logger.Debug($"[DotNetDiver] Dead Callback client at {endpoint} (Token = {registeredEventHandlerInfo.Key}) DROPPED!");
                         _remoteEventHandler.TryRemove(registeredEventHandlerInfo.Key, out _);
                     }
                 }

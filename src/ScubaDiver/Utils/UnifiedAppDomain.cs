@@ -66,7 +66,6 @@ namespace ScubaDiver.Utils
         public Assembly[] GetAssemblies()
         {
             var domains = GetDomains();
-            Console.WriteLine($"[GetAssemblies] Domains: {domains.Length}");
             return domains.SelectMany(domain => domain.GetAssemblies()).ToArray();
         }
 
