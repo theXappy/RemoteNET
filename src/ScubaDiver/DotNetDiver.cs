@@ -118,10 +118,24 @@ namespace ScubaDiver
         {
             lock (_clrMdLock)
             {
+                var windowsProcessDataReader = _dt?.DataReader;
+                int? pid = windowsProcessDataReader?.ProcessId;
+
                 _runtime?.Dispose();
                 _runtime = null;
                 _dt?.Dispose();
                 _dt = null;
+
+                if (pid != null)
+                {
+                    try
+                    {
+                        Process.GetProcessById(pid.Value).Kill();
+                    }
+                    catch
+                    {
+                    }
+                }
 
                 // This works like 'fork()', it does NOT create a dump file and uses it as the target
                 // Instead it creates a secondary process which is a copy of the current one, but without any running threads.
