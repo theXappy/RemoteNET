@@ -446,6 +446,8 @@ namespace ScubaDiver
                 // No exact matches, widen search to any assembly *containing* the query
                 matchingAssemblies = allAssembliesInApp.Where(module =>
                 {
+                    if (assembly == null)
+                        return false;
                     try
                     {
                         return module?.GetName()?.Name?.Contains(assembly) == true;
