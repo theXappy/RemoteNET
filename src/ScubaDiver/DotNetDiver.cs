@@ -1010,8 +1010,7 @@ namespace ScubaDiver
             var method = dumpedObjType.GetMethodRecursive(request.MethodName, genericArgumentTypes, argumentTypes);
             if (method == null)
             {
-                Debugger.Launch();
-                Logger.Debug($"[DotNetDiver] Failed to Resolved method :/");
+                Logger.Debug($"[DotNetDiver] Failed to Resolved method {request.MethodName} in type {dumpedObjType.Name} :/");
                 return QuickError("Couldn't find method in type.");
             }
 
