@@ -128,7 +128,8 @@ namespace ScubaDiver.Hooking
             //
             // Save a side the patch callback to invoke when the target is called
             //
-            string uniqueId = target.DeclaringType.FullName + ":" + target.Name + ":" + pos;
+            string argsStr = string.Join(";", target.GetParameters().Select(pi => pi.ParameterType.FullName));
+            string uniqueId = target.DeclaringType.FullName + ":" + argsStr + ":"+ target.Name + ":" + pos;
             if (_actualHooks.ContainsKey(uniqueId))
             {
                 Logger.Debug($"Hook already exists under (not so) unique ID: {uniqueId}");
@@ -143,22 +144,23 @@ namespace ScubaDiver.Hooking
             //
 
 
-            MethodInfo myPrefixHook;
+            MethodInfo myHook;
             if (target.IsConstructor)
             {
-                myPrefixHook = typeof(HarmonyWrapper).GetMethod("UnifiedHook_ctor", (BindingFlags)0xffff);
+                myHook = typeof(HarmonyWrapper).GetMethod("UnifiedHook_ctor", (BindingFlags)0xffff);
             }
             else
             {
-                myPrefixHook = GetUnifiedHook(target as MethodInfo, pos);
+                myHook = GetUnifiedHook(target as MethodInfo, pos);
             }
 
-            Logger.Debug($"[HarmonyWrapper] Choose this hook myPrefixHook: " + myPrefixHook);
+            Logger.Debug($"[HarmonyWrapper] Choose this hook myHook: " + myHook);
+            Logger.Debug($"[HarmonyWrapper] Hooking this position: " + pos);
 
 
 
             // Document the `single prefix hook` used so we can remove later
-            _singlePrefixHooks[uniqueId] = myPrefixHook;
+            _singlePrefixHooks[uniqueId] = myHook;
             _locksDict.Add(target);
 
             HarmonyMethod prefix = null;
@@ -168,13 +170,13 @@ namespace ScubaDiver.Hooking
             switch (pos)
             {
                 case HarmonyPatchPosition.Prefix:
-                    prefix = new HarmonyMethod(myPrefixHook);
+                    prefix = new HarmonyMethod(myHook);
                     break;
                 case HarmonyPatchPosition.Postfix:
-                    postfix = new HarmonyMethod(myPrefixHook);
+                    postfix = new HarmonyMethod(myHook);
                     break;
                 case HarmonyPatchPosition.Finalizer:
-                    finalizer = new HarmonyMethod(myPrefixHook);
+                    finalizer = new HarmonyMethod(myHook);
                     break;
                 default:
                     throw new ArgumentException("Invalid value for the 'HarmonyPatchPosition pos' arg");
@@ -253,7 +255,8 @@ namespace ScubaDiver.Hooking
         {
             foreach (HarmonyPatchPosition pos in new[] { HarmonyPatchPosition.Prefix, HarmonyPatchPosition.Postfix })
             {
-                string uniqueId = target.DeclaringType.FullName + ":" + target.Name + ":" + pos;
+                string argsStr = string.Join(";", target.GetParameters().Select(pi => pi.ParameterType.FullName));
+                string uniqueId = target.DeclaringType.FullName + ":" + argsStr + ":" + target.Name + ":" + pos;
                 if (_singlePrefixHooks.TryGetValue(uniqueId, out MethodInfo spHook))
                 {
                     _harmony.Unpatch(target, spHook);
@@ -305,7 +308,8 @@ namespace ScubaDiver.Hooking
 
             try
             {
-                string uniqueId = __originalMethod.DeclaringType.FullName + ":" + __originalMethod.Name + ":" + pos;
+                string argsStr = string.Join(";", __originalMethod.GetParameters().Select(pi => pi.ParameterType.FullName));
+                string uniqueId = __originalMethod.DeclaringType.FullName + ":" + argsStr + ":" + __originalMethod.Name + ":" + pos;
                 if (_actualHooks.TryGetValue(uniqueId, out HookCallback funcHook))
                 {
                     // Return value will determine wether the original method will be called or not.
