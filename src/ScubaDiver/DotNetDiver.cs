@@ -128,11 +128,18 @@ namespace ScubaDiver
                 {
                     try
                     {
+                        Logger.Debug("[Info] Trying to kill snapshot with PID = " + pid);
                         Process.GetProcessById(pid.Value).Kill();
+                        Logger.Debug("[Info] Killed snapshot with PID = " + pid);
                     }
-                    catch
+                    catch(Exception ex)
                     {
+                        Logger.Debug("[ERROR] Trying to kill snapshot with PID = " + pid + "failed. Ex: " + ex);
                     }
+                }
+                else
+                {
+                    Logger.Debug("[ERROR] No PID of snapshot ???");
                 }
 
                 // This works like 'fork()', it does NOT create a dump file and uses it as the target
