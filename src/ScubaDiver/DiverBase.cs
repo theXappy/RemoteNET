@@ -243,7 +243,9 @@ namespace ScubaDiver
                         skipOriginal = boolRes;
                 }
 
-                return skipOriginal;
+                // Silly mix up...
+                bool callOriginal = !skipOriginal;
+                return callOriginal;
             };
 
             Logger.Debug($"[DiverBase] Hooking function {req.MethodName}...");
