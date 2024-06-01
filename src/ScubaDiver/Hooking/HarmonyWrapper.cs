@@ -326,7 +326,7 @@ namespace ScubaDiver.Hooking
 #pragma warning disable IDE0051 // Remove unused private members
         // ReSharper disable UnusedMember.Local
         // ReSharper disable InconsistentNaming
-        private static bool UnifiedHook_ctor(MethodBase __originalMethod, ref object __result) => SinglePrefixHook(__originalMethod, ref __result, new object());
+        private static void UnifiedHook_ctor(MethodBase __originalMethod) => SinglePrefixHookNoReturn(__originalMethod, DummyParameterReplacement.Instance);
         private static bool UnifiedHook_Prefix_0000000000(MethodBase __originalMethod, object __instance, ref object __result) => SinglePrefixHook(__originalMethod, ref __result, __instance);
         private static bool UnifiedHook_Prefix_0000000000_NoReturn(MethodBase __originalMethod, object __instance) => SinglePrefixHookNoReturn(__originalMethod, __instance);
         private static bool UnifiedHook_Prefix_1000000000(MethodBase __originalMethod, object __instance, object __0, ref object __result) => SinglePrefixHook(__originalMethod, ref __result, __instance, __0);
