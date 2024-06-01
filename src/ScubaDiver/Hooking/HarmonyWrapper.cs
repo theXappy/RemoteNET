@@ -21,6 +21,16 @@ namespace ScubaDiver.Hooking
                     "Dummy Parameter. The real parameter couldn't be proxied (probably because it's a ref struct) so you got this instead.";
             }
         }
+        public class DummyThisReplacement
+        {
+            public static readonly DummyThisReplacement Instance = new();
+
+            public override string ToString()
+            {
+                return
+                    "Dummy Object Instance. The real parameter couldn't be proxied (probably because you hooked a ctor)";
+            }
+        }
 
         private static HarmonyWrapper _instance = null;
         public static HarmonyWrapper Instance => _instance ??= new();
