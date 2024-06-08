@@ -171,7 +171,7 @@ public abstract class DynamicRemoteObject : DynamicObject
         Dictionary<string, List<MethodBase>> _processedOverloads = new Dictionary<string, List<MethodBase>>();
         do
         {
-            var members = nextType.GetMembers((BindingFlags)0xffff);
+            var members = nextType.GetMembers(~(BindingFlags.DeclaredOnly));
             foreach (MemberInfo member in members)
             {
                 if (member is MethodBase newMethods)
@@ -265,7 +265,7 @@ public abstract class DynamicRemoteObject : DynamicObject
     private bool TryGetMember(Type t, string name, out object result)
     {
         result = null;
-        MemberInfo[] members = t.GetMembers((BindingFlags)0xffff);
+        MemberInfo[] members = t.GetMembers(~(BindingFlags.DeclaredOnly));
         List<MemberInfo> matches = members.Where(member => member.Name == name).ToList();
 
         if (!matches.Any())
