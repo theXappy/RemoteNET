@@ -90,7 +90,7 @@ namespace RemoteNET
             // TODO: Add a check for amount of parameters and types (need to be dynamics)
             // See implementation inside DynamicEventProxy
 
-            DiverCommunicator.LocalEventCallback callbackProxy = (ObjectOrRemoteAddress[] args) =>
+            DiverCommunicator.LocalEventCallback callbackProxy = (ObjectOrRemoteAddress[] args, ObjectOrRemoteAddress retVal) =>
             {
                 DynamicRemoteObject[] droParameters = new DynamicRemoteObject[args.Length];
                 for (int i = 0; i < args.Length; i++)
@@ -100,9 +100,10 @@ namespace RemoteNET
 
                     droParameters[i] = dro;
                 }
+                DynamicRemoteObject droRetValue = _app.GetRemoteObject(retVal).Dynamify() as DynamicRemoteObject;
 
-                // Call the callback wutg tge proxied parameters (using DynamicRemoteObjects)
-                callback.DynamicInvoke(droParameters);
+                // Call the callback with the proxied parameters (using DynamicRemoteObjects)
+                callback.DynamicInvoke(droParameters, droRetValue);
 
                 // TODO: Change this so the callback can actually return stuff?
                 return (true, null);

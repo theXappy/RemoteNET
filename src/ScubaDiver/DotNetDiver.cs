@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -766,7 +767,7 @@ namespace ScubaDiver
         /// <param name="stackTrace"></param>
         /// <param name="parameters"></param>
         /// <returns>Any results returned from the</returns>
-        protected override ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
+        protected override ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
         {
             ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
@@ -795,8 +796,29 @@ namespace ScubaDiver
                 }
             }
 
+            ObjectOrRemoteAddress remoteRetVal;
+            if (retValue == null)
+            {
+                remoteRetVal = ObjectOrRemoteAddress.Null;
+            }
+            else if (retValue.GetType().IsPrimitiveEtc())
+            {
+                remoteRetVal = ObjectOrRemoteAddress.FromObj(retValue);
+            }
+            else // Not primitive
+            {
+                // Check if the object was pinned
+                if (!_freezer.TryGetPinningAddress(retValue, out ulong addr))
+                {
+                    // Pin and mark for unpinning later
+                    addr = _freezer.Pin(retValue);
+                }
+                remoteRetVal = ObjectOrRemoteAddress.FromToken(addr, retValue.GetType().FullName);
+            }
+            
+            
             // Call callback at controller
-            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, remoteParams);
+            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, remoteRetVal, remoteParams);
 
             return hookCallbackResults.ReturnedObjectOrAddress;
         }

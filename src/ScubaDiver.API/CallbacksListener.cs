@@ -179,7 +179,7 @@ namespace ScubaDiver.API
                 CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
                 if (_tokensToEventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
                 {
-                    (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray());
+                    (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray(), res.RetValue);
 
                     InvocationResults ir = new()
                     {
@@ -194,7 +194,7 @@ namespace ScubaDiver.API
                     HookContext hookContext = new(res.StackTrace, res.ThreadID);
 
                     // Run hook. No results expected directly (it might alter variabels inside the hook)
-                    hook(hookContext, res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray());
+                    hook(hookContext, res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray(), res.RetValue);
 
                     // Report back whether to call the original function or no (Harmony wants this as the return value)
                     InvocationResults ir = new()

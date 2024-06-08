@@ -293,7 +293,7 @@ namespace ScubaDiver.Tester
                                 }
                             });
 
-                            HookAction callback = (HookContext context, dynamic instace, dynamic[] args) =>
+                            HookAction callback = (HookContext context, dynamic instace, dynamic[] args, dynamic retValue) =>
                             {
                                 Console.WriteLine($"$$$ Hooked Function {type}.{methodName} called! $$$");
                                 foreach (dynamic d in args)
