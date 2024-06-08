@@ -89,7 +89,7 @@ public class RemoteHookingManager
 
     private LocalHookCallback WrapCallback(HookAction callback)
     {
-        LocalHookCallback hookProxy = (HookContext context, ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args) =>
+        LocalHookCallback hookProxy = (HookContext context, ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args, ObjectOrRemoteAddress retValue) =>
         {
             dynamic DecodeOora(ObjectOrRemoteAddress oora)
             {
@@ -123,6 +123,10 @@ public class RemoteHookingManager
             dynamic droInstance;
             droInstance = DecodeOora(instance);
 
+            // Converting Return Value to DRO
+            dynamic droRetValue;
+            droRetValue = DecodeOora(retValue);
+
 
             object[] decodedParameters = new object[args.Length];
             for (int i = 0; i < decodedParameters.Length; i++)
@@ -132,7 +136,7 @@ public class RemoteHookingManager
             }
 
             // Call the callback with the proxied parameters (using DynamicRemoteObjects)
-            callback.DynamicInvoke(new object[3] { context, droInstance, decodedParameters });
+            callback.DynamicInvoke(new object[4] { context, droInstance, decodedParameters, droRetValue });
         };
         return hookProxy;
     }

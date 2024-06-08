@@ -2,5 +2,5 @@
 
 namespace RemoteNET.Common
 {
-    public delegate void HookAction(HookContext context, dynamic instance, dynamic[] args);
+    public delegate void HookAction(HookContext context, dynamic instance, dynamic[] args, dynamic retValue);
 }

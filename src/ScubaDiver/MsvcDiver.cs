@@ -235,7 +235,7 @@ namespace ScubaDiver
         /// <param name="stackTrace"></param>
         /// <param name="parameters"></param>
         /// <returns>Any results returned from the</returns>
-        protected override ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters)
+        protected override ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
         {
             ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
@@ -270,8 +270,36 @@ namespace ScubaDiver
                 }
             }
 
+            ObjectOrRemoteAddress retValueOora;
+            if (retValue == null)
+            {
+                retValueOora = ObjectOrRemoteAddress.Null;
+            }
+            else if (retValue.GetType().IsPrimitiveEtc())
+            {
+                retValueOora = ObjectOrRemoteAddress.FromObj(retValue);
+            }
+            else if (retValue is NativeObject nativeObj)
+            {
+                // TODO: Freeze?
+                retValueOora = ObjectOrRemoteAddress.FromToken(nativeObj.Address, nativeObj.TypeInfo.FullTypeName);
+            }
+            else if (retValue is CharStar charStar)
+            {
+                // TODO: Freeze?
+                var oora = ObjectOrRemoteAddress.FromToken(charStar.Address, typeof(CharStar).FullName);
+                oora.EncodedObject = charStar.Value;
+                retValueOora = oora;
+            }
+            else // Not primitive
+            {
+                Logger.Debug($"Unexpected non native ret value of hooked method. Type: {retValue.GetType().FullName}");
+                throw new Exception($"Unexpected non native argument to hooked method. Type: {retValue.GetType().FullName}");
+            }
+            
+
             // Call callback at controller
-            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, remoteParams);
+            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, retValueOora, remoteParams);
 
             return hookCallbackResults.ReturnedObjectOrAddress;
         }

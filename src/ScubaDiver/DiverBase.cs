@@ -225,14 +225,14 @@ namespace ScubaDiver
 
 
             // Preparing a proxy method that Harmony will invoke
-            HarmonyWrapper.HookCallback patchCallback = (object obj, object[] args, ref object _) =>
+            HarmonyWrapper.HookCallback patchCallback = (object obj, object[] args, ref object retValue) =>
             {
                 object[] parameters = new object[args.Length + 1];
                 parameters[0] = obj;
                 Array.Copy(args, 0, parameters, 1, args.Length);
 
                 // Shift control to remote hook (Other process)
-                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), parameters);
+                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), retValue, parameters: parameters);
 
                 // Remote hook returned, examine it's return value.
                 bool skipOriginal = false;
@@ -280,7 +280,7 @@ namespace ScubaDiver
 
         protected abstract Action HookFunction(FunctionHookRequest req, HarmonyWrapper.HookCallback patchCallback);
 
-        protected abstract ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, params object[] parameters);
+        protected abstract ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters);
 
 
 

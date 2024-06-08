@@ -516,7 +516,7 @@ namespace ScubaDiver.API
             }
         }
 
-        public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args);
+        public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args, ObjectOrRemoteAddress retVal);
 
         public void Dispose()
         {
