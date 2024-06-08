@@ -35,20 +35,21 @@ namespace RemoteNET.Internal.Reflection.DotNet
             // Most notably the RemoteXXXInfo objects freely use mi's,ci's,pi's (etc) "ReturnType","FieldType","PropertyType"
             // not checking if they are actually RemoteTypes themselves...
 
-            foreach (MethodInfo mi in localType.GetMethods())
+            BindingFlags allRecursive = ~(BindingFlags.DeclaredOnly);
+            foreach (MethodInfo mi in localType.GetMethods(allRecursive))
                 AddMethod(new RemoteMethodInfo(this, mi));
-            foreach (ConstructorInfo ci in localType.GetConstructors())
+            foreach (ConstructorInfo ci in localType.GetConstructors(allRecursive))
                 AddConstructor(new RemoteConstructorInfo(this, ci));
-            foreach (PropertyInfo pi in localType.GetProperties())
+            foreach (PropertyInfo pi in localType.GetProperties(allRecursive))
             {
                 RemotePropertyInfo remotePropInfo = new RemotePropertyInfo(this, pi);
                 remotePropInfo.RemoteGetMethod = _methods.FirstOrDefault(m => m.Name == "get_" + pi.Name);
                 remotePropInfo.RemoteSetMethod = _methods.FirstOrDefault(m => m.Name == "set_" + pi.Name);
                 AddProperty(remotePropInfo);
             }
-            foreach (FieldInfo fi in localType.GetFields())
+            foreach (FieldInfo fi in localType.GetFields(allRecursive))
                 AddField(new RemoteFieldInfo(this, fi));
-            foreach (EventInfo ei in localType.GetEvents())
+            foreach (EventInfo ei in localType.GetEvents(allRecursive))
                 AddEvent(new RemoteEventInfo(this, ei));
         }
 

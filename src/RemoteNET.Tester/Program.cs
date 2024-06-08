@@ -244,7 +244,7 @@ namespace ScubaDiver.Tester
                                 Console.WriteLine("Method name:");
                                 methodName = Console.ReadLine();
 
-                                var methods = t.GetMethods((BindingFlags)0xffff).Where(mInfo => mInfo.Name == methodName).ToArray();
+                                var methods = t.GetMethods(~(BindingFlags.DeclaredOnly)).Where(mInfo => mInfo.Name == methodName).ToArray();
                                 if (methodName.Length < 0)
                                 {
                                     throw new Exception("No such function");
