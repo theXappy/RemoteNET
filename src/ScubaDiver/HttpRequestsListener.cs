@@ -137,6 +137,7 @@ public class RnetRequestsListener : IRequestsListener
     public RnetRequestsListener(int listenPort)
     {
         _listener = new TcpListener(IPAddress.Any, listenPort);
+        Console.WriteLine($"[RnetRequestsListener] Created listener at http://127.0.01:{listenPort}/help");
     }
 
 
