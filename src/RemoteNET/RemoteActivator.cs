@@ -52,5 +52,6 @@ namespace RemoteNET
         }
 
         public ManagedRemoteObject CreateInstance<T>() => CreateInstance(typeof(T));
+        public ManagedRemoteObject CreateInstance<T>(params object[] parameters) => CreateInstance(typeof(T), parameters);
     }
 }
