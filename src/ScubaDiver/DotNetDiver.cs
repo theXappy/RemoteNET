@@ -135,7 +135,14 @@ namespace ScubaDiver
                     }
                     catch(Exception ex)
                     {
-                        Logger.Debug("[ERROR] Trying to kill snapshot with PID = " + pid + "failed. Ex: " + ex);
+                        if (ex.Message.Contains("is not running."))
+                        {
+                            // This is ok.
+                        }
+                        else
+                        {
+                            Logger.Debug("[ERROR] Trying to kill snapshot with PID = " + pid + "failed. Ex: " + ex);
+                        }
                     }
                 }
                 else
