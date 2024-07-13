@@ -16,7 +16,6 @@ using ScubaDiver.Rtti;
 namespace RemoteNET.Tests
 {
     [TestFixture]
-
     public class RttiTypesFactoryTests
     {
         class FakeRemoteApp : RemoteApp

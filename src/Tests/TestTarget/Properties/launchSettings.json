@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TestTarget": {
+      "commandName": "Project",
+      "commandLineArgs": "wowowowoowowwA wowowowoowowwB"
+    }
+  }
+}

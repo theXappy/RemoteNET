@@ -137,7 +137,7 @@ namespace RemoteNET
                 Debug.WriteLine("hostInjector.Inject RESULTS: " + results);
                 if (!results.IsSuccess)
                     throw new Exception(
-                        "DotNetHostInjector failed to host the .NET runtime in the target. Raw error: " +
+                        $"DotNetHostInjector failed to host the .NET runtime in the target (PID={target.Id}).\nRaw error:\n" +
                         results.Error.Message);
             }
 
