@@ -1,49 +1,11 @@
-﻿using CliWrap;
-using CliWrap.Buffered;
-using RemoteNET.Internal.Extensions;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 using TestTarget;
 
 namespace RemoteNET.Tests
 {
-    public class DisposableTarget : IDisposable
-    {
-        private readonly Process process;
-
-        public DisposableTarget(string exePath)
-        {
-            while(Process.GetProcessesByName(Path.GetFileNameWithoutExtension(exePath)).Any())
-            {
-                Thread.Sleep(10);
-            }
-
-            var wrap = Cli.Wrap(exePath).ExecuteBufferedAsync();
-            process = Process.GetProcessById(wrap.ProcessId);
-
-            while(process.GetSupportedTargetFramework() == "native")
-            {
-                Thread.Sleep(10);
-            }
-            Debug.WriteLine($"[{nameof(DisposableTarget)}] Final detected framework = {process.GetSupportedTargetFramework()}");
-            // Give a few more seconds for the runtime to load and reach Main.
-            Thread.Sleep(TimeSpan.FromSeconds(5));
-        }
-
-        public Process Process => process;
-
-        public void Dispose()
-        {
-            try { process?.Kill(true); } catch { }
-            try { process?.WaitForExit(TimeSpan.FromSeconds(10)); } catch { }
-        }
-    }
 
     [TestFixture]
+    [Parallelizable(scope: ParallelScope.All)]
     internal class IntegrationTests
     {
         private Random r = new Random();
@@ -68,10 +30,9 @@ namespace RemoteNET.Tests
         [TestCase(2)]
         [TestCase(3)]
         [TestCase(4)]
-        [NonParallelizable]
         public void CheckAlivenessRemoteApp(int sleepSeconds)
         {
-            if(sleepSeconds > 1)
+            if (sleepSeconds > 1)
                 Thread.Sleep(10);
             // Arrange
             using var target = new DisposableTarget(TestTargetExe);
@@ -96,17 +57,148 @@ namespace RemoteNET.Tests
 
             // Act
             var app = RemoteAppFactory.Connect(target.Process, RuntimeType.Managed);
-            List<CandidateObject> candidates = app.QueryInstances("*").ToList();
-            Debug.WriteLine("Candidates #1 count: " + candidates.Count);
-            candidates = app.QueryInstances("*").ToList();
-            Debug.WriteLine("Candidates #2 count: " + candidates.Count);
-            IEnumerable<RemoteObject> objects = candidates.Select(c => app.GetRemoteObject(c));
-            List<Type> types = objects.Select(o => o.GetRemoteType()).ToList();
-            var ro = objects.Single();
+            List<CandidateObject> candidates = null;
+            candidates = app.QueryInstances(typeof(TestClass)).ToList();
+            var ro = app.GetRemoteObject(candidates.Single());
 
             // Assert
             Assert.That(ro, Is.Not.Null);
             Assert.That(ro.GetType().Name, Is.EqualTo(typeof(TestClass).Name));
+        }
+
+        private RemoteObject GetSingleTestObject(DisposableTarget target, out ManagedRemoteApp app)
+        {
+            app = RemoteAppFactory.Connect(target.Process, RuntimeType.Managed) as ManagedRemoteApp;
+            List<CandidateObject> candidates = null;
+            candidates = app.QueryInstances(typeof(TestClass)).ToList();
+            var ro = app.GetRemoteObject(candidates.Single());
+            return ro;
+        }
+
+        [Test]
+        public void ReadRemoteField()
+        {
+            // Arrange
+            using var target = new DisposableTarget(TestTargetExe);
+            RemoteObject ro = GetSingleTestObject(target, out _);
+            dynamic dro = ro.Dynamify();
+
+            // Act
+            object res = dro.TestField1;
+
+            // Assert
+            Assert.That(res, Is.Not.Null);
+            Assert.That(res, Is.TypeOf<int>());
+            Assert.That(res, Is.EqualTo(5));
+        }
+
+        [Test]
+        public void ReadRemoteReadOnlyProperty()
+        {
+            // Arrange
+            using var target = new DisposableTarget(TestTargetExe);
+            RemoteObject ro = GetSingleTestObject(target, out _);
+            dynamic dro = ro.Dynamify();
+
+            // Act
+            object res = dro.TestProp1;
+
+            // Assert
+            Assert.That(res, Is.Not.Null);
+            Assert.That(res, Is.TypeOf<int>());
+            Assert.That(res, Is.EqualTo(6));
+        }
+
+        [Test]
+        public void ReadWriteRemoteModifiableProperty()
+        {
+            // Arrange
+            using var target = new DisposableTarget(TestTargetExe);
+            RemoteObject ro = GetSingleTestObject(target, out _);
+            dynamic dro = ro.Dynamify();
+            int newWriteValue = 1337;
+
+            // Act
+            object originalReadValue = dro.TestProp2;
+            dro.TestProp2 = newWriteValue;
+            object newReadValue = dro.TestProp2;
+
+            // Assert
+            Assert.That(originalReadValue, Is.Not.Null);
+            Assert.That(originalReadValue, Is.TypeOf<int>());
+            Assert.That(originalReadValue, Is.EqualTo(7));
+            Assert.That(newReadValue, Is.Not.Null);
+            Assert.That(newReadValue, Is.TypeOf<int>());
+            Assert.That(newReadValue, Is.EqualTo(newWriteValue));
+        }
+
+        [Test]
+        public void InvokeRemoteParameterlessMethod()
+        {
+            // Arrange
+            using var target = new DisposableTarget(TestTargetExe);
+            RemoteObject ro = GetSingleTestObject(target, out _);
+            dynamic dro = ro.Dynamify();
+
+            // Act
+            object res = dro.TestMethod1();
+
+            // Assert
+            Assert.That(res, Is.Not.Null);
+            Assert.That(res, Is.TypeOf<int>());
+            Assert.That(res, Is.EqualTo(8));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        public void InvokeRemoteParameteredMethod(int input)
+        {
+            // Arrange
+            using var target = new DisposableTarget(TestTargetExe);
+            RemoteObject ro = GetSingleTestObject(target, out _);
+            dynamic dro = ro.Dynamify();
+
+            // Act
+            // TestMethod2 just does `input + 9`
+            object res = dro.TestMethod2(input);
+
+            // Assert
+            Assert.That(res, Is.Not.Null);
+            Assert.That(res, Is.TypeOf<int>());
+            Assert.That(res, Is.EqualTo(input + 9));
+        }
+
+        [Test]
+        public void InvokeRemoteParameterlessCtor()
+        {
+            // Arrange
+            using var target = new DisposableTarget(TestTargetExe);
+            var app = RemoteAppFactory.Connect(target.Process, RuntimeType.Managed) as ManagedRemoteApp;
+
+            // Act
+            ManagedRemoteObject res = app.Activator.CreateInstance(typeof(StringBuilder));
+
+            // Assert
+            Assert.That(res, Is.Not.Null);
+            Assert.That(res.GetRemoteType().FullName, Is.EqualTo(typeof(StringBuilder).FullName));
+        }
+
+        [Test]
+        public void InvokeRemoteMethodWithRemoteParameter()
+        {
+            // Arrange
+            using var target = new DisposableTarget(TestTargetExe);
+            var ro = GetSingleTestObject(target, out ManagedRemoteApp app);
+            dynamic dro = ro.Dynamify();
+
+            // Act
+            ManagedRemoteObject stringBuilderParameter = app.Activator.CreateInstance(typeof(StringBuilder));
+            dro.TestMethod3(stringBuilderParameter);
+            string res = stringBuilderParameter.Dynamify().ToString();
+
+            // Assert
+            Assert.That(res, Is.Not.Null);
+            Assert.That(res, Is.EqualTo("10"));
         }
     }
 }

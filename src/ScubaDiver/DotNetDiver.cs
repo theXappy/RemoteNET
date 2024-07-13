@@ -65,6 +65,10 @@ namespace ScubaDiver
             var nsJson = InitNewtonsoftJson();
             Logger.Debug("[DotNetDiver] Newtonsoft.Json's module path: " + nsJson.Location);
 
+            // Trying GC Collect to overcome some problem where ClrMD won't "see" many existing objects
+            // when the heap is dumped.
+            GC.Collect();
+            
             // Start session
             Logger.Debug("[DotNetDiver] Refreshing runtime...");
             RefreshRuntime();
@@ -340,6 +344,7 @@ namespace ScubaDiver
                 objects.Clear();
                 anyErrors = false;
 
+                GC.Collect();
                 RefreshRuntime();
                 lock (_clrMdLock)
                 {
