@@ -117,6 +117,7 @@ namespace ScubaDiver
         {
             lock (_clrMdLock)
             {
+                Logger.Debug("[RefreshRuntime] Called");
                 var windowsProcessDataReader = _dt?.DataReader;
                 int? pid = windowsProcessDataReader?.ProcessId;
 
@@ -589,6 +590,10 @@ namespace ScubaDiver
         }
         protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
+            // Since ClrMD works on copied memory (in the snapshot process), we must refresh it so it copies again
+            // the updated heap's state between invocations.
+            RefreshRuntime();
+
             string filter = arg.QueryString.Get("type_filter");
             string dumpHashcodesStr = arg.QueryString.Get("dump_hashcodes");
             bool dumpHashcodes = dumpHashcodesStr?.ToLower() == "true";
