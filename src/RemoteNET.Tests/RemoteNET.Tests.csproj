@@ -10,7 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+    <PackageReference Include="CliWrap" Version="3.6.6" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
     <PackageReference Include="NUnit" Version="3.13.3" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.4.2" />
     <PackageReference Include="NUnit.Analyzers" Version="3.6.1" />
@@ -20,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RemoteNET\RemoteNET.csproj" />
     <ProjectReference Include="..\ScubaDiver\project_net6_x64\ScubaDiver_Net6_x64.csproj" />
+    <ProjectReference Include="..\Tests\TestTarget\TestTarget.csproj" />
   </ItemGroup>
 
 </Project>
