@@ -1,4 +1,6 @@
-﻿namespace TestTarget
+﻿using System.Text;
+
+namespace TestTarget
 {
     public class TestClass
     {
@@ -18,6 +20,11 @@
         public int TestMethod2(int i)
         {
             return i + 9;
+        }
+
+        public void TestMethod3(StringBuilder sb)
+        {
+            sb.Append(10);
         }
     }
 }
