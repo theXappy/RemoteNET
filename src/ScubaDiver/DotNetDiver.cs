@@ -672,7 +672,8 @@ namespace ScubaDiver
 
             if (methodInfo == null)
             {
-                error = $"Failed to find method {methodName} in type {resolvedType.Name}";
+                string parametersList = string.Join(", ", request.ParametersTypeFullNames);
+                error = $"Failed to find method {methodName}({parametersList}) in type {resolvedType.Name}";
                 return true;
             }
 
