@@ -96,18 +96,12 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 
         public void Dispose()
         {
-            try
-            {
-                _client.Dispose();
-                _netStream.Dispose();
-                _reader.Dispose();
-                _writer.Dispose();
-                _requests.CompleteAdding();
-                _requests.Dispose();
-            }
-            catch
-            {
-            }
+            try { _client.Dispose(); } catch { }
+            try { _netStream.Dispose(); } catch { }
+            try { _reader.Dispose(); } catch { }
+            try { _writer.Dispose(); } catch { }
+            try { _requests.CompleteAdding(); } catch { }
+            try { _requests.Dispose(); } catch { }
         }
     }
 }
