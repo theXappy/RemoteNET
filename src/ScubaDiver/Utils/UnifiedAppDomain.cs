@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
@@ -66,7 +67,10 @@ namespace ScubaDiver.Utils
         public Assembly[] GetAssemblies()
         {
             var domains = GetDomains();
-            return domains.SelectMany(domain => domain.GetAssemblies()).ToArray();
+            var allAssemblies = domains.SelectMany(domain => domain.GetAssemblies());
+            // Like `Distinct` without an IEqualityComparer
+            var uniqueAssemblies = allAssemblies.GroupBy(x => x.FullName).Select(grp => grp.First());
+            return uniqueAssemblies.ToArray();
         }
 
         public Type ResolveType(string typeFullName, string assembly = null)
