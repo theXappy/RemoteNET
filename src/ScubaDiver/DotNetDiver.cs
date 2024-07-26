@@ -299,9 +299,9 @@ namespace ScubaDiver
 
             //
             // A GC collect might still happen between checking
-            // the CLR MD object and the retrival of the object
+            // the CLR MD object and the retrieval of the object
             // So we check the final object's type name one last time 
-            // (It's better to crash here then return bas objects)
+            // (It's better to crash here then return bad objects)
             //
             string finalTypeName;
             try
@@ -311,12 +311,12 @@ namespace ScubaDiver
             catch (Exception ex)
             {
                 throw new AggregateException(
-                    "The final object we got from the addres (after checking CLR MD twice) was" +
-                    "broken and we couldn't read it's Type's full name.", ex);
+                    "The final object we got from the address (after checking CLR MD twice) was broken " +
+                    "and we couldn't read it's Type's full name.", ex);
             }
 
             if (finalTypeName != typeName)
-                throw new Exception("A GC occurened between checking the CLR MD (twice) and the object retrival." +
+                throw new Exception("A GC collection occurred between checking the CLR MD (twice) and the object retrieval." +
                                     "A different object was retrieved and its type is not the one we expected." +
                                     $"Expected Type: {typeName}, Actual Type: {finalTypeName}");
 
