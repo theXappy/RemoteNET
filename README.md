@@ -183,8 +183,13 @@ The limitations:
 
 
 ## Thanks
-**denandz** for his interesting project **KeeFarce** which was a major inspiration for this project.  
-Also, multiple parts of this project are directly taken from KeeFarce (DLL Injection, Bootstrap, IntPtr-to-Object converter).
+[denandz/KeeFarce](https://github.com/denandz/KeeFarce): Which was a major inspiration for this project.  
+Also, multiple parts of this project were adapted from ones in KeeFarce (DLL Injection, Bootstrap, IntPtr-to-Object converter).
+[TheLeftExit/Trickster](https://github.com/TheLeftExit/Trickster]): Which I used for the MSVC Diver (for C++ targets).  
+[pardeike/Harmony](https://github.com/pardeike/Harmony): Which I used for hooking .NET methods.  
+[microsoft/Detours](https://github.com/microsoft/Detours): Which I used for hooking native methods.  
+[citronneur/detours.net](https://github.com/citronneur/detours.net): Which I used as a wrapper for Detours.  
+[uxmal/reko](https://github.com/uxmal/reko): Whic I used to demangle C++ symbols.  
 
 **icons8** for the "Puppet" icon
 
