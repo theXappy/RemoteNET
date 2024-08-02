@@ -69,7 +69,7 @@ namespace ScubaDiver
 
         // Size Match-Making
         private static readonly object _addressToSizeLock = new();
-        private static readonly LimitedSizeDictionary<nuint, nuint> _addressToSize = new(100);
+        private static readonly LimitedSizeDictionary<nuint, nuint> _addressToSize = new(1000);
         private static readonly object _classSizesLock = new();
         private static readonly NamedDict<nuint> _classSizes = new();
         public IReadOnlyDictionary<string, nuint> ClassSizes
@@ -79,6 +79,16 @@ namespace ScubaDiver
                 lock (_classSizesLock)
                 {
                     return _classSizes.DeepCopy();
+                }
+            }
+        }
+        public IReadOnlyDictionary<nuint, nuint> AddressesSizes
+        {
+            get
+            {
+                lock (_addressToSizeLock)
+                {
+                    return _addressToSize.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
                 }
             }
         }
