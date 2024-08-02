@@ -1,5 +1,7 @@
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using NtApiDotNet;
 
 namespace ScubaDiver;
 
@@ -80,7 +82,7 @@ public class LRUCache<TKey, TValue>
     }
 }
 
-class LimitedSizeDictionary<TKey, TValue>
+class LimitedSizeDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
 {
     private Dictionary<TKey, TValue> _this;
     Queue<TKey> queue;
@@ -127,4 +129,7 @@ class LimitedSizeDictionary<TKey, TValue>
         Remove(key);
         Add(key, value);
     }
+
+    public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => _this.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

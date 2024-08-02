@@ -77,8 +77,11 @@ namespace ScubaDiver
         }
         protected string MakeGcStatsResponse(ScubaDiverMessage req)
         {
-            var classSizes = _offensiveGC.ClassSizes;
-            return JsonConvert.SerializeObject(classSizes);
+            Dictionary<string, object> output = new Dictionary<string, object>();
+            output["ClassInstances"] = _offensiveGC.ClassInstances;
+            output["ClassSizes"] = _offensiveGC.ClassSizes;
+            output["AddressesSizes"] = _offensiveGC.AddressesSizes;
+            return JsonConvert.SerializeObject(output);
         }
 
         private List<SafeHandle> _injectedDlls = new();
