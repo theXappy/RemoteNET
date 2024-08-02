@@ -163,6 +163,7 @@ namespace RemoteNET.Internal.Extensions
 
             bool mscorlibSeen = false;
             bool clrDllSeen = false;
+            bool uwphostDllSeen = false;
             foreach (var module in modules)
             {
                 if (module.szModule.StartsWith("hostpolicy.dll", StringComparison.OrdinalIgnoreCase))
@@ -190,12 +191,19 @@ namespace RemoteNET.Internal.Extensions
                 {
                     clrDllSeen = true;
                 }
+                if (module.szModule.StartsWith("uwphost.dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    uwphostDllSeen = true;
+                }
             }
 
             // SS: This is a HEURISTIC and it's *good enough* but more could be done here
             // like check the DLLs versions (at least I hope we can get back the full module path...)
             if (hostPolicyVersionInfo == null)
             {
+                if (uwphostDllSeen)
+                    return "native";
+
                 if (mscorlibSeen || clrDllSeen)
                 {
                     return "net451";
