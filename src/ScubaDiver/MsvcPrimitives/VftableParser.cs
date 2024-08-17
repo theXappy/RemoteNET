@@ -12,7 +12,7 @@ public static class VftableParser
     /// Tries to parse the different functions in some type's vftable.
     /// Note that inheritance might cause some of the methods in the table to have names of base classes.
     /// For example, a vftable of a ChildClass might look like his:
-    /// 1) ~ChildClass (dtor)
+    /// 1) ChildClass::~ChildClass (dtor)
     /// 2) ChildClass::Add      --{ Overridden method 
     /// 3) ParentClass::Remove  --{ Non-overridden method
     ///
@@ -26,7 +26,9 @@ public static class VftableParser
         using var scanner = new RttiScanner(
             process,
             module.BaseAddress,
-            module.Size);
+            module.Size,
+            module.ListSections()
+            );
 
         Dictionary<nuint, UndecoratedSymbol> exportsDict = exportsList
                                                 .DistinctBy(exp => exp.Address)
