@@ -132,7 +132,7 @@ public unsafe class Trickster : IDisposable
 
     public Trickster(Process process)
     {
-        _processHandle = Kernel32.OpenProcess(PROCESS_ACCESS_RIGHTS.PROCESS_ALL_ACCESS, true, (uint)process.Id);
+        _processHandle = PInvoke.OpenProcess(PROCESS_ACCESS_RIGHTS.PROCESS_ALL_ACCESS, true, (uint)process.Id);
         if (_processHandle.IsNull) throw new TricksterException();
 
         var mainModuleName = process.MainModule.ModuleName;
@@ -152,7 +152,7 @@ public unsafe class Trickster : IDisposable
             .ToList();
 
         BOOL is32Bit;
-        Kernel32.IsWow64Process(_processHandle, &is32Bit);
+        PInvoke.IsWow64Process(_processHandle, &is32Bit);
         _is32Bit = is32Bit;
     }
 
@@ -267,7 +267,7 @@ public unsafe class Trickster : IDisposable
         nuint address = 0;
 
 
-        while (address < stop && Kernel32.VirtualQueryEx(_processHandle, (void*)address, &mbi, size) > 0 && address + mbi.RegionSize > address)
+        while (address < stop && PInvoke.VirtualQueryEx(_processHandle, (void*)address, &mbi, size) > 0 && address + mbi.RegionSize > address)
         {
             if (mbi.State == VIRTUAL_ALLOCATION_TYPE.MEM_COMMIT &&
                 !mbi.Protect.HasFlag(PAGE_PROTECTION_FLAGS.PAGE_NOACCESS) &&
@@ -288,7 +288,7 @@ public unsafe class Trickster : IDisposable
             void* baseAddress = infoArray[i].BaseAddress;
             nuint size = infoArray[i].Size;
             void* pointer = NativeMemory.Alloc(size);
-            Kernel32.ReadProcessMemory(_processHandle, baseAddress, pointer, size);
+            PInvoke.ReadProcessMemory(_processHandle, baseAddress, pointer, size);
             regionArray[i] = new(pointer, baseAddress, size);
         }
         return regionArray;

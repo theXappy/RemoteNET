@@ -90,7 +90,7 @@ namespace ScubaDiver
             string dllPath = req.QueryString.Get("dll_path");
             try
             {
-                var handle = Windows.Win32.Kernel32.LoadLibrary(dllPath);
+                var handle = Windows.Win32.PInvoke.LoadLibrary(dllPath);
 
                 if (handle.IsInvalid)
                     return "{\"status\":\"dll load failed\"}";
