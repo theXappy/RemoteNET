@@ -110,6 +110,10 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Diagnostics.Runtime" Version="2.0.222201" />
+		<PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.106">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
 		<PackageReference Include="Lib.Harmony" Version="2.3.3" />
 		<PackageReference Include="NtApiDotNet" Version="1.1.33" />
