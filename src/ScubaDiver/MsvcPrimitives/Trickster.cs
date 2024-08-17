@@ -156,7 +156,9 @@ public unsafe class Trickster : IDisposable
         _is32Bit = is32Bit;
     }
 
-    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(string moduleName, nuint moduleBaseAddress, nuint moduleSize, nuint segmentBaseAddress, nuint segmentBSize)
+    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(string moduleName, 
+        nuint moduleBaseAddress, nuint moduleSize, List<ModuleSegment> segments,
+        nuint segmentBaseAddress, nuint segmentBSize)
     {
         List<TypeInfo> list = new();
 
@@ -165,7 +167,7 @@ public unsafe class Trickster : IDisposable
         // is missing all our "findings" are actually false positives
         bool typeInfoSeen = false;
 
-        using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize))
+        using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize, segments))
         {
             nuint inc = (nuint)(_is32Bit ? 4 : 8);
             Func<ulong, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
@@ -208,7 +210,7 @@ public unsafe class Trickster : IDisposable
             {
                 try
                 {
-                    (bool typeInfoSeenInSeg, List<TypeInfo> types) = ScanTypesCore(module.Name, module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
+                    (bool typeInfoSeenInSeg, List<TypeInfo> types) = ScanTypesCore(module.Name, module.BaseAddress, module.Size, segments, (nuint)segment.BaseAddress, (nuint)segment.Size);
                     typeInfoSeenInModule = typeInfoSeenInModule || typeInfoSeenInSeg;
                     allModuleTypes = allModuleTypes.Concat(types);
                 }
@@ -381,7 +383,7 @@ public unsafe class Trickster : IDisposable
         return results2;
     }
 
-    private nuint[] ScanOperatorNewFuncsCore(string moduleName, nuint moduleBaseAddress, nuint moduleSize, nuint segmentBaseAddress, nuint segmentBSize)
+    private nuint[] ScanOperatorNewFuncsCore(string moduleName, nuint moduleBaseAddress, nuint moduleSize, List<ModuleSegment> segments, nuint segmentBaseAddress, nuint segmentBSize)
     {
         List<nuint> list = new();
 
@@ -391,7 +393,7 @@ public unsafe class Trickster : IDisposable
         };
         byte[] tempData = new byte[encodedFuncEpilouge.Length];
 
-        using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize))
+        using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize, segments))
         {
             nuint inc = 4;
             for (nuint offset = inc; offset < segmentBSize; offset += inc)
@@ -457,7 +459,7 @@ public unsafe class Trickster : IDisposable
             {
                 try
                 {
-                    var newFuncs = ScanOperatorNewFuncsCore(module.Name, module.BaseAddress, module.Size, (nuint)segment.BaseAddress, (nuint)segment.Size);
+                    var newFuncs = ScanOperatorNewFuncsCore(module.Name, module.BaseAddress, module.Size, segments,(nuint)segment.BaseAddress, (nuint)segment.Size);
                     if (newFuncs.Length > 0)
                     {
                         res[module] = res[module].Concat(newFuncs).ToArray();

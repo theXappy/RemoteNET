@@ -1,5 +1,6 @@
 ﻿using NtApiDotNet;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -15,14 +16,41 @@ public unsafe struct RttiScanner : IDisposable
     private nuint _size;
     private byte* _pointer;
 
-    public RttiScanner(HANDLE handle, nuint mainModuleBaseAddress, nuint mainModuleSize)
+    public RttiScanner(HANDLE handle, nuint mainModuleBaseAddress, nuint mainModuleSize, List<ModuleSegment> segments)
     {
         _baseAddress = mainModuleBaseAddress;
         _size = mainModuleSize;
         _pointer = (byte*)NativeMemory.Alloc(mainModuleSize);
-        if (!PInvoke.ReadProcessMemory(handle, (void*)mainModuleBaseAddress, _pointer, mainModuleSize))
+        nuint numberOfBytesRead = 0;
+        nuint* lpNumberOfBytesRead = &numberOfBytesRead;
         {
-            throw new ApplicationException("RttiScanner failed on ReadProcessMemory");
+            foreach (ModuleSegment segment in segments)
+            {
+                ulong distance = segment.BaseAddress - mainModuleBaseAddress;
+                if (!PInvoke.ReadProcessMemory(handle, (void*)segment.BaseAddress,
+                        _pointer + distance,
+                        (nuint)segment.Size,
+                        lpNumberOfBytesRead))
+                {
+                    int gle = Marshal.GetLastWin32Error();
+                    string error = $"RttiScanner failed on ReadProcessMemory(" +
+                                   $"hProcess: 0x{handle:x16}," +
+                                   $"lpBaseAddress: 0x{mainModuleBaseAddress:x16}," +
+                                   $"lpBuffer: 0x{(nuint)_pointer:x16}," +
+                                   $"nSize: 0x{mainModuleSize:x16}," +
+                                   $"lpNumberOfBytesRead: 0x{new IntPtr(lpNumberOfBytesRead):x16}" +
+                                   $")\n" +
+                                   $"numberOfBytesRead was: 0x{numberOfBytesRead:x16}\n" +
+                                   $"GetLastError: 0x{gle:x16}";
+
+                    Logger.Debug($"[RTTI Scanner] Error reading segment {segment.Name} in module @0x{mainModuleBaseAddress}. Formatter error:\n" + error);
+                    throw new ApplicationException(error);
+                }
+                else
+                {
+                }
+            }
+
         }
     }
 
