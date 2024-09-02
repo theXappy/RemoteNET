@@ -33,7 +33,7 @@
 		<Compile Include="..\MsvcPrimitives\DllExportExt.cs" Link="MsvcPrimitives\DllExportExt.cs" />
 		<Compile Include="..\MsvcPrimitives\RttiScanner.cs" Link="MsvcPrimitives\RttiScanner.cs" />
 		<Compile Include="..\MsvcPrimitives\Trickster.cs" Link="MsvcPrimitives\Trickster.cs" />
-		<Compile Include="..\MsvcPrimitives\TricksterUI.cs" Link="MsvcPrimitives\TricksterUI.cs" />
+		<Compile Include="..\MsvcPrimitives\TricksterSearchHelper.cs" Link="MsvcPrimitives\TricksterSearchHelper.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedExport.cs" Link="MsvcPrimitives\UndecoratedExport.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedFunction.cs" Link="MsvcPrimitives\UndecoratedFunction.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedInternalFunction.cs" Link="MsvcPrimitives\UndecoratedInternalFunction.cs" />

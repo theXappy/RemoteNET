@@ -6,7 +6,6 @@ using Windows.Win32.Foundation;
 using ScubaDiver.Rtti;
 using ScubaDiver.API.Utils;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
-using System.Reflection;
 
 namespace ScubaDiver;
 
@@ -277,7 +276,6 @@ public class TricksterWrapper
 
     public Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(IEnumerable<FirstClassTypeInfo> allClassesToScanFor)
     {
-        Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = TricksterUI.Scan(_trickster, allClassesToScanFor);
-        return addresses;
+        return TricksterScanHelper.Scan(_trickster, allClassesToScanFor);
     }
 }
