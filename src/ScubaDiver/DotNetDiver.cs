@@ -281,7 +281,7 @@ namespace ScubaDiver
                 HeapDump.HeapObject heapObj = matches.Single();
                 ulong newObjAddress = heapObj.Address;
                 finalObjAddress = newObjAddress;
-                methodTable = heapObj.MethodTable;
+                methodTable = heapObj.MethodTable();
             }
 
             //
@@ -394,9 +394,11 @@ namespace ScubaDiver
                             objects.Add(new HeapDump.HeapObject()
                             {
                                 Address = clrObj.Address,
-                                MethodTable = clrObj.Type.MethodTable,
                                 Type = objType,
-                                HashCode = hashCode
+                                HashCode = hashCode,
+                                // No need to mask the Method Table in the .NET diver
+                                XoredMethodTable = clrObj.Type.MethodTable,
+                                XorMask = 0
                             });
                         }
                     }
