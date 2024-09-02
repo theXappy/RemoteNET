@@ -658,7 +658,8 @@ namespace ScubaDiver
                     HeapDump.HeapObject ho = new HeapDump.HeapObject()
                     {
                         Address = address,
-                        MethodTable = typeInfo.VftableAddress, // TODO: Send XOR'd value instead?
+                        XoredMethodTable = typeInfo.XoredVftableAddress,
+                        XorMask = FirstClassTypeInfo.XorMask,
                         Type = typeInfo.FullTypeName
                     };
                     output.Objects.Add(ho);
@@ -687,14 +688,7 @@ namespace ScubaDiver
                 }
             }
 
-
-            string json = JsonConvert.SerializeObject(output);
-
-            // Trying to get rid of the VFTable addresses from our heap.
-            output.Objects.ForEach(heapObj => heapObj.MethodTable = 0xdeadc0de);
-
-            return json;
-
+            return JsonConvert.SerializeObject(output);
         }
 
         private static void ParseFullTypeName(string rawFilter, out string rawAssemblyFilter, out string rawTypeFilter)
