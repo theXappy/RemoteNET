@@ -289,7 +289,6 @@ public unsafe class Trickster : IDisposable
 
     private MemoryRegion[] ReadRegionsCore(MemoryRegionInfo[] infoArray)
     {
-        Logger.Debug($"[{DateTime.Now}][Trickster.ReadRegionsCore] Enter");
         MemoryRegion[] regionArray = new MemoryRegion[infoArray.Length];
         for (int i = 0; i < regionArray.Length; i++)
         {
@@ -298,14 +297,7 @@ public unsafe class Trickster : IDisposable
             void* pointer = NativeMemory.AllocZeroed(size, 1);
             PInvoke.ReadProcessMemory(_processHandle, baseAddress, pointer, size);
             regionArray[i] = new(pointer, baseAddress, size);
-
-            Logger.Debug($"[{DateTime.Now}][Trickster.ReadRegionsCore] Copied " +
-                $"0x{(nuint)baseAddress:x16}-{((nuint)baseAddress + size):x16} " +
-                $"into " +
-                $"0x{(nuint)pointer:x16}-{((nuint)pointer + size):x16} ({size} bytes)");
-
         }
-        Logger.Debug($"[{DateTime.Now}][Trickster.ReadRegionsCore] Exit");
         return regionArray;
     }
 
@@ -316,12 +308,8 @@ public unsafe class Trickster : IDisposable
             FreeRegionsCore(Regions);
         }
 
-        Logger.Debug($"[{DateTime.Now}][Trickster][ReadRegions] ScanRegionInfoCore...");
         MemoryRegionInfo[] scannedRegions = ScanRegionInfoCore();
-        Logger.Debug($"[{DateTime.Now}][Trickster][ReadRegions] ScanRegionInfoCore - Done.");
-        Logger.Debug($"[{DateTime.Now}][Trickster][ReadRegions] ReadRegionsCore... ScannedRegion = {scannedRegions.Length}");
         Regions = ReadRegionsCore(scannedRegions);
-        Logger.Debug($"[{DateTime.Now}][Trickster][ReadRegions] ReadRegionsCore - Done.");
     }
 
     //public ulong[] ScanRegions(ulong value, nuint xorMask = 0x00000000)
@@ -335,16 +323,11 @@ public unsafe class Trickster : IDisposable
 
     private void FreeRegionsCore(MemoryRegion[] regionArray)
     {
-        Logger.Debug($"[Trickster.FreeRegionsCore] Enter");
         for (int i = 0; i < regionArray.Length; i++)
         {
-            Logger.Debug($"[Trickster.FreeRegionsCore] Freeing " +
-                $"0x{((nuint)regionArray[i].BaseAddress):x16}:" +
-                $"0x{(((nuint)regionArray[i].BaseAddress) + regionArray[i].Size):x16} ({regionArray[i].Size} bytes)");
             CryptographicOperations.ZeroMemory(new Span<byte>(regionArray[i].Pointer, (int)regionArray[i].Size));
             NativeMemory.Free(regionArray[i].Pointer);
         }
-        Logger.Debug($"[Trickster.FreeRegionsCore] Exit");
     }
 
     //private ulong[] ScanRegionsCore(MemoryRegion[] regionArray, ulong value, nuint xorMask)
