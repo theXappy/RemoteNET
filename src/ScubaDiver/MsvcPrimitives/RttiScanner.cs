@@ -43,7 +43,7 @@ public unsafe struct RttiScanner : IDisposable
                                    $"numberOfBytesRead was: 0x{numberOfBytesRead:x16}\n" +
                                    $"GetLastError: 0x{gle:x16}";
 
-                    Logger.Debug($"[RTTI Scanner] Error reading segment {segment.Name} in module @0x{mainModuleBaseAddress}. Formatter error:\n" + error);
+                    //Logger.Debug($"[RTTI Scanner] Error reading segment {segment.Name} in module @0x{mainModuleBaseAddress}. Formatter error:\n" + error);
                     throw new ApplicationException(error);
                 }
                 else
