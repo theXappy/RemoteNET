@@ -40,6 +40,7 @@ This fun example dumps all private RSA keys (which are stored in `RSACryptoServi
 Func<byte[], string> ToHex = ba => BitConverter.ToString(ba).Replace("-", "");
 
 // Finding every RSACryptoServiceProvider instance
+RemoteApp remoteApp = RemoteAppFactory.Connect("MyDotNetTarget.exe", RuntimeType.Managed);
 var rsaProviderCandidates = remoteApp.QueryInstances(typeof(RSACryptoServiceProvider));
 foreach (CandidateObject candidateRsa in rsaProviderCandidates)
 {
