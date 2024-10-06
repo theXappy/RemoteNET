@@ -220,10 +220,7 @@ namespace RemoteNET.RttiReflection
                 {
                     string type = func.UndecoratedFullName.Substring(0, func.UndecoratedFullName.LastIndexOf("::"));
                     Lazy<Type> declaringTypeFactory = CreateTypeFactory(type, moduleName);
-                    declaringTypeResolver = new LazyRemoteTypeResolver(declaringTypeFactory,
-                        null,
-                        type,
-                        type);
+                    declaringTypeResolver = new LazyRemoteTypeResolver(declaringType);
                 }
 
                 RemoteRttiMethodInfo methodInfo =
