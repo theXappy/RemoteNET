@@ -47,6 +47,13 @@ namespace RemoteNET.Internal
                         // I only ever expect a single process (or none) to hold the target port opened, but the API here is sh*t
                         // and MIB_TCPROW_OWNER_MODULE is not comparable to `default`
                         diverPortIsUse = targetOpenedListenPorts.Any(t => t.dwOwningPid == target.Id);
+
+                        // Fallback - Port might be held in use by the Lifeboat
+                        if (!diverPortIsUse)
+                        {
+                            var ownerProcs = targetOpenedListenPorts.Select(t => (int)t.dwOwningPid).Select(Process.GetProcessById);
+                            diverPortIsUse = ownerProcs.Any(proc => proc.ProcessName == "Lifeboat");
+                        }
                     }
                 }
                 else
