@@ -225,7 +225,8 @@ public static class DetoursMethodGenerator
         {
             if (hookedFunc.PreHook != null)
             {
-                skipOriginal = hookedFunc.PreHook(self, argsToForward, ref newRetVal);
+                bool callOriginal = hookedFunc.PreHook(self, argsToForward, ref newRetVal);
+                skipOriginal = !callOriginal;
                 retValModified = skipOriginal;
             }
         }
