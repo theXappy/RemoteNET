@@ -120,7 +120,7 @@ namespace ScubaDiver.Hooking
         }
 
 
-        /// <returns>Skip original</returns>
+        /// <returns>'True' to call original method, 'False' To skip</returns>
         public delegate bool HookCallback(object instance, object[] args, ref object retValue);
 
         public void AddHook(MethodBase target, HarmonyPatchPosition pos, HookCallback patch)
@@ -303,7 +303,7 @@ namespace ScubaDiver.Hooking
                 // Whoops looks like we patched a method used in the 'ScubaDvier framework code'
                 // Luckily, this if clause allows us to avoid recursion
 
-                return false; // Don't skip original
+                return true; // Don't skip original
             }
 
             try
@@ -318,7 +318,7 @@ namespace ScubaDiver.Hooking
                 else
                 {
                     Console.WriteLine("!ERROR! No such hooked func");
-                    return false; // Don't skip original
+                    return true; // Don't skip original
                 }
             }
             finally
