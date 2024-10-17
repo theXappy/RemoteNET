@@ -35,6 +35,12 @@ public static class DllExportExt
             className = undecoratedFullName[..(undecoratedFullName.LastIndexOf("::"))];
             undecoratedName = undecoratedFullName[(undecoratedFullName.LastIndexOf("::") + 2)..];
         }
+        else if (input.Name == undecoratedFullName)
+        {
+            // No namespace (no '::' separator) and the name wasn't demangled, it remained the same.
+            // So this is not a decorated symbol in the first place...
+            return false;
+        }
 
         bool isFunc = MsMangledNameParser.IsFunction(input.Name);
 
