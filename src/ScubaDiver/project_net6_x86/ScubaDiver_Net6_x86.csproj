@@ -93,6 +93,12 @@
 		<Content Include="..\..\detours_build\bin\Debug\DetoursNet.pdb" Link="DetoursNet.pdb">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
+		<Content Include="..\..\MsvcOffensiveGcHelper\bin\Debug\Win32\MsvcOffensiveGcHelper.dll" Link="MsvcOffensiveGcHelper.dll">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\MsvcOffensiveGcHelper\bin\Debug\Win32\MsvcOffensiveGcHelper.pdb" Link="MsvcOffensiveGcHelper.pdb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
 	</ItemGroup>
 
 	<!-- DetoursNET for RELEASE configuration -->
@@ -114,6 +120,12 @@
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 		<Content Include="..\..\detours_build\bin\RelWithDebInfo\DetoursNet.pdb" Link="DetoursNet.pdb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\MsvcOffensiveGcHelper\bin\Release\Win32\MsvcOffensiveGcHelper.dll" Link="MsvcOffensiveGcHelper.dll">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+		<Content Include="..\..\MsvcOffensiveGcHelper\bin\Release\Win32\MsvcOffensiveGcHelper.pdb" Link="MsvcOffensiveGcHelper.pdb">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
