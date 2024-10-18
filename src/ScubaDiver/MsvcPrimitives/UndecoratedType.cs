@@ -9,7 +9,7 @@ public class UndecoratedType : Dictionary<string, UndecoratedMethodGroup>
     private UndecoratedMethodGroup GetOrAddGroup(string method)
     {
         if (!ContainsKey(method))
-            this[method] = new UndecoratedMethodGroup();
+            this[method] = new UndecoratedMethodGroup(method);
         return this[method];
     }
 }

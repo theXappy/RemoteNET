@@ -5,3 +5,4 @@ UnDecorateSymbolName
 ReadProcessMemory
 OpenProcess
 LoadLibrary
+GetProcAddress

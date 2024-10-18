@@ -7,12 +7,9 @@ using Windows.Win32.Foundation;
 using Windows.Win32.System.Threading;
 using Windows.Win32.System.Memory;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Xml.Linq;
-using System.Reflection;
 using System.Security.Cryptography;
 // ReSharper disable UnusedMember.Global
 // ReSharper disable InconsistentNaming
@@ -132,7 +129,7 @@ public unsafe class Trickster : IDisposable
     private bool _is32Bit;
 
     public Dictionary<ModuleInfo, TypeInfo[]> ScannedTypes;
-    public Dictionary<ModuleInfo, nuint[]> OperatorNewFuncs;
+    public Dictionary<ModuleInfo, ModuleOperatorFunctions> OperatorNewFuncs;
     public MemoryRegion[] Regions;
 
     public List<ModuleInfo> UnmanagedModules;
@@ -312,10 +309,6 @@ public unsafe class Trickster : IDisposable
         Regions = ReadRegionsCore(scannedRegions);
     }
 
-    //public ulong[] ScanRegions(ulong value, nuint xorMask = 0x00000000)
-    //{
-    //    return ScanRegionsCore(Regions, value, xorMask);
-    //}
     public IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegions(IEnumerable<nuint> xoredVftables, nuint xorMask = 0x00000000)
     {
         return ScanRegionsCore2(Regions, xoredVftables, xorMask);
@@ -329,41 +322,6 @@ public unsafe class Trickster : IDisposable
             NativeMemory.Free(regionArray[i].Pointer);
         }
     }
-
-    //private ulong[] ScanRegionsCore(MemoryRegion[] regionArray, ulong value, nuint xorMask)
-    //{
-    //    List<ulong> list = new();
-
-    //    Parallel.For(0, regionArray.Length, i =>
-    //    {
-    //        MemoryRegion region = regionArray[i];
-    //        byte* start = (byte*)region.Pointer;
-    //        byte* end = start + region.Size;
-    //        if (_is32Bit)
-    //        {
-    //            for (byte* a = start; a < end; a += 4)
-    //                if ((*(uint*)a ^ xorMask) == value)
-    //                    lock (list)
-    //                    {
-    //                        ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
-    //                        list.Add(result);
-    //                    }
-    //        }
-    //        else
-    //        {
-    //            for (byte* a = start; a < end; a += 8)
-    //                if ((*(ulong*)a ^ xorMask) == value)
-    //                    lock (list)
-    //                    {
-    //                        ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
-    //                        list.Add(result);
-    //                    }
-    //        }
-    //    });
-
-    //    return list.ToArray();
-    //}
-
     private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegion[] regionArray, IEnumerable<nuint> xoredVftables, nuint xorMask)
     {
         ConcurrentDictionary<ulong, ConcurrentBag<ulong>> results = new();
@@ -409,12 +367,17 @@ public unsafe class Trickster : IDisposable
         return results2;
     }
 
+    public class ModuleOperatorFunctions
+    {
+        public List<nuint> OperatorNewFuncs { get; } = new();
+        public List<nuint> OperatorDeleteFuncs { get; } = new();
+    }
 
-    private Dictionary<ModuleInfo, nuint[]> ScanOperatorNewFuncsCore()
+    private Dictionary<ModuleInfo, ModuleOperatorFunctions> ScanOperatorNewFuncsCore()
     {
         // Start with any existing findings
-        OperatorNewFuncs ??= new Dictionary<ModuleInfo, nuint[]>();
-        Dictionary<ModuleInfo, nuint[]> res = new(OperatorNewFuncs);
+        OperatorNewFuncs ??= new Dictionary<ModuleInfo, ModuleOperatorFunctions>();
+        Dictionary<ModuleInfo, ModuleOperatorFunctions> res = new(OperatorNewFuncs);
 
         Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
         foreach (ModuleInfo modInfo in UnmanagedModules)
@@ -452,17 +415,19 @@ public unsafe class Trickster : IDisposable
             var segments = kvp.Value;
 
             if (!res.ContainsKey(module))
-                res[module] = Array.Empty<nuint>();
+                res[module] = new ModuleOperatorFunctions();
 
             foreach (ModuleSegment segment in segments)
             {
                 try
                 {
-                    var newFuncs = InnerCheckFunc(module.Name, module.BaseAddress, module.Size, segments, (nuint)segment.BaseAddress, (nuint)segment.Size);
-                    if (newFuncs.Length > 0)
-                    {
-                        res[module] = res[module].Concat(newFuncs).ToArray();
-                    }
+                    InnerCheckFunc(module.Name, module.BaseAddress, module.Size, 
+                        segments, (nuint)segment.BaseAddress, (nuint)segment.Size,
+                        out List<nuint> newFuncs,
+                        out List<nuint> deleteFuncs
+                        );
+                    res[module].OperatorNewFuncs.AddRange(newFuncs);
+                    res[module].OperatorDeleteFuncs.AddRange(deleteFuncs);
                 }
                 catch (Exception ex)
                 {
@@ -475,33 +440,35 @@ public unsafe class Trickster : IDisposable
         return res;
 
 
-        nuint[] InnerCheckFunc(string moduleName, nuint moduleBaseAddress, nuint moduleSize, List<ModuleSegment> segments, nuint segmentBaseAddress, nuint segmentBSize)
+        void InnerCheckFunc(string moduleName, nuint moduleBaseAddress, nuint moduleSize,
+            List<ModuleSegment> segments, nuint segmentBaseAddress, nuint segmentBSize,
+            out List<nuint> operatorNewFuncs,
+            out List<nuint> operatorDeleteFuncs)
         {
-            List<nuint> list = new();
+            operatorNewFuncs = new();
+            operatorDeleteFuncs = new();
 
-            byte[] encodedFuncEpilouge = new byte[]
+            byte[] opNewEncodedFuncEpilouge_x64_rel = new byte[]
             {
-            0x40, 0x53, 0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0xD9, 0xEB, 0x0F
+                0x40, 0x53, 0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0xD9, 0xEB, 0x0F
             };
-            byte[] tempData = new byte[encodedFuncEpilouge.Length];
+            byte[] tempData = new byte[opNewEncodedFuncEpilouge_x64_rel.Length];
 
             using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize, segments))
             {
-                nuint inc = 4;
+                nuint inc = (nuint)IntPtr.Size;
                 for (nuint offset = inc; offset < segmentBSize; offset += inc)
                 {
                     nuint address = segmentBaseAddress + offset;
                     if (!processMemory.TryRead<byte>(address, tempData))
                         continue;
-                    if (!tempData.SequenceEqual(encodedFuncEpilouge))
-                        continue;
-
-                    list.Add(address);
+                    if (tempData.SequenceEqual(opNewEncodedFuncEpilouge_x64_rel))
+                    {
+                        operatorNewFuncs.Add(address);
+                    }
                 }
             }
-            return list.ToArray();
         }
-
     }
 
 

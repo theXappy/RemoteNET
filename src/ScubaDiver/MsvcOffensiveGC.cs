@@ -6,10 +6,9 @@ using ScubaDiver.Hooking;
 using DetoursNet;
 using ScubaDiver.API.Hooking;
 using ScubaDiver.Rtti;
-using ScubaDiver.Demangle.Demangle.Core;
-using ScubaDiver.Demangle.Demangle.Core.Types;
-using System.Net;
-using System.Drawing;
+using System.Collections.Concurrent;
+using NtApiDotNet.Win32;
+using Windows.Win32;
 
 namespace ScubaDiver
 {
@@ -38,14 +37,36 @@ namespace ScubaDiver
         }
     }
 
+    internal static class FreeFinder
+    {
+        public static Dictionary<ModuleInfo, DllExport> Find(List<UndecoratedModule> modules, string name)
+        {
+            void ProcessSingleModule(UndecoratedModule module,
+                Dictionary<ModuleInfo, DllExport> workingDict)
+            {
+                if (!module.TryGetRegularTypelessFunc(name, out List<NtApiDotNet.Win32.DllExport> methodGroup))
+                    return;
+
+                var firstPtr = methodGroup.Single();
+                Logger.Debug($"[{nameof(FreeFinder)}] FOUND {name} in {module.Name} = 0x{firstPtr.Address:X16}");
+
+                workingDict[module.ModuleInfo] = firstPtr;
+                // TODO: Am I missing matches if there are multiple exports called 'free'?
+                return;
+            }
+
+            Dictionary<ModuleInfo, DllExport> res = new();
+            foreach (UndecoratedModule module in modules)
+            {
+                ProcessSingleModule(module, res);
+            }
+            return res;
+        }
+    }
+
+
     internal class MsvcOffensiveGC
     {
-        // From https://github.com/gperftools/gperftools/issues/715
-        // [x64] operator new(ulong size)
-        //private string kMangledNew64 = "??2@YAPEAX_K@Z";
-        // [x64] operator new(ulong size, struct std::nothrow_t const &obj)
-        //private string kMangledNewNothrow64 = "??2@YAPEAX_KAEBUnothrow_t@std@@@z";
-
         private string operatorNewName = "operator new";
         private static HashSet<string> _alreadyHookedDecorated = new();
 
@@ -93,10 +114,8 @@ namespace ScubaDiver
             }
         }
 
-        public void HookModule(UndecoratedModule module) => HookModules(new List<UndecoratedModule>() { module });
-
         private List<UndecoratedModule> _alreadyHookedModules = new List<UndecoratedModule>();
-
+        public void HookModule(UndecoratedModule module) => HookModules(new List<UndecoratedModule>() { module });
         public void HookModules(List<UndecoratedModule> modules)
         {
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(HookModules)} IN");
@@ -118,15 +137,94 @@ namespace ScubaDiver
             Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(HookModules)} OUT");
         }
 
+        public void HookAllFreeFuncs(UndecoratedModule target, List<UndecoratedModule> allModules)
+        {
+            // Make sure our C++ Helper is loaded before accessing anything from the `MsvcOffensiveGcHelper` class
+            // otherwise the loading the P/Invoke methods will fail on "Failed to load DLL.
+            System.Reflection.Assembly assm = typeof(MsvcOffensiveGC).Assembly;
+            string assmDir = System.IO.Path.GetDirectoryName(assm.Location);
+            string helperPath = System.IO.Path.Combine(assmDir, "MsvcOffensiveGcHelper.dll");
+            var res = PInvoke.LoadLibrary(helperPath);
+
+            int attemptedFreeFuncs = 0;
+            foreach (string funcName in new[] { "free", "_free", "_free_dbg" })
+            {
+                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook '{funcName}'s...");
+                Dictionary<ModuleInfo, DllExport> funcs = FreeFinder.Find(allModules, funcName);
+                if (funcs.Count == 0)
+                {
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
+                    continue;
+                }
+                if (funcs.Count > 1)
+                {
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " +
+                        string.Join(", ", funcs.Keys.Select(a => a.Name).ToArray()));
+                }
+                foreach (var kvp in funcs)
+                {
+                    DllExport freeFunc = kvp.Value;
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Chose '{funcName}' from {kvp.Key.Name}");
+
+                    // Find out native replacement function for the given func name
+                    IntPtr replacementPtr = MsvcOffensiveGcHelper.GetOrAddReplacement((IntPtr)freeFunc.Address);
+
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking '{funcName}' at 0x{freeFunc.Address:X16} (from {kvp.Key.Name}), " +
+                        $"in the IAT of {target.Name}. " +
+                        $"Replacement Address: 0x{replacementPtr:X16}");
+                    ModuleInfo targetModule = target.ModuleInfo;
+                    bool replacementRes = Loader.HookIAT((IntPtr)(ulong)targetModule.BaseAddress, (IntPtr)freeFunc.Address, replacementPtr);
+
+
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] res = {replacementRes}");
+                    if (replacementRes)
+                    {
+                        // Found the right import! Breaking so we don't override the "original free ptr" with wrong matches.
+                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] [@@@@@@@] Found the right import! Breaking.");
+                        attemptedFreeFuncs++;
+                        break;
+                    }
+                    else
+                    {
+                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] [xxxxxxx] Wrong import.");
+                    }
+                }
+            }
+
+            Logger.Debug(
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking free funcs. attempted to hook: {attemptedFreeFuncs} funcs");
+        }
+
         private Dictionary<string, List<UndecoratedFunction>> GetNewOperators(List<UndecoratedModule> modules)
         {
             void ProcessSingleModule(UndecoratedModule module,
                 Dictionary<string, List<UndecoratedFunction>> workingDict)
             {
-                if (module.TryGetTypelessFunc(operatorNewName, out var methodGroup))
+                List<UndecoratedFunction> tempList = new List<UndecoratedFunction>();
+                //if (module.TryGetTypelessFunc(kMangledNew64, out var methodGroup))
+                //{
+                //    tempList.AddRange(methodGroup);
+                //}
+
+                //if (module.TryGetTypelessFunc(kMangledNewNothrow64, out methodGroup))
+                //{
+                //    tempList.AddRange(methodGroup);
+                //}
+
+                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Looking for {operatorNewName} in {module.Name}");
+                if (module.TryGetUndecoratedTypelessFunc(operatorNewName, out var methodGroup))
                 {
                     Logger.Debug($"[{nameof(MsvcOffensiveGC)}] FOUND {operatorNewName} in {module.Name}");
-                    workingDict[module.Name] = methodGroup;
+                    tempList.AddRange(methodGroup);
+                }
+                else
+                {
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Did NOT find {operatorNewName} in {module.Name}");
+                }
+
+                if (tempList.Any())
+                {
+                    workingDict[module.Name] = tempList;
                 }
             }
 
@@ -143,7 +241,11 @@ namespace ScubaDiver
             string GetCtorName(TypeInfo type)
             {
                 string fullTypeName = type.Name;
-                string className = fullTypeName.Substring(fullTypeName.LastIndexOf("::") + 2);
+                string className = fullTypeName;
+                if (fullTypeName.Contains("::"))
+                {
+                    className = fullTypeName.Substring(fullTypeName.LastIndexOf("::") + 2);
+                }
                 return $"{fullTypeName}::{className}";
             }
 
@@ -174,7 +276,11 @@ namespace ScubaDiver
             string GetDtorName(TypeInfo type)
             {
                 string fullTypeName = type.Name;
-                string className = fullTypeName.Substring(fullTypeName.LastIndexOf("::") + 2);
+                string className = fullTypeName;
+                if (fullTypeName.Contains("::"))
+                {
+                    className = fullTypeName.Substring(fullTypeName.LastIndexOf("::") + 2);
+                }
                 return $"{fullTypeName}::~{className}";
             }
 
@@ -183,8 +289,8 @@ namespace ScubaDiver
             {
                 foreach (TypeInfo type in module.Types)
                 {
-                    string ctorName = GetDtorName(type);
-                    if (!module.TryGetTypeFunc(type, ctorName, out var dtors))
+                    string dtorName = GetDtorName(type);
+                    if (!module.TryGetTypeFunc(type, dtorName, out var dtors))
                         continue;
 
                     // Found the method group
@@ -268,7 +374,7 @@ namespace ScubaDiver
                 Logger.Debug($"[UnifiedOperatorNew] sizeObj: {sizeObj}");
             }
 
-            return false; // Don't skip original
+            return true; // Don't skip original
         }
         private delegate nuint OperatorNewType(nuint size);
 
@@ -303,7 +409,7 @@ namespace ScubaDiver
                     _alreadyHookedDecorated.Add(ctor.DecoratedName);
 
 
-                    if (ctor.NumArgs > 1 || !ctor.UndecoratedFullName.StartsWith("SPen"))
+                    if (ctor.NumArgs > 1)
                     {
                         Debug.WriteLine($"[{nameof(MsvcOffensiveGC)}] Skipping hooking CTOR {ctor.UndecoratedFullName} with {ctor.NumArgs} args");
                         continue;
@@ -333,7 +439,7 @@ namespace ScubaDiver
             {
                 Logger.Debug($"[UnifiedCtor] Args: {args.Length}, Self: <ERROR!>");
             }
-            return false;
+            return true; // Call Original
         }
 
         // DTORS
@@ -355,40 +461,52 @@ namespace ScubaDiver
 
                     if (_alreadyHookedDecorated.Contains(dtor.DecoratedName))
                     {
-                        Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {dtor.UndecoratedFullName} , Decorated: {dtor.DecoratedName}");
+                        Logger.Debug($"[WARNING] Attempted re-hooking of dtor. UnDecorated: {dtor.UndecoratedFullName} , Decorated: {dtor.DecoratedName}");
                         continue;
                     }
                     _alreadyHookedDecorated.Add(dtor.DecoratedName);
 
 
-                    if (dtor.NumArgs > 1 || !dtor.UndecoratedFullName.StartsWith("SPen"))
+                    if (dtor.NumArgs > 1)
                     {
-                        Debug.WriteLine($"[{nameof(MsvcOffensiveGC)}] Skipping hooking CTOR {dtor.UndecoratedFullName} with {dtor.NumArgs} args");
+                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Skipping hooking DTOR {dtor.UndecoratedFullName} with {dtor.NumArgs} args");
                         continue;
                     }
 
                     DetoursNetWrapper.Instance.AddHook(type, dtor, UnifiedDtor, HarmonyPatchPosition.Prefix);
                     attemptedHookedCtorsCount++;
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DTOR hooked! {dtor.UndecoratedFullName} !~!~!~!~!~!~!");
+
                 }
             }
 
             Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. attempted to hook: {attemptedHookedCtorsCount} ctors");
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking dtors. attempted to hook: {attemptedHookedCtorsCount} ctors");
             Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+                $"[{nameof(MsvcOffensiveGC)}] Done hooking dtors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
         public static bool UnifiedDtor(object selfObj, object[] args, ref object retValue)
         {
             if (selfObj is NativeObject self)
             {
                 // TODO: Intercept dtors here to prevent de-allocation
+                Logger.Debug($"[UnifiedDtor] Enter! Type: {self.TypeInfo.FullTypeName} Address: 0x{self.Address:X16}");
                 DeregisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
+
+                if (_frozenObjectsToDtorUpdateActions.TryGetValue(self.Address, out var dtorUpdateAction))
+                {
+                    Logger.Debug($"[UnifiedDtor] DING DING DING! Frozen object flow! Avoiding DTOR :) Address: 0x{self.Address:X16}");
+                    // This object is frozen! Record this dtor call and avoid calling it
+                    dtorUpdateAction.Invoke(self.Address, self.TypeInfo);
+                    return false; // Skip Original
+
+                }
             }
             else
             {
                 Logger.Debug($"[UnifiedDtor] error Args: {args.Length}, Self: <ERROR!>");
             }
-            return false; // Skip original
+            return true; // Call Original
         }
 
         // AUTO CLASS INIT 2
@@ -427,7 +545,7 @@ namespace ScubaDiver
                 Logger.Debug($"[UnifiedAutoClassInit2] Args: {args.Length}, Self: <ERROR!>");
             }
 
-            return false; // Don't skip original
+            return true; // Don't skip original
         }
 
 
@@ -518,6 +636,26 @@ namespace ScubaDiver
                     Logger.Debug($"[TryMatchClassToSize] Found size of class. Full Name: {fullTypeClassName}, Size: {size} bytes");
                 }
             }
+        }
+
+        private static ConcurrentDictionary<ulong, Action<ulong, TypeInfo>> _frozenObjectsToDtorUpdateActions = new();
+
+        // Pinning
+        public void Pin(ulong objAddress, Action<ulong, TypeInfo> dtorUpdator)
+        {
+            // Set the DTORs registeration function aside so any dtor can register itself on-demand
+            _frozenObjectsToDtorUpdateActions[objAddress] = dtorUpdator;
+
+            // Ask the C++ Helper to watch for `free` calls to our address
+            MsvcOffensiveGcHelper.AddAddress((IntPtr)objAddress);
+        }
+
+        // Unpinning
+        public void Unpin(ulong objAddress)
+        {
+            _frozenObjectsToDtorUpdateActions.Remove(objAddress, out _);
+            MsvcOffensiveGcHelper.RemoveAddress((IntPtr)objAddress);
+            // TODO: Invoke dtors + free here?
         }
     }
 }

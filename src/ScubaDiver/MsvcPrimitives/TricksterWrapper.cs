@@ -6,6 +6,7 @@ using Windows.Win32.Foundation;
 using ScubaDiver.Rtti;
 using ScubaDiver.API.Utils;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
+using NtApiDotNet.Win32;
 
 namespace ScubaDiver;
 
@@ -23,8 +24,8 @@ public class TricksterWrapper
 
     public void Refresh()
     {
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Refreshing runtime!");
-        Dictionary<ModuleInfo, nuint[]> operatorNewFuncs = null;
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Refreshing runtime!");
+        Dictionary<ModuleInfo, Trickster.ModuleOperatorFunctions> operatorNewFuncs = null;
         if (_trickster != null)
         {
             operatorNewFuncs = _trickster.OperatorNewFuncs;
@@ -35,20 +36,20 @@ public class TricksterWrapper
         _trickster = new Trickster(Process.GetCurrentProcess());
         _trickster.OperatorNewFuncs = operatorNewFuncs;
 
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scanning types...");
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scanning types...");
         _trickster.ScanTypes();
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scanning types... Found {_trickster.ScannedTypes.Sum(x => x.Value.Length)} types in {_trickster.ScannedTypes.Count}");
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Done.");
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Reading Regions...");
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scanning types... Found {_trickster.ScannedTypes.Sum(x => x.Value.Length)} types in {_trickster.ScannedTypes.Count}");
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Done.");
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Reading Regions...");
         _trickster.ReadRegions();
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
         // TODO: Searching new is a heavy operation & only used for Offensive GC. Removed for now.
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators...");
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators...");
         _trickster.ScanOperatorNewFuncs();
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators... Found {_trickster.OperatorNewFuncs.Count}");
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Scan 'new' operators... Found {_trickster.OperatorNewFuncs.Count}");
         //_trickster.OperatorNewFuncs = new Dictionary<ModuleInfo, nuint[]>();
-        //Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
-        Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
+        //// Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] Done.");
+        // Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}");
 
         // Update "identifiers"
         Process p = Process.GetCurrentProcess();
@@ -58,9 +59,15 @@ public class TricksterWrapper
             .ToHashSet();
     }
 
-    public bool TryGetOperatorNew(ModuleInfo moduleInfo, out nuint[] operatorNewAddresses)
+    public bool TryGetOperatorNew(ModuleInfo moduleInfo, out List<nuint> operatorNewAddresses)
     {
-        return _trickster.OperatorNewFuncs.TryGetValue(moduleInfo, out operatorNewAddresses);
+        if(_trickster.OperatorNewFuncs.TryGetValue(moduleInfo, out var moduleFuncs))
+        {
+            operatorNewAddresses = moduleFuncs.OperatorNewFuncs;
+            return true;
+        }
+        operatorNewAddresses = null;
+        return false;
     }
 
     public Dictionary<ModuleInfo, TypeInfo[]> GetDecoratedTypes()
@@ -73,14 +80,21 @@ public class TricksterWrapper
     public List<ModuleInfo> GetModules(string name) => GetModules(s => s == name);
 
     private Dictionary<string, UndecoratedModule> _undecModeulesCache = new Dictionary<string, UndecoratedModule>();
+
+    /// <summary>
+    /// Returns ALL modules as UndecoratedModule
+    /// </summary>
     public List<UndecoratedModule> GetUndecoratedModules() => GetUndecoratedModules(_ => true);
+
+    /// <summary>
+    /// Return some modules according to a given filter
+    /// </summary>
     public List<UndecoratedModule> GetUndecoratedModules(Predicate<string> moduleNameFilter)
     {
         Dictionary<ModuleInfo, TypeInfo[]> modulesAndTypes = GetDecoratedTypes();
         if (!modulesAndTypes.Any(m => moduleNameFilter(m.Key.Name)))
         {
             // No modules pass the filter... Try again after a refresh.
-            Logger.Debug("[GetUndecoratedModules] Hopefully rare refresh flow hit.");
             Refresh();
             modulesAndTypes = GetDecoratedTypes();
         }
@@ -134,10 +148,11 @@ public class TricksterWrapper
         HashSet<string> allClassTypesNames = allClassTypes.Select(x => x.Value.Name).ToHashSet();
 
         // Collect 2nd-class types & removing ALL ctors from the exports list (for 1st or 2nd class types).
+
         // First, going over exports and looking for constructors.
-        // Getting all exports, type funcs and typeless
-        List<UndecoratedSymbol> allExports = _exports.GetExports(moduleInfo).ToList();
-        foreach (UndecoratedSymbol undecSymbol in allExports)
+        // Getting all UNEDCORATED exports, type funcs and typeless
+        List<UndecoratedSymbol> allUndecoratedExports = _exports.GetUndecoratedExports(moduleInfo).ToList();
+        foreach (UndecoratedSymbol undecSymbol in allUndecoratedExports)
         {
             if (undecSymbol is not UndecoratedFunction ctor)
                 continue;
@@ -178,25 +193,33 @@ public class TricksterWrapper
                 module.AddTypeFunction(typeInfo, undecFunc);
 
                 // Removing type func from allExports
-                allExports.Remove(undecFunc);
+                allUndecoratedExports.Remove(undecFunc);
             }
         }
 
         // This list should now hold only typeless symbols.
-        // Which means C-style, non-class-associated funcs/variables.
-        foreach (UndecoratedSymbol export in allExports)
+        // Which means C++-style, non-class-associated funcs/variables.
+        foreach (UndecoratedSymbol export in allUndecoratedExports)
         {
             if (export is not UndecoratedFunction undecFunc)
             {
-                //Logger.Debug("Typeless-export which isn't a function is discarded. Undecorated name: " + export.UndecoratedFullName);
+                //// Logger.Debug("Typeless-export which isn't a function is discarded. Undecorated name: " + export.UndecoratedFullName);
                 continue;
             }
 
-            module.AddTypelessFunction(undecFunc);
+            module.AddUndecoratedTypelessFunction(undecFunc);
         }
 
+        // Which means C-style, non-class-associated funcs/variables.
+        List<DllExport> leftoverFunc = _exports.GetLeftoverExports(moduleInfo).ToList();
+        foreach (DllExport export in leftoverFunc)
+        {
+            module.AddRegularTypelessFunction(export);
+        }
+
+
         // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
-        if (TryGetOperatorNew(moduleInfo, out nuint[] operatorNewAddresses))
+        if (TryGetOperatorNew(moduleInfo, out List<nuint> operatorNewAddresses))
         {
             foreach (nuint operatorNewAddr in operatorNewAddresses)
             {
@@ -207,7 +230,8 @@ public class TricksterWrapper
                         decoratedName: "operator new",
                         (long)operatorNewAddr, 1,
                         moduleInfo);
-                module.AddTypelessFunction(undecFunction);
+                // TODO: Add this is a "regular" typeless func
+                module.AddUndecoratedTypelessFunction(undecFunction);
             }
         }
 

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net6.0-windows</TargetFramework>
@@ -49,6 +49,7 @@
 		<Compile Include="..\MsvcPrimitives\UndecoratedModule.cs" Link="MsvcPrimitives\UndecoratedModule.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedType.cs" Link="MsvcPrimitives\UndecoratedType.cs" />
 		<Compile Include="..\MsvcDiver.cs" />
+		<Compile Include="..\MsvcFrozenItemsCollection.cs" />
 		<Compile Include="..\MsvcOffensiveGC.cs" />
 		<Compile Include="..\HttpRequestsListener.cs" />
 		<Compile Include="..\IRequestsListener.cs" />
