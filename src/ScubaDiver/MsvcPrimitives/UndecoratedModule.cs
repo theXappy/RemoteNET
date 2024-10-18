@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using NtApiDotNet.Win32;
 using ScubaDiver.Rtti;
 
 namespace ScubaDiver;
@@ -12,15 +14,16 @@ public class UndecoratedModule
 
     private Dictionary<string, Rtti.TypeInfo> _namesToTypes;
     private Dictionary<Rtti.TypeInfo, UndecoratedType> _types;
-    private Dictionary<string, UndecoratedMethodGroup> _typelessFunctions;
-
+    private Dictionary<string, UndecoratedMethodGroup> _undecoratedTypelessFunctions;
+    private Dictionary<string, List<DllExport>> _leftoverTypelessFunctions;
 
     public UndecoratedModule(string name, Rtti.ModuleInfo moduleInfo)
     {
         Name = name;
         _namesToTypes = new Dictionary<string, TypeInfo>();
         _types = new Dictionary<Rtti.TypeInfo, UndecoratedType>();
-        _typelessFunctions = new Dictionary<string, UndecoratedMethodGroup>();
+        _undecoratedTypelessFunctions = new Dictionary<string, UndecoratedMethodGroup>();
+        _leftoverTypelessFunctions = new Dictionary<string, List<DllExport>>();
         ModuleInfo = moduleInfo;
     }
 
@@ -36,7 +39,7 @@ public class UndecoratedModule
     {
         UndecoratedType undType = GetOrAddType(type);
         if (!undType.ContainsKey(func.UndecoratedFullName))
-            undType[func.UndecoratedFullName] = new UndecoratedMethodGroup();
+            undType[func.UndecoratedFullName] = new UndecoratedMethodGroup(func.UndecoratedFullName);
         undType[func.UndecoratedFullName].Add(func);
     }
 
@@ -45,16 +48,38 @@ public class UndecoratedModule
         res = null;
         return TryGetType(type, out var undType) && undType.TryGetValue(undecMethodName, out res);
     }
-    public void AddTypelessFunction(UndecoratedFunction func)
+
+    public void AddRegularTypelessFunction(DllExport func)
+    {
+        if (!_leftoverTypelessFunctions.ContainsKey(func.Name))
+            _leftoverTypelessFunctions[func.Name] = new List<DllExport>();
+        _leftoverTypelessFunctions[func.Name].Add(func);
+    }
+
+    public bool TryGetRegularTypelessFunc(string name, out List<DllExport> res)
+    {
+        return _leftoverTypelessFunctions.TryGetValue(name, out res);
+    }
+    public IEnumerable<DllExport> GetRegularTypelessFuncs()
+    {
+        return _leftoverTypelessFunctions.Values.SelectMany(x => x);
+    }
+
+    public void AddUndecoratedTypelessFunction(UndecoratedFunction func)
     {
         string decoratedMethodName = func.DecoratedName;
-        if (!_typelessFunctions.ContainsKey(decoratedMethodName))
-            _typelessFunctions[decoratedMethodName] = new UndecoratedMethodGroup();
-        _typelessFunctions[decoratedMethodName].Add(func);
+        if (!_undecoratedTypelessFunctions.ContainsKey(decoratedMethodName))
+            _undecoratedTypelessFunctions[decoratedMethodName] = new UndecoratedMethodGroup(decoratedMethodName);
+        _undecoratedTypelessFunctions[decoratedMethodName].Add(func);
     }
-    public bool TryGetTypelessFunc(string decoratedMethodName, out UndecoratedMethodGroup res)
+
+    public bool TryGetUndecoratedTypelessFunc(string name, out UndecoratedMethodGroup res)
     {
-        return _typelessFunctions.TryGetValue(decoratedMethodName, out res);
+        return _undecoratedTypelessFunctions.TryGetValue(name, out res);
+    }
+    public IEnumerable<UndecoratedMethodGroup> GetUndecoratedTypelessFuncs()
+    {
+        return _undecoratedTypelessFunctions.Values;        
     }
 
     public UndecoratedType GetOrAddType(Rtti.TypeInfo type)

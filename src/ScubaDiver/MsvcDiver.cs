@@ -45,6 +45,8 @@ namespace ScubaDiver
 
 
         private MsvcOffensiveGC _offensiveGC = null;
+        private MsvcFrozenItemsCollection _freezer = null;
+
         protected string MakeGcHookModuleResponse(ScubaDiverMessage req)
         {
             string assemblyFilter = req.QueryString.Get("assembly");
@@ -59,6 +61,7 @@ namespace ScubaDiver
                 if (_tricksterWrapper.RefreshRequired())
                     _tricksterWrapper.Refresh();
                 _offensiveGC = new MsvcOffensiveGC();
+                _freezer = new MsvcFrozenItemsCollection(_offensiveGC);
             }
 
             List<UndecoratedModule> undecoratedModules = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate);
@@ -66,6 +69,10 @@ namespace ScubaDiver
             try
             {
                 _offensiveGC.HookModules(undecoratedModules);
+                foreach(UndecoratedModule module in undecoratedModules)
+                {
+                    _offensiveGC.HookAllFreeFuncs(module, _tricksterWrapper.GetUndecoratedModules());
+                }
             }
             catch (Exception e)
             {
@@ -195,7 +202,10 @@ namespace ScubaDiver
             if (vftable != null)
             {
 
-                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), module, _exportsMaster.GetExports(module), vftable.Address);
+                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), 
+                    module, 
+                    _exportsMaster.GetUndecoratedExports(module).ToList(), 
+                    vftable.Address);
 
                 // Remove duplicates - the methods which are both virtual and exported.
                 virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
@@ -390,7 +400,7 @@ namespace ScubaDiver
                     if (firstClassTypeInfo.VftableAddress != methodTableAddress)
                         continue;
 
-                    IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module);
+                    IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module).ToList();
                     return GenerateTypeDump(typeInfo, module, exports);
                 }
             }
@@ -449,7 +459,7 @@ namespace ScubaDiver
             foreach (KeyValuePair<ModuleInfo, IEnumerable<Rtti.TypeInfo>> moduleAndTypes in modulesAndTypes)
             {
                 ModuleInfo module = moduleAndTypes.Key;
-                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetExports(module);
+                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module).ToList();
                 foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
                 {
 #pragma warning disable CS0168 // Variable is declared but never used
@@ -726,6 +736,11 @@ namespace ScubaDiver
                     return QuickError("Parameter 'hashcode_fallback' was 'true' but the hashcode argument was missing or not an int");
                 }
             }
+            if (pinningRequested)
+            {
+                if (_freezer == null)
+                    return QuickError("Pinning requested but Freezer/Offensive GC was not initialized.");
+            }
 
             try
             {
@@ -737,7 +752,13 @@ namespace ScubaDiver
                     throw new Exception("Failed to resolve vftable of target to any RTTI type.");
                 }
 
-                // TODO: Actual Pin
+                ulong pinningAddress = objAddr;
+                if (pinningRequested)
+                {
+                    Logger.Debug($"[MsvcDiver][MakeObjectResponse] Pinning object at 0x{objAddr}");
+                    pinningAddress = _freezer.Pin(objAddr);
+                    Logger.Debug($"[MsvcDiver][MakeObjectResponse] Pinned object at 0x{objAddr}");
+                }
 
                 ObjectDump od = new ObjectDump()
                 {
