@@ -601,7 +601,7 @@ namespace ScubaDiver
             lock (_addressToSizeLock)
             {
                 _addressToSize.AddOrUpdate(address, size);
-                Logger.Debug($"[RegisterSize] Addr: 0x{address:x16}, Size: {size}");
+                //Logger.Debug($"[RegisterSize] Addr: 0x{address:x16}, Size: {size}");
             }
         }
 
