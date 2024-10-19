@@ -29,7 +29,7 @@ jobs:
         fetch-depth: 0
 
     - name: Checkout submodule
-      uses: Mushus/checkout-submodule@f6a7fddc9798c8f8728b252594243ced3b56e550
+      uses: Mushus/checkout-submodule@v1.0.1
       with:
         # A path of submodule directory
         submodulePath: .
