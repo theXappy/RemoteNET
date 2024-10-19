@@ -89,7 +89,7 @@ RemoteObject passwordContainer = remoteApp.GetRemoteObject(candidates.Single());
 ### ✳️ Creating New Remote Objects
 Sometimes the existing objects in the remote app are not enough to do what you want.  
 For this reason you can also create new objects remotely.  
-Use the `Activator`-lookalike for that cause:
+Use the `Activator`-lookalike for that:
 ```C#
 // Creating a remote StringBuilder with default constructor
 RemoteObject remoteSb1 = remoteApp.Activator.CreateInstance(typeof(StringBuilder));
@@ -99,7 +99,7 @@ RemoteObject remoteSb2 = remoteApp.Activator.CreateInstance(typeof(StringBuilder
 ```
 Note how we used constructor arguments in the second `CreateInstance` call. Those could also be other `RemoteObject`s:
 ```C#
-// Constructing a bew StringBuilder
+// Constructing a new StringBuilder
 RemoteObject remoteStringBuilder = remoteApp.Activator.CreateInstance(typeof(StringBuilder));
 // Constructing a new StringWriter using the "StringWriter(StringBuilder sb)" ctor
 RemoteObject remoteStringWriter = remoteApp.Activator.CreateInstance(typeof(StringWriter), remoteStringBuilder);
