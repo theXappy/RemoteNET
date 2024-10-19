@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
+		<TargetFramework>net7.0-windows</TargetFramework>
 		<NoWin32Manifest>true</NoWin32Manifest>
 		<Company>theXappy</Company>
 		<Description>Examine, create and interact with remote objects in other .NET processes.</Description>
@@ -67,7 +67,7 @@
 			<CopyOperations Include="$(SolutionDir)\dist\$(Configuration)\x64\**\*.exe;$(SolutionDir)\dist\$(Configuration)\x64\**\*.dll;$(SolutionDir)\dist\$(Configuration)\x64\**\*.pdb">
 				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
 			</CopyOperations>
-			<CopyOperations Include="$(ProjectDir)\..\InjectableDummy\bin\$(Configuration)\net6.0\**\*">
+			<CopyOperations Include="$(ProjectDir)\..\InjectableDummy\bin\$(Configuration)\net6.0-windows\**\*">
 				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
 			</CopyOperations>
 		</ItemGroup>
@@ -78,7 +78,7 @@
 	
 	<Target Name="ZipFolders" BeforeTargets="BeforeBuild">
 		<ItemGroup>
-			<ZipOperations Include="$(ProjectDir)\..\Lifeboat\bin\$(Configuration)\net6.0">
+			<ZipOperations Include="$(ProjectDir)\..\Lifeboat\bin\$(Configuration)\net6.0-windows">
 				<ZipFileName>$(ProjectDir)\Resources\Lifeboat.zip</ZipFileName>
 			</ZipOperations>
 			<ZipOperations Include="$(SolutionDir)\dist\$(Configuration)\ScubaDivers">
