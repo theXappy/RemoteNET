@@ -9,7 +9,7 @@ public class SafeMarshalTests
         int size = 100;
         IntPtr result = SafeMarshal.AllocHGlobal(size);
 
-        Assert.AreNotEqual(IntPtr.Zero, result);
+        Assert.That(result, Is.Not.EqualTo(IntPtr.Zero));
         SafeMarshal.FreeHGlobal(result); // Cleanup
     }
 
