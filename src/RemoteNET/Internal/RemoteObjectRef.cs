@@ -10,14 +10,13 @@ namespace RemoteNET.Internal
     {
         private bool _isReleased;
         private readonly TypeDump _typeInfo;
-        private ObjectDump _remoteObjectInfo;
-        private readonly DiverCommunicator _creatingCommunicator;
+        public ObjectDump RemoteObjectInfo { get; private set; }
+        public DiverCommunicator CreatingCommunicator { get; private set; }
 
         // TODO: I think addresses as token should be reworked
-        public ulong Token => _remoteObjectInfo.PinnedAddress;
-        public DiverCommunicator Communicator => _creatingCommunicator;
+        public ulong Token => RemoteObjectInfo.PinnedAddress;
+        public DiverCommunicator Communicator => CreatingCommunicator;
 
-        
         public RemoteObjectRef(ObjectDump remoteObjectInfo, TypeDump typeInfo, DiverCommunicator creatingCommunicator)
         {
             if (typeInfo == null)
@@ -25,9 +24,9 @@ namespace RemoteNET.Internal
                 throw new ArgumentNullException(nameof(typeInfo));
             }
 
-            _remoteObjectInfo = remoteObjectInfo;
+            RemoteObjectInfo = remoteObjectInfo;
             _typeInfo = typeInfo;
-            _creatingCommunicator = creatingCommunicator;
+            CreatingCommunicator = creatingCommunicator;
             _isReleased = false;
         }
 
@@ -46,10 +45,10 @@ namespace RemoteNET.Internal
             ThrowIfReleased();
             if (refresh)
             {
-                _remoteObjectInfo = _creatingCommunicator.DumpObject(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type);
+                RemoteObjectInfo = CreatingCommunicator.DumpObject(RemoteObjectInfo.PinnedAddress, RemoteObjectInfo.Type);
             }
 
-            var field = _remoteObjectInfo.Fields.Single(fld => fld.Name == name);
+            var field = RemoteObjectInfo.Fields.Single(fld => fld.Name == name);
             if (!string.IsNullOrEmpty(field.RetrivalError))
                 throw new Exception(
                     $"Field of the remote object could not be retrieved. Error: {field.RetrivalError}");
@@ -70,7 +69,7 @@ namespace RemoteNET.Internal
                 throw new NotImplementedException("Refreshing property values not supported yet");
             }
 
-            var property = _remoteObjectInfo.Properties.Single(prop => prop.Name == name);
+            var property = RemoteObjectInfo.Properties.Single(prop => prop.Name == name);
             if (!string.IsNullOrEmpty(property.RetrivalError))
             {
                 throw new Exception(
@@ -92,32 +91,33 @@ namespace RemoteNET.Internal
         public InvocationResults InvokeMethod(string methodName, string[] genericArgsFullTypeNames, ObjectOrRemoteAddress[] args)
         {
             ThrowIfReleased();
-            return _creatingCommunicator.InvokeMethod(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, methodName, genericArgsFullTypeNames, args);
+            string typeFullName = $"{_typeInfo.Assembly}!{_typeInfo.Type}";
+            return CreatingCommunicator.InvokeMethod(RemoteObjectInfo.PinnedAddress, typeFullName, methodName, genericArgsFullTypeNames, args);
         }
 
         public InvocationResults SetField(string fieldName, ObjectOrRemoteAddress newValue)
         {
             ThrowIfReleased();
-            return _creatingCommunicator.SetField(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, fieldName, newValue);
+            return CreatingCommunicator.SetField(RemoteObjectInfo.PinnedAddress, RemoteObjectInfo.Type, fieldName, newValue);
         }
         public InvocationResults GetField(string fieldName)
         {
             ThrowIfReleased();
-            return _creatingCommunicator.GetField(_remoteObjectInfo.PinnedAddress, _remoteObjectInfo.Type, fieldName);
+            return CreatingCommunicator.GetField(RemoteObjectInfo.PinnedAddress, RemoteObjectInfo.Type, fieldName);
         }
 
         public void EventSubscribe(string eventName, DiverCommunicator.LocalEventCallback callbackProxy)
         {
             ThrowIfReleased();
 
-            _creatingCommunicator.EventSubscribe(_remoteObjectInfo.PinnedAddress, eventName, callbackProxy);
+            CreatingCommunicator.EventSubscribe(RemoteObjectInfo.PinnedAddress, eventName, callbackProxy);
         }
 
         public void EventUnsubscribe(string eventName, DiverCommunicator.LocalEventCallback callbackProxy)
         {
             ThrowIfReleased();
 
-            _creatingCommunicator.EventUnsubscribe(callbackProxy);
+            CreatingCommunicator.EventUnsubscribe(callbackProxy);
         }
 
         /// <summary>
@@ -125,18 +125,18 @@ namespace RemoteNET.Internal
         /// </summary>
         public void RemoteRelease()
         {
-            _creatingCommunicator.UnpinObject(_remoteObjectInfo.PinnedAddress);
+            CreatingCommunicator.UnpinObject(RemoteObjectInfo.PinnedAddress);
             _isReleased = true;
         }
 
         public override string ToString()
         {
-            return $"RemoteObjectRef. Address: {_remoteObjectInfo.PinnedAddress}, TypeFullName: {_typeInfo.Type}";
+            return $"RemoteObjectRef. Address: {RemoteObjectInfo.PinnedAddress}, TypeFullName: {_typeInfo.Type}";
         }
 
         internal ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
         {
-            return _creatingCommunicator.GetItem(this.Token, key);
+            return CreatingCommunicator.GetItem(this.Token, key);
         }
     }
 }

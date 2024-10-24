@@ -127,5 +127,10 @@ namespace RemoteNET
         {
             return  _ref.GetItem(key);
         }
+
+        public override RemoteObject Cast(Type t)
+        {
+            throw new NotImplementedException("Not implemented in Managed context");
+        }
     }
 }
