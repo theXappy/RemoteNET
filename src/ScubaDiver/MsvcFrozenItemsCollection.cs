@@ -32,6 +32,13 @@ namespace ScubaDiver
             }
         }
 
+        public bool IsFrozen(ulong objAddress)
+        {
+            lock (_lock)
+            {
+                return _frozenItemsToDestructors.ContainsKey(objAddress);
+            }
+        }
 
         /// <summary>
         /// Unpins an object
