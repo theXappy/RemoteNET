@@ -744,6 +744,20 @@ namespace ScubaDiver
 
             try
             {
+                // Check if the object is already frozen
+                if (_freezer.IsFrozen(objAddr))
+                {
+                    Logger.Debug($"[MsvcDiver][MakeObjectResponse] Object at 0x{objAddr:X16} is already frozen.");
+                    ObjectDump od = new ObjectDump()
+                    {
+                        Type = typeName,
+                        RetrivalAddress = objAddr,
+                        PinnedAddress = objAddr,
+                        HashCode = 0x0bad0bad
+                    };
+                    return JsonConvert.SerializeObject(od);
+                }
+
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
                 Rtti.TypeInfo typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
