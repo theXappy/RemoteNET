@@ -748,14 +748,14 @@ namespace ScubaDiver
                 if (_freezer.IsFrozen(objAddr))
                 {
                     Logger.Debug($"[MsvcDiver][MakeObjectResponse] Object at 0x{objAddr:X16} is already frozen.");
-                    ObjectDump od = new ObjectDump()
+                    ObjectDump alreadyFrozenObjDump = new ObjectDump()
                     {
                         Type = typeName,
                         RetrivalAddress = objAddr,
                         PinnedAddress = objAddr,
                         HashCode = 0x0bad0bad
                     };
-                    return JsonConvert.SerializeObject(od);
+                    return JsonConvert.SerializeObject(alreadyFrozenObjDump);
                 }
 
                 // TODO: Wrong for x86
