@@ -61,4 +61,12 @@ public class UnmanagedRemoteObject : RemoteObject
     {
         return $"{nameof(UnmanagedRemoteObject)}. Type: {_type?.FullName ?? "UNK"} Reference: [{_ref}]";
     }
+
+    public override RemoteObject Cast(Type t)
+    {
+        TypeDump dumpType = _app.Communicator.DumpType(t.FullName, t.Assembly.GetName().Name);
+
+        RemoteObjectRef ror = new RemoteObjectRef(_ref.RemoteObjectInfo, dumpType, _ref.CreatingCommunicator);
+        return new UnmanagedRemoteObject(ror, _app);
+    }
 }

@@ -30,4 +30,9 @@ public class RemoteCharStar : RemoteObject
     {
         return typeof(ScubaDiver.API.CharStar);
     }
+
+    public override RemoteObject Cast(Type t)
+    {
+        throw new NotImplementedException("Not implemented for char* remote objects");
+    }
 }
