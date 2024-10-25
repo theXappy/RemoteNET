@@ -45,6 +45,11 @@ namespace RemoteNET
         // Remote Heap querying
         //
 
+        /// <summary>
+        /// Modules that threw exceptions when being dumped.
+        /// </summary>
+        static Dictionary<string, int> _badModules = new Dictionary<string, int>();
+
         public override IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter)
         {
             Predicate<string> matchesFilter = Filter.CreatePredicate(typeFullNameFilter);
@@ -55,6 +60,13 @@ namespace RemoteNET
                     _unmanagedCommunicator.DumpDomains().AvailableDomains.Single().AvailableModules;
                 foreach (string module in _unmanagedModulesList)
                 {
+                    if (_badModules.TryGetValue(module, out int exceptionsThrown) && exceptionsThrown > 3)
+                    {
+                        Debug.WriteLine(
+                            $"[{nameof(UnmanagedRemoteApp)}][{nameof(QueryTypes)}] Too many exceptions thrown for unmanaged module: {module}, Skipping.");
+                        continue;
+                    }
+
                     List<TypesDump.TypeIdentifiers> typeIdentifiers;
                     try
                     {
@@ -63,8 +75,12 @@ namespace RemoteNET
                     catch
                     {
                         // TODO:
+                        if (!_badModules.ContainsKey(module))
+                            _badModules.Add(module, 0);
+                        _badModules[module]++;
+
                         Debug.WriteLine(
-                            $"[{nameof(ManagedRemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Dumping/Iterating unmanaged module: {module}");
+                            $"[{nameof(UnmanagedRemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Dumping/Iterating unmanaged module: {module}");
                         continue;
                     }
 
