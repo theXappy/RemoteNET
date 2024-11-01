@@ -544,10 +544,20 @@ public abstract class DynamicRemoteObject : DynamicObject
             array[i] = dyn[i];
         return array;
     }
+    private static byte[] __cast_to_byte_array(DynamicRemoteObject dro)
+    {
+        // Invoke remote Convert.ToBase64String(byte[])
+        Type ConvertType = dro.__ra.GetRemoteType(typeof(Convert));
+        MethodInfo toBase64 = ConvertType.GetMethods().Single(mi => mi.Name == nameof(Convert.ToBase64String) && mi.GetParameters().Length == 1);
+
+        string base64 = toBase64.Invoke(null, new object[] { dro }) as string;
+
+        return Convert.FromBase64String(base64);
+    }
 #pragma warning restore IDE1006 // Naming Styles
 
     public static implicit operator bool[](DynamicRemoteObject dro) => __cast_to_array<bool>(dro);
-    public static implicit operator byte[](DynamicRemoteObject dro) => __cast_to_array<byte>(dro);
+    public static implicit operator byte[](DynamicRemoteObject dro) => __cast_to_byte_array(dro);
     public static implicit operator char[](DynamicRemoteObject dro) => __cast_to_array<char>(dro);
     public static implicit operator short[](DynamicRemoteObject dro) => __cast_to_array<short>(dro);
     public static implicit operator ushort[](DynamicRemoteObject dro) => __cast_to_array<ushort>(dro);
