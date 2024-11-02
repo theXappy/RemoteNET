@@ -47,13 +47,14 @@
 
         <dependencies>
           <group targetFramework=".NETStandard2.0">
-            <dependency id="Newtonsoft.Json" version="13.0.1" />
+            <dependency id="Newtonsoft.Json" version="13.0.3" />
             <dependency id="NETStandard.Library" version="2.0.3" />
-            <dependency id="Microsoft.Diagnostics.Runtime" version="2.0.222201" />
+            <dependency id="Microsoft.Diagnostics.Runtime" version="3.1.512801" />
             <dependency id="Microsoft.CSharp" version="4.7.0" />
-			<dependency id="System.Security.AccessControl" version="6.0.0.0" />
+			<dependency id="System.Security.AccessControl" version="6.0.1.0" />
 			<dependency id="System.IO.FileSystem.AccessControl" version="5.0.0.0" />
 			<dependency id="InjectableDotNetHost.Injector" version="1.0.12" />
+			<dependency id="Vanara.PInvoke.IpHlpApi" version="4.0.4" />
           </group>
         </dependencies>
 		
