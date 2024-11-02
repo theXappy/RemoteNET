@@ -837,7 +837,7 @@ namespace ScubaDiver
 
             // Search the method/ctor with the matching signature
             List<TypeDump.TypeMethod> overloads = dumpedObjType.Methods.Concat(dumpedObjType.Constructors)
-                .Where(m => m.Name == request.MethodName)
+                .Where(m => m.Name == request.MethodName || m.DecoratedName == request.MethodName)
                 .Where(m => m.Parameters.Count == paramsList.Count + 1) // TODO: Check types
                 .ToList();
 
