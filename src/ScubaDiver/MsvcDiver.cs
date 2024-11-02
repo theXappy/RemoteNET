@@ -951,7 +951,7 @@ namespace ScubaDiver
             ObjectOrRemoteAddress returnValue;
             if (returnTypeDump == null || results is null or 0)
             {
-                if (returnTypeDump != null)
+                if (returnTypeDump != null || results == null)
                 {
                     // This is a null pointer
                     returnValue = ObjectOrRemoteAddress.Null;
