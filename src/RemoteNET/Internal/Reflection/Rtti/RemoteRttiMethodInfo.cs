@@ -92,7 +92,8 @@ namespace RemoteNET.Internal.Reflection
 
         public override object Invoke(object obj, BindingFlags invokeAttr, Binder binder, object[] parameters, CultureInfo culture)
         {
-            return UnmanagedRemoteFunctionsInvokeHelper.Invoke(this.App as UnmanagedRemoteApp, DeclaringType, Name, obj, parameters);
+            // Using MangledName as it should be more globally unique then Name
+            return UnmanagedRemoteFunctionsInvokeHelper.Invoke(this.App as UnmanagedRemoteApp, DeclaringType, MangledName, obj, parameters);
         }
 
         public override MethodInfo GetBaseDefinition()
