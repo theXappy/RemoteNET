@@ -872,7 +872,7 @@ namespace ScubaDiver
                 // Extend search to other types (this method might be inherited and hence found under another type's name.
                 // Turning `namespace::class::func` to `namespace::class`
                 string methodFullName = method.UndecoratedFullName;
-                string parentType = methodFullName.Substring(0, methodFullName.IndexOf(method.Name));
+                string parentType = methodFullName.Substring(0, methodFullName.IndexOf(method.Name)).TrimEnd(':');
 
                 typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, parentType).ToList();
                 targetMethod = typeFuncs.SingleOrDefault(m => m.DecoratedName == method.DecoratedName);
