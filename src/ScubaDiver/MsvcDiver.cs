@@ -862,8 +862,29 @@ namespace ScubaDiver
             Rtti.TypeInfo typeInfo = modulesAndTypes[module].Single();
 
             List<UndecoratedFunction> typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, typeInfo.Name).ToList();
-            UndecoratedFunction targetMethod = typeFuncs.Single(m => m.DecoratedName == method.DecoratedName);
-            Logger.Debug($"[MsvcDiver] FOUND the target function: {targetMethod}");
+            UndecoratedFunction targetMethod = typeFuncs.SingleOrDefault(m => m.DecoratedName == method.DecoratedName);
+            if (targetMethod != null)
+            {
+                Logger.Debug($"[MsvcDiver] FOUND the target function: {targetMethod}");
+            }
+            else
+            {
+                // Extend search to other types (this method might be inherited and hence found under another type's name.
+                // Turning `namespace::class::func` to `namespace::class`
+                string methodFullName = method.UndecoratedFullName;
+                string parentType = methodFullName.Substring(0, methodFullName.IndexOf(method.Name));
+
+                typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, parentType).ToList();
+                targetMethod = typeFuncs.SingleOrDefault(m => m.DecoratedName == method.DecoratedName);
+                if (targetMethod != null)
+                {
+                    Logger.Debug($"[MsvcDiver] FOUND the target function in PARENT type: {targetMethod}");
+                }
+                else
+                {
+                    return QuickError($"Could not find method {targetMethod} in either {typeInfo.Name} nor {parentType}");
+                }
+            }
 
             //
             // Turn target method into an invoke-able delegate
