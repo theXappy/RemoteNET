@@ -48,7 +48,6 @@ namespace ScubaDiver
                     return;
 
                 var firstPtr = methodGroup.Single();
-                Logger.Debug($"[{nameof(FreeFinder)}] FOUND {name} in {module.Name} = 0x{firstPtr.Address:X16}");
 
                 workingDict[module.ModuleInfo] = firstPtr;
                 // TODO: Am I missing matches if there are multiple exports called 'free'?
@@ -118,8 +117,6 @@ namespace ScubaDiver
         public void HookModule(UndecoratedModule module) => HookModules(new List<UndecoratedModule>() { module });
         public void HookModules(List<UndecoratedModule> modules)
         {
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(HookModules)} IN");
-
             modules = modules.Where(m => !_alreadyHookedModules.Contains(m)).ToList();
 
             Dictionary<TypeInfo, UndecoratedFunction> initMethods = GetAutoClassInit2Funcs(modules);
@@ -133,8 +130,6 @@ namespace ScubaDiver
             HookNewOperators(newOperators);
 
             _alreadyHookedModules.AddRange(modules);
-
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] {nameof(HookModules)} OUT");
         }
 
         public void HookAllFreeFuncs(UndecoratedModule target, List<UndecoratedModule> allModules)
@@ -489,14 +484,12 @@ namespace ScubaDiver
         {
             if (selfObj is NativeObject self)
             {
-                // TODO: Intercept dtors here to prevent de-allocation
-                Logger.Debug($"[UnifiedDtor] Enter! Type: {self.TypeInfo.FullTypeName} Address: 0x{self.Address:X16}");
                 DeregisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
 
+                // Intercept dtors here to prevent de-allocation
                 if (_frozenObjectsToDtorUpdateActions.TryGetValue(self.Address, out var dtorUpdateAction))
                 {
                     Logger.Debug($"[UnifiedDtor] DING DING DING! Frozen object flow! Avoiding DTOR :) Address: 0x{self.Address:X16}");
-                    // This object is frozen! Record this dtor call and avoid calling it
                     dtorUpdateAction.Invoke(self.Address, self.TypeInfo);
                     return false; // Skip Original
 
