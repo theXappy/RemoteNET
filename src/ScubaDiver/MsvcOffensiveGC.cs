@@ -144,50 +144,48 @@ namespace ScubaDiver
             int attemptedFreeFuncs = 0;
             foreach (string funcName in new[] { "free", "_free", "_free_dbg" })
             {
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook '{funcName}'s...");
+                // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook '{funcName}'s...");
                 Dictionary<ModuleInfo, DllExport> funcs = FreeFinder.Find(allModules, funcName);
                 if (funcs.Count == 0)
                 {
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
                     continue;
                 }
                 if (funcs.Count > 1)
                 {
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " +
-                        string.Join(", ", funcs.Keys.Select(a => a.Name).ToArray()));
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " +string.Join(", ", funcs.Keys.Select(a => a.Name).ToArray()));
                 }
                 foreach (var kvp in funcs)
                 {
                     DllExport freeFunc = kvp.Value;
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Chose '{funcName}' from {kvp.Key.Name}");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Chose '{funcName}' from {kvp.Key.Name}");
 
                     // Find out native replacement function for the given func name
                     IntPtr replacementPtr = MsvcOffensiveGcHelper.GetOrAddReplacement((IntPtr)freeFunc.Address);
 
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking '{funcName}' at 0x{freeFunc.Address:X16} (from {kvp.Key.Name}), " +
-                        $"in the IAT of {target.Name}. " +
-                        $"Replacement Address: 0x{replacementPtr:X16}");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking '{funcName}' at 0x{freeFunc.Address:X16} (from {kvp.Key.Name}), " +
+                        //$"in the IAT of {target.Name}. " +
+                        //$"Replacement Address: 0x{replacementPtr:X16}");
                     ModuleInfo targetModule = target.ModuleInfo;
                     bool replacementRes = Loader.HookIAT((IntPtr)(ulong)targetModule.BaseAddress, (IntPtr)freeFunc.Address, replacementPtr);
 
 
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] res = {replacementRes}");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] res = {replacementRes}");
                     if (replacementRes)
                     {
                         // Found the right import! Breaking so we don't override the "original free ptr" with wrong matches.
-                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] [@@@@@@@] Found the right import! Breaking.");
+                        // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] [@@@@@@@] Found the right import! Breaking.");
                         attemptedFreeFuncs++;
                         break;
                     }
                     else
                     {
-                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] [xxxxxxx] Wrong import.");
+                        // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] [xxxxxxx] Wrong import.");
                     }
                 }
             }
 
-            Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking free funcs. attempted to hook: {attemptedFreeFuncs} funcs");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking free funcs. attempted to hook: {attemptedFreeFuncs} funcs");
         }
 
         private Dictionary<string, List<UndecoratedFunction>> GetNewOperators(List<UndecoratedModule> modules)
@@ -206,15 +204,15 @@ namespace ScubaDiver
                 //    tempList.AddRange(methodGroup);
                 //}
 
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Looking for {operatorNewName} in {module.Name}");
+                // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Looking for {operatorNewName} in {module.Name}");
                 if (module.TryGetUndecoratedTypelessFunc(operatorNewName, out var methodGroup))
                 {
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] FOUND {operatorNewName} in {module.Name}");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] FOUND {operatorNewName} in {module.Name}");
                     tempList.AddRange(methodGroup);
                 }
                 else
                 {
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Did NOT find {operatorNewName} in {module.Name}");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Did NOT find {operatorNewName} in {module.Name}");
                 }
 
                 if (tempList.Any())
@@ -314,7 +312,7 @@ namespace ScubaDiver
                     // Found the method group (all overloads with the same name)
                     if (methodGroup.Count != 1)
                     {
-                        Logger.Debug($"Expected exactly one __autoclassinit2 function for type {type.Name}, Found {methodGroup.Count}");
+                        // Logger.Debug($"Expected exactly one __autoclassinit2 function for type {type.Name}, Found {methodGroup.Count}");
                         continue;
                     }
 
@@ -336,25 +334,22 @@ namespace ScubaDiver
         private static void HookNewOperators(Dictionary<string, List<UndecoratedFunction>> newOperators)
         {
             // Hook all new operators
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook 'operator new's...");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook 'operator new's...");
             int attemptedOperatorNews = 0;
             foreach (var moduleToFuncs in newOperators)
             {
                 foreach (var newOperator in moduleToFuncs.Value)
                 {
                     attemptedOperatorNews++;
-                    Logger.Debug(
-                        $"[{nameof(MsvcOffensiveGC)}] Hooking 'operator new' at 0x{newOperator.Address:x16} ({newOperator.Module})");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking 'operator new' at 0x{newOperator.Address:x16} ({newOperator.Module})");
 
                     //DetoursNetWrapper.Instance.AddHook(newOperator, UnifiedOperatorNew);
                     DetoursNetWrapper.Instance.AddHook(TypeInfo.Dummy, newOperator, UnifiedOperatorNew, HarmonyPatchPosition.Postfix);
                 }
             }
 
-            Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new' s. attempted to hook: {attemptedOperatorNews} funcs");
-            Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new' s. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new' s. attempted to hook: {attemptedOperatorNews} funcs");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking 'operator new' s. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
         private static bool UnifiedOperatorNew(object sizeObj, object[] args, ref object retValue)
         {
@@ -366,7 +361,7 @@ namespace ScubaDiver
             }
             else
             {
-                Logger.Debug($"[UnifiedOperatorNew] sizeObj: {sizeObj}");
+                // Logger.Debug($"[UnifiedOperatorNew] sizeObj: {sizeObj}");
             }
 
             return true; // Don't skip original
@@ -377,7 +372,7 @@ namespace ScubaDiver
         private static void HookCtors(Dictionary<TypeInfo, List<UndecoratedFunction>> ctors)
         {
             // Hook all ctors
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook ctors...");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook ctors...");
             int attemptedHookedCtorsCount = 0;
             foreach (var kvp in ctors)
             {
@@ -398,7 +393,7 @@ namespace ScubaDiver
 
                     if (_alreadyHookedDecorated.Contains(ctor.DecoratedName))
                     {
-                        Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {ctor.UndecoratedFullName} , Decorated: {ctor.DecoratedName}");
+                        // Logger.Debug($"[WARNING] Attempted re-hooking of ctor. UnDecorated: {ctor.UndecoratedFullName} , Decorated: {ctor.DecoratedName}");
                         continue;
                     }
                     _alreadyHookedDecorated.Add(ctor.DecoratedName);
@@ -410,29 +405,27 @@ namespace ScubaDiver
                         continue;
                     }
 
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking CTOR {ctor.UndecoratedFullName} with {ctor.NumArgs} args");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking CTOR {ctor.UndecoratedFullName} with {ctor.NumArgs} args");
                     DetoursNetWrapper.Instance.AddHook(type, ctor, UnifiedCtor, HarmonyPatchPosition.Prefix);
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] QUICK EXIT");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] QUICK EXIT");
                     attemptedHookedCtorsCount++;
                 }
             }
 
-            Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. attempted to hook: {attemptedHookedCtorsCount} ctors");
-            Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. attempted to hook: {attemptedHookedCtorsCount} ctors");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking ctors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
         public static bool UnifiedCtor(object selfObj, object[] args, ref object retValue)
         {
             if (selfObj is NativeObject self)
             {
-                Logger.Debug($"[UnifiedCtor] self.TypeInfo.Name: {self.TypeInfo.Name}, Addr: 0x{self.Address:x16}");
+                // Logger.Debug($"[UnifiedCtor] self.TypeInfo.Name: {self.TypeInfo.Name}, Addr: 0x{self.Address:x16}");
                 RegisterClass(self.Address, self.TypeInfo.ModuleName, self.TypeInfo.Name);
                 TryMatchClassToSize(self.Address, self.TypeInfo.FullTypeName);
             }
             else
             {
-                Logger.Debug($"[UnifiedCtor] Args: {args.Length}, Self: <ERROR!>");
+                // Logger.Debug($"[UnifiedCtor] Args: {args.Length}, Self: <ERROR!>");
             }
             return true; // Call Original
         }
@@ -441,7 +434,7 @@ namespace ScubaDiver
         private static void HookDtors(Dictionary<TypeInfo, List<UndecoratedFunction>> dtors)
         {
             // Hook all ctors
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook dtors...");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook dtors...");
             int attemptedHookedCtorsCount = 0;
             foreach (var kvp in dtors)
             {
@@ -456,7 +449,7 @@ namespace ScubaDiver
 
                     if (_alreadyHookedDecorated.Contains(dtor.DecoratedName))
                     {
-                        Logger.Debug($"[WARNING] Attempted re-hooking of dtor. UnDecorated: {dtor.UndecoratedFullName} , Decorated: {dtor.DecoratedName}");
+                        // Logger.Debug($"[WARNING] Attempted re-hooking of dtor. UnDecorated: {dtor.UndecoratedFullName} , Decorated: {dtor.DecoratedName}");
                         continue;
                     }
                     _alreadyHookedDecorated.Add(dtor.DecoratedName);
@@ -464,21 +457,19 @@ namespace ScubaDiver
 
                     if (dtor.NumArgs > 1)
                     {
-                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Skipping hooking DTOR {dtor.UndecoratedFullName} with {dtor.NumArgs} args");
+                        // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Skipping hooking DTOR {dtor.UndecoratedFullName} with {dtor.NumArgs} args");
                         continue;
                     }
 
                     DetoursNetWrapper.Instance.AddHook(type, dtor, UnifiedDtor, HarmonyPatchPosition.Prefix);
                     attemptedHookedCtorsCount++;
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DTOR hooked! {dtor.UndecoratedFullName} !~!~!~!~!~!~!");
+                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DTOR hooked! {dtor.UndecoratedFullName} !~!~!~!~!~!~!");
 
                 }
             }
 
-            Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking dtors. attempted to hook: {attemptedHookedCtorsCount} ctors");
-            Logger.Debug(
-                $"[{nameof(MsvcOffensiveGC)}] Done hooking dtors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking dtors. attempted to hook: {attemptedHookedCtorsCount} ctors");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking dtors. DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
         public static bool UnifiedDtor(object selfObj, object[] args, ref object retValue)
         {
@@ -489,7 +480,7 @@ namespace ScubaDiver
                 // Intercept dtors here to prevent de-allocation
                 if (_frozenObjectsToDtorUpdateActions.TryGetValue(self.Address, out var dtorUpdateAction))
                 {
-                    Logger.Debug($"[UnifiedDtor] DING DING DING! Frozen object flow! Avoiding DTOR :) Address: 0x{self.Address:X16}");
+                    // Logger.Debug($"[UnifiedDtor] DING DING DING! Frozen object flow! Avoiding DTOR :) Address: 0x{self.Address:X16}");
                     dtorUpdateAction.Invoke(self.Address, self.TypeInfo);
                     return false; // Skip Original
 
@@ -497,7 +488,7 @@ namespace ScubaDiver
             }
             else
             {
-                Logger.Debug($"[UnifiedDtor] error Args: {args.Length}, Self: <ERROR!>");
+                // Logger.Debug($"[UnifiedDtor] error Args: {args.Length}, Self: <ERROR!>");
             }
             return true; // Call Original
         }
@@ -506,26 +497,25 @@ namespace ScubaDiver
         private void HookAutoClassInit2Funcs(Dictionary<TypeInfo, UndecoratedFunction> initMethods)
         {
             // Hook all __autoclassinit2
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2. Count: {initMethods.Count}");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook __autoclassinit2. Count: {initMethods.Count}");
             foreach (var kvp in initMethods)
             {
                 UndecoratedFunction autoClassInit2 = kvp.Value;
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedFullName}");
+                // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking {autoClassInit2.UndecoratedFullName}");
                 DetoursNetWrapper.Instance.AddHook(kvp.Key, kvp.Value, UnifiedAutoClassInit2, HarmonyPatchPosition.Prefix);
             }
 
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
-            Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking __autoclassinit2.");
+            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] DelegateStore.Mine.Count: {DelegateStore.Mine.Count}");
         }
 
         private bool UnifiedAutoClassInit2(object selfObj, object[] args, ref object retvalue)
         {
             if (selfObj is NativeObject self)
             {
-                Logger.Debug($"[UnifiedAutoClassInit2] Secret: {self.TypeInfo.Name}, Args: {args.Length}");
+                // Logger.Debug($"[UnifiedAutoClassInit2] Secret: {self.TypeInfo.Name}, Args: {args.Length}");
                 nuint size = (nuint)args.FirstOrDefault();
-                Logger.Debug(
-                    $"[UnifiedAutoClassInit2] Secret: {self.TypeInfo.Name}, Args: {args.Length}, Self: 0x{size:x16}");
+                // Logger.Debug($"[UnifiedAutoClassInit2] Secret: {self.TypeInfo.Name}, Args: {args.Length}, Self: 0x{size:x16}");
                 lock (_classSizesLock)
                 {
                     // Found a new match!
@@ -535,7 +525,7 @@ namespace ScubaDiver
 
             else
             {
-                Logger.Debug($"[UnifiedAutoClassInit2] Args: {args.Length}, Self: <ERROR!>");
+                // Logger.Debug($"[UnifiedAutoClassInit2] Args: {args.Length}, Self: <ERROR!>");
             }
 
             return true; // Don't skip original
@@ -594,7 +584,7 @@ namespace ScubaDiver
             lock (_addressToSizeLock)
             {
                 _addressToSize.AddOrUpdate(address, size);
-                //Logger.Debug($"[RegisterSize] Addr: 0x{address:x16}, Size: {size}");
+                //// Logger.Debug($"[RegisterSize] Addr: 0x{address:x16}, Size: {size}");
             }
         }
 
@@ -611,14 +601,14 @@ namespace ScubaDiver
             {
                 res = _addressToSize.Remove(address, out size);
             }
-            Logger.Debug($"[TryMatchClassToSize] fullTypeClassName: {fullTypeClassName}, Addr: 0x{address:x16}, Results: {res}");
+            // Logger.Debug($"[TryMatchClassToSize] fullTypeClassName: {fullTypeClassName}, Addr: 0x{address:x16}, Results: {res}");
 
             // Check if we already found the size of this class
             lock (_classSizesLock)
             {
                 if (_classSizes.ContainsKey(fullTypeClassName))
                 {
-                    Logger.Debug($"[TryMatchClassToSize] Already matched size of fullTypeClassName: {fullTypeClassName}");
+                    // Logger.Debug($"[TryMatchClassToSize] Already matched size of fullTypeClassName: {fullTypeClassName}");
                     return;
                 }
 
@@ -626,7 +616,7 @@ namespace ScubaDiver
                 {
                     // Found a new match!
                     _classSizes[fullTypeClassName] = size;
-                    Logger.Debug($"[TryMatchClassToSize] Found size of class. Full Name: {fullTypeClassName}, Size: {size} bytes");
+                    // Logger.Debug($"[TryMatchClassToSize] Found size of class. Full Name: {fullTypeClassName}, Size: {size} bytes");
                 }
             }
         }
