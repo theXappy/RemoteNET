@@ -13,6 +13,8 @@ namespace RemoteNET
 {
     public class UnmanagedRemoteApp : RemoteApp
     {
+        private Action<string> _logger = (str) => { };// Console.WriteLine($"[{DateTime.Now.ToLongTimeString()}]{str}");
+
         private Process _procWithDiver;
         public Process Process => _procWithDiver;
 
@@ -33,7 +35,7 @@ namespace RemoteNET
             _unmanagedCommunicator = unmanagedCommunicator;
             _hub = hub;
             _hookingManager = new RemoteHookingManager(this);
-            if(hub.TryGetValue(RuntimeType.Managed, out RemoteApp managedApp) && managedApp is ManagedRemoteApp castedManagedApp)
+            if (hub.TryGetValue(RuntimeType.Managed, out RemoteApp managedApp) && managedApp is ManagedRemoteApp castedManagedApp)
                 Marshal = new RemoteMarshal(castedManagedApp);
         }
 
@@ -45,53 +47,19 @@ namespace RemoteNET
         // Remote Heap querying
         //
 
-        /// <summary>
-        /// Modules that threw exceptions when being dumped.
-        /// </summary>
-        static Dictionary<string, int> _badModules = new Dictionary<string, int>();
-
         public override IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter)
+            => QueryTypes(typeFullNameFilter, null);
+
+        public IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter, string importerModule)
         {
-            Predicate<string> matchesFilter = Filter.CreatePredicate(typeFullNameFilter);
+            _logger($"[QueryTypes] Enter with filter {typeFullNameFilter}");
+            TypesDump resutls = _unmanagedCommunicator.DumpTypes(typeFullNameFilter, importerModule);
 
-            if (_unmanagedCommunicator != null)
+            foreach (TypesDump.TypeIdentifiers type in resutls.Types)
             {
-                _unmanagedModulesList ??=
-                    _unmanagedCommunicator.DumpDomains().AvailableDomains.Single().AvailableModules;
-                foreach (string module in _unmanagedModulesList)
-                {
-                    if (_badModules.TryGetValue(module, out int exceptionsThrown) && exceptionsThrown > 3)
-                    {
-                        Debug.WriteLine(
-                            $"[{nameof(UnmanagedRemoteApp)}][{nameof(QueryTypes)}] Too many exceptions thrown for unmanaged module: {module}, Skipping.");
-                        continue;
-                    }
-
-                    List<TypesDump.TypeIdentifiers> typeIdentifiers;
-                    try
-                    {
-                        typeIdentifiers = _unmanagedCommunicator.DumpTypes(module).Types;
-                    }
-                    catch
-                    {
-                        // TODO:
-                        if (!_badModules.ContainsKey(module))
-                            _badModules.Add(module, 0);
-                        _badModules[module]++;
-
-                        Debug.WriteLine(
-                            $"[{nameof(UnmanagedRemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Dumping/Iterating unmanaged module: {module}");
-                        continue;
-                    }
-
-                    foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
-                    {
-                        // TODO: Filtering should probably be done in the Diver's side
-                        if (matchesFilter(type.TypeName))
-                            yield return new CandidateType(RuntimeType.Unmanaged, type.TypeName, module);
-                    }
-                }
+                yield return new CandidateType(RuntimeType.Unmanaged, type.FullTypeName, type.Assembly);
             }
+            _logger($"[QueryTypes] Enter with filter {typeFullNameFilter} -- DONE");
         }
 
         /// <summary>
@@ -120,6 +88,8 @@ namespace RemoteNET
         /// <returns></returns>
         public override Type GetRemoteType(string typeFullName, string assembly = null)
         {
+            _logger($"[GetRemoteType] Enter with filter = {typeFullName}, Assembly = {assembly ?? "null"}");
+
             // Easy case: Trying to resolve from cache or from local assemblies
             var resolver = RttiTypesResolver.Instance;
             Type res = resolver.Resolve(assembly, typeFullName);
@@ -134,7 +104,9 @@ namespace RemoteNET
             RttiTypesFactory rtf =
                 new RttiTypesFactory(resolver, _unmanagedCommunicator);
             var dumpedType = _unmanagedCommunicator.DumpType(typeFullName, assembly);
-            return rtf.Create(this, dumpedType);
+            Type results = rtf.Create(this, dumpedType);
+            _logger($"[GetRemoteType] Enter with filter = {typeFullName}, Assembly = {assembly ?? "null"} -- DONE");
+            return results;
         }
 
         /// <summary>
@@ -144,12 +116,16 @@ namespace RemoteNET
         /// <returns></returns>
         public override Type GetRemoteType(long methodTableAddress)
         {
+            _logger($"[GetRemoteType] Enter with Method Table = {methodTableAddress:X16}");
+
+
             // Easy case: Trying to resolve from cache or from local assemblies
             var resolver = RttiTypesResolver.Instance;
             Type res = resolver.Resolve(methodTableAddress);
             if (res != null)
             {
                 // Found in cache.
+                _logger($"[GetRemoteType] Enter with Method Table = {methodTableAddress:X16} -- DONE, WAS IN CACHE");
                 return res;
             }
 
@@ -158,7 +134,9 @@ namespace RemoteNET
             RttiTypesFactory rtf =
                 new RttiTypesFactory(resolver, _unmanagedCommunicator);
             var dumpedType = _unmanagedCommunicator.DumpType(methodTableAddress);
-            return rtf.Create(this, dumpedType);
+            var results = rtf.Create(this, dumpedType);
+            _logger($"[GetRemoteType] Enter with Method Table = {methodTableAddress:X16} -- DONE, WAS NOT in CACHE");
+            return results;
         }
 
         //
@@ -167,6 +145,8 @@ namespace RemoteNET
 
         public override UnmanagedRemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
         {
+            _logger($"[GetRemoteObject] Enter with Address = {remoteAddress:X16}, TypeName = {typeName}");
+
             ObjectDump od;
             TypeDump td;
             try
@@ -181,17 +161,24 @@ namespace RemoteNET
 
 
             var remoteObject = new UnmanagedRemoteObject(new RemoteObjectRef(od, td, _unmanagedCommunicator), this);
+            _logger($"[GetRemoteObject] Enter with Address = {remoteAddress:X16}, TypeName = {typeName} -- DONE");
             return remoteObject;
         }
 
         public override RemoteObject GetRemoteObject(ObjectOrRemoteAddress oora)
         {
+            _logger($"[GetRemoteObject] Enter with OORA");
+
+
             if (oora.Type == typeof(CharStar).FullName)
             {
+                _logger($"[GetRemoteObject] Enter with OORA -- CharStar shortcut");
                 return new RemoteCharStar(_hub[RuntimeType.Managed] as ManagedRemoteApp, oora.RemoteAddress, oora.EncodedObject);
             }
 
-            return GetRemoteObject(oora.RemoteAddress, oora.Type);
+            UnmanagedRemoteObject results = GetRemoteObject(oora.RemoteAddress, oora.Type);
+            _logger($"[GetRemoteObject] Enter with OORA -- DONE");
+            return results;
         }
 
         //

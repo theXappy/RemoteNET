@@ -245,14 +245,22 @@ namespace RemoteNET.RttiReflection
                     Debug.WriteLine($"[@@@][RttiTypeFactory] Trying to resolve non-cached sub-type: `{namespaceAndTypeName}`");
 
                     var possibleParamTypes = app.QueryTypes(namespaceAndTypeName).ToArray();
-                    if (possibleParamTypes.Length == 0 && !namespaceAndTypeName.Contains('!'))
+                    if (possibleParamTypes.Length != 1 && !namespaceAndTypeName.Contains('!'))
                     {
-                        // Try with given module name
+                        // Look for the "other" type in the current module
                         possibleParamTypes = app.QueryTypes($"{moduleName}!{namespaceAndTypeName}").ToArray();
 
-                        if (possibleParamTypes.Length == 0 && moduleName == "*")
+                        // Fallback 1:  Look for matching IMPORTED types into the given module
+                        // (Helpf the there are multiple types with the same name in several modules)
+                        if (possibleParamTypes.Length != 1)
                         {
-                            // If we didn't figure using the given module name, let's extend the search using a wild card module name
+                            UnmanagedRemoteApp unmanApp = (UnmanagedRemoteApp)app;
+                            possibleParamTypes = unmanApp.QueryTypes($"*!{namespaceAndTypeName}", importerModule: moduleName).ToArray();
+                        }
+
+                        // Fallback 2: Widen search to ALL loaded modules
+                        if (possibleParamTypes.Length != 1 && moduleName != "*")
+                        {
                             possibleParamTypes = app.QueryTypes($"*!{namespaceAndTypeName}").ToArray();
                         }
                     }

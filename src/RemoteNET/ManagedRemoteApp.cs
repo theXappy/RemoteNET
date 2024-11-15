@@ -127,30 +127,20 @@ namespace RemoteNET
 
         public override IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter)
         {
-            Predicate<string> matchesFilter = Filter.CreatePredicate(typeFullNameFilter);
-
-            _managedDomains ??= _managedCommunicator.DumpDomains();
-            var allModules = _managedDomains.AvailableDomains.SelectMany(domain => domain.AvailableModules);
-            foreach (string assembly in allModules)
+            List<TypesDump.TypeIdentifiers> typeIdentifiers;
+            try
             {
-                List<TypesDump.TypeIdentifiers> typeIdentifiers;
-                try
-                {
-                    typeIdentifiers = _managedCommunicator.DumpTypes(assembly).Types;
-                }
-                catch
-                {
-                    // TODO:
-                    Debug.WriteLine($"[{nameof(ManagedRemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Dumping/Iterating managed assembly: {assembly}");
-                    continue;
-                }
-                foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
-                {
-                    // TODO: Filtering should probably be done in the Diver's side
-                    if (matchesFilter(type.TypeName))
-                        yield return new CandidateType(RuntimeType.Managed, type.TypeName, assembly);
-                }
-
+                typeIdentifiers = _managedCommunicator.DumpTypes(typeFullNameFilter).Types;
+            }
+            catch
+            {
+                // TODO:
+                Debug.WriteLine($"[{nameof(ManagedRemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Querying for Type filter: {typeFullNameFilter}");
+                yield break;
+            }
+            foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
+            {
+                yield return new CandidateType(RuntimeType.Managed, type.FullTypeName, type.Assembly);
             }
         }
 

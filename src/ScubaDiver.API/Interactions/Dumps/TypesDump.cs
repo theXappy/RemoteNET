@@ -6,9 +6,9 @@ namespace ScubaDiver.API.Interactions.Dumps
     {
         public class TypeIdentifiers
         {
-            public string TypeName { get; set; }
+            public string Assembly { get; set; }
+            public string FullTypeName { get; set; }
         }
-        public string AssemblyName { get; set; }
         public List<TypeIdentifiers> Types { get; set; }
     }
 }
