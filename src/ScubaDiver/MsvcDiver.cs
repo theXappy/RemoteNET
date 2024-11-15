@@ -15,6 +15,7 @@ using ScubaDiver.Hooking;
 using Windows.Win32.Foundation;
 using ScubaDiver.API.Hooking;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
+using NtApiDotNet.Win32;
 
 namespace ScubaDiver
 {
@@ -319,38 +320,58 @@ namespace ScubaDiver
 
         protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
-            string assemblyFilter = req.QueryString.Get("assembly");
+            string importerModule = req.QueryString.Get("importer_module");
+
+            string typeFilter = req.QueryString.Get("type_filter");
+            ParseFullTypeName(typeFilter, out var assemblyFilter, out typeFilter);
+
             Predicate<string> assemblyFilterPredicate = Filter.CreatePredicate(assemblyFilter);
+            Predicate<string> typeFilterPredicate = Filter.CreatePredicate(typeFilter);
 
-            List<UndecoratedModule> matchingAssemblies = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate).ToList();
-            List<TypesDump.TypeIdentifiers> types = new();
-            if (matchingAssemblies.Count == 0)
+            List<UndecoratedModule> matchingModules = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate).ToList();
+            if (importerModule != null)
             {
-                return QuickError($"No modules matched the filter '{assemblyFilter}'");
-            }
-            if (matchingAssemblies.Count > 1)
-            {
-                string assembliesList = string.Join(", ", matchingAssemblies.Select(x => x.Name).ToArray());
-                return QuickError(
-                    $"Too many modules matched the filter '{assemblyFilter}'. Found {matchingAssemblies.Count} ({assembliesList})");
-            }
-
-            UndecoratedModule module = matchingAssemblies.Single();
-            foreach (Rtti.TypeInfo type in module.Types)
-            {
-                types.Add(new TypesDump.TypeIdentifiers()
+                IReadOnlyList<DllImport> imports = _tricksterWrapper.ExportsMaster.GetImports(importerModule);
+                if (imports == null)
                 {
-                    TypeName = $"{module.Name}!{type.Name}"
-                });
+                    // TODO: Something else where no modules could be found in the imports table??
+                    matchingModules = new List<UndecoratedModule>();
+                }
+                else
+                {
+                    matchingModules = matchingModules.Where(module => IsImportedInto(module, imports)).ToList();
+                }
+            }
+
+            List<TypesDump.TypeIdentifiers> types = new();
+            foreach (UndecoratedModule module in matchingModules)
+            {
+                foreach (Rtti.TypeInfo type in module.Types)
+                {
+                    if (!typeFilterPredicate(type.Name))
+                        continue;
+
+                    // TODO: Extend to also look for a SPECIFIC import of some function of the queried type
+
+                    types.Add(new TypesDump.TypeIdentifiers()
+                    {
+                        Assembly = module.Name,
+                        FullTypeName = $"{module.Name}!{type.Name}"
+                    });
+                }
             }
 
             TypesDump dump = new()
             {
-                AssemblyName = module.Name,
                 Types = types
             };
-
             return JsonConvert.SerializeObject(dump);
+
+
+            bool IsImportedInto(UndecoratedModule module, IReadOnlyList<DllImport> imports)
+            {
+                return imports.Any(imp => imp.DllName == module.Name);
+            }
         }
 
         protected override string MakeTypeResponse(ScubaDiverMessage req)

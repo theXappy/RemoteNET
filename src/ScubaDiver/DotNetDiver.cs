@@ -456,36 +456,25 @@ namespace ScubaDiver
         }
         protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
-            string assembly = req.QueryString.Get("assembly");
+            string assemblyFilter = req.QueryString.Get("assembly");
+            string typeFilter = req.QueryString.Get("type_filter");
+
+            Predicate<string> assemblyFilterPredicate = Filter.CreatePredicate(assemblyFilter);
+            Predicate<string> typeFilterPredicate = Filter.CreatePredicate(typeFilter);
+
 
             // Try exact match assembly 
             var allAssembliesInApp = _unifiedAppDomain.GetAssemblies();
-            List<Assembly> matchingAssemblies = allAssembliesInApp.Where(assm => assm.GetName().Name == assembly).ToList();
-            if (matchingAssemblies.Count == 0)
-            {
-                // No exact matches, widen search to any assembly *containing* the query
-                matchingAssemblies = allAssembliesInApp.Where(module =>
-                {
-                    if (assembly == null)
-                        return false;
-                    try
-                    {
-                        return module?.GetName()?.Name?.Contains(assembly) == true;
-                    }
-                    catch { }
-
-                    return false;
-                }).ToList();
-            }
+            List<Assembly> matchingAssemblies = allAssembliesInApp.Where(assm => assemblyFilterPredicate(assm.GetName().Name)).ToList();
 
             if (!matchingAssemblies.Any())
             {
                 // No matching assemblies found
-                return QuickError($"No assemblies found matching the query '{assembly}'");
+                return QuickError($"No assemblies found matching the query '{assemblyFilter}'");
             }
             else if (matchingAssemblies.Count > 1)
             {
-                return $"{{\"error\":\"Too many assemblies found matching the query '{assembly}'. Expected: 1, Got: {matchingAssemblies.Count}\"}}";
+                return $"{{\"error\":\"Too many assemblies found matching the query '{assemblyFilter}'. Expected: 1, Got: {matchingAssemblies.Count}\"}}";
             }
 
             // Got here - we have a single matching assembly.
@@ -495,15 +484,19 @@ namespace ScubaDiver
             List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
             foreach (Type type in matchingAssembly.GetTypes())
             {
+                // TODO: Is checking both FullName and Name overkill?
+                if (!typeFilterPredicate(type.FullName) && !typeFilterPredicate(type.Name))
+                    continue;
+
                 types.Add(new TypesDump.TypeIdentifiers()
                 {
-                    TypeName = type.FullName
+                    Assembly = matchingAssembly.FullName,
+                    FullTypeName = type.FullName
                 });
             }
 
             TypesDump dump = new()
             {
-                AssemblyName = assembly,
                 Types = types
             };
 

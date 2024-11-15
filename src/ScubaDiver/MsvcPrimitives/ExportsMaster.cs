@@ -8,21 +8,57 @@ namespace ScubaDiver;
 public class ExportsMaster : IReadOnlyExportsMaster
 {
     private Dictionary<string, List<DllExport>> _exportsCache = new();
+    private Dictionary<string, List<DllImport>> _importsCache = new();
 
     private Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>> _undecExportsCache = new();
     private Dictionary<Rtti.ModuleInfo, List<DllExport>> _leftoverExportsCache = new();
 
-    public IReadOnlyList<DllExport> GetExports(Rtti.ModuleInfo modInfo)
-        => GetExports(modInfo.Name);
-    public IReadOnlyList<DllExport> GetExports(string moduleName)
+
+    public void LoadExportsImports(string moduleName)
     {
         if (!_exportsCache.ContainsKey(moduleName))
         {
-            var lib = SafeLoadLibraryHandle.GetModuleHandle(moduleName);
-            _exportsCache[moduleName] = lib.Exports.ToList();
+            try
+            {
+                var lib = SafeLoadLibraryHandle.GetModuleHandle(moduleName);
+                _exportsCache[moduleName] = lib.Exports.ToList();
+                _importsCache[moduleName] = lib.Imports.ToList();
+
+            }
+            catch (NtApiDotNet.Win32.SafeWin32Exception ex)
+            {
+                if (ex.Message == "The specified module could not be found.")
+                {
+                    // fuck it
+                    _exportsCache[moduleName] = new List<DllExport>();
+                    _importsCache[moduleName] = new List<DllImport>();
+                }
+                else
+                {
+                    throw;
+                }
+            }
         }
+    }
+    public IReadOnlyList<DllExport> GetExports(string moduleName)
+    {
+        LoadExportsImports(moduleName);
         return _exportsCache[moduleName];
     }
+
+    public IReadOnlyList<DllExport> GetExports(Rtti.ModuleInfo modInfo) => GetExports(modInfo.Name);
+
+    public IReadOnlyList<DllImport> GetImports(string moduleName)
+    {
+        LoadExportsImports(moduleName);
+        if (_importsCache.TryGetValue(moduleName, out var list))
+        {
+            return list;
+        }
+        return null;
+    }
+
+    public IReadOnlyList<DllImport> GetImports(Rtti.ModuleInfo modInfo) => GetImports(modInfo.Name);
 
     public IEnumerable<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo)
     {
@@ -35,7 +71,7 @@ public class ExportsMaster : IReadOnlyExportsMaster
         ProcessExports(modInfo);
         return _leftoverExportsCache[modInfo];
     }
-    
+
 
     public void ProcessExports(Rtti.ModuleInfo modInfo)
     {

@@ -72,6 +72,9 @@ public class TricksterWrapper
 
     public Dictionary<ModuleInfo, TypeInfo[]> GetDecoratedTypes()
     {
+        if (_trickster == null)
+            Refresh();
+
         return _trickster.ScannedTypes;
     }
 
