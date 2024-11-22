@@ -139,9 +139,10 @@ namespace ScubaDiver
                     }
                     catch(Exception ex)
                     {
-                        if (ex.Message.Contains("is not running."))
+                        if (ex.Message.Contains("is not running.") ||
+                            ex.Message.Contains("Access is denied."))
                         {
-                            // This is ok.
+                            // These are ok.
                         }
                         else
                         {
@@ -472,27 +473,22 @@ namespace ScubaDiver
                 // No matching assemblies found
                 return QuickError($"No assemblies found matching the query '{assemblyFilter}'");
             }
-            else if (matchingAssemblies.Count > 1)
-            {
-                return $"{{\"error\":\"Too many assemblies found matching the query '{assemblyFilter}'. Expected: 1, Got: {matchingAssemblies.Count}\"}}";
-            }
-
-            // Got here - we have a single matching assembly.
-            Assembly matchingAssembly = matchingAssemblies.Single();
-
 
             List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
-            foreach (Type type in matchingAssembly.GetTypes())
+            foreach (Assembly matchingAssembly in matchingAssemblies)
             {
-                // TODO: Is checking both FullName and Name overkill?
-                if (!typeFilterPredicate(type.FullName) && !typeFilterPredicate(type.Name))
-                    continue;
-
-                types.Add(new TypesDump.TypeIdentifiers()
+                foreach (Type type in matchingAssembly.GetTypes())
                 {
-                    Assembly = matchingAssembly.FullName,
-                    FullTypeName = type.FullName
-                });
+                    // TODO: Is checking both FullName and Name overkill?
+                    if (!typeFilterPredicate(type.FullName) && !typeFilterPredicate(type.Name))
+                        continue;
+
+                    types.Add(new TypesDump.TypeIdentifiers()
+                    {
+                        Assembly = matchingAssembly.GetName().Name,
+                        FullTypeName = type.FullName
+                    });
+                }
             }
 
             TypesDump dump = new()
