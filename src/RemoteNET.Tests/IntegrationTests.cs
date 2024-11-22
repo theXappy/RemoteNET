@@ -22,7 +22,7 @@ namespace RemoteNET.Tests
             var app = RemoteAppFactory.Connect(target.Process, RuntimeType.Managed);
 
             // Assert
-            Assert.IsNotNull(app);
+            Assert.That(app, Is.Not.Null);
             app.Dispose();
         }
 
@@ -43,7 +43,7 @@ namespace RemoteNET.Tests
             bool alive = app.Communicator.CheckAliveness();
 
             // Assert
-            Assert.True(alive);
+            Assert.That(alive, Is.True);
             var unmanAppp = RemoteAppFactory.Connect(target.Process, RuntimeType.Unmanaged);
             app.Dispose();
             unmanAppp.Dispose();

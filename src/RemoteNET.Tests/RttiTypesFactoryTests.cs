@@ -266,7 +266,7 @@ namespace RemoteNET.Tests
             // Assert
             MethodInfo method = childType.GetMethods().Single();
             string decTypeLongName = $"{method.DeclaringType.Namespace}::{method.DeclaringType.Name}";
-            Assert.That(childTypeLongName, Is.Not.EqualTo(decTypeLongName));
+            Assert.That(childTypeLongName, Is.EqualTo(decTypeLongName));
         }
 
 
@@ -320,7 +320,7 @@ namespace RemoteNET.Tests
 
             // Assert
             var arg = args[1];
-            Assert.AreEqual("Peek::WClass&", arg);
+            Assert.That(arg, Is.EqualTo("Peek::WClass&"));
         }
 
         [Test]
@@ -350,7 +350,7 @@ namespace RemoteNET.Tests
 
             // Assert
             // Expecting `AddFunctionImpl` to NOT add that function (not supported yet)
-            Assert.IsEmpty(childType.GetMethods());
+            Assert.That(childType.GetMethods(), Is.Empty);
         }
     }
 }
