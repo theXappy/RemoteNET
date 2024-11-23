@@ -159,8 +159,15 @@ public class RnetRequestsListener : IRequestsListener
         // 'stayAlive' state changes to "reset" (which means we should die)
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)))
         {
-            TcpClient client = _listener.AcceptTcpClient();
-            Task.Run(() => HandleTcpClient(client));
+            try
+            {
+                TcpClient client = _listener.AcceptTcpClient();
+                Task.Run(() => HandleTcpClient(client));
+            }
+            catch (SocketException)
+            {
+                continue;
+            }
         }
     }
 
