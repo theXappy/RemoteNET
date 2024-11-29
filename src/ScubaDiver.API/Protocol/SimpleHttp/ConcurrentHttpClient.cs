@@ -74,6 +74,12 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 _responses[id] = resp;
                 are.Set();
             }
+
+            // Signal all reset event to allow waiting Sender threads to realize the connection broke.
+            foreach (AutoResetEvent item in _autoResetEvents.Values)
+            {
+                item.Set();
+            }
         }
 
         public HttpResponseSummary Send(HttpRequestSummary request)

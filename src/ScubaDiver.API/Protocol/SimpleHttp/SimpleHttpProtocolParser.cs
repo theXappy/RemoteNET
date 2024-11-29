@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -16,6 +16,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
         {
             object res;
             NetworkStream networkStream = client.GetStream();
+            networkStream.ReadTimeout = 2000;
             MemoryStream memoryStream = new MemoryStream();
 
             ReadHttpMessageFromStream(networkStream, memoryStream);
