@@ -131,7 +131,8 @@ namespace RemoteNET.Internal
 
         public override string ToString()
         {
-            return $"RemoteObjectRef. Address: {RemoteObjectInfo.PinnedAddress}, TypeFullName: {_typeInfo.Type}";
+            return $"RemoteObjectRef. Address: {RemoteObjectInfo.PinnedAddress} (0x{RemoteObjectInfo.PinnedAddress:x16}), " +
+                   $"TypeFullName: {_typeInfo.Type}";
         }
 
         internal ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
