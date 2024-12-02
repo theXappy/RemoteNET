@@ -31,7 +31,7 @@ namespace RemoteNET.Internal
 
         public static DiverState QueryStatus(Process target, string diverAddr, int diverPort)
         {
-            using DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort);
+            using DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort, timeout: 500 /* ms */);
 
             bool diverPortIsUse = false;
             try

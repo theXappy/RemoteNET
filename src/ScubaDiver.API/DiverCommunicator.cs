@@ -36,15 +36,16 @@ namespace ScubaDiver.API
         private CallbacksListener _listener;
         private object _httpClientLock = new object();
         private ConcurrentHttpClient? _httpClient;
+        private int _timeout;
 
-        public DiverCommunicator(string hostname, int diverPort)
+        public DiverCommunicator(string hostname, int diverPort, int timeout = -1)
         {
             _hostname = hostname;
             DiverPort = diverPort;
             _listener = new CallbacksListener(this);
-
-
+            _timeout = timeout;
         }
+
         public DiverCommunicator(IPAddress ipa, int diverPort) : this(ipa.ToString(), diverPort) { }
         public DiverCommunicator(IPEndPoint ipe) : this(ipe.Address, ipe.Port) { }
 
@@ -66,7 +67,7 @@ namespace ScubaDiver.API
                         tcpClient.Connect(_hostname, DiverPort);
                     }
 
-                    _httpClient = new ConcurrentHttpClient(tcpClient);
+                    _httpClient = new ConcurrentHttpClient(tcpClient, _timeout);
                 }
             }
         }

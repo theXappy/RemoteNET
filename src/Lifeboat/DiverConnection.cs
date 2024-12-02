@@ -32,7 +32,7 @@ namespace Lifeboat
                 HttpResponseSummary resp = null;
                 try
                 {
-                    resp = SimpleHttpProtocolParser.ReadResponse(TcpClient);
+                    resp = SimpleHttpProtocolParser.ReadResponse(TcpClient.GetStream());
                 }
                 catch (IOException)
                 {
@@ -53,7 +53,7 @@ namespace Lifeboat
             Console.WriteLine("[Diver Writer] Exiting...");
             foreach (HttpRequestSummary request in _requests.GetConsumingEnumerable())
             {
-                SimpleHttpProtocolParser.Write(TcpClient, request);
+                SimpleHttpProtocolParser.Write(TcpClient.GetStream(), request);
             }
             Console.WriteLine("[Diver Writer] Exiting...");
         }

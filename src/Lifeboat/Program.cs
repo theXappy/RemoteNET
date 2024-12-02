@@ -60,7 +60,7 @@ public class Program
         Dictionary<string, string> dict = new Dictionary<string, string>();
         dict["requestId"] = requestId;
         HttpResponseSummary introReject = HttpResponseSummary.FromJson(HttpStatusCode.Unauthorized, $"{{\"status\":\"reject, {error}\"}}", dict);
-        SimpleHttpProtocolParser.Write(client, introReject);
+        SimpleHttpProtocolParser.Write(client.GetStream(), introReject);
         client.GetStream().Flush();
     }
     static void SendAcceptRole(TcpClient client, string requestId)
@@ -68,7 +68,7 @@ public class Program
         Dictionary<string, string> dict = new Dictionary<string, string>();
         dict["requestId"] = requestId;
         HttpResponseSummary introAccept = HttpResponseSummary.FromJson(HttpStatusCode.OK, "{\"status\":\"OK\"}", dict);
-        SimpleHttpProtocolParser.Write(client, introAccept);
+        SimpleHttpProtocolParser.Write(client.GetStream(), introAccept);
         client.GetStream().Flush();
     }
 
@@ -140,7 +140,7 @@ public class Program
             Log($"Waiting for diver...");
             TcpClient diverConnection = listener.AcceptTcpClient();
             Log($"Diver Suspect: {diverConnection.Client.RemoteEndPoint}");
-            HttpRequestSummary msg = SimpleHttpProtocolParser.ReadRequest(diverConnection);
+            HttpRequestSummary msg = SimpleHttpProtocolParser.ReadRequest(diverConnection.GetStream());
             string id = msg.QueryString.Get("requestId") ?? "999";
             if (msg == null)
             {

@@ -17,10 +17,14 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
         private BlockingCollection<HttpRequestSummary> _requests;
         private int _nextId;
 
-        public ConcurrentHttpClient(TcpClient c)
+        public ConcurrentHttpClient(TcpClient c, int timeout)
         {
             _client = c;
             _netStream = c.GetStream();
+            if (timeout > 0)
+            {
+                _netStream.ReadTimeout = timeout;
+            }
 
             _autoResetEvents = new ConcurrentDictionary<string, AutoResetEvent>();
             _responses = new ConcurrentDictionary<string, HttpResponseSummary>();
@@ -35,7 +39,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
         {
             foreach (HttpRequestSummary httpRequestSummary in _requests.GetConsumingEnumerable())
             {
-                SimpleHttpProtocolParser.Write(_client, httpRequestSummary);
+                SimpleHttpProtocolParser.Write(_netStream, httpRequestSummary);
             }
         }
 
@@ -46,7 +50,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 HttpResponseSummary resp = null;
                 try
                 {
-                    resp = SimpleHttpProtocolParser.Read<HttpResponseSummary>(_client);
+                    resp = SimpleHttpProtocolParser.Read<HttpResponseSummary>(_netStream);
                 }
                 catch
                 {

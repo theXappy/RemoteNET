@@ -64,9 +64,9 @@ public class RnetReverseRequestsListener : IRequestsListener
         // Introduce ourselves to the proxy
         HttpRequestSummary intro =
             HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver\"}");
-        SimpleHttpProtocolParser.WriteRequest(client, intro);
+        SimpleHttpProtocolParser.WriteRequest(client.GetStream(), intro);
 
-        var introResp = SimpleHttpProtocolParser.ReadResponse(client);
+        var introResp = SimpleHttpProtocolParser.ReadResponse(client.GetStream());
         if (introResp == null || !introResp.BodyString.Contains("\"status\":\"OK\""))
             throw new Exception("Diver couldn't register at Lifeboat");
 
@@ -78,9 +78,10 @@ public class RnetReverseRequestsListener : IRequestsListener
 
     private void Dispatcher(TcpClient client)
     {
+        NetworkStream networkStream = client.GetStream();
         while (_bootstrapStayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
-            HttpRequestSummary request = SimpleHttpProtocolParser.ReadRequest(client);
+            HttpRequestSummary request = SimpleHttpProtocolParser.ReadRequest(networkStream);
             if (request == null)
             {
                 continue;
@@ -94,7 +95,7 @@ public class RnetReverseRequestsListener : IRequestsListener
                     headers["requestId"] = requestId;
 
                 var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body, headers);
-                SimpleHttpProtocolParser.WriteResponse(client, resp);
+                SimpleHttpProtocolParser.WriteResponse(networkStream, resp);
             }
 
             ScubaDiverMessage req =
@@ -175,7 +176,7 @@ public class RnetRequestsListener : IRequestsListener
     {
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
-            var request = SimpleHttpProtocolParser.ReadRequest(client);
+            var request = SimpleHttpProtocolParser.ReadRequest(client.GetStream());
             if (request == null)
             {
                 // Connection closed
@@ -190,7 +191,7 @@ public class RnetRequestsListener : IRequestsListener
                     headers["requestId"] = requestId;
 
                 var resp = HttpResponseSummary.FromJson(HttpStatusCode.OK, body, headers);
-                SimpleHttpProtocolParser.WriteResponse(client, resp);
+                SimpleHttpProtocolParser.WriteResponse(client.GetStream(), resp);
             }
 
             ScubaDiverMessage req =

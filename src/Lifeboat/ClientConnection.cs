@@ -29,7 +29,7 @@ namespace Lifeboat
             {
                 try
                 {
-                    HttpRequestSummary req = SimpleHttpProtocolParser.ReadRequest(_client);
+                    HttpRequestSummary req = SimpleHttpProtocolParser.ReadRequest(_client.GetStream());
                     if (req == null)
                     {
                         break;
@@ -69,7 +69,7 @@ namespace Lifeboat
             {
                 try
                 {
-                    SimpleHttpProtocolParser.WriteResponse(_client, task.Result);
+                    SimpleHttpProtocolParser.WriteResponse(_client.GetStream(), task.Result);
                 }
                 catch (Exception ex)
                 {

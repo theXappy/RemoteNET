@@ -53,10 +53,10 @@ namespace LifeboatProxy
 
             var r = HttpRequestSummary.FromJson(requestUrl, ParseQueryString(context.Request.QueryString),
                 ReadRequestBody(context));
-            SimpleHttpProtocolParser.WriteRequest(targetClient, r);
+            SimpleHttpProtocolParser.WriteRequest(targetClient.GetStream(), r);
             Console.WriteLine($"Forwarded request: {requestUrl}");
 
-            HttpResponseSummary? resp = SimpleHttpProtocolParser.ReadResponse(targetClient);
+            HttpResponseSummary? resp = SimpleHttpProtocolParser.ReadResponse(targetClient.GetStream());
             if (resp == null)
                 throw new Exception("Response is NULL");
             byte[] respBody = resp.Body;

@@ -9,14 +9,12 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 {
     public class SimpleHttpProtocolParser
     {
-        public static HttpRequestSummary? ReadRequest(TcpClient client) => Read<HttpRequestSummary>(client);
-        public static HttpResponseSummary? ReadResponse(TcpClient client) => Read<HttpResponseSummary>(client);
+        public static HttpRequestSummary? ReadRequest(NetworkStream networkStream) => Read<HttpRequestSummary>(networkStream);
+        public static HttpResponseSummary? ReadResponse(NetworkStream networkStream) => Read<HttpResponseSummary>(networkStream);
 
-        public static T Read<T>(TcpClient client)
+        public static T Read<T>(NetworkStream networkStream)
         {
             object res;
-            NetworkStream networkStream = client.GetStream();
-            networkStream.ReadTimeout = 2000;
             MemoryStream memoryStream = new MemoryStream();
 
             ReadHttpMessageFromStream(networkStream, memoryStream);
@@ -116,10 +114,10 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
             throw new IOException("Unexpected end of stream while reading request header.");
         }
 
-        public static void WriteRequest(TcpClient client, HttpRequestSummary summary) => Write(client, summary);
-        public static void WriteResponse(TcpClient client, HttpResponseSummary summary) => Write(client, summary);
+        public static void WriteRequest(NetworkStream networkStream, HttpRequestSummary summary) => Write(networkStream, summary);
+        public static void WriteResponse(NetworkStream networkStream, HttpResponseSummary summary) => Write(networkStream, summary);
 
-        public static void Write<T>(TcpClient client, T summary)
+        public static void Write<T>(NetworkStream networkStream, T summary)
         {
             byte[] encoded;
 
@@ -144,7 +142,6 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                     $"SimpleHttpEncoder failed to encode our summary of type '{summary.GetType().Name}'. Summary: {summary}");
             }
 
-            NetworkStream networkStream = client.GetStream();
             networkStream.Write(encoded, 0, encoded.Length);
         }
     }
