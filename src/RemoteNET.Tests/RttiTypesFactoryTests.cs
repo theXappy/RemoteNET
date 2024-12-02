@@ -188,8 +188,8 @@ namespace RemoteNET.Tests
             {
                 var cands = new CandidateType[]
                 {
-                    new CandidateType(RuntimeType.Unmanaged, "Peek::Child", "libPeek_lies.dll"),
-                    new CandidateType(RuntimeType.Unmanaged, "Peek::Parent", "libPeek_lies.dll")
+                    new CandidateType(RuntimeType.Unmanaged, "Peek::Child", "libPeek_lies.dll", 0x00000000_11223344),
+                    new CandidateType(RuntimeType.Unmanaged, "Peek::Parent", "libPeek_lies.dll", 0x00000000_11223355)
                 };
 
                 return cands.Where(cand => cand.TypeFullName.Contains(typeFullNameFilter));

@@ -140,7 +140,7 @@ namespace RemoteNET
             }
             foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
             {
-                yield return new CandidateType(RuntimeType.Managed, type.FullTypeName, type.Assembly);
+                yield return new CandidateType(RuntimeType.Managed, type.FullTypeName, type.Assembly, type.MethodTable);
             }
         }
 

@@ -16,6 +16,7 @@ using Windows.Win32.Foundation;
 using ScubaDiver.API.Hooking;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 using NtApiDotNet.Win32;
+using System.Reflection;
 
 namespace ScubaDiver
 {
@@ -915,7 +916,8 @@ namespace ScubaDiver
             Type retType = method.ReturnTypeName.Equals("void", StringComparison.OrdinalIgnoreCase)
                 ? typeof(void)
                 : typeof(nuint);
-            var delegateType = NativeDelegatesFactory.GetDelegateType(retType, method.Parameters.Count);
+            int floatsBitmap = NativeDelegatesFactory.GetFloatsBitmap(method.Parameters, p => p.FullTypeName == "float" || p.FullTypeName == "double");
+            var delegateType = NativeDelegatesFactory.GetDelegateType(retType, method.Parameters.Count, floatsBitmap);
             var methodPtr = Marshal.GetDelegateForFunctionPointer(new IntPtr(targetMethod.Address), delegateType);
 
             //

@@ -31,7 +31,12 @@ public class DetoursNetWrapper
             return false;
         }
         DetoursMethodGenerator.DetouredFuncInfo tramp;
-        tramp = DetoursMethodGenerator.GetOrCreateMethod(typeInfo, methodToHook, typeof(nuint), methodToHook.DecoratedName);
+        Type retType = typeof(nuint);
+        if (methodToHook.RetType == "float")
+            retType = typeof(float);
+        if (methodToHook.RetType == "double")
+            retType = typeof(double);
+        tramp = DetoursMethodGenerator.GetOrCreateMethod(typeInfo, methodToHook, retType, methodToHook.DecoratedName);
         switch (hookPosition)
         {
             case HarmonyPatchPosition.Prefix:

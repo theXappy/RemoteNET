@@ -78,7 +78,8 @@ public static class DetoursMethodGenerator
         string key = $"{targetType.ModuleName}!{generatedMethodName}";
         if (!TryGetMethod(key, out detouredFuncInfo))
         {
-            (var generatedMethodInfo, var generatedDelegate, var delType) = GenerateMethodForName(targetMethod.NumArgs.Value, retType, key);
+            int floatsBitmap = NativeDelegatesFactory.GetFloatsBitmap(targetMethod.ArgTypes, p => p == "float" || p == "double");
+            (var generatedMethodInfo, var generatedDelegate, var delType) = GenerateMethodForName(targetMethod.NumArgs.Value, floatsBitmap, retType, key);
 
             detouredFuncInfo = new DetouredFuncInfo(targetType, targetMethod, generatedMethodName, generatedMethodInfo,
                 generatedDelegate, delType);
@@ -91,10 +92,11 @@ public static class DetoursMethodGenerator
 
 
 
-    private static (MethodInfo, Delegate, Type) GenerateMethodForName(int numArguments, Type retType, string generatedMethodName)
+    private static (MethodInfo, Delegate, Type) GenerateMethodForName(int numArguments, int floatsBitmap, Type retType, string generatedMethodName)
     {
         // Create a dynamic method with the specified return type and parameter types
-        DynamicMethod dynamicMethod = new DynamicMethod(generatedMethodName, retType, GetParameterTypes(numArguments));
+        Type[] parameters = GetParameterTypes(numArguments, floatsBitmap);
+        DynamicMethod dynamicMethod = new DynamicMethod(generatedMethodName, retType, parameters);
 
         // Get the IL generator for the dynamic method
         ILGenerator il = dynamicMethod.GetILGenerator();
@@ -114,7 +116,15 @@ public static class DetoursMethodGenerator
             il.Emit(OpCodes.Ldloc, argsLocal); // Load the array
             il.Emit(OpCodes.Ldc_I4, i); // Load the index
             il.Emit(OpCodes.Ldarg, i); // Load the corresponding argument
-            il.Emit(OpCodes.Box, typeof(nuint)); // Box the nuint argument
+            bool isFloating = i < 4 && parameters[i] == typeof(double);
+            if (isFloating)
+            {
+                il.Emit(OpCodes.Box, typeof(double)); // Box the double argument
+            }
+            else
+            {
+                il.Emit(OpCodes.Box, typeof(nuint)); // Box the nuint argument
+            }
             il.Emit(OpCodes.Stelem_Ref); // Store the argument in the array
         }
 
@@ -126,19 +136,23 @@ public static class DetoursMethodGenerator
         il.Emit(OpCodes.Ret);
 
         // Create a delegate from the dynamic method
-        Type delType = NativeDelegatesFactory.GetDelegateType(retType, numArguments);
+        Type delType = NativeDelegatesFactory.GetDelegateType(retType, numArguments, floatsBitmap);
         Delegate del = dynamicMethod.CreateDelegate(delType);
 
         // Return the MethodInfo and the delegate
         return (dynamicMethod, del, delType);
 
-        static Type[] GetParameterTypes(int numArguments)
+        static Type[] GetParameterTypes(int numArguments, int floatsBitmap)
         {
             Type[] parameterTypes = new Type[numArguments];
 
             for (int i = 0; i < numArguments; i++)
             {
                 parameterTypes[i] = typeof(nuint); // Parameters are of type long
+
+                int floatFlag = 1 << i;
+                if (i < 4 && (floatsBitmap & floatFlag) != 0)
+                    parameterTypes[i] = typeof(double);
             }
 
             return parameterTypes;
@@ -155,29 +169,60 @@ public static class DetoursMethodGenerator
     {
         DetouredFuncInfo tramp = _trampolines[generatedMethodName];
 
+        // First 4 args are ALWAYS double if floating point (so for both 'float' and 'double' parameters)
+        // The rest of the args are ALWAYS nuint, for all types.
+        object[] castedArgs = args.ToArray();
+        for (int i = 0; i < castedArgs.Length; i++)
+        {
+            if (tramp.Target.ArgTypes[i] == "float")
+            {
+                if (castedArgs[i] is double floatingPointArg)
+                {
+                    castedArgs[i] = BitConverter.UInt32BitsToSingle((uint)(BitConverter.DoubleToUInt64Bits(floatingPointArg)));
+                }
+                else if (castedArgs[i] is nuint nuintArg)
+                {
+                    castedArgs[i] = BitConverter.UInt32BitsToSingle((uint)nuintArg);
+                }
+            }
+            if (tramp.Target.ArgTypes[i] == "double")
+            {
+                if (castedArgs[i] is nuint nuintArg)
+                {
+                    castedArgs[i] = BitConverter.UInt64BitsToDouble(nuintArg);
+                }
+            }
+        }
+
         // Call prefix hook
-        nuint retValue = 0;
-        bool skipOriginal = RunPatchInPosition(HarmonyPatchPosition.Prefix, tramp, args, ref retValue);
+        object tempRetValue = 0;
+        bool skipOriginal = RunPatchInPosition(HarmonyPatchPosition.Prefix, tramp, castedArgs, ref tempRetValue);
         if (!skipOriginal)
         {
-            retValue = 0;
+            tempRetValue = 0;
 
             // Call original method
             Delegate realMethod = DelegateStore.Real[tramp.GenerateMethodInfo];
-            object res = realMethod.DynamicInvoke(args);
-            if (res != null)
-                retValue = (nuint)res;
+            tempRetValue = realMethod.DynamicInvoke(args);
         }
 
         // Call postfix hook
-        RunPatchInPosition(HarmonyPatchPosition.Postfix, tramp, args, ref retValue);
+        RunPatchInPosition(HarmonyPatchPosition.Postfix, tramp, castedArgs, ref tempRetValue);
 
-        return retValue;
+        nuint finalRetVal = 0;
+        if (tempRetValue is nuint nuintVal2)
+            finalRetVal = nuintVal2;
+        if (tempRetValue is double doubleVal2)
+            finalRetVal = (nuint)BitConverter.DoubleToUInt64Bits(doubleVal2);
+        if (tempRetValue is float floatVal2)
+            finalRetVal = (nuint)BitConverter.SingleToUInt32Bits(floatVal2);
+
+        return finalRetVal;
     }
 
 
     /// <returns>Boolean indicating 'skipOriginal'</returns>
-    static bool RunPatchInPosition(HarmonyPatchPosition position, DetouredFuncInfo hookedFunc, object[] args, ref nuint retValue)
+    static bool RunPatchInPosition(HarmonyPatchPosition position, DetouredFuncInfo hookedFunc, object[] args, ref object retValue)
     {
         if (args.Length == 0) throw new Exception("Bad arguments to unmanaged HookCallback. Expecting at least 1 (for 'this').");
 
@@ -187,32 +232,45 @@ public static class DetoursMethodGenerator
         object[] argsToForward = new object[args.Length - 1];
         for (int i = 0; i < argsToForward.Length; i++)
         {
-            nuint arg = (nuint)args[i + 1];
-
-            string argType = hookedFunc.Target.ArgTypes[i + 1];
-            if (argType == "char*" || argType == "char *")
+            if (args[i + 1] is nuint arg)
             {
-                if (arg != 0)
+                string argType = hookedFunc.Target.ArgTypes[i + 1];
+                if (argType == "char*" || argType == "char *")
                 {
-                    string cString = Marshal.PtrToStringAnsi(new IntPtr((long)arg));
-                    argsToForward[i] = new CharStar(arg, cString);
+                    if (arg != 0)
+                    {
+                        string cString = Marshal.PtrToStringAnsi(new IntPtr((long)arg));
+                        argsToForward[i] = new CharStar(arg, cString);
+                    }
+                    else
+                    {
+                        argsToForward[i] = arg;
+                    }
+                }
+                else if (argType.EndsWith('*'))
+                {
+                    // If the argument is a pointer, indicate it with a NativeObject
+                    // TODO: SecondClassTypeInfo is abused here
+                    string fixedArgType = argType[..^1].Trim();
+                    argsToForward[i] = new NativeObject(arg, new SecondClassTypeInfo(hookedFunc.DeclaringClass.ModuleName, fixedArgType));
                 }
                 else
                 {
+                    // Primitive or struct or something else crazy
                     argsToForward[i] = arg;
                 }
             }
-            else if (argType.EndsWith('*'))
+            else if (args[i + 1] is double doubleArg)
             {
-                // If the argument is a pointer, indicate it with a NativeObject
-                // TODO: SecondClassTypeInfo is abused here
-                string fixedArgType = argType[..^1].Trim();
-                argsToForward[i] = new NativeObject(arg, new SecondClassTypeInfo(hookedFunc.DeclaringClass.ModuleName, fixedArgType));
+                argsToForward[i] = doubleArg;
+            }
+            else if (args[i + 1] is float floatArg)
+            {
+                argsToForward[i] = floatArg;
             }
             else
             {
-                // Primitive or struct or something else crazy
-                argsToForward[i] = arg;
+                throw new Exception($"Unexpected argument type from generated detour hook. Expected nuint or double, got: {args[i + 1].GetType().FullName}, Arg Num: {i}");
             }
         }
 
@@ -246,11 +304,15 @@ public static class DetoursMethodGenerator
 
         if (retValModified)
         {
-            if (newRetVal is not nuint newNuintRetVal)
+            if (newRetVal.GetType().Equals(retValue.GetType()))
             {
-                throw new ArgumentException($"Return value from {position} hook was NOT an nuint. It was: {newRetVal}");
+                retValue = newRetVal;
             }
-            retValue = newNuintRetVal;
+            else
+            {
+                throw new ArgumentException($"New return value's type from {position} hook was NOT the same original. " +
+                    $"It was: {newRetVal.GetType()} instead of {retValue.GetType()}");
+            }
         }
 
         return skipOriginal;

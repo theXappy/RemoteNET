@@ -57,7 +57,7 @@ namespace RemoteNET
 
             foreach (TypesDump.TypeIdentifiers type in resutls.Types)
             {
-                yield return new CandidateType(RuntimeType.Unmanaged, type.FullTypeName, type.Assembly);
+                yield return new CandidateType(RuntimeType.Unmanaged, type.FullTypeName, type.Assembly, type.MethodTable);
             }
             _logger($"[QueryTypes] Enter with filter {typeFullNameFilter} -- DONE");
         }
