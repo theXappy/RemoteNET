@@ -483,11 +483,10 @@ namespace ScubaDiver
                     if (!typeFilterPredicate(type.FullName) && !typeFilterPredicate(type.Name))
                         continue;
 
-                    types.Add(new TypesDump.TypeIdentifiers()
-                    {
-                        Assembly = matchingAssembly.GetName().Name,
-                        FullTypeName = type.FullName
-                    });
+                    string assembly = matchingAssembly.GetName().Name;
+                    string fullTypeName = type.FullName;
+                    ulong? methodTable = null; // Not yet supported in DotNetDiver
+                    types.Add(new TypesDump.TypeIdentifiers(assembly, fullTypeName, methodTable));
                 }
             }
 

@@ -353,11 +353,12 @@ namespace ScubaDiver
 
                     // TODO: Extend to also look for a SPECIFIC import of some function of the queried type
 
-                    types.Add(new TypesDump.TypeIdentifiers()
-                    {
-                        Assembly = module.Name,
-                        FullTypeName = $"{module.Name}!{type.Name}"
-                    });
+                    string assembly = module.Name;
+                    string fullTypeName = $"{module.Name}!{type.Name}";
+                    ulong? methodTable = null;
+                    if (type is FirstClassTypeInfo firstClassType)
+                        methodTable = firstClassType.VftableAddress;
+                    types.Add(new TypesDump.TypeIdentifiers(assembly, fullTypeName, methodTable));
                 }
             }
 
