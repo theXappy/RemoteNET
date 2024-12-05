@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using TestTarget;
 
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
 namespace RemoteNET.Tests
 {
 
@@ -57,7 +58,7 @@ namespace RemoteNET.Tests
 
             // Act
             var app = RemoteAppFactory.Connect(target.Process, RuntimeType.Managed);
-            List<CandidateObject> candidates = null;
+            List<CandidateObject>? candidates = null;
             candidates = app.QueryInstances(typeof(TestClass)).ToList();
             var ro = app.GetRemoteObject(candidates.Single());
 
@@ -68,8 +69,8 @@ namespace RemoteNET.Tests
 
         private RemoteObject GetSingleTestObject(DisposableTarget target, out ManagedRemoteApp app)
         {
-            app = RemoteAppFactory.Connect(target.Process, RuntimeType.Managed) as ManagedRemoteApp;
-            List<CandidateObject> candidates = null;
+            app = (ManagedRemoteApp)RemoteAppFactory.Connect(target.Process, RuntimeType.Managed);
+            List<CandidateObject>? candidates = null;
             candidates = app.QueryInstances(typeof(TestClass)).ToList();
             var ro = app.GetRemoteObject(candidates.Single());
             return ro;
@@ -202,3 +203,4 @@ namespace RemoteNET.Tests
         }
     }
 }
+#pragma warning restore CS8602 // Dereference of a possibly null reference.

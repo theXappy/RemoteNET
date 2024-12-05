@@ -13,6 +13,9 @@ using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.Rtti;
 
+#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
 namespace RemoteNET.Tests
 {
     [TestFixture]
@@ -244,7 +247,7 @@ namespace RemoteNET.Tests
         {
             // Arrange
             ScubaDiver.Rtti.ModuleInfo module = new ModuleInfo("libPeek_lies.dll", 0xaabbccdd, 0xaabbccdd);
-            DllExport export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
+            DllExport? export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
                 .Single(c => c.GetParameters().Length == 5).Invoke(new object?[]
                 {
                     "?ApplyBinary@Parent@Peek@@UEAA_NPEAEIHMHHH@Z", 1, 0xbbccddee, "a", "b"
@@ -252,19 +255,19 @@ namespace RemoteNET.Tests
             export.TryUndecorate(module, out var undecFunc);
             TypeDump.TypeMethod? func = VftableParser.ConvertToTypeMethod(undecFunc as UndecoratedFunction);
             string childTypeLongName = "Peek::Child";
-            TypeDump typeDump = new TypeDump()
+            TypeDump? typeDump = new TypeDump()
             {
                 Type = childTypeLongName,
                 Assembly = "libPeek_lies.dll"
             };
-            RemoteRttiType childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
-            RemoteApp fakeApp = new FakeRemoteApp();
+            RemoteRttiType? childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
+            RemoteApp? fakeApp = new FakeRemoteApp();
 
             // Act
             RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump, func, childType, false);
 
             // Assert
-            MethodInfo method = childType.GetMethods().Single();
+            MethodInfo? method = childType.GetMethods().Single();
             string decTypeLongName = $"{method.DeclaringType.Namespace}::{method.DeclaringType.Name}";
             Assert.That(childTypeLongName, Is.EqualTo(decTypeLongName));
         }
@@ -275,7 +278,7 @@ namespace RemoteNET.Tests
         {
             // Arrange
             ScubaDiver.Rtti.ModuleInfo module = new ModuleInfo("libPeek_lies.dll", 0xaabbccdd, 0xaabbccdd);
-            DllExport export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
+            DllExport? export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
                 .Single(c => c.GetParameters().Length == 5).Invoke(new object?[]
                 {
                     "?Construct@Child@Peek@@QEAA_NPEBVString@2@@Z", 1, 0xbbccddee, "a", "b"
@@ -283,19 +286,19 @@ namespace RemoteNET.Tests
             export.TryUndecorate(module, out var undecFunc);
             TypeDump.TypeMethod? func = VftableParser.ConvertToTypeMethod(undecFunc as UndecoratedFunction);
             string childTypeLongName = "Peek::Child";
-            TypeDump typeDump = new TypeDump()
+            TypeDump? typeDump = new TypeDump()
             {
                 Type = childTypeLongName,
                 Assembly = "libPeek_lies.dll"
             };
-            RemoteRttiType childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
-            RemoteApp fakeApp = new FakeRemoteApp();
+            RemoteRttiType? childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
+            RemoteApp? fakeApp = new FakeRemoteApp();
 
             // Act
             RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump, func, childType, false);
 
             // Assert
-            MethodInfo method = childType.GetMethods().Single();
+            MethodInfo? method = childType.GetMethods().Single();
             string decTypeLongName = $"{method.DeclaringType.Namespace}::{method.DeclaringType.Name}";
             Assert.That(childTypeLongName, Is.EqualTo(decTypeLongName));
             Assert.That(childType, Is.EqualTo(method.DeclaringType));
@@ -307,7 +310,7 @@ namespace RemoteNET.Tests
         {
             // Arrange
             ScubaDiver.Rtti.ModuleInfo module = new ModuleInfo("libPeek_lies.dll", 0xaabbccdd, 0xaabbccdd);
-            DllExport export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
+            DllExport? export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
                 .Single(c => c.GetParameters().Length == 5).Invoke(new object?[]
                 {
                     "??0WClass@Peek@@QEAA@AEBV01@@Z", 1, 0xbbccddee, "a", "b"
@@ -328,7 +331,7 @@ namespace RemoteNET.Tests
         {
             // Arrange
             ScubaDiver.Rtti.ModuleInfo module = new ModuleInfo("libPeek_lies.dll", 0xaabbccdd, 0xaabbccdd);
-            DllExport export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
+            DllExport? export = typeof(DllExport).GetConstructors((BindingFlags)0xffff)
                 .Single(c => c.GetParameters().Length == 5).Invoke(new object?[]
                 {
                     "??0WClass@Peek@@QEAA@AEBV01@@Z", 1, 0xbbccddee, "a", "b"
@@ -337,13 +340,13 @@ namespace RemoteNET.Tests
             export.TryUndecorate(module, out var undecFunc);
             TypeDump.TypeMethod? func = VftableParser.ConvertToTypeMethod(undecFunc as UndecoratedFunction);
             string childTypeLongName = "Peek::WClass";
-            TypeDump typeDump = new TypeDump()
+            TypeDump? typeDump = new TypeDump()
             {
                 Type = childTypeLongName,
                 Assembly = "libPeek_lies.dll"
             };
-            RemoteRttiType childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
-            RemoteApp fakeApp = new FakeRemoteApp();
+            RemoteRttiType? childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
+            RemoteApp? fakeApp = new FakeRemoteApp();
 
             // Act
             RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump, func, childType, false);
@@ -354,3 +357,6 @@ namespace RemoteNET.Tests
         }
     }
 }
+#pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
