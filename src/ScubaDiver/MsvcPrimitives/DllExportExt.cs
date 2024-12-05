@@ -1,11 +1,11 @@
-﻿using NtApiDotNet;
-using NtApiDotNet.Win32;
+﻿using NtApiDotNet.Win32;
 using ScubaDiver.Rtti;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using ScubaDiver.Demangle.Demangle;
 using ScubaDiver.Demangle.Demangle.Core.Serialization;
+using Microsoft.Extensions.Primitives;
 
 namespace ScubaDiver;
 
@@ -46,11 +46,11 @@ public static class DllExportExt
 
         if (isFunc)
         {
-            Lazy<(string, string[])> lazyArgs = new Lazy<(string, string[])>(() =>
+            Lazy<DemangledSignature> lazyArgs = new Lazy<DemangledSignature>(() =>
             {
                 SerializedType sig;
                 if (input.Name.FirstOrDefault() != '?')
-                    return (null, null);
+                    return DemangledSignature.Empty;
                 try
                 {
                     var parser = new MsMangledNameParser(input.Name);
@@ -59,36 +59,50 @@ public static class DllExportExt
                 catch (Exception)
                 {
                     //Logger.Debug($"Failed to demangle name of function, Raw: {input.Name}, Exception: " + ex.Message);
-                    return (null, null);
+                    return DemangledSignature.Empty;
                 }
 
                 if (sig is not SerializedSignature serSig)
                 {
                     // Failed to parse?!?
                     //Logger.Debug($"Failed to parse arguments of function, Raw: {input.Name}");
-                    return (null, null);
+                    return DemangledSignature.Empty;
                 }
 
 
                 List<RestarizedParameter> restParameters;
                 RestarizedParameter resRetType;
+                bool isRetNonRefStruct;
                 try
                 {
                     restParameters = TypesRestarizer.RestarizeParameters(serSig);
                     resRetType = TypesRestarizer.RestarizeArgument(serSig.ReturnValue);
+
+                    // Non-ref return values are stringified to "arg(some_struct_name)"
+                    // Logic below looks for this pattern.
+                    string retValueToString = serSig.ReturnValue.ToString();
+                    // Removing "arg(" and ")";
+                    retValueToString = retValueToString.Substring("arg(".Length, retValueToString.Length - 5);
+                    isRetNonRefStruct = !retValueToString.Contains('(') && retValueToString != "void";
                 }
                 catch
                 {
                     // Failed to parse?!?
                     Logger.Debug(
                         $"[TypesRestarizer.RestarizeParameters] Failed to parse arguments of function, Raw: {input.Name}");
-                    return (null, null);
+                    return DemangledSignature.Empty;
                 }
 
 
                 string[] argTypes = restParameters.Select(param => param.FriendlyName).ToArray();
                 string retType = resRetType.FriendlyName;
-                return (retType, argTypes);
+
+                return new DemangledSignature
+                {
+                    ArgTypes = argTypes,
+                    RetType = retType,
+                    IsRetNonRefStruct = isRetNonRefStruct,
+                };
             });
 
             output = new UndecoratedExportedFunc(className, undecoratedName, undecoratedFullName, lazyArgs, input, module);

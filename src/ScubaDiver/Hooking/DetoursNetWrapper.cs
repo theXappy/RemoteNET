@@ -30,13 +30,8 @@ public class DetoursNetWrapper
             // Can't read num of arguments, fuck it.
             return false;
         }
-        DetoursMethodGenerator.DetouredFuncInfo tramp;
-        Type retType = typeof(nuint);
-        if (methodToHook.RetType == "float")
-            retType = typeof(float);
-        if (methodToHook.RetType == "double")
-            retType = typeof(double);
-        tramp = DetoursMethodGenerator.GetOrCreateMethod(typeInfo, methodToHook, retType, methodToHook.DecoratedName);
+
+        DetoursMethodGenerator.DetouredFuncInfo tramp = DetoursMethodGenerator.GetOrCreateMethod(typeInfo, methodToHook, methodToHook.DecoratedName);
         switch (hookPosition)
         {
             case HarmonyPatchPosition.Prefix:

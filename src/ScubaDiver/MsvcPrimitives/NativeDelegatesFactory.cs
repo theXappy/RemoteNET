@@ -862,7 +862,10 @@ public static class NativeDelegatesFactory
                 // Floating-point arguments are only important up to the 4th args (= 4th bit)
                 floatsBitmap &= 0x0f;
             }
-            delegateTypeName += $"_f{floatsBitmap}";
+            if (floatsBitmap != 0)
+            {
+                delegateTypeName += $"_f{floatsBitmap}";
+            }
         }
         return typeof(FuncVoidArgs0).DeclaringType!.GetNestedType(delegateTypeName, (BindingFlags)0xffff);
     }

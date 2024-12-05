@@ -71,8 +71,16 @@ public static class DetoursMethodGenerator
         _trampolines.Remove(generatedMethodName);
     }
 
-    public static DetouredFuncInfo GetOrCreateMethod(TypeInfo targetType, UndecoratedFunction targetMethod, Type retType, string generatedMethodName)
+    public static DetouredFuncInfo GetOrCreateMethod(TypeInfo targetType, UndecoratedFunction targetMethod, string generatedMethodName)
     {
+        // Floating point return value are the only "special" cases because they 
+        // aren't returned in rax, but in xmm0.
+        Type retType = typeof(nuint);
+        if (targetMethod.RetType == "float")
+            retType = typeof(float);
+        if (targetMethod.RetType == "double")
+            retType = typeof(double);
+
         DetouredFuncInfo detouredFuncInfo;
 
         string key = $"{targetType.ModuleName}!{generatedMethodName}";
