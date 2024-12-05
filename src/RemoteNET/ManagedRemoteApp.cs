@@ -94,7 +94,6 @@ namespace RemoteNET
 
         private Process _procWithDiver;
         private DiverCommunicator _managedCommunicator;
-        private DomainsDump _managedDomains;
         private readonly ManagedRemoteApp.RemoteObjectsCollection _remoteObjects;
 
         private RemoteHookingManager _hookingManager;
@@ -242,21 +241,11 @@ namespace RemoteNET
         public override bool InjectAssembly(string path)
         {
             bool res = _managedCommunicator.InjectAssembly(path);
-            if (res)
-            {
-                // Re-setting the cached domains because otherwise we won't
-                // see our newly injected module
-                _managedDomains = null;
-            }
             return res;
         }
         public override bool InjectDll(string path)
         {
             bool res = _managedCommunicator.InjectDll(path);
-            if (res)
-            {
-                _managedDomains = null;
-            }
             return res;
         }
 
