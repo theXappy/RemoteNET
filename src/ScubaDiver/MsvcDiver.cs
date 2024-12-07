@@ -485,9 +485,6 @@ namespace ScubaDiver
                 IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module).ToList();
                 foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
                 {
-#pragma warning disable CS0168 // Variable is declared but never used
-                    UndecoratedSymbol vftable;
-#pragma warning restore CS0168 // Variable is declared but never used
                     List<TypeDump.TypeField> fields = new();
                     List<TypeDump.TypeMethod> methods = new();
                     List<TypeDump.TypeMethod> constructors = new();
