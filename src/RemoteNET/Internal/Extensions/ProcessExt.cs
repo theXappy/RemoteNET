@@ -213,28 +213,25 @@ namespace RemoteNET.Internal.Extensions
 
             switch (hostPolicyVersionInfo?.ProductMajorPart)
             {
+                case 9:
+                    return "net9.0-windows";
                 case 8:
                     return "net8.0-windows";
-
                 case 7:
                     return "net7.0-windows";
-
                 case 6:
                     return "net6.0-windows";
-
                 case 5:
                     return "net5.0-windows";
 
                 case 3 when hostPolicyVersionInfo.ProductMinorPart >= 1:
                     return "netcoreapp3.1";
-
                 case 3:
                     return "netcoreapp3.0";
 
                 default:
                     throw new NotSupportedException($"Unsupported .NET version: {hostPolicyVersionInfo.ProductMajorPart}. Please file a bug report.");
             }
-
         }
 
         public static bool IsUwpApp(this Process process)

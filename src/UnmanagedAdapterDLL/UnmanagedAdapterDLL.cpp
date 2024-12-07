@@ -31,6 +31,7 @@ enum FrameworkType ParseFrameworkType(const std::wstring& framework)
 		|| icase_cmp(framework, L"net6.0-windows")
 		|| icase_cmp(framework, L"net7.0-windows")
 		|| icase_cmp(framework, L"net8.0-windows")
+		|| icase_cmp(framework, L"net9.0-windows")
 		|| icase_cmp(framework, L"native")
 		)
 	{
@@ -136,6 +137,9 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 			&result);
 
 		DebugOut(L"[UnmanagedAdapter] ExecuteInDefaultAppDomain(...) returned %d\n", hr);
+		if (hr == 0x80070002 && frameworkType == FrameworkType::NET_FRAMEWORK) {
+			DebugOut(L"[UnmanagedAdapter] %d (0x%x) for .NET FRAMEWORK. Is this a newly relesaed .NET version and Unmanaged Adapter was not updated for it?", hr, hr);
+		}
 	}
 	else {
 		msgboxf("[UnmanagedAdapter] could not spawn CLR\n");
