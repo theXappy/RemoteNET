@@ -18,7 +18,8 @@ namespace RemoteNET
         private Process _procWithDiver;
         public Process Process => _procWithDiver;
 
-        public RemoteActivator Activator => throw new NotImplementedException("Not yet");
+        RemoteActivator _activator;
+        public override RemoteActivator Activator => _activator;
 
         private DiverCommunicator _unmanagedCommunicator;
         private readonly RemoteAppsHub _hub;
@@ -36,6 +37,7 @@ namespace RemoteNET
             _hookingManager = new RemoteHookingManager(this);
             if (hub.TryGetValue(RuntimeType.Managed, out RemoteApp managedApp) && managedApp is ManagedRemoteApp castedManagedApp)
                 Marshal = new RemoteMarshal(castedManagedApp);
+            _activator = new UnmanagedRemoteActivator(this);
         }
 
         //
@@ -155,7 +157,7 @@ namespace RemoteNET
             }
             catch (Exception e)
             {
-                throw new Exception("Could not dump remote object/type.", e);
+                throw new AggregateException("Could not dump remote object/type.", e);
             }
 
 

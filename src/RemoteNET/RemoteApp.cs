@@ -10,6 +10,8 @@ public abstract class RemoteApp : IDisposable
     public abstract DiverCommunicator Communicator { get; }
     public abstract RemoteHookingManager HookingManager { get; }
     public abstract RemoteMarshal Marshal { get; }
+    public abstract RemoteActivator Activator { get; }
+
 
     public abstract IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter);
 

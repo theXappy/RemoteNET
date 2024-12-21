@@ -38,7 +38,7 @@ namespace RemoteNET
                 }
                 catch (Exception e)
                 {
-                    throw new Exception("Could not dump remote object/type.", e);
+                    throw new AggregateException("Could not dump remote object/type.", e);
                 }
 
 
@@ -101,7 +101,8 @@ namespace RemoteNET
 
 
         public Process Process => _procWithDiver;
-        public RemoteActivator Activator { get; private set; }
+        ManagedRemoteActivator _activator;
+        public override RemoteActivator Activator => _activator;
         public override RemoteMarshal Marshal { get; }
 
         public override DiverCommunicator Communicator => _managedCommunicator;
@@ -110,7 +111,7 @@ namespace RemoteNET
         {
             _procWithDiver = procWithDiver;
             _managedCommunicator = managedCommunicator;
-            Activator = new RemoteActivator(managedCommunicator, this);
+            _activator = new ManagedRemoteActivator(managedCommunicator, this);
             Marshal = new RemoteMarshal(this);
             _hookingManager = new RemoteHookingManager(this);
             _remoteObjects = new ManagedRemoteApp.RemoteObjectsCollection(this);
