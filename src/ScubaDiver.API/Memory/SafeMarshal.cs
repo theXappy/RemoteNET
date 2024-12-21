@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Drawing;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ScubaDiver.API.Memory
@@ -15,6 +17,14 @@ namespace ScubaDiver.API.Memory
         public static IntPtr AllocHGlobal(int cb)
         {
             return Marshal.AllocHGlobal(cb);
+        }
+
+        public static IntPtr AllocHGlobalZero(int cb)
+        {
+            IntPtr ptr = Marshal.AllocHGlobal(cb);
+            for (int i = 0; i < cb; i++)
+                Marshal.WriteByte(ptr, 0x00);
+            return ptr;
         }
 
         public static void FreeHGlobal(IntPtr hglobal)

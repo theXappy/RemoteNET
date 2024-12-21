@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using ScubaDiver.API.Memory;
@@ -10,6 +10,7 @@ public class RemoteMarshal
     private readonly ManagedRemoteApp _app;
     private readonly Type _remoteMarshalType;
     private readonly MethodInfo _remoteAlloc;
+    private readonly MethodInfo _remoteAllocZero;
     private readonly MethodInfo _remoteFree;
     private readonly MethodInfo _remoteWrite;
     private readonly MethodInfo _remoteRead;
@@ -19,16 +20,23 @@ public class RemoteMarshal
     {
         _app = app;
         _remoteMarshalType = _app.GetRemoteType(typeof(SafeMarshal));
-        _remoteAlloc = _remoteMarshalType.GetMethod(nameof(AllocHGlobal), (BindingFlags)0xffff, new[] { typeof(int) });
-        _remoteFree = _remoteMarshalType.GetMethod(nameof(FreeHGlobal), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
-        _remoteWrite = _remoteMarshalType.GetMethod(nameof(Copy), (BindingFlags)0xffff, new[] { typeof(byte[]), typeof(int), typeof(IntPtr), typeof(int) });
-        _remoteRead = _remoteMarshalType.GetMethod(nameof(Copy), (BindingFlags)0xffff, new[] { typeof(IntPtr), typeof(byte[]), typeof(int), typeof(int) });
-        _remotePtrToStringAnsi = _remoteMarshalType.GetMethod(nameof(PtrToStringAnsi), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
+        _remoteAlloc = _remoteMarshalType.GetMethod(nameof(SafeMarshal.AllocHGlobal), (BindingFlags)0xffff, new[] { typeof(int) });
+        _remoteAllocZero = _remoteMarshalType.GetMethod(nameof(SafeMarshal.AllocHGlobalZero), (BindingFlags)0xffff, new[] { typeof(int) });
+        _remoteFree = _remoteMarshalType.GetMethod(nameof(SafeMarshal.FreeHGlobal), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
+        _remoteWrite = _remoteMarshalType.GetMethod(nameof(SafeMarshal.Copy), (BindingFlags)0xffff, new[] { typeof(byte[]), typeof(int), typeof(IntPtr), typeof(int) });
+        _remoteRead = _remoteMarshalType.GetMethod(nameof(SafeMarshal.Copy), (BindingFlags)0xffff, new[] { typeof(IntPtr), typeof(byte[]), typeof(int), typeof(int) });
+        _remotePtrToStringAnsi = _remoteMarshalType.GetMethod(nameof(SafeMarshal.PtrToStringAnsi), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
     }
 
     public IntPtr AllocHGlobal(int cb)
     {
         object results = _remoteAlloc.Invoke(obj: null, new object[1] { cb });
+        return (IntPtr)results;
+    }
+
+    public IntPtr AllocHGlobalZero(int cb)
+    {
+        object results = _remoteAllocZero.Invoke(obj: null, new object[1] { cb });
         return (IntPtr)results;
     }
 
