@@ -24,7 +24,6 @@ namespace ScubaDiver
             lock (_lock)
             {
                 _frozenItemsToDestructors.Add(objAddress, new List<TypeInfo>());
-                Logger.Debug($"[MsvcFrozenItemsCollection][INFO] Address 0x{objAddress:X16} added to dict.");
 
                 _gc.Pin(objAddress, RegisterDestructor);
 

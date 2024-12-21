@@ -57,7 +57,6 @@ namespace ScubaDiver
 
             Predicate<string> assemblyFilterPredicate = Filter.CreatePredicate(assemblyFilter);
 
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcHookModuleResponse)} IN!");
             if (_offensiveGC == null)
             {
                 if (_tricksterWrapper.RefreshRequired())
@@ -67,11 +66,10 @@ namespace ScubaDiver
             }
 
             List<UndecoratedModule> undecoratedModules = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate);
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcHookModuleResponse)} Initialization GC");
             try
             {
                 _offensiveGC.HookModules(undecoratedModules);
-                foreach(UndecoratedModule module in undecoratedModules)
+                foreach (UndecoratedModule module in undecoratedModules)
                 {
                     _offensiveGC.HookAllFreeFuncs(module, _tricksterWrapper.GetUndecoratedModules());
                 }
@@ -81,7 +79,6 @@ namespace ScubaDiver
                 Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcHookModuleResponse)} Exception: " + e);
             }
 
-            Logger.Debug($"[{nameof(MsvcDiver)}] {nameof(MakeGcHookModuleResponse)} OUT!");
             return "{\"status\":\"ok\"}";
         }
         protected string MakeGcStatsResponse(ScubaDiverMessage req)
@@ -204,9 +201,9 @@ namespace ScubaDiver
             if (vftable != null)
             {
 
-                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(), 
-                    module, 
-                    _exportsMaster.GetUndecoratedExports(module).ToList(), 
+                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(),
+                    module,
+                    _exportsMaster.GetUndecoratedExports(module).ToList(),
                     vftable.Address);
 
                 // Remove duplicates - the methods which are both virtual and exported.
@@ -311,7 +308,7 @@ namespace ScubaDiver
                 Logger.Debug($"Unexpected non native ret value of hooked method. Type: {retValue.GetType().FullName}");
                 throw new Exception($"Unexpected non native argument to hooked method. Type: {retValue.GetType().FullName}");
             }
-            
+
 
             // Call callback at controller
             InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, retValueOora, remoteParams);
@@ -789,9 +786,7 @@ namespace ScubaDiver
                 ulong pinningAddress = objAddr;
                 if (pinningRequested)
                 {
-                    Logger.Debug($"[MsvcDiver][MakeObjectResponse] Pinning object at 0x{objAddr}");
                     pinningAddress = _freezer.Pin(objAddr);
-                    Logger.Debug($"[MsvcDiver][MakeObjectResponse] Pinned object at 0x{objAddr}");
                 }
 
                 ObjectDump od = new ObjectDump()
@@ -816,7 +811,6 @@ namespace ScubaDiver
 
         protected override string MakeInvokeResponse(ScubaDiverMessage arg)
         {
-            Logger.Debug("[MsvcDiver] Got /Invoke request!");
             string body = arg.Body;
             if (string.IsNullOrEmpty(body))
             {
@@ -846,13 +840,11 @@ namespace ScubaDiver
             List<object> paramsList = new();
             if (request.Parameters.Any())
             {
-                Logger.Debug($"[MsvcDiver] Invoking with parameters. Count: {request.Parameters.Count}");
                 paramsList = request.Parameters.Select(ParseParameterObject).ToList();
             }
             else
             {
                 // No parameters.
-                Logger.Debug("[MsvcDiver] Invoking without parameters");
             }
 
             // Search the method/ctor with the matching signature
@@ -875,7 +867,6 @@ namespace ScubaDiver
             }
             TypeDump.TypeMethod method = overloads.Single();
 
-            Logger.Debug($"[MsvcDiver] Getting RTTI info objects from TypeFullName: {request.TypeFullName}");
             ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
             var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
             ModuleInfo module = modulesAndTypes.Keys.Single();
@@ -883,11 +874,7 @@ namespace ScubaDiver
 
             List<UndecoratedFunction> typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, typeInfo.Name).ToList();
             UndecoratedFunction targetMethod = typeFuncs.SingleOrDefault(m => m.DecoratedName == method.DecoratedName);
-            if (targetMethod != null)
-            {
-                Logger.Debug($"[MsvcDiver] FOUND the target function: {targetMethod}");
-            }
-            else
+            if (targetMethod == null)
             {
                 // Extend search to other types (this method might be inherited and hence found under another type's name.
                 // Turning `namespace::class::func` to `namespace::class`
@@ -898,7 +885,7 @@ namespace ScubaDiver
                 targetMethod = typeFuncs.SingleOrDefault(m => m.DecoratedName == method.DecoratedName);
                 if (targetMethod != null)
                 {
-                    Logger.Debug($"[MsvcDiver] FOUND the target function in PARENT type: {targetMethod}");
+                    // Found the target function is a PARENT type!
                 }
                 else
                 {
@@ -920,33 +907,46 @@ namespace ScubaDiver
             //
             // Prepare parameters
             //
-            Logger.Debug($"[MsvcDiver] Invoking {targetMethod} with 1 arg ('this'): 0x{objAddress:x16}");
             object[] invocationArgs = new object[method.Parameters.Count];
             invocationArgs[0] = objAddress;
             for (int i = 0; i < paramsList.Count; i++)
             {
-                Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Decoding parameter #{i} (skipping 'this').");
                 var decodedParam = paramsList[i];
-                Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Decoded parameter #{i}, Is Null: {decodedParam == null}");
-                nuint nuintParam = 0;
-                if (decodedParam != null)
+                if (decodedParam is float || decodedParam is double)
                 {
-                    Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Decoded parameter #{i}, Result Managed Type: {decodedParam?.GetType().Name}");
-                    Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Casting parameter #{i} to nuint");
-                    nuintParam = (nuint)(Convert.ToUInt64(decodedParam));
+                    double doubleParam = (double)Convert.ToDouble(decodedParam);
+                    invocationArgs[i + 1] = doubleParam;
                 }
+                else
+                {
+                    nuint nuintParam = 0;
+                    if (decodedParam != null)
+                    {
+                        nuintParam = (nuint)(Convert.ToUInt64(decodedParam));
+                    }
 
-                invocationArgs[i + 1] = nuintParam;
-                Logger.Debug($"[MsvcDiver] Invoking {targetMethod}, Done with parameter #{i}");
+                    invocationArgs[i + 1] = nuintParam;
+                }
             }
 
             //
             // Invoke target
             //
-            nuint? results;
+            bool resIsDouble = false;
+            nuint? resultsNuint = null;
+            double? resultsDouble = null;
             try
             {
-                results = methodPtr.DynamicInvoke(invocationArgs) as nuint?;
+                object resultsObj = methodPtr.DynamicInvoke(invocationArgs);
+                if (resultsObj is double)
+                {
+                    resultsDouble = (double)resultsObj;
+                    resIsDouble = true;
+                }
+                else
+                {
+                    resultsNuint = resultsObj as nuint?;
+                }
             }
             catch (Exception ex)
             {
@@ -954,25 +954,26 @@ namespace ScubaDiver
                 throw new AggregateException(ex);
             }
 
-            Logger.Debug("[MakeInvokeResponse] SUCCESS. Target didn't throw an exception.");
-
             //
             // Prepare invocation results for response
             //
             TypeDump returnTypeDump = null;
-            if (targetMethod.RetType.Contains("::") && /*Is a pointer */ targetMethod.RetType.EndsWith("*"))
+            if (!resIsDouble)
             {
-                string normalizedRetType = method.ReturnTypeName[..^1]; // Remove '*' suffix
-                returnTypeDump = GetRttiType(normalizedRetType);
+                if (targetMethod.RetType.Contains("::") && /*Is a pointer */ targetMethod.RetType.EndsWith("*"))
+                {
+                    string normalizedRetType = method.ReturnTypeName[..^1]; // Remove '*' suffix
+                    returnTypeDump = GetRttiType(normalizedRetType);
+                }
             }
 
             InvocationResults invocResults;
             // Need to return the results. If it's primitive we'll encode it
             // If it's non-primitive we pin it and send the address.
             ObjectOrRemoteAddress returnValue;
-            if (returnTypeDump == null || results is null or 0)
+            if (returnTypeDump == null || resultsNuint is null or 0)
             {
-                if (returnTypeDump != null || results == null)
+                if (returnTypeDump != null || resultsNuint == null)
                 {
                     // This is a null pointer
                     returnValue = ObjectOrRemoteAddress.Null;
@@ -980,40 +981,36 @@ namespace ScubaDiver
                 else
                 {
                     // This is (probably) not a pointer. Hopefully just a primitive.
-                    returnValue = ObjectOrRemoteAddress.FromObj(results);
+                    if (resIsDouble)
+                        returnValue = ObjectOrRemoteAddress.FromObj(resultsDouble);
+                    else
+                        returnValue = ObjectOrRemoteAddress.FromObj(resultsNuint);
                 }
             }
             else
             {
-                Logger.Debug($"[MsvcDiver] Invoking {targetMethod} result with a not-null OBJECT address");
-
-                // Pinning results TODO
                 string normalizedRetType = targetMethod.RetType;
-                // Remove ' *' suffix, if exists
-                normalizedRetType = normalizedRetType.EndsWith('*') ? normalizedRetType[..^1] : normalizedRetType;
-                normalizedRetType = normalizedRetType.TrimEnd(' ');
+                // Remove a single '*' suffix, if exists.
+                // Example: "int*" -> "int"
+                // But Also: "int**" -> "int*"
+                if (normalizedRetType.EndsWith('*')) {
+                    normalizedRetType = normalizedRetType[..^1];
+                    normalizedRetType = normalizedRetType.TrimEnd(' ');
+                }
 
-                Logger.Debug(
-                    $"[MsvcDiver] Trying to result the type of the returned object. Normalized return type from signature: {normalizedRetType}");
                 ParseFullTypeName(normalizedRetType, out string retTypeRawAssemblyFilter, out string retTypeRawTypeFilter);
 
-
-                Logger.Debug($"Dumping vftable (8 bytes) at the results address: 0x{results.Value:x16}");
                 // TODO: Wrong for x86
-                long vftable = Marshal.ReadInt64(new IntPtr((long)results.Value));
-                Logger.Debug($"vftable: {vftable:x16}");
-                Logger.Debug("Trying to resolve vftable to type...");
+                long vftable = Marshal.ReadInt64(new IntPtr((long)resultsNuint.Value));
                 Rtti.TypeInfo retTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
-                Logger.Debug($"Trying to resolve vftable to type... Got back: {retTypeInfo}");
 
                 if (retTypeInfo != null)
                 {
-                    returnValue = ObjectOrRemoteAddress.FromToken(results.Value, retTypeInfo.FullTypeName);
+                    returnValue = ObjectOrRemoteAddress.FromToken(resultsNuint.Value, retTypeInfo.FullTypeName);
                 }
                 else
                 {
-                    Logger.Debug("FAILED to resolve vftable to type. returning as nuint.");
-                    returnValue = ObjectOrRemoteAddress.FromObj(results);
+                    returnValue = ObjectOrRemoteAddress.FromObj(resultsNuint);
                 }
             }
 

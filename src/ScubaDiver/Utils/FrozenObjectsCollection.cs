@@ -83,8 +83,6 @@ public class FrozenObjectsCollection
             object[] objs = _frozenObjects.Keys.Concat(new object[] { o }).ToArray();
             PinInternal(objs);
 
-            Logger.Debug($"[{nameof(FrozenObjectsCollection)}] Pinned another object. Num Pinned: {_frozenObjects.Count}");
-
             return _frozenObjects[o];
         }
     }
@@ -122,13 +120,11 @@ public class FrozenObjectsCollection
 
             // Making sure that adress was even in the dictionary.
             // Otherwise, we don't need to re-pin all objects.
-            Logger.Debug($"[{nameof(FrozenObjectsCollection)}] Unpinning another object. New Num Pinned: {objs.Length}");
             if (objs.Length == _frozenObjects.Count)
                 return false;
 
             PinInternal(objs);
 
-            Logger.Debug($"[{nameof(FrozenObjectsCollection)}] Unpinned another object. Final Num Pinned: {_frozenObjects.Count}");
             return true;
         }
     }

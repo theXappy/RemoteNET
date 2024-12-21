@@ -67,7 +67,6 @@ public static class VftableParser
             return virtualMethods;
         }
 
-        Logger.Debug($"[AnalyzeVftable] Next vftable not found starting at 0x{vftableAddress:X16}");
         return new();
 
         bool IsVftableAddress(nuint addr)
