@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using ScubaDiver.API.Memory;
@@ -48,7 +48,7 @@ public class RemoteMarshal
     public void Copy(byte[] source, int startIndex, IntPtr destination, int length)
     {
         // The byte array is encoded entirely and sent to the diver.
-        _remoteWrite.Invoke(obj: null, new object[4] { source, startIndex, destination, length });
+        _remoteWrite.Invoke(obj: null, [source, startIndex, destination, length]);
     }
 
     public void Write(byte[] source, int startIndex, IntPtr destination, int length)
@@ -70,6 +70,13 @@ public class RemoteMarshal
 
     public void Read(IntPtr source, byte[] destination, int startIndex, int length)
         => Copy(source, destination, startIndex, length);
+
+    public byte[] Read(IntPtr source, int length)
+    {
+        byte[] output = new byte[length];
+        Read(source, output, 0, length);
+        return output;
+    }
 
     public string PtrToStringAnsi(IntPtr ptr)
     {
