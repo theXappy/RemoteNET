@@ -868,7 +868,6 @@ namespace ScubaDiver
         }
         protected override string MakeCreateObjectResponse(ScubaDiverMessage arg)
         {
-            Logger.Debug("[DotNetDiver] Got /create_object request!");
             if (string.IsNullOrEmpty(arg.Body))
                 return QuickError("Missing body");
             var request = JsonConvert.DeserializeObject<CtorInvocationRequest>(arg.Body);
@@ -886,13 +885,11 @@ namespace ScubaDiver
             List<object> paramsList = new();
             if (request.Parameters.Any())
             {
-                Logger.Debug($"[DotNetDiver] Ctor'ing with parameters. Count: {request.Parameters.Count}");
                 paramsList = request.Parameters.Select(ParseParameterObject).ToList();
             }
             else
             {
                 // No parameters.
-                Logger.Debug("[DotNetDiver] Ctor'ing without parameters");
             }
 
             object createdObject;
@@ -942,7 +939,6 @@ namespace ScubaDiver
 
         protected override string MakeInvokeResponse(ScubaDiverMessage arg)
         {
-            Logger.Debug("[DotNetDiver] Got /Invoke request!");
             string body = arg.Body;
 
             if (string.IsNullOrEmpty(body))
@@ -1026,13 +1022,11 @@ namespace ScubaDiver
             List<object> paramsList = new();
             if (request.Parameters.Any())
             {
-                Logger.Debug($"[DotNetDiver] Invoking with parameters. Count: {request.Parameters.Count}");
                 paramsList = request.Parameters.Select(ParseParameterObject).ToList();
             }
             else
             {
                 // No parameters.
-                Logger.Debug("[DotNetDiver] Invoking without parameters");
             }
 
             // Infer parameter types from received parameters.
@@ -1051,7 +1045,6 @@ namespace ScubaDiver
             }
 
             string argsSummary = string.Join(", ", argumentTypes.Select(arg => arg.Name));
-            Logger.Debug($"[DotNetDiver] Resolved method: {method.Name}({argsSummary}), Containing Type: {method.DeclaringType}");
 
             object results = null;
             try
@@ -1059,7 +1052,6 @@ namespace ScubaDiver
                 argsSummary = string.Join(", ", paramsList.Select(param => param?.ToString() ?? "null"));
                 if (string.IsNullOrEmpty(argsSummary))
                     argsSummary = "No Arguments";
-                Logger.Debug($"[DotNetDiver] Invoking {method.Name} with those args (Count: {paramsList.Count}): `{argsSummary}`");
                 HarmonyWrapper.Instance.AllowFrameworkThreadToTrigger(Thread.CurrentThread.ManagedThreadId);
                 results = method.Invoke(instance, paramsList.ToArray());
             }
@@ -1449,7 +1441,6 @@ namespace ScubaDiver
             {
                 return QuickError("Missing parameter 'address'");
             }
-            Logger.Debug($"[DotNetDiver][Debug](Unpin) objAddrStr={objAddr:X16}");
 
             // Check if we have this objects in our pinned pool
             if (_freezer.TryGetPinnedObject(objAddr, out _))
