@@ -187,6 +187,8 @@ namespace RemoteNET.Tests
             public override RemoteHookingManager HookingManager { get; }
             public override RemoteMarshal Marshal { get; }
 
+            public override RemoteActivator Activator => throw new NotImplementedException();
+
             public override IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter)
             {
                 var cands = new CandidateType[]

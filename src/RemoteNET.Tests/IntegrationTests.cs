@@ -177,7 +177,7 @@ namespace RemoteNET.Tests
             var app = RemoteAppFactory.Connect(target.Process, RuntimeType.Managed) as ManagedRemoteApp;
 
             // Act
-            ManagedRemoteObject res = app.Activator.CreateInstance(typeof(StringBuilder));
+            ManagedRemoteObject res = app.Activator.CreateInstance(typeof(StringBuilder)) as ManagedRemoteObject;
 
             // Assert
             Assert.That(res, Is.Not.Null);
@@ -193,7 +193,7 @@ namespace RemoteNET.Tests
             dynamic dro = ro.Dynamify();
 
             // Act
-            ManagedRemoteObject stringBuilderParameter = app.Activator.CreateInstance(typeof(StringBuilder));
+            ManagedRemoteObject stringBuilderParameter = app.Activator.CreateInstance(typeof(StringBuilder)) as ManagedRemoteObject;
             dro.TestMethod3(stringBuilderParameter);
             string res = stringBuilderParameter.Dynamify().ToString();
 
