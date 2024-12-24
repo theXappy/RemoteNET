@@ -12,6 +12,8 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
         private NetworkStream _netStream;
         private Task _reader;
         private Task _writer;
+        private ManualResetEvent _readerReady;
+        private bool _isReaderAlive;
         private ConcurrentDictionary<string, AutoResetEvent> _autoResetEvents;
         private ConcurrentDictionary<string, HttpResponseSummary> _responses;
         private BlockingCollection<HttpRequestSummary> _requests;
@@ -31,6 +33,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
             _requests = new BlockingCollection<HttpRequestSummary>();
             _nextId = 5;
 
+            _readerReady = new ManualResetEvent(false);
             _reader = Task.Run(DoRead);
             _writer = Task.Run(DoWrite);
         }
@@ -45,6 +48,8 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 
         private void DoRead()
         {
+            _isReaderAlive = true;
+            _readerReady.Set();
             while (true)
             {
                 HttpResponseSummary resp = null;
@@ -79,6 +84,8 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
                 are.Set();
             }
 
+            _isReaderAlive = false;
+
             // Signal all reset event to allow waiting Sender threads to realize the connection broke.
             foreach (AutoResetEvent item in _autoResetEvents.Values)
             {
@@ -88,6 +95,11 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 
         public HttpResponseSummary Send(HttpRequestSummary request)
         {
+            if (!_readerReady.WaitOne(TimeSpan.FromSeconds(10)))
+                throw new Exception("Reader didn't start in 10 seconds.");
+            if (!_isReaderAlive)
+                throw new Exception("Can't send HTTP request, HTTP reader is dead. This indicates the connection dropped.");
+
             AutoResetEvent are = new AutoResetEvent(false);
             string myId = Interlocked.Increment(ref _nextId).ToString();
             request.QueryString.Add("requestId", myId);
@@ -99,7 +111,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
             // Wait for response
             are.WaitOne();
             if (!_responses.TryRemove(myId, out HttpResponseSummary val))
-                throw new Exception("AutoResetEvent was signaled but a resposnes wasn't found in the responses dict.");
+                throw new Exception("AutoResetEvent was signaled but a resposne wasn't found in the responses dict.");
 
             return val;
         }
