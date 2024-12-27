@@ -30,7 +30,7 @@ There are 2 ways to get the library:
 5. `mkdir detours_build`
 6. `cd detours_build`
 7. `cmake ..\detours.net`
-8. `msbuild ALL_BUILD.vcxproj`
+8. `msbuild /t:restore,build ALL_BUILD.vcxproj`
 9. Open `RemoteNET.sln` in Visual Studio
 10. Compile the RemoteNET project
 
