@@ -25,9 +25,6 @@
     }
 
 
-
-
-
 #define EXPORT __declspec(dllexport)
 
 #define INITIAL_SIZE 10
@@ -35,13 +32,6 @@
 void** trackedAddresses = NULL;
 size_t trackedCount = 0;
 size_t arraySize = INITIAL_SIZE;
-
-// Pointer to the original free function
-void (*OriginalFree)(void* ptr) = NULL;
-// Pointer to the original "_free" function
-void (*Original_free)(void* ptr) = NULL;
-// Pointer to the original "_free_dbg" function
-void (*Original_free_dbg)(void* ptr) = NULL;
 
 // ----------------
 // Address Tracking
@@ -51,17 +41,27 @@ void (*Original_free_dbg)(void* ptr) = NULL;
 void GrowArrayIfNeeded() {
     if (trackedCount >= arraySize) {
         arraySize *= 2;
-        trackedAddresses = (void**)realloc(trackedAddresses, arraySize * sizeof(void*));
+        void** temp = (void**)realloc(trackedAddresses, arraySize * sizeof(void*));
+        if (temp == NULL) {
+            // Handle memory allocation failure
+            msgboxf("Memory allocation failed while growing the array.");
+            return;
+        }
+        trackedAddresses = temp;
     }
 }
 
-// Exported method to add an address to the tracking list
 EXPORT void AddAddress(void* address) {
     if (!trackedAddresses) {
         trackedAddresses = (void**)malloc(arraySize * sizeof(void*));
+        if (!trackedAddresses) {
+            // Handle memory allocation failure
+            msgboxf("Memory allocation failed while initializing the array.");
+            return;
+        }
     }
     GrowArrayIfNeeded();
-    trackedAddresses[trackedCount++] = address;
+	trackedAddresses[trackedCount++] = address;
 }
 
 // Exported method to remove an address from the tracking list
@@ -85,7 +85,7 @@ void* originalFreeFunctions[MAX_HOOKS] = { nullptr };
 
 // Macro to define the hook function for each index
 // garbgeOrDebugArg is an ugly hack to support both free/_free (1 argument) and _free_dbg (2 arguments)
-// I'm risking violating the stack and this only works because both my function and the calles use `cdecl`
+// I'm risking violating the stack and this only works because both my function and the callees use `cdecl`
 #define DEFINE_HOOK_FOR_FREE(index) \
     EXPORT void HookForFree##index(void* ptr, void* garbgeOrDebugArg) { \
         debugf("[mogHelper] HookForFree"#index" called for ptr = %p\n", ptr); \
@@ -99,7 +99,7 @@ void* originalFreeFunctions[MAX_HOOKS] = { nullptr };
         if (originalFreeFunctions[index] != nullptr) { \
             reinterpret_cast<void(*)(void*, void*)>(originalFreeFunctions[index])(ptr, garbgeOrDebugArg); \
         } else { \
-            debugf("[mogHelper][ERROR] HookForFree"#index" could not free ptr = %p because OriginalFree func ptr was null...\n", ptr); \
+            debugf("[mogHelper][ERROR] HookForFree"#index" could not free ptr = %p because originalFreeFunctions["#index"] func ptr was null...\n", ptr); \
         } \
     }
 
@@ -166,7 +166,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         trackedAddresses = NULL;
         trackedCount = 0;
         arraySize = INITIAL_SIZE;
-        OriginalFree = NULL;
         break;
     case DLL_PROCESS_DETACH:
         if (trackedAddresses) {

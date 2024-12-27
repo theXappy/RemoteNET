@@ -132,32 +132,36 @@ namespace ScubaDiver
             _alreadyHookedModules.AddRange(modules);
         }
 
-        public void HookAllFreeFuncs(UndecoratedModule target, List<UndecoratedModule> allModules)
+        public void HookAllFreeFuncs(UndecoratedModule targetUndecoratedModule, List<UndecoratedModule> allModules)
         {
             // Make sure our C++ Helper is loaded before accessing anything from the `MsvcOffensiveGcHelper` class
-            // otherwise the loading the P/Invoke methods will fail on "Failed to load DLL.
+            // otherwise the loading the P/Invoke methods will fail on "Failed to load DLL".
             System.Reflection.Assembly assm = typeof(MsvcOffensiveGC).Assembly;
             string assmDir = System.IO.Path.GetDirectoryName(assm.Location);
             string helperPath = System.IO.Path.Combine(assmDir, "MsvcOffensiveGcHelper.dll");
-            var res = PInvoke.LoadLibrary(helperPath);
+            FreeLibrarySafeHandle res = PInvoke.LoadLibrary(helperPath);
+            if (res.IsInvalid)
+            {
+                throw new Exception($"LoadLibrary failed for {helperPath}");
+            }
 
             int attemptedFreeFuncs = 0;
             foreach (string funcName in new[] { "free", "_free", "_free_dbg" })
             {
                 // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook '{funcName}'s...");
-                Dictionary<ModuleInfo, DllExport> funcs = FreeFinder.Find(allModules, funcName);
-                if (funcs.Count == 0)
+                Dictionary<ModuleInfo, DllExport> freeExportedFunctions = FreeFinder.Find(allModules, funcName);
+                if (freeExportedFunctions.Count == 0)
                 {
-                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
                     continue;
                 }
-                if (funcs.Count > 1)
+                if (freeExportedFunctions.Count > 1)
                 {
-                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " +string.Join(", ", funcs.Keys.Select(a => a.Name).ToArray()));
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " + string.Join(", ", freeExportedFunctions.Keys.Select(a => a.Name).ToArray()));
                 }
-                foreach (var kvp in funcs)
+                foreach (var moduleToFreeExport in freeExportedFunctions)
                 {
-                    DllExport freeFunc = kvp.Value;
+                    DllExport freeFunc = moduleToFreeExport.Value;
                     // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Chose '{funcName}' from {kvp.Key.Name}");
 
                     // Find out native replacement function for the given func name
@@ -166,7 +170,7 @@ namespace ScubaDiver
                     // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking '{funcName}' at 0x{freeFunc.Address:X16} (from {kvp.Key.Name}), " +
                         //$"in the IAT of {target.Name}. " +
                         //$"Replacement Address: 0x{replacementPtr:X16}");
-                    ModuleInfo targetModule = target.ModuleInfo;
+                    ModuleInfo targetModule = targetUndecoratedModule.ModuleInfo;
                     bool replacementRes = Loader.HookIAT((IntPtr)(ulong)targetModule.BaseAddress, (IntPtr)freeFunc.Address, replacementPtr);
 
 
