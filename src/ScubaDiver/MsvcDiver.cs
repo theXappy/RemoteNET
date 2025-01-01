@@ -813,6 +813,7 @@ namespace ScubaDiver
 
         protected override string MakeInvokeResponse(ScubaDiverMessage arg)
         {
+            Console.WriteLine($"[{nameof(MsvcDiver)}] MakeInvokeResponse Entered (!)");
             string body = arg.Body;
             if (string.IsNullOrEmpty(body))
             {

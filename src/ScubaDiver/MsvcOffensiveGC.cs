@@ -209,7 +209,7 @@ namespace ScubaDiver
                 //}
 
                 // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Looking for {operatorNewName} in {module.Name}");
-                if (module.TryGetUndecoratedTypelessFunc(operatorNewName, out var methodGroup))
+                if (module.TryGetUndecoratedTypelessFunc(operatorNewName, out UndecoratedMethodGroup methodGroup))
                 {
                     // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] FOUND {operatorNewName} in {module.Name}");
                     tempList.AddRange(methodGroup);
