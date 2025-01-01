@@ -84,6 +84,9 @@ namespace RemoteNET.RttiReflection
                 switch (obj)
                 {
                     // obj is NOT null. Make sure it's a RemoteObject.
+                    case DynamicUnmanagedRemoteObject dro:
+                        (hasResults, oora) = (dro.__ro as UnmanagedRemoteObject).InvokeMethod(funcName, remoteParams);
+                        break;
                     case UnmanagedRemoteObject ro:
                         (hasResults, oora) = ro.InvokeMethod(funcName, remoteParams);
                         break;

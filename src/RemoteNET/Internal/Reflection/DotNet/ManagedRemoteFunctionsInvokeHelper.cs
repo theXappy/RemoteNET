@@ -22,7 +22,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             {
                 return ObjectOrRemoteAddress.FromObj(parameter);
             }
-            else if (parameter is ManagedRemoteObject remoteArg)
+            else if (parameter is RemoteObject remoteArg)
             {
                 return ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetRemoteType().FullName);
             }
