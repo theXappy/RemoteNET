@@ -88,14 +88,11 @@ void* originalFreeFunctions[MAX_HOOKS] = { nullptr };
 // I'm risking violating the stack and this only works because both my function and the callees use `cdecl`
 #define DEFINE_HOOK_FOR_FREE(index) \
     EXPORT void HookForFree##index(void* ptr, void* garbgeOrDebugArg) { \
-        debugf("[mogHelper] HookForFree"#index" called for ptr = %p\n", ptr); \
         for (size_t i = 0; i < trackedCount; ++i) { \
             if (trackedAddresses[i] == ptr) { \
-                debugf("[mogHelper] HookForFree"#index" ptr = %p found in list! Not freeing\n", ptr); \
                 return; /* Do not free */ \
             } \
         } \
-        debugf("[mogHelper] HookForFree"#index" ptr = %p not in list! Freeing\n", ptr); \
         if (originalFreeFunctions[index] != nullptr) { \
             reinterpret_cast<void(*)(void*, void*)>(originalFreeFunctions[index])(ptr, garbgeOrDebugArg); \
         } else { \
