@@ -124,10 +124,22 @@ namespace ScubaDiver
                 var windowsProcessDataReader = _dt?.DataReader;
                 int? pid = windowsProcessDataReader?.ProcessId;
 
-                _runtime?.Dispose();
-                _runtime = null;
-                _dt?.Dispose();
-                _dt = null;
+                try
+                {
+                    _runtime?.Dispose();
+                }
+                finally
+                {
+                    _runtime = null;
+                }
+                try
+                {
+                    _dt?.Dispose();
+                }
+                finally
+                {
+                    _dt = null;
+                }
 
                 if (pid != null)
                 {
