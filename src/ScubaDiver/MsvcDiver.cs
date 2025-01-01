@@ -91,6 +91,8 @@ namespace ScubaDiver
         }
 
         private List<SafeHandle> _injectedDlls = new();
+        private IEqualityComparer<string> TypesComparer = new ParameterNamesComparer();
+
         protected override string MakeInjectDllResponse(ScubaDiverMessage req)
         {
             string dllPath = req.QueryString.Get("dll_path");
@@ -215,7 +217,7 @@ namespace ScubaDiver
             var overloads = allFuncs.Where(method => method.UndecoratedName == methodName);
             // Find the specific overload with the right argument types
             UndecoratedFunction methodToHook = overloads.SingleOrDefault(method =>
-                method.ArgTypes.Skip(1).SequenceEqual(request.ParametersTypeFullNames));
+                method.ArgTypes.Skip(1).SequenceEqual(request.ParametersTypeFullNames, TypesComparer));
 
             if (methodToHook == null)
             {

@@ -32,24 +32,25 @@
 		<Compile Include="..\Utils\UnifiedAppDomain.cs" Link="Utils\UnifiedAppDomain.cs" />
 		<Compile Include="..\MsvcPrimitives\DemangledSignature.cs" Link="MsvcPrimitives\DemangledSignature.cs" />
 		<Compile Include="..\MsvcPrimitives\DllExportExt.cs" Link="MsvcPrimitives\DllExportExt.cs" />
+		<Compile Include="..\MsvcPrimitives\ExportsMaster.cs" Link="MsvcPrimitives\ExportsMaster.cs" />
+		<Compile Include="..\MsvcPrimitives\IReadOnlyExportsMaster.cs" Link="MsvcPrimitives\IReadOnlyExportsMaster.cs" />
+		<Compile Include="..\MsvcPrimitives\LRUCache.cs" Link="MsvcPrimitives\LRUCache.cs" />
+		<Compile Include="..\MsvcPrimitives\MsvcOffensiveGcHelper.cs" Link="MsvcPrimitives\MsvcOffensiveGcHelper.cs" />
+		<Compile Include="..\MsvcPrimitives\NativeDelegatesFactory.cs" Link="MsvcPrimitives\NativeDelegatesFactory.cs" />
+		<Compile Include="..\MsvcPrimitives\NativeObject.cs" Link="MsvcPrimitives\NativeObject.cs" />
+		<Compile Include="..\MsvcPrimitives\ParameterNamesComparer.cs" Link="MsvcPrimitives\ParameterNamesComparer.cs" />
 		<Compile Include="..\MsvcPrimitives\RttiScanner.cs" Link="MsvcPrimitives\RttiScanner.cs" />
 		<Compile Include="..\MsvcPrimitives\Trickster.cs" Link="MsvcPrimitives\Trickster.cs" />
 		<Compile Include="..\MsvcPrimitives\TricksterSearchHelper.cs" Link="MsvcPrimitives\TricksterSearchHelper.cs" />
+		<Compile Include="..\MsvcPrimitives\TricksterWrapper.cs" Link="MsvcPrimitives\TricksterWrapper.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedExport.cs" Link="MsvcPrimitives\UndecoratedExport.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedExportedField.cs" Link="MsvcPrimitives\UndecoratedExportedField.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedFunction.cs" Link="MsvcPrimitives\UndecoratedFunction.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedInternalFunction.cs" Link="MsvcPrimitives\UndecoratedInternalFunction.cs" />
-		<Compile Include="..\MsvcPrimitives\VftableParser.cs" Link="MsvcPrimitives\VftableParser.cs" />
-		<Compile Include="..\MsvcPrimitives\NativeDelegatesFactory.cs" Link="MsvcPrimitives\NativeDelegatesFactory.cs" />
-		<Compile Include="..\MsvcPrimitives\ExportsMaster.cs" Link="MsvcPrimitives\ExportsMaster.cs" />
-		<Compile Include="..\MsvcPrimitives\IReadOnlyExportsMaster.cs" Link="MsvcPrimitives\IReadOnlyExportsMaster.cs" />
-		<Compile Include="..\MsvcPrimitives\LRUCache.cs" Link="MsvcPrimitives\LRUCache.cs" />
-		<Compile Include="..\MsvcPrimitives\NativeObject.cs" Link="MsvcPrimitives\NativeObject.cs" />
-		<Compile Include="..\MsvcPrimitives\MsvcOffensiveGcHelper.cs" Link="MsvcPrimitives\MsvcOffensiveGcHelper.cs" />
-		<Compile Include="..\MsvcPrimitives\TricksterWrapper.cs" Link="MsvcPrimitives\TricksterWrapper.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedMethodGroup.cs" Link="MsvcPrimitives\UndecoratedMethodGroup.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedModule.cs" Link="MsvcPrimitives\UndecoratedModule.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedType.cs" Link="MsvcPrimitives\UndecoratedType.cs" />
+		<Compile Include="..\MsvcPrimitives\VftableParser.cs" Link="MsvcPrimitives\VftableParser.cs" />
 		<Compile Include="..\MsvcDiver.cs" />
 		<Compile Include="..\MsvcFrozenItemsCollection.cs" />
 		<Compile Include="..\MsvcOffensiveGC.cs" />
