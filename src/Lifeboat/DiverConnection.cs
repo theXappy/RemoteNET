@@ -32,7 +32,7 @@ namespace Lifeboat
                 HttpResponseSummary resp = null;
                 try
                 {
-                    resp = SimpleHttpProtocolParser.ReadResponse(TcpClient.GetStream());
+                    resp = SimpleHttpProtocolParser.ReadResponse(TcpClient.GetStream(), CancellationToken.None);
                 }
                 catch (IOException)
                 {

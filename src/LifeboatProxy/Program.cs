@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Net;
 using System.Threading.Tasks;
 using ScubaDiver.API.Protocol.SimpleHttp;
+using System.Threading;
 
 namespace LifeboatProxy
 {
@@ -56,7 +57,7 @@ namespace LifeboatProxy
             SimpleHttpProtocolParser.WriteRequest(targetClient.GetStream(), r);
             Console.WriteLine($"Forwarded request: {requestUrl}");
 
-            HttpResponseSummary? resp = SimpleHttpProtocolParser.ReadResponse(targetClient.GetStream());
+            HttpResponseSummary? resp = SimpleHttpProtocolParser.ReadResponse(targetClient.GetStream(), CancellationToken.None);
             if (resp == null)
                 throw new Exception("Response is NULL");
             byte[] respBody = resp.Body;

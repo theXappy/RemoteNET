@@ -10,7 +10,10 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
     {
         private TcpClient _client;
         private NetworkStream _netStream;
+
+        private CancellationTokenSource _readerCancellationTokenSource;
         private Task _reader;
+        private CancellationTokenSource _writerCancellationTokenSource;
         private Task _writer;
         private ManualResetEvent _readerReady;
         private bool _isReaderAlive;
@@ -34,8 +37,10 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
             _nextId = 5;
 
             _readerReady = new ManualResetEvent(false);
-            _reader = Task.Run(DoRead);
-            _writer = Task.Run(DoWrite);
+            _readerCancellationTokenSource = new CancellationTokenSource();
+            _reader = Task.Run(DoRead, _readerCancellationTokenSource.Token);
+            _writerCancellationTokenSource = new CancellationTokenSource();
+            _writer = Task.Run(DoWrite, _writerCancellationTokenSource.Token);
         }
 
         private void DoWrite()
@@ -48,14 +53,16 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 
         private void DoRead()
         {
+            CancellationToken token = _readerCancellationTokenSource.Token;
+
             _isReaderAlive = true;
             _readerReady.Set();
-            while (true)
+            while (!token.IsCancellationRequested)
             {
                 HttpResponseSummary resp = null;
                 try
                 {
-                    resp = SimpleHttpProtocolParser.Read<HttpResponseSummary>(_netStream);
+                    resp = SimpleHttpProtocolParser.Read<HttpResponseSummary>(_netStream, token);
                 }
                 catch
                 {
@@ -118,11 +125,15 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
 
         public void Dispose()
         {
+            try { _readerCancellationTokenSource.Cancel(); } catch { }
+            try { _writerCancellationTokenSource.Cancel(); } catch { }
             try { _client.Dispose(); } catch { }
             try { _netStream.Dispose(); } catch { }
+            try { _reader.Wait(TimeSpan.FromMilliseconds(200)); } catch { }
             try { _reader.Dispose(); } catch { }
-            try { _writer.Dispose(); } catch { }
             try { _requests.CompleteAdding(); } catch { }
+            try { _writer.Wait(TimeSpan.FromMilliseconds(200)); } catch { }
+            try { _writer.Dispose(); } catch { }
             try { _requests.Dispose(); } catch { }
         }
     }

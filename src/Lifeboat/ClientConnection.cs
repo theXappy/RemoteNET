@@ -29,7 +29,7 @@ namespace Lifeboat
             {
                 try
                 {
-                    HttpRequestSummary req = SimpleHttpProtocolParser.ReadRequest(_client.GetStream());
+                    HttpRequestSummary req = SimpleHttpProtocolParser.ReadRequest(_client.GetStream(), CancellationToken.None);
                     if (req == null)
                     {
                         break;

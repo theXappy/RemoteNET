@@ -4,18 +4,22 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace ScubaDiver.API.Protocol.SimpleHttp
 {
     public class SimpleHttpProtocolParser
     {
-        public static HttpRequestSummary? ReadRequest(NetworkStream networkStream) => Read<HttpRequestSummary>(networkStream);
-        public static HttpResponseSummary? ReadResponse(NetworkStream networkStream) => Read<HttpResponseSummary>(networkStream);
+        public static HttpRequestSummary? ReadRequest(NetworkStream networkStream, CancellationToken token) => Read<HttpRequestSummary>(networkStream, token);
+        public static HttpResponseSummary? ReadResponse(NetworkStream networkStream, CancellationToken token) => Read<HttpResponseSummary>(networkStream, token);
 
-        public static T Read<T>(NetworkStream networkStream)
+        public static T Read<T>(NetworkStream networkStream, CancellationToken token)
         {
             object res;
             MemoryStream memoryStream = new MemoryStream();
+
+            if (token.IsCancellationRequested)
+                throw new OperationCanceledException(token);
 
             ReadHttpMessageFromStream(networkStream, memoryStream);
             byte[] requestData = memoryStream.ToArray();
