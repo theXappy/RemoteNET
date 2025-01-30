@@ -51,7 +51,7 @@ public class RemoteHookingManager
     {
         // Wrapping the callback which uses `dynamic`s in a callback that handles `ObjectOrRemoteAddresses`
         // and converts them to DROs
-        LocalHookCallback wrappedHook = WrapCallback(hookAction);
+        LocalHookCallback wrappedHook = WrapCallback(_app, hookAction);
 
         // Look for MethodHooks object for the given REMOTE OBJECT
         if (!_callbacksToProxies.ContainsKey(methodToHook))
@@ -84,10 +84,15 @@ public class RemoteHookingManager
                 methodToHook.GetParameters().Select(prm => prm.ParameterType.FullName).ToList();
         }
 
-        return _app.Communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappedHook, parametersTypeFullNames);
+        return HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappedHook, parametersTypeFullNames);
     }
 
-    private LocalHookCallback WrapCallback(HookAction callback)
+    private bool HookMethod(string typeFullName, string methodName, HarmonyPatchPosition pos, LocalHookCallback wrappedHook, List<string> parametersTypeFullNames)
+    {
+        return _app.Communicator.HookMethod(typeFullName, methodName, pos, wrappedHook, parametersTypeFullNames);
+    }
+
+    public static LocalHookCallback WrapCallback(RemoteApp app, HookAction callback)
     {
         LocalHookCallback hookProxy = (HookContext context, ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args, ObjectOrRemoteAddress retValue) =>
         {
@@ -102,7 +107,7 @@ public class RemoteHookingManager
                 {
                     try
                     {
-                        RemoteObject roInstance = this._app.GetRemoteObject(oora);
+                        RemoteObject roInstance = app.GetRemoteObject(oora);
                         o = roInstance.Dynamify();
                     }
                     catch (Exception)

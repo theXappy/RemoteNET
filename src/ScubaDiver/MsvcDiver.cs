@@ -20,7 +20,7 @@ using System.Reflection;
 
 namespace ScubaDiver
 {
-    public class MsvcDiver : DiverBase
+    public partial class MsvcDiver : DiverBase
     {
         private TricksterWrapper _tricksterWrapper = null;
         private IReadOnlyExportsMaster _exportsMaster = null;
@@ -159,88 +159,7 @@ namespace ScubaDiver
             Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] DONE refreshing runtime. Num Modules: {_tricksterWrapper.GetModules().Count}");
         }
 
-        protected override Action HookFunction(FunctionHookRequest request, HarmonyWrapper.HookCallback patchCallback)
-        {
-            string rawTypeFilter = request.TypeFullName;
-            string methodName = request.MethodName;
-
-            ParseFullTypeName(rawTypeFilter, out var rawAssemblyFilter, out rawTypeFilter);
-            var modulesToTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
-            if (modulesToTypes.Count != 1)
-                QuickError($"Expected exactly 1 match for module, got {modulesToTypes.Count}");
-
-            ModuleInfo module = modulesToTypes.Keys.Single();
-            Rtti.TypeInfo[] typeInfos = modulesToTypes[module].ToArray();
-            if (typeInfos.Length != 1)
-                QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
-
-
-            Rtti.TypeInfo typeInfo;
-            try
-            {
-                typeInfo = typeInfos.Single();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message +
-                                    $".\n typeInfos: {String.Join(", ", typeInfos.Select(x => x.ToString()))}");
-            }
-
-            // Get all exported members of the requseted type
-            List<UndecoratedSymbol> members = _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name).ToList();
-
-            // Find the first vftable within all members
-            // (TODO: Bug? How can I tell this is the "main" vftable?)
-            UndecoratedSymbol vftable = members.FirstOrDefault(member => member.UndecoratedName.EndsWith("`vftable'"));
-
-            string hookPositionStr = request.HookPosition;
-            HarmonyPatchPosition hookPosition = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPositionStr);
-            if (!Enum.IsDefined(typeof(HarmonyPatchPosition), hookPosition))
-                throw new Exception("hook_position has an invalid or unsupported value");
-
-            List<UndecoratedFunction> exportedFuncs = members.OfType<UndecoratedFunction>().ToList();
-            List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
-            if (vftable != null)
-            {
-
-                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(),
-                    module,
-                    _exportsMaster.GetUndecoratedExports(module).ToList(),
-                    vftable.Address);
-
-                // Remove duplicates - the methods which are both virtual and exported.
-                virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
-            }
-            var allFuncs = exportedFuncs.Concat(virtualFuncs);
-
-            // Find all methods with the requested name
-            var overloads = allFuncs.Where(method => method.UndecoratedName == methodName);
-            // Find the specific overload with the right argument types
-            UndecoratedFunction methodToHook = overloads.SingleOrDefault(method =>
-                method.ArgTypes.Skip(1).SequenceEqual(request.ParametersTypeFullNames, TypesComparer));
-
-            if (methodToHook == null)
-            {
-                throw new Exception($"No matches for {methodName} in type {typeInfo}");
-            }
-
-            Logger.Debug("[MsvcDiver] Hook Method - Resolved Method");
-            Logger.Debug($"[MsvcDiver] Hooking function {methodName}...");
-
-
-
-            // TODO: Is "nuint" return type always right here?
-            DetoursNetWrapper.Instance.AddHook(typeInfo, methodToHook, patchCallback, hookPosition);
-            Logger.Debug($"[MsvcDiver] Hooked function {methodName}!");
-
-            Action unhook = (Action)(() =>
-            {
-                DetoursNetWrapper.Instance.RemoveHook(methodToHook, patchCallback);
-            });
-            return unhook;
-        }
-
-
+     
         /// <summary>
         /// 
         /// </summary>
@@ -329,17 +248,26 @@ namespace ScubaDiver
             Predicate<string> typeFilterPredicate = Filter.CreatePredicate(typeFilter);
 
             List<UndecoratedModule> matchingModules = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate).ToList();
+
+            // To narrow down matches, we might be given the "importer" module.
+            // We'd only proceed with modules that are imported into the importer module.
             if (importerModule != null)
             {
                 IReadOnlyList<DllImport> imports = _tricksterWrapper.ExportsMaster.GetImports(importerModule);
-                if (imports == null)
+                if (imports != null)
                 {
-                    // TODO: Something else where no modules could be found in the imports table??
-                    matchingModules = new List<UndecoratedModule>();
+                    // Module has imports.
+                    HashSet<string> importsNames = imports.Select(imp => imp.DllName).ToHashSet();
+
+                    // Compare imports list to all candidate modules (i.e., modules which matched the user's query)
+                    matchingModules = matchingModules.Where(m => importsNames.Contains(m.Name)).ToList();
                 }
                 else
                 {
-                    matchingModules = matchingModules.Where(module => IsImportedInto(module, imports)).ToList();
+                    // Module has no imports (?!)
+
+                    // TODO: Something else where no modules could be found in the imports table??
+                    matchingModules = new List<UndecoratedModule>();
                 }
             }
 
@@ -367,12 +295,6 @@ namespace ScubaDiver
                 Types = types
             };
             return JsonConvert.SerializeObject(dump);
-
-
-            bool IsImportedInto(UndecoratedModule module, IReadOnlyList<DllImport> imports)
-            {
-                return imports.Any(imp => imp.DllName == module.Name);
-            }
         }
 
         protected override string MakeTypeResponse(ScubaDiverMessage req)
