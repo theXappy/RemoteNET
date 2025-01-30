@@ -66,7 +66,7 @@ public class RnetReverseRequestsListener : IRequestsListener
             HttpRequestSummary.FromJson("/proxy_intro", new NameValueCollection(), "{\"role\":\"diver\"}");
         SimpleHttpProtocolParser.WriteRequest(client.GetStream(), intro);
 
-        var introResp = SimpleHttpProtocolParser.ReadResponse(client.GetStream());
+        var introResp = SimpleHttpProtocolParser.ReadResponse(client.GetStream(), CancellationToken.None);
         if (introResp == null || !introResp.BodyString.Contains("\"status\":\"OK\""))
             throw new Exception("Diver couldn't register at Lifeboat");
 
@@ -81,11 +81,9 @@ public class RnetReverseRequestsListener : IRequestsListener
         NetworkStream networkStream = client.GetStream();
         while (_bootstrapStayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
-            HttpRequestSummary request = SimpleHttpProtocolParser.ReadRequest(networkStream);
+            HttpRequestSummary request = SimpleHttpProtocolParser.ReadRequest(networkStream, CancellationToken.None);
             if (request == null)
-            {
                 continue;
-            }
 
             void RespondFunc(string body)
             {
@@ -101,7 +99,7 @@ public class RnetReverseRequestsListener : IRequestsListener
             ScubaDiverMessage req =
                 new ScubaDiverMessage(request.QueryString, request.Url, request.BodyString, RespondFunc);
 
-            RequestReceived?.Invoke(this, req);
+            Task.Run(() => RequestReceived?.Invoke(this, req));
         }
     }
 
@@ -176,7 +174,7 @@ public class RnetRequestsListener : IRequestsListener
     {
         while (_stayAlive.WaitOne(TimeSpan.FromMilliseconds(100)) && client.Connected)
         {
-            var request = SimpleHttpProtocolParser.ReadRequest(client.GetStream());
+            var request = SimpleHttpProtocolParser.ReadRequest(client.GetStream(), CancellationToken.None);
             if (request == null)
             {
                 // Connection closed

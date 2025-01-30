@@ -140,7 +140,7 @@ public class Program
             Log($"Waiting for diver...");
             TcpClient diverConnection = listener.AcceptTcpClient();
             Log($"Diver Suspect: {diverConnection.Client.RemoteEndPoint}");
-            HttpRequestSummary msg = SimpleHttpProtocolParser.ReadRequest(diverConnection.GetStream());
+            HttpRequestSummary msg = SimpleHttpProtocolParser.ReadRequest(diverConnection.GetStream(), CancellationToken.None);
             string id = msg.QueryString.Get("requestId") ?? "999";
             if (msg == null)
             {
