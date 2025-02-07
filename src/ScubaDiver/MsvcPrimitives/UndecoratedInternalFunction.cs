@@ -7,9 +7,9 @@ namespace ScubaDiver;
 public class UndecoratedInternalFunction : UndecoratedFunction
 {
     private ModuleInfo _module;
-    private long _address;
+    private nuint _address;
 
-    public override long Address => _address;
+    public override nuint Address => _address;
     public override ModuleInfo Module => _module;
 
     private string[] _argTypes;
@@ -18,8 +18,8 @@ public class UndecoratedInternalFunction : UndecoratedFunction
     public UndecoratedInternalFunction(
         string undecoratedName, 
         string undecoratedFullName, 
-        string decoratedName, 
-        long address, 
+        string decoratedName,
+        nuint address, 
         int numArgs, 
         ModuleInfo moduleInfo) 
         : base(decoratedName, undecoratedName, undecoratedFullName, numArgs)

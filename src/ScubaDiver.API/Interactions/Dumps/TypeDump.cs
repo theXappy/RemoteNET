@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace ScubaDiver.API.Interactions.Dumps
 {
-    [DebuggerDisplay("ManagedTypeDump of {" + nameof(Type) + "} (Assembly: {" + nameof(Assembly) + "})")]
+    [DebuggerDisplay("ManagedTypeDump of {" + nameof(FullTypeName) + "} (Assembly: {" + nameof(Assembly) + "})")]
     public class TypeDump
     {
         [DebuggerDisplay("{" + nameof(ReturnTypeName) + "} {" + nameof(Name) + "}(...)")]
@@ -88,6 +88,8 @@ namespace ScubaDiver.API.Interactions.Dumps
             public string ReturnTypeAssembly { get; set; }
             public string ReturnTypeName { get; set; }
             public bool IsReturnTypeGenericParameter { get; set; }
+            public bool IsInherited { get; set; }
+
 
             public TypeMethod()
             {
@@ -239,7 +241,7 @@ namespace ScubaDiver.API.Interactions.Dumps
             public long Address { get; set; }
         }
 
-        public string Type { get; set; }
+        public string FullTypeName { get; set; }
         public string Assembly { get; set; }
 
         public bool IsArray { get; set; }

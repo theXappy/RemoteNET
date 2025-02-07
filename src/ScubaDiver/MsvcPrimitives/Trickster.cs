@@ -11,6 +11,9 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Security.Cryptography;
+using ScubaDiver.Rtti;
+using ScubaDiver;
+using System.Drawing;
 // ReSharper disable UnusedMember.Global
 // ReSharper disable InconsistentNaming
 // ReSharper disable IdentifierTypo
@@ -24,15 +27,19 @@ public record struct FunctionInfo(string mangledName, nuint address);
 
 public abstract class TypeInfo
 {
-    public static TypeInfo Dummy = new SecondClassTypeInfo("DummyModule", "DummyType");
+    public static TypeInfo Dummy = new SecondClassTypeInfo("DummyModule", "DummyNamespace", "DummyType");
 
     public string ModuleName { get; }
+    public string Namespace { get; }
     public string Name { get; }
-    public string FullTypeName => $"{ModuleName}!{Name}";
+    public string NamespaceAndName => string.IsNullOrWhiteSpace(Namespace) ? $"{Name}" : $"{Namespace}::{Name}";
+    public string FullTypeName => $"{ModuleName}!{NamespaceAndName}";
 
-    protected TypeInfo(string moduleName, string name)
+    protected TypeInfo(string moduleName, string @namespace, string name)
     {
         ModuleName = moduleName;
+        if (!string.IsNullOrWhiteSpace(@namespace))
+            Namespace = @namespace;
         Name = name;
     }
 }
@@ -49,7 +56,7 @@ public class FirstClassTypeInfo : TypeInfo
     public List<nuint> XoredSecondaryVftableAddresses { get; }
     public IEnumerable<nuint> SecondaryVftableAddresses => XoredSecondaryVftableAddresses.Select(x => x ^ XorMask);
 
-    public FirstClassTypeInfo(string ModuleName, string Name, nuint VftableAddress, nuint Offset) : base(ModuleName, Name)
+    public FirstClassTypeInfo(string moduleName, string @namespace, string name, nuint VftableAddress, nuint Offset) : base(moduleName, @namespace, name)
     {
         XoredVftableAddress = VftableAddress ^ XorMask;
         this.Offset = Offset;
@@ -75,18 +82,18 @@ public class FirstClassTypeInfo : TypeInfo
 
 /// <summary>
 /// Information about a "Second-Class Type" - Types which don't have a full RTTI entry and, most importantly, a vftable.
-/// The existence of these types is inferred from export their export functions.
+/// The existence of these types is inferred from their exported functions.
 /// If none of the type's methods are exported, we might not know such a type even exists.
 /// </summary>
 public class SecondClassTypeInfo : TypeInfo
 {
-    public SecondClassTypeInfo(string ModuleName, string Name) : base(ModuleName, Name)
+    public SecondClassTypeInfo(string moduleName, string @namespace, string name) : base(moduleName, @namespace, name)
     {
     }
 
     public override string ToString()
     {
-        return $"{Name} (Second Class Type)";
+        return $"{FullTypeName} (Second Class Type)";
     }
 }
 
@@ -128,7 +135,7 @@ public unsafe class Trickster : IDisposable
 
     private bool _is32Bit;
 
-    public Dictionary<ModuleInfo, TypeInfo[]> ScannedTypes;
+    public Dictionary<ModuleInfo, List<TypeInfo>> ScannedTypes;
     public Dictionary<ModuleInfo, ModuleOperatorFunctions> OperatorNewFuncs;
     public MemoryRegion[] Regions;
 
@@ -160,7 +167,7 @@ public unsafe class Trickster : IDisposable
         _is32Bit = is32Bit;
     }
 
-    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(ModuleInfo module, List<ModuleSegment> segments, nuint segmentBaseAddress, nuint segmentBSize)
+    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(ModuleInfo module, List<ModuleSegment> segments, nuint segmentBaseAddress, nuint segmentSize)
     {
         List<TypeInfo> list = new();
 
@@ -172,22 +179,29 @@ public unsafe class Trickster : IDisposable
         using (RttiScanner processMemory = new(_processHandle, module.BaseAddress, module.Size, segments))
         {
             nuint inc = (nuint)(_is32Bit ? 4 : 8);
-            Func<ulong, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
-            for (nuint offset = inc; offset < segmentBSize; offset += inc)
+            Func<ulong, List<ModuleSegment>, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
+            for (nuint offset = inc; offset < segmentSize; offset += inc)
             {
                 nuint possibleVftableAddress = segmentBaseAddress + offset;
-                if (getClassName(possibleVftableAddress) is string className)
+                if (getClassName(possibleVftableAddress, segments) is string fullClassName)
                 {
                     // Avoiding names with the "BEL" control ASCII char specifically.
                     // The heuristic search in this method finds a lot of garbage, but this one is particularly 
                     // annoying because trying to print any type's "name" containing
                     // "BEL" to the console will trigger a *ding* sound.
-                    if (className.Contains('\a'))
+                    if (fullClassName.Contains('\a'))
                         continue;
 
-                    if (className == "type_info")
+                    if (fullClassName == "type_info")
                         typeInfoSeen = true;
-                    list.Add(new FirstClassTypeInfo(module.Name, className, possibleVftableAddress, offset));
+
+                    // split fullClassName into namespace and class name
+                    int lastIndexOfColonColon = fullClassName.LastIndexOf("::");
+                    // take into consideration that "::" might no be present at all, and the namespace is empty
+                    string namespaceName = lastIndexOfColonColon == -1 ? "" : fullClassName.Substring(0, lastIndexOfColonColon);
+                    string typeName = lastIndexOfColonColon == -1 ? fullClassName : fullClassName.Substring(lastIndexOfColonColon + 2);
+
+                    list.Add(new FirstClassTypeInfo(module.Name, namespaceName, typeName, possibleVftableAddress, offset));
                 }
             }
         }
@@ -195,51 +209,75 @@ public unsafe class Trickster : IDisposable
         return (typeInfoSeen, list);
     }
 
-    private Dictionary<ModuleInfo, TypeInfo[]> ScanTypesCore()
+    private Dictionary<ModuleInfo, List<TypeInfo>> ScanTypesCore()
     {
-        Dictionary<ModuleInfo, TypeInfo[]> res = new Dictionary<ModuleInfo, TypeInfo[]>();
+        Dictionary<ModuleInfo, List<TypeInfo>> res = new Dictionary<ModuleInfo, List<TypeInfo>>();
+        if (ScannedTypes != null)
+            res = ScannedTypes;
 
-        Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = GetAllModulesSegments();
+        Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = GetAllModulesSegments(res.Keys.ToList());
         foreach (KeyValuePair<ModuleInfo, List<ModuleSegment>> kvp in dataSegments)
         {
             ModuleInfo module = kvp.Key;
             List<ModuleSegment> segments = kvp.Value;
 
             bool typeInfoSeenInModule = false;
-            IEnumerable<TypeInfo> allModuleTypes = Array.Empty<TypeInfo>();
+            List<TypeInfo> allModuleTypes = new();
             foreach (ModuleSegment segment in segments)
             {
                 try
                 {
                     (bool typeInfoSeenInSeg, List<TypeInfo> types) = ScanTypesCore(module, segments, (nuint)segment.BaseAddress, (nuint)segment.Size);
+
                     typeInfoSeenInModule = typeInfoSeenInModule || typeInfoSeenInSeg;
-                    allModuleTypes = allModuleTypes.Concat(types);
+
+                    if (typeInfoSeenInModule)
+                    {
+                        if (allModuleTypes.Count == 0)
+                        {
+                            // optimized(?) - swap lists instead of copy
+                            allModuleTypes = types;
+                        }
+                        else
+                        {
+                            allModuleTypes.AddRange(types);
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[Error] Couldn't scan for RTTI info in {module.Name}, EX: " + ex.GetType().Name);
                 }
             }
+
             if (typeInfoSeenInModule && allModuleTypes.Any())
             {
-                if (!res.ContainsKey(module))
-                    res[module] = Array.Empty<TypeInfo>();
-                res[module] = res[module].Concat(allModuleTypes).ToArray();
+                if (res.ContainsKey(module))
+                {
+                    Logger.Debug("[ScanTypesCore] WTF module alraedy exists in final dictionary... ???");
+                }
+                res[module] = allModuleTypes;
             }
             else
             {
                 // No types in this module. Might just be non-MSVC one so we add a dummy
-                res[module] = Array.Empty<TypeInfo>();
+                res[module] = new List<TypeInfo>();
             }
         }
 
         return res;
 
-        Dictionary<ModuleInfo, List<ModuleSegment>> GetAllModulesSegments()
+        Dictionary<ModuleInfo, List<ModuleSegment>> GetAllModulesSegments(IReadOnlyList<ModuleInfo> skip)
         {
             Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
             foreach (ModuleInfo modInfo in UnmanagedModules)
             {
+                if (skip.Contains(modInfo))
+                {
+                    Logger.Debug($"Skipping {modInfo.Name} :)");
+                    continue;
+                }
+
                 List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
                 foreach (ModuleSegment moduleSegment in sections)
                 {
@@ -311,16 +349,28 @@ public unsafe class Trickster : IDisposable
 
     public IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegions(IEnumerable<nuint> xoredVftables, nuint xorMask = 0x00000000)
     {
-        return ScanRegionsCore2(Regions, xoredVftables, xorMask);
+        Logger.Debug("[ScanRegions] Fetching Regions for ScanRegionsCore2");
+        var regions = Regions;
+        Logger.Debug("[ScanRegions] Fetching Regions for ScanRegionsCore2 -- DONE");
+        var res = ScanRegionsCore2(Regions, xoredVftables, xorMask);
+        Logger.Debug("[ScanRegions] Returned from ScanRegionsCore2");
+        return res;
     }
 
     private void FreeRegionsCore(MemoryRegion[] regionArray)
     {
+        // Print call stack to find who called us
+        StackTrace stackTrace = new(true);
+        Logger.Debug($"[FreeRegionsCore] Called");
+
         for (int i = 0; i < regionArray.Length; i++)
         {
             CryptographicOperations.ZeroMemory(new Span<byte>(regionArray[i].Pointer, (int)regionArray[i].Size));
+            IntPtr intPtr = new(regionArray[i].Pointer);
+            //Logger.Debug($"[FreeRegionsCore] Freeing 0x{((ulong)intPtr):X16}");
             NativeMemory.Free(regionArray[i].Pointer);
         }
+        Logger.Debug("[FreeRegionsCore] Done freeing regions");
     }
     private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegion[] regionArray, IEnumerable<nuint> xoredVftables, nuint xorMask)
     {
@@ -402,6 +452,9 @@ public unsafe class Trickster : IDisposable
 
             foreach (ModuleSegment moduleSegment in sections)
             {
+                if (!moduleSegment.Name.ToUpperInvariant().Contains(".TEXT"))
+                    continue;
+
                 if (!dataSegments.ContainsKey(modInfo))
                     dataSegments.Add(modInfo, new List<ModuleSegment>());
 
@@ -421,7 +474,7 @@ public unsafe class Trickster : IDisposable
             {
                 try
                 {
-                    InnerCheckFunc(module.Name, module.BaseAddress, module.Size, 
+                    InnerCheckFunc(module.Name, module.BaseAddress, module.Size,
                         segments, (nuint)segment.BaseAddress, (nuint)segment.Size,
                         out List<nuint> newFuncs,
                         out List<nuint> deleteFuncs
@@ -436,36 +489,39 @@ public unsafe class Trickster : IDisposable
                 }
             }
         }
-
         return res;
+    }
 
 
-        void InnerCheckFunc(string moduleName, nuint moduleBaseAddress, nuint moduleSize,
+    public static readonly byte[] opNewEncodedFuncEpilouge_x64_rel = new byte[]
+    {
+            0x40, 0x53, 0x48, 0x83,
+            0xEC, 0x20, 0x48, 0x8B,
+            0xD9, 0xEB, 0x0F
+    };
+    public const ulong _first8bytes = 0x8B4820EC83485340;
+
+    void InnerCheckFunc(string moduleName, nuint moduleBaseAddress, nuint moduleSize,
             List<ModuleSegment> segments, nuint segmentBaseAddress, nuint segmentBSize,
             out List<nuint> operatorNewFuncs,
             out List<nuint> operatorDeleteFuncs)
+    {
+        operatorNewFuncs = new();
+        operatorDeleteFuncs = new();
+
+        byte[] tempData = new byte[opNewEncodedFuncEpilouge_x64_rel.Length];
+
+        using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize, segments))
         {
-            operatorNewFuncs = new();
-            operatorDeleteFuncs = new();
-
-            byte[] opNewEncodedFuncEpilouge_x64_rel = new byte[]
+            nuint inc = (nuint)IntPtr.Size;
+            for (nuint offset = inc; offset < segmentBSize; offset += inc)
             {
-                0x40, 0x53, 0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0xD9, 0xEB, 0x0F
-            };
-            byte[] tempData = new byte[opNewEncodedFuncEpilouge_x64_rel.Length];
-
-            using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize, segments))
-            {
-                nuint inc = (nuint)IntPtr.Size;
-                for (nuint offset = inc; offset < segmentBSize; offset += inc)
+                nuint address = segmentBaseAddress + offset;
+                if (!processMemory.TryRead<byte>(address, tempData))
+                    continue;
+                if (tempData.AsSpan().SequenceEqual(opNewEncodedFuncEpilouge_x64_rel.AsSpan()))
                 {
-                    nuint address = segmentBaseAddress + offset;
-                    if (!processMemory.TryRead<byte>(address, tempData))
-                        continue;
-                    if (tempData.SequenceEqual(opNewEncodedFuncEpilouge_x64_rel))
-                    {
-                        operatorNewFuncs.Add(address);
-                    }
+                    operatorNewFuncs.Add(address);
                 }
             }
         }
@@ -508,7 +564,7 @@ public class ModuleSegment
 
     public override string ToString()
     {
-        return string.Format("{0,-8}: 0x{1:X8} - 0x{2:X8} ({3} bytes)",
+        return string.Format("{0,-8}: 0x{1:X8} - 0x{2:X8} (0x{3:X8} bytes)",
             Name,
             BaseAddress,
             BaseAddress + Size,
@@ -558,7 +614,7 @@ static class ProcessModuleExtensions
         }
 
         // Read the DOS header from the module
-            IMAGE_DOS_HEADER dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(moduleHandle);
+        IMAGE_DOS_HEADER dosHeader = Marshal.PtrToStructure<IMAGE_DOS_HEADER>(moduleHandle);
 
         // Read the PE header from the module
         IntPtr peHeader = new IntPtr(moduleHandle.ToInt64() + dosHeader.e_lfanew);
@@ -577,10 +633,13 @@ static class ProcessModuleExtensions
 
             // Print the section details
 
+            // To nearest page boundary
+            uint alignment = (uint)ntHeaders.OptionalHeader.SectionAlignment;
+            uint roundedVirtualSize = (section.VirtualSize + alignment - 1) & ~(alignment - 1);
             output.Add(
                 new ModuleSegment(Encoding.ASCII.GetString(section.Name).TrimEnd('\0'),
                     (ulong)module.BaseAddress + section.VirtualAddress,
-                    section.VirtualSize));
+                    roundedVirtualSize));
         }
 
         return output;

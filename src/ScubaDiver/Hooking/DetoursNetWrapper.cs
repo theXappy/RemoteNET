@@ -81,7 +81,7 @@ public class DetoursNetWrapper
         // Fallback, Try directly with pointers
         Console.WriteLine($"[DetoursNetWrapper] Hooking with LoadLibrary + GetProcAddress failed, trying direct pointers. Target: {methodToHook.Module.Name}!{methodToHook.UndecoratedFullName}");
         IntPtr module = new IntPtr((long)methodToHook.Module.BaseAddress);
-        IntPtr targetFunc = new IntPtr(methodToHook.Address);
+        IntPtr targetFunc = new IntPtr((long)methodToHook.Address);
         success = Loader.HookMethod(module, targetFunc, tramp.DelegateType, tramp.GenerateMethodInfo, tramp.GeneratedDelegate);
 
         return success;
@@ -90,7 +90,7 @@ public class DetoursNetWrapper
     public bool RemoveHook(UndecoratedFunction methodToUnhook, HarmonyWrapper.HookCallback callback)
     {
         IntPtr module = new IntPtr((long)methodToUnhook.Module.BaseAddress);
-        IntPtr targetFunc = new IntPtr(methodToUnhook.Address);
+        IntPtr targetFunc = new IntPtr((long)methodToUnhook.Address);
 
         if (!_methodsToGenMethods.TryGetValue(methodToUnhook, out MethodInfo genMethodInfo)) 
             return false;

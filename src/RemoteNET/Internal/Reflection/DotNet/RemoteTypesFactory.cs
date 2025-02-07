@@ -138,16 +138,16 @@ namespace RemoteNET.Internal.Reflection.DotNet
 
         public Type Create(ManagedRemoteApp app, TypeDump typeDump)
         {
-            Type shortOutput = _resolver.Resolve(typeDump.Assembly, typeDump.Type);
+            Type shortOutput = _resolver.Resolve(typeDump.Assembly, typeDump.FullTypeName);
             if (shortOutput != null)
             {
                 return shortOutput;
             }
 
-            RemoteType output = new RemoteType(app, typeDump.Type, typeDump.Assembly, typeDump.IsArray);
+            RemoteType output = new RemoteType(app, typeDump.FullTypeName, typeDump.Assembly, typeDump.IsArray);
 
             // Temporarily indicate we are on-going creation
-            _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.Type)] = output;
+            _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.FullTypeName)] = output;
 
             string parentType = typeDump.ParentFullTypeName;
             if (parentType != null)
@@ -171,10 +171,10 @@ namespace RemoteNET.Internal.Reflection.DotNet
             AddMembers(app, typeDump, output);
 
             // remove on-going creation indication
-            _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
+            _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.FullTypeName));
 
             // Register at resolver
-            _resolver.RegisterType(typeDump.Assembly, typeDump.Type, output);
+            _resolver.RegisterType(typeDump.Assembly, typeDump.FullTypeName, output);
 
             return output;
         }
@@ -215,7 +215,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 {
                     try
                     {
-                        return ResolveTypeWhileCreating(app, typeDump.Type, "prop__resolving__logic",
+                        return ResolveTypeWhileCreating(app, typeDump.FullTypeName, "prop__resolving__logic",
                         propDump.Assembly, propDump.TypeFullName);
                     }
                     catch (Exception e)
@@ -252,7 +252,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 {
                     try
                     {
-                        return ResolveTypeWhileCreating(app, typeDump.Type, "event__resolving__logic", eventType.Assembly, eventType.TypeFullName);
+                        return ResolveTypeWhileCreating(app, typeDump.FullTypeName, "event__resolving__logic", eventType.Assembly, eventType.TypeFullName);
                     }
                     catch (Exception e)
                     {
@@ -275,7 +275,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 {
                     try
                     {
-                        return ResolveTypeWhileCreating(app, typeDump.Type, "field__resolving__logic",
+                        return ResolveTypeWhileCreating(app, typeDump.FullTypeName, "field__resolving__logic",
                         fieldDump.Assembly, fieldDump.TypeFullName);
                     }
                     catch (Exception e)
@@ -305,7 +305,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                         {
                             // In case of a generic type we have no way to "resolve" it
                             // We are just creating a dummy type
-                            return new RemoteType(app, typeDump.Type, "FakeAssemblyForGenericTypes", typeDump.IsArray, true);
+                            return new RemoteType(app, typeDump.FullTypeName, "FakeAssemblyForGenericTypes", typeDump.IsArray, true);
                         }
                         else
                         {
@@ -316,7 +316,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                             //      void MyOtherMethod(System.Text.StringBuilder sb) <-- The 'sb' parameter WILL get here
                             try
                             {
-                                Type paramType = ResolveTypeWhileCreating(app, typeDump.Type, func.Name, methodParameter.Assembly,
+                                Type paramType = ResolveTypeWhileCreating(app, typeDump.FullTypeName, func.Name, methodParameter.Assembly,
                                    methodParameter.FullTypeName);
                                 if (paramType == null)
                                 {
@@ -351,7 +351,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 {
                     try
                     {
-                        return ResolveTypeWhileCreating(app, typeDump.Type, func.Name,
+                        return ResolveTypeWhileCreating(app, typeDump.FullTypeName, func.Name,
                         func.ReturnTypeAssembly, func.ReturnTypeFullName);
                     }
                     catch (Exception e)

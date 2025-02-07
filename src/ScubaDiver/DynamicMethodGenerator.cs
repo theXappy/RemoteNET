@@ -260,7 +260,16 @@ public static class DetoursMethodGenerator
                     // If the argument is a pointer, indicate it with a NativeObject
                     // TODO: SecondClassTypeInfo is abused here
                     string fixedArgType = argType[..^1].Trim();
-                    argsToForward[i] = new NativeObject(arg, new SecondClassTypeInfo(hookedFunc.DeclaringClass.ModuleName, fixedArgType));
+
+                    // split fixedArgType to namespace and name
+                    // Look for last index of "::" and split around it
+                    int lastIndexOfColonColon = fixedArgType.LastIndexOf("::");
+                    // take into consideration that "::" might no be present at all, and the namespace is empty
+                    string namespaceName = lastIndexOfColonColon == -1 ? "" : fixedArgType.Substring(0, lastIndexOfColonColon);
+                    string typeName = lastIndexOfColonColon == -1 ? fixedArgType : fixedArgType.Substring(lastIndexOfColonColon + 2);
+
+                    SecondClassTypeInfo typeInfo = new SecondClassTypeInfo(hookedFunc.DeclaringClass.ModuleName, namespaceName, typeName);
+                    argsToForward[i] = new NativeObject(arg, typeInfo);
                 }
                 else
                 {

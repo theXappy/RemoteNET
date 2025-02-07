@@ -41,7 +41,7 @@ public abstract class RemoteApp : IDisposable
     /// </summary>
     public virtual Type GetRemoteType(Type localType) => GetRemoteType(localType.FullName, localType.Assembly.GetName().Name);
     public virtual Type GetRemoteType(CandidateType candidate) => GetRemoteType(candidate.TypeFullName, candidate.Assembly);
-    public virtual Type GetRemoteType(TypeDump typeDump) => GetRemoteType(typeDump.Type, typeDump.Assembly);
+    public virtual Type GetRemoteType(TypeDump typeDump) => GetRemoteType(typeDump.FullTypeName, typeDump.Assembly);
 
 
     public abstract RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null);

@@ -9,16 +9,18 @@ namespace ScubaDiver;
 
 public class UndecoratedExportedField : UndecoratedSymbol
 {
-    private long _address;
-    public override long Address => _address;
+    public const nuint XorMask = 0xaabbccdd; // Keeping it to 32 bits so it works in both x32 and x64
+    public override nuint XoredAddress { get; }
+    public override nuint Address => XoredAddress ^ XorMask;
+
     private ModuleInfo _module;
     public override ModuleInfo Module => _module;
     public DllExport Export { get; set; }
 
-    public UndecoratedExportedField(long address, string undecoratedName, string undecoratedFullName, DllExport export, ModuleInfo module)
+    public UndecoratedExportedField(nuint address, string undecoratedName, string undecoratedFullName, DllExport export, ModuleInfo module)
         : base(export.Name, undecoratedName, undecoratedFullName)
     {
-        _address = address;
+        XoredAddress = address ^ XorMask;
         Export = export;
         _module = module;
     }

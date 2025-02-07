@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -70,11 +71,22 @@ public unsafe struct RttiScanner : IDisposable
         return false;
     }
 
-    public bool TryRead<T>(ulong address, out T result) where T : unmanaged
+    public bool TryRead(ulong address, out ulong result)
     {
         fixed (void* ptr = &result)
-            return TryRead(address, sizeof(T), ptr);
+            return TryRead(address, sizeof(ulong), ptr);
     }
+    public bool TryRead(ulong address, out nuint result)
+    {
+        fixed (void* ptr = &result)
+            return TryRead(address, sizeof(nuint), ptr);
+    }
+    public bool TryRead(ulong address, out uint result)
+    {
+        fixed (void* ptr = &result)
+            return TryRead(address, sizeof(uint), ptr);
+    }
+
     public bool TryRead<T>(ulong address, Span<T> buffer) where T : unmanaged
     {
         fixed (void* ptr = buffer)
@@ -83,9 +95,16 @@ public unsafe struct RttiScanner : IDisposable
 
     private const int BUFFER_SIZE = 256;
 
-    public string GetClassName64(ulong address)
+    public string GetClassName64(ulong address, List<ModuleSegment> segments)
     {
         if (!TryRead(address - 0x08, out ulong object_locator)) return null;
+
+        // January 2025: Trying to optimize this
+        //bool IsInSegment(ModuleSegment segment) => object_locator >= segment.BaseAddress && object_locator <= segment.BaseAddress + segment.Size;
+        //bool isInOutOfTheSegment = segments.Any(IsInSegment);
+        //if (!isInOutOfTheSegment)
+        //    return null;
+
         if (!TryRead(object_locator + 0x14, out ulong base_offset)) return null;
         ulong base_address = object_locator - base_offset;
         if (!TryRead(object_locator + 0x0C, out uint type_descriptor_offset)) return null;
@@ -116,7 +135,7 @@ public unsafe struct RttiScanner : IDisposable
         }
     }
 
-    public string GetClassName32(ulong address)
+    public string GetClassName32(ulong address, List<ModuleSegment> segments)
     {
         if (!TryRead(address - 0x04, out uint object_locator)) return null;
         if (!TryRead(object_locator + 0x06, out uint type_descriptor)) return null;

@@ -43,6 +43,8 @@
 		<Compile Include="..\MsvcPrimitives\Trickster.cs" Link="MsvcPrimitives\Trickster.cs" />
 		<Compile Include="..\MsvcPrimitives\TricksterSearchHelper.cs" Link="MsvcPrimitives\TricksterSearchHelper.cs" />
 		<Compile Include="..\MsvcPrimitives\TricksterWrapper.cs" Link="MsvcPrimitives\TricksterWrapper.cs" />
+		<Compile Include="..\MsvcPrimitives\TypeDumpFactory.cs" Link="MsvcPrimitives\TypeDumpFactory.cs" />
+		<Compile Include="..\MsvcPrimitives\MsvcTypesManager.cs" Link="MsvcPrimitives\MsvcTypesManager.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedExport.cs" Link="MsvcPrimitives\UndecoratedExport.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedExportedField.cs" Link="MsvcPrimitives\UndecoratedExportedField.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedFunction.cs" Link="MsvcPrimitives\UndecoratedFunction.cs" />

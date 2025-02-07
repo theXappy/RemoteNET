@@ -17,21 +17,21 @@ using ScubaDiver.API.Hooking;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 using NtApiDotNet.Win32;
 using System.Reflection;
+using System.Web;
 
 namespace ScubaDiver
 {
     public class MsvcDiver : DiverBase
     {
-        private TricksterWrapper _tricksterWrapper = null;
-        private IReadOnlyExportsMaster _exportsMaster = null;
+        private MsvcTypesManager _typesManager = null;
+        private MsvcOffensiveGC _offensiveGC = null;
+        private MsvcFrozenItemsCollection _freezer = null;
 
         public MsvcDiver(IRequestsListener listener) : base(listener)
         {
             _responseBodyCreators["/gc"] = MakeGcHookModuleResponse;
             _responseBodyCreators["/gc_stats"] = MakeGcStatsResponse;
-
-            _tricksterWrapper = new TricksterWrapper();
-            _exportsMaster = _tricksterWrapper.ExportsMaster;
+            _typesManager = new MsvcTypesManager();
         }
 
         public override void Start()
@@ -46,8 +46,6 @@ namespace ScubaDiver
         }
 
 
-        private MsvcOffensiveGC _offensiveGC = null;
-        private MsvcFrozenItemsCollection _freezer = null;
 
         protected string MakeGcHookModuleResponse(ScubaDiverMessage req)
         {
@@ -55,23 +53,20 @@ namespace ScubaDiver
             if (assemblyFilter == null || assemblyFilter == "*")
                 return QuickError("'assembly' parameter can't be null or wildcard.");
 
-            Predicate<string> assemblyFilterPredicate = Filter.CreatePredicate(assemblyFilter);
-
+            Predicate<string> moduleNameFilter = Filter.CreatePredicate(assemblyFilter);
             if (_offensiveGC == null)
             {
-                if (_tricksterWrapper.RefreshRequired())
-                    _tricksterWrapper.Refresh();
                 _offensiveGC = new MsvcOffensiveGC();
                 _freezer = new MsvcFrozenItemsCollection(_offensiveGC);
             }
 
-            List<UndecoratedModule> undecoratedModules = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate);
+            List<UndecoratedModule> undecoratedModules = _typesManager.GetUndecoratedModules(moduleNameFilter);
             try
             {
                 _offensiveGC.HookModules(undecoratedModules);
                 foreach (UndecoratedModule module in undecoratedModules)
                 {
-                    _offensiveGC.HookAllFreeFuncs(module, _tricksterWrapper.GetUndecoratedModules());
+                    _offensiveGC.HookAllFreeFuncs(module, _typesManager.GetUndecoratedModules());
                 }
             }
             catch (Exception e)
@@ -123,7 +118,7 @@ namespace ScubaDiver
             RefreshRuntime();
 
             List<DomainsDump.AvailableDomain> available = new();
-            var modules = _tricksterWrapper.GetModules();
+            var modules = _typesManager.GetUndecoratedModules();
             var moduleNames = modules
                 .Select(m => m.Name)
                 .Where(m => !string.IsNullOrWhiteSpace(m))
@@ -149,94 +144,44 @@ namespace ScubaDiver
 
         protected void RefreshRuntimeInternal(bool force)
         {
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] Refreshing runtime! forced?");
-            if (!_tricksterWrapper.RefreshRequired() && !force)
-            {
-                Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] Refreshing avoided...");
-                return;
-            }
-            _tricksterWrapper.Refresh();
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][RefreshRuntime] DONE refreshing runtime. Num Modules: {_tricksterWrapper.GetModules().Count}");
+            _typesManager.RefreshIfNeeded();
         }
 
         protected override Action HookFunction(FunctionHookRequest request, HarmonyWrapper.HookCallback patchCallback)
         {
-            string rawTypeFilter = request.TypeFullName;
-            string methodName = request.MethodName;
-
-            ParseFullTypeName(rawTypeFilter, out var rawAssemblyFilter, out rawTypeFilter);
-            var modulesToTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
-            if (modulesToTypes.Count != 1)
-                QuickError($"Expected exactly 1 match for module, got {modulesToTypes.Count}");
-
-            ModuleInfo module = modulesToTypes.Keys.Single();
-            Rtti.TypeInfo[] typeInfos = modulesToTypes[module].ToArray();
-            if (typeInfos.Length != 1)
-                QuickError($"Expected exactly 1 match for type, got {typeInfos.Length}");
-
-
-            Rtti.TypeInfo typeInfo;
-            try
-            {
-                typeInfo = typeInfos.Single();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message +
-                                    $".\n typeInfos: {String.Join(", ", typeInfos.Select(x => x.ToString()))}");
-            }
-
-            // Get all exported members of the requseted type
-            List<UndecoratedSymbol> members = _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name).ToList();
-
-            // Find the first vftable within all members
-            // (TODO: Bug? How can I tell this is the "main" vftable?)
-            UndecoratedSymbol vftable = members.FirstOrDefault(member => member.UndecoratedName.EndsWith("`vftable'"));
-
-            string hookPositionStr = request.HookPosition;
-            HarmonyPatchPosition hookPosition = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), hookPositionStr);
+            var hookPosition = (HarmonyPatchPosition)Enum.Parse(typeof(HarmonyPatchPosition), request.HookPosition);
             if (!Enum.IsDefined(typeof(HarmonyPatchPosition), hookPosition))
                 throw new Exception("hook_position has an invalid or unsupported value");
 
-            List<UndecoratedFunction> exportedFuncs = members.OfType<UndecoratedFunction>().ToList();
-            List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
-            if (vftable != null)
-            {
+            string rawTypeFilter = request.TypeFullName;
+            string methodName = request.MethodName;
+            ParseFullTypeName(rawTypeFilter, out var rawModuleFilter, out rawTypeFilter);
 
-                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(),
-                    module,
-                    _exportsMaster.GetUndecoratedExports(module).ToList(),
-                    vftable.Address);
-
-                // Remove duplicates - the methods which are both virtual and exported.
-                virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
-            }
-            var allFuncs = exportedFuncs.Concat(virtualFuncs);
+            MsvcType targetType = _typesManager.GetType(rawModuleFilter, rawTypeFilter).Upgrade();
+            if (targetType == null)
+                throw new Exception($"Failed to find type {rawTypeFilter} in module {rawModuleFilter}");
 
             // Find all methods with the requested name
-            var overloads = allFuncs.Where(method => method.UndecoratedName == methodName);
+            IEnumerable<MsvcMethod> overloads = targetType.GetMethods().Where(method => method.Name == methodName);
+            IEnumerable<UndecoratedFunction> overloadsUndecFuncs = overloads.Select(func => func.UndecoratedFunc);
             // Find the specific overload with the right argument types
-            UndecoratedFunction methodToHook = overloads.SingleOrDefault(method =>
+            UndecoratedFunction methodToHook = overloadsUndecFuncs.SingleOrDefault(method =>
                 method.ArgTypes.Skip(1).SequenceEqual(request.ParametersTypeFullNames, TypesComparer));
 
             if (methodToHook == null)
-            {
-                throw new Exception($"No matches for {methodName} in type {typeInfo}");
-            }
+                throw new Exception($"No matches for {methodName} in type {targetType}");
 
             Logger.Debug("[MsvcDiver] Hook Method - Resolved Method");
             Logger.Debug($"[MsvcDiver] Hooking function {methodName}...");
 
-
-
             // TODO: Is "nuint" return type always right here?
-            DetoursNetWrapper.Instance.AddHook(typeInfo, methodToHook, patchCallback, hookPosition);
+            DetoursNetWrapper.Instance.AddHook(targetType.TypeInfo, methodToHook, patchCallback, hookPosition);
             Logger.Debug($"[MsvcDiver] Hooked function {methodName}!");
 
-            Action unhook = (Action)(() =>
+            Action unhook = () =>
             {
                 DetoursNetWrapper.Instance.RemoveHook(methodToHook, patchCallback);
-            });
+            };
             return unhook;
         }
 
@@ -321,45 +266,32 @@ namespace ScubaDiver
         protected override string MakeTypesResponse(ScubaDiverMessage req)
         {
             string importerModule = req.QueryString.Get("importer_module");
+            if (string.IsNullOrWhiteSpace(importerModule))
+                importerModule = null;
 
             string typeFilter = req.QueryString.Get("type_filter");
+            if (string.IsNullOrWhiteSpace(typeFilter))
+                return QuickError("Missing parameter 'type_filter'");
             ParseFullTypeName(typeFilter, out var assemblyFilter, out typeFilter);
 
-            Predicate<string> assemblyFilterPredicate = Filter.CreatePredicate(assemblyFilter);
             Predicate<string> typeFilterPredicate = Filter.CreatePredicate(typeFilter);
-
-            List<UndecoratedModule> matchingModules = _tricksterWrapper.GetUndecoratedModules(assemblyFilterPredicate).ToList();
-            if (importerModule != null)
+            Predicate<string> moduleFilterPredicate = Filter.CreatePredicate(assemblyFilter);
+            MsvcModuleFilter msvcModuleFilter = new MsvcModuleFilter()
             {
-                IReadOnlyList<DllImport> imports = _tricksterWrapper.ExportsMaster.GetImports(importerModule);
-                if (imports == null)
-                {
-                    // TODO: Something else where no modules could be found in the imports table??
-                    matchingModules = new List<UndecoratedModule>();
-                }
-                else
-                {
-                    matchingModules = matchingModules.Where(module => IsImportedInto(module, imports)).ToList();
-                }
-            }
+                NamePredicate = moduleFilterPredicate,
+                ImportingModule = importerModule
+            };
+
+            IEnumerable<MsvcTypeStub> matchingTypes = _typesManager.GetTypes(msvcModuleFilter, typeFilterPredicate);
 
             List<TypesDump.TypeIdentifiers> types = new();
-            foreach (UndecoratedModule module in matchingModules)
+            foreach (MsvcTypeStub typeStub in matchingTypes)
             {
-                foreach (Rtti.TypeInfo type in module.Types)
-                {
-                    if (!typeFilterPredicate(type.Name))
-                        continue;
-
-                    // TODO: Extend to also look for a SPECIFIC import of some function of the queried type
-
-                    string assembly = module.Name;
-                    string fullTypeName = $"{module.Name}!{type.Name}";
-                    ulong? methodTable = null;
-                    if (type is FirstClassTypeInfo firstClassType)
-                        methodTable = firstClassType.VftableAddress;
-                    types.Add(new TypesDump.TypeIdentifiers(assembly, fullTypeName, methodTable));
-                }
+                string assembly = typeStub.TypeInfo.ModuleName;
+                string fullTypeName = typeStub.TypeInfo.FullTypeName;
+                // TODO: We might have multiple vftable addresses...
+                ulong? vftable = (typeStub.TypeInfo as FirstClassTypeInfo)?.VftableAddress;
+                types.Add(new TypesDump.TypeIdentifiers(assembly, fullTypeName, vftable));
             }
 
             TypesDump dump = new()
@@ -367,12 +299,6 @@ namespace ScubaDiver
                 Types = types
             };
             return JsonConvert.SerializeObject(dump);
-
-
-            bool IsImportedInto(UndecoratedModule module, IReadOnlyList<DllImport> imports)
-            {
-                return imports.Any(imp => imp.DllName == module.Name);
-            }
         }
 
         protected override string MakeTypeResponse(ScubaDiverMessage req)
@@ -407,53 +333,18 @@ namespace ScubaDiver
 
         private TypeDump GetTypeDump(nuint methodTableAddress)
         {
-            var modules = _tricksterWrapper.GetModules();
-            foreach (ModuleInfo module in modules)
-            {
-                if (module.BaseAddress > methodTableAddress ||
-                    methodTableAddress >= (module.BaseAddress + module.Size))
-                    continue;
-
-                var types = _tricksterWrapper.SearchTypes(module.Name, "*").Values.SingleOrDefault();
-                foreach (TypeInfo typeInfo in types)
-                {
-                    if (typeInfo is not FirstClassTypeInfo firstClassTypeInfo)
-                        continue;
-                    if (firstClassTypeInfo.VftableAddress != methodTableAddress)
-                        continue;
-
-                    IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module).ToList();
-                    return GenerateTypeDump(typeInfo, module, exports);
-                }
-            }
-
-            return null;
+            MsvcType matchingType = _typesManager.GetType(methodTableAddress).Upgrade();
+            if (matchingType == null)
+                return null;
+            return TypeDumpFactory.ConvertMsvcTypeToTypeDump(matchingType);
         }
 
-        private TypeDump GenerateTypeDump(TypeInfo typeInfo, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports)
+        private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
-#pragma warning disable CS0168 // Variable is declared but never used
-            UndecoratedSymbol vftable;
-#pragma warning restore CS0168 // Variable is declared but never used
-            List<TypeDump.TypeField> fields = new();
-            List<TypeDump.TypeMethod> methods = new();
-            List<TypeDump.TypeMethod> constructors = new();
-            List<TypeDump.TypeMethodTable> vftables = new();
-            DeconstructRttiType(typeInfo, module, fields, constructors, methods, vftables);
-
-            HANDLE process = _tricksterWrapper.GetProcessHandle();
-            AnalyzeVftables(vftables, process, module, exports, methods);
-
-            TypeDump recusiveTypeDump = new TypeDump()
-            {
-                Assembly = module.Name,
-                Type = typeInfo.Name,
-                Methods = methods,
-                Constructors = constructors,
-                Fields = fields,
-                MethodTables = vftables
-            };
-            return recusiveTypeDump;
+            MsvcType matchingType = _typesManager.GetType(rawAssemblyFilter, rawTypeFilter).Upgrade();
+            if (matchingType == null)
+                return null;
+            return TypeDumpFactory.ConvertMsvcTypeToTypeDump(matchingType);
         }
 
         private TypeDump GetRttiType(string rawTypeFilter, string assembly = null)
@@ -473,182 +364,6 @@ namespace ScubaDiver
             return dump;
         }
 
-        private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
-        {
-            //Logger.Debug($"[GetTypeDump] Querying for rawAssemblyFilter: {rawAssemblyFilter}, rawTypeFilter: {rawTypeFilter}");
-            var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
-
-            foreach (KeyValuePair<ModuleInfo, IEnumerable<Rtti.TypeInfo>> moduleAndTypes in modulesAndTypes)
-            {
-                ModuleInfo module = moduleAndTypes.Key;
-                IReadOnlyList<UndecoratedSymbol> exports = _exportsMaster.GetUndecoratedExports(module).ToList();
-                foreach (Rtti.TypeInfo typeInfo in moduleAndTypes.Value)
-                {
-                    List<TypeDump.TypeField> fields = new();
-                    List<TypeDump.TypeMethod> methods = new();
-                    List<TypeDump.TypeMethod> constructors = new();
-                    List<TypeDump.TypeMethodTable> vftables = new();
-                    DeconstructRttiType(typeInfo, module, fields, constructors, methods, vftables);
-
-                    HANDLE process = _tricksterWrapper.GetProcessHandle();
-                    AnalyzeVftables(vftables, process, module, exports, methods);
-
-                    TypeDump recusiveTypeDump = new TypeDump()
-                    {
-                        Assembly = module.Name,
-                        Type = typeInfo.Name,
-                        Methods = methods,
-                        Constructors = constructors,
-                        Fields = fields,
-                        MethodTables = vftables
-                    };
-                    return recusiveTypeDump;
-                }
-            }
-
-            return null;
-        }
-
-        private void DeconstructRttiType(Rtti.TypeInfo typeInfo,
-            ModuleInfo module,
-            List<TypeDump.TypeField> fields,
-            List<TypeDump.TypeMethod> constructors,
-            List<TypeDump.TypeMethod> methods,
-            List<TypeDump.TypeMethodTable> vftables)
-        {
-            string className = typeInfo.Name.Substring(typeInfo.Name.LastIndexOf("::") + 2);
-            string ctorName = $"{typeInfo.Name}::{className}"; // Constructing NameSpace::ClassName::ClassName
-            string vftableName = $"{typeInfo.Name}::`vftable'"; // Constructing NameSpace::ClassName::`vftable
-            foreach (UndecoratedSymbol dllExport in _exportsMaster.GetExportedTypeMembers(module, typeInfo.Name))
-            {
-                if (dllExport is UndecoratedFunction undecoratedFunc)
-                {
-                    var typeMethod = VftableParser.ConvertToTypeMethod(undecoratedFunc);
-                    if (typeMethod == null)
-                    {
-                        Logger.Debug($"[MsvcDiver] Failed to convert UndecoratedFunction: {undecoratedFunc.UndecoratedFullName}. Skipping.");
-                        continue;
-                    }
-
-                    if (typeMethod.UndecoratedFullName == ctorName)
-                        constructors.Add(typeMethod);
-                    else
-                        methods.Add(typeMethod);
-                }
-                else if (dllExport is UndecoratedExportedField undecField)
-                {
-                    bool isVftable = HandleVftable(undecField, vftableName, fields);
-                    if (isVftable)
-                    {
-                        if (vftables.Count > 0)
-                        {
-                            var mainVftable = vftables.First();
-                            Logger.Debug(
-                                $"Secondary vftable export found. Old: {mainVftable.Name} (0x{mainVftable.Address:X16}) , " +
-                                $"New: {undecField.UndecoratedFullName} (0x{undecField.Address:X16}) ,");
-                        }
-
-                        // Keep vftable aside so we can also gather functions from it
-                        vftables.Add(new TypeDump.TypeMethodTable
-                        {
-                            Name = undecField.DecoratedName,
-                            Address = undecField.Address,
-                        });
-                        continue;
-                    }
-
-                    HandleTypeField(undecField, fields);
-                }
-            }
-        }
-
-        private bool HandleVftable(UndecoratedExportedField undecField, string vftableName,
-            List<TypeDump.TypeField> fields)
-        {
-            // vftable gets a special treatment because we need it outside this func.
-            if (undecField.UndecoratedFullName != vftableName)
-                return false;
-
-
-            fields.Add(new TypeDump.TypeField()
-            {
-                Name = "vftable",
-                TypeFullName = undecField.UndecoratedFullName,
-                Visibility = "Public"
-            });
-
-            return true;
-        }
-
-        private void HandleTypeField(UndecoratedExportedField undecField,
-            List<TypeDump.TypeField> fields)
-        {
-            fields.Add(new TypeDump.TypeField()
-            {
-                Name = undecField.UndecoratedName,
-                TypeFullName = undecField.UndecoratedFullName,
-                Visibility = "Public"
-            });
-        }
-
-        private void AnalyzeVftables(List<TypeDump.TypeMethodTable> vftables, HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports,
-            List<TypeDump.TypeMethod> methods)
-        {
-            foreach (TypeDump.TypeMethodTable vftable in vftables)
-            {
-                AnalyzeVftable(vftable, process, module, exports, methods);
-            }
-        }
-
-        private void AnalyzeVftable(TypeDump.TypeMethodTable vftable, HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exports,
-            List<TypeDump.TypeMethod> methods)
-        {
-            // Parse functions from the vftable
-            List<UndecoratedFunction> virtualFunctionsInternal =
-                VftableParser.AnalyzeVftable(process, module, exports, vftable.Address);
-
-            // Convert "Undecorated Functions" into "Type Methods"
-            IEnumerable<TypeDump.TypeMethod> virtualFunctions = virtualFunctionsInternal
-                .Select(VftableParser.ConvertToTypeMethod)
-                .Where(x => x != null);
-
-            // Filter out all the existing methods
-            foreach (TypeDump.TypeMethod virtualFunction in virtualFunctions)
-            {
-                bool exists = methods.Any(existingMethod =>
-                    existingMethod.UndecoratedFullName == virtualFunction.UndecoratedFullName);
-                if (exists)
-                    continue;
-
-                methods.Add(virtualFunction);
-            }
-        }
-
-        private FirstClassTypeInfo ResolveTypeFromVftableAddress(nuint address)
-        {
-            foreach (var kvp in _tricksterWrapper.GetDecoratedTypes())
-            {
-                var module = kvp.Key;
-                if (address < module.BaseAddress || address > (module.BaseAddress + module.Size))
-                    continue;
-
-                var typeInfos = kvp.Value;
-
-                foreach (var typeInfo in typeInfos)
-                {
-                    if (typeInfo is FirstClassTypeInfo firstClassTypeInfo && firstClassTypeInfo.VftableAddress == address)
-                        return firstClassTypeInfo;
-                }
-                // This module was the module containing our queried address.
-                // We couldn't find the type within the module.
-                // Modules don't overlap so no other module will help use. It's safe to abort (Skipping the rest of the modules list)
-                return null;
-            }
-
-            // Address was not in range of any of the modules...
-            return null;
-        }
-
         protected override string MakeHeapResponse(ScubaDiverMessage arg)
         {
             // Since trickster works on copied memory, we must refresh it so it copies again
@@ -658,28 +373,18 @@ namespace ScubaDiver
             string rawFilter = arg.QueryString.Get("type_filter");
             ParseFullTypeName(rawFilter, out var rawAssemblyFilter, out var rawTypeFilter);
 
-            Predicate<string> assmFilter = Filter.CreatePredicate(rawAssemblyFilter);
             Predicate<string> typeFilter = Filter.CreatePredicate(rawTypeFilter);
-            IEnumerable<FirstClassTypeInfo> allClassesToScanFor = Array.Empty<FirstClassTypeInfo>();
-            foreach (var undecModule in _tricksterWrapper.GetUndecoratedModules(assmFilter))
-            {
-                IEnumerable<FirstClassTypeInfo> currModuleClasses =
-                    undecModule.Types.OfType<FirstClassTypeInfo>();
-                if (!string.IsNullOrEmpty(rawTypeFilter) && rawTypeFilter != "*")
-                    currModuleClasses = currModuleClasses.Where(ti => typeFilter(ti.Name));
-
-                Logger.Debug($"[{DateTime.Now}] Trickster aggregating types from {undecModule.Name}");
-                allClassesToScanFor = allClassesToScanFor.Concat(currModuleClasses);
-            }
+            Predicate<string> moduleNameFilter = Filter.CreatePredicate(rawAssemblyFilter);
+            IEnumerable<MsvcTypeStub> matchingType = _typesManager.GetTypes(moduleNameFilter, typeFilter);
 
             //
             // Heap Search using Trickster
             //
             HeapDump output = new HeapDump();
             Logger.Debug($"[{DateTime.Now}] Starting Trickster Scan for class instances.");
-            Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> addresses = _tricksterWrapper.Scan(allClassesToScanFor);
-            Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {addresses.SelectMany(kvp => kvp.Value).Count()} results");
-            foreach (var typeInstancesKvp in addresses)
+            Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> hits = _typesManager.Scan(matchingType);
+            Logger.Debug($"[{DateTime.Now}] Trickster Scan finished with {hits.SelectMany(kvp => kvp.Value).Count()} results");
+            foreach (var typeInstancesKvp in hits)
             {
                 FirstClassTypeInfo typeInfo = typeInstancesKvp.Key;
                 foreach (nuint address in typeInstancesKvp.Value.Select(l => (nuint)l))
@@ -698,7 +403,7 @@ namespace ScubaDiver
             // Heap & Search using Offensive GC (if enabled)
             if (_offensiveGC != null)
             {
-                foreach (var kvp in _offensiveGC.ClassInstances.Where(kvp => assmFilter(kvp.Key)))
+                foreach (var kvp in _offensiveGC.ClassInstances.Where(kvp => moduleNameFilter(kvp.Key)))
                 {
                     string module = kvp.Key;
                     foreach (var kvp2 in kvp.Value.Where(kvp2 => typeFilter(kvp2.Key)))
@@ -779,7 +484,8 @@ namespace ScubaDiver
 
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
-                Rtti.TypeInfo typeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                MsvcType matchingType = _typesManager.GetType((nuint)vftable).Upgrade();
+                Rtti.TypeInfo typeInfo = matchingType?.TypeInfo;
                 if (typeInfo == null)
                 {
                     throw new Exception("Failed to resolve vftable of target to any RTTI type.");
@@ -814,40 +520,31 @@ namespace ScubaDiver
         protected override string MakeInvokeResponse(ScubaDiverMessage arg)
         {
             Console.WriteLine($"[{nameof(MsvcDiver)}] MakeInvokeResponse Entered (!)");
-            string body = arg.Body;
-            if (string.IsNullOrEmpty(body))
-            {
+            if (string.IsNullOrEmpty(arg.Body))
                 return QuickError("Missing body");
-            }
-            var request = JsonConvert.DeserializeObject<InvocationRequest>(body);
+
+            var request = JsonConvert.DeserializeObject<InvocationRequest>(arg.Body);
             if (request == null)
-            {
                 return QuickError("Failed to deserialize body");
-            }
+            nuint objAddress = (nuint)request.ObjAddress;
+            if (objAddress == 0)
+                return QuickError("Calling a instance-less function is not implemented for MSVC");
 
             // Need to figure target instance and the target type.
-            // In case of a static call the target instance stays null.
-            if (request.ObjAddress == 0)
-            {
-                return QuickError("Calling a instance-less function is not implemented");
-            }
+            ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
+            MsvcType msvcType = _typesManager.GetType(rawAssemblyFilter, rawTypeFilter).Upgrade();
             TypeDump dumpedObjType = GetRttiType(request.TypeFullName);
             // Check if we have this objects in our pinned pool
             // TODO: Pull from freezer?
-            nuint objAddress = (nuint)request.ObjAddress;
 
             //
-            // We have our target and it's type. Now look for a matching overload for the
+            // We have our target and it's Type Dump. Now look for a matching overload for the
             // function to invoke.
             //
             List<object> paramsList = new();
             if (request.Parameters.Any())
             {
                 paramsList = request.Parameters.Select(ParseParameterObject).ToList();
-            }
-            else
-            {
-                // No parameters.
             }
 
             // Search the method/ctor with the matching signature
@@ -870,29 +567,32 @@ namespace ScubaDiver
             }
             TypeDump.TypeMethod method = overloads.Single();
 
-            ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
-            var modulesAndTypes = _tricksterWrapper.SearchTypes(rawAssemblyFilter, rawTypeFilter);
-            ModuleInfo module = modulesAndTypes.Keys.Single();
-            Rtti.TypeInfo typeInfo = modulesAndTypes[module].Single();
 
-            List<UndecoratedFunction> typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, typeInfo.Name).ToList();
+            List<UndecoratedFunction> typeFuncs = msvcType.GetMethods().Select(msvcMethod => msvcMethod.UndecoratedFunc).ToList();
             UndecoratedFunction targetMethod = typeFuncs.SingleOrDefault(m => m.DecoratedName == method.DecoratedName);
             if (targetMethod == null)
             {
-                // Extend search to other types (this method might be inherited and hence found under another type's name.
-                // Turning `namespace::class::func` to `namespace::class`
+                // Extend search to other types. Useful when:
+                //  * The method is inherited and hence found under another type's name.
+                //  * The object was casted from one module to another: module_1!class_name -> module_2!class_name
+                //
+                // Extracting the "owning" type of the method, which we now assume is different then the object's type.
+                // Turning `namespace::method_owner_type::func` to `namespace::method_owner_type`
                 string methodFullName = method.UndecoratedFullName;
-                string parentType = methodFullName.Substring(0, methodFullName.IndexOf(method.Name)).TrimEnd(':');
+                string methodOwnerTypeFullName = methodFullName.Substring(0, methodFullName.IndexOf(method.Name)).TrimEnd(':');
 
-                typeFuncs = _exportsMaster.GetExportedTypeFunctions(module, parentType).ToList();
+                ParseFullTypeName(methodOwnerTypeFullName, out string methodOwnerModuleName, out string methodOwnerTypeName);
+                MsvcType methodOwnerType = _typesManager.GetType(methodOwnerModuleName, methodOwnerTypeName).Upgrade();
+
+                typeFuncs = methodOwnerType.GetMethods().Select(msvcMethod => msvcMethod.UndecoratedFunc).ToList();
                 targetMethod = typeFuncs.SingleOrDefault(m => m.DecoratedName == method.DecoratedName);
                 if (targetMethod != null)
                 {
-                    // Found the target function is a PARENT type!
+                    // Found the target function in a PARENT/DIFFERENT type!
                 }
                 else
                 {
-                    return QuickError($"Could not find method {targetMethod} in either {typeInfo.Name} nor {parentType}");
+                    return QuickError($"Could not find method {targetMethod} in either {msvcType.Name} nor {methodOwnerType}");
                 }
             }
 
@@ -900,12 +600,13 @@ namespace ScubaDiver
             // Turn target method into an invoke-able delegate
             //
 
+            // TODO: What about doubles/floats return vaslues?
             Type retType = method.ReturnTypeName.Equals("void", StringComparison.OrdinalIgnoreCase)
                 ? typeof(void)
                 : typeof(nuint);
             int floatsBitmap = NativeDelegatesFactory.GetFloatsBitmap(method.Parameters, p => p.FullTypeName == "float" || p.FullTypeName == "double");
             var delegateType = NativeDelegatesFactory.GetDelegateType(retType, method.Parameters.Count, floatsBitmap);
-            var methodPtr = Marshal.GetDelegateForFunctionPointer(new IntPtr(targetMethod.Address), delegateType);
+            var methodPtr = Marshal.GetDelegateForFunctionPointer(new IntPtr((long)targetMethod.Address), delegateType);
 
             //
             // Prepare parameters
@@ -996,7 +697,8 @@ namespace ScubaDiver
                 // Remove a single '*' suffix, if exists.
                 // Example: "int*" -> "int"
                 // But Also: "int**" -> "int*"
-                if (normalizedRetType.EndsWith('*')) {
+                if (normalizedRetType.EndsWith('*'))
+                {
                     normalizedRetType = normalizedRetType[..^1];
                     normalizedRetType = normalizedRetType.TrimEnd(' ');
                 }
@@ -1005,7 +707,8 @@ namespace ScubaDiver
 
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)resultsNuint.Value));
-                Rtti.TypeInfo retTypeInfo = ResolveTypeFromVftableAddress((nuint)vftable);
+                MsvcType matchingType = _typesManager.GetType((nuint)vftable).Upgrade();
+                Rtti.TypeInfo retTypeInfo = matchingType?.TypeInfo;
 
                 if (retTypeInfo != null)
                 {

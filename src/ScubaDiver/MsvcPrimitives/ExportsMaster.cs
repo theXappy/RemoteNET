@@ -60,7 +60,7 @@ public class ExportsMaster : IReadOnlyExportsMaster
 
     public IReadOnlyList<DllImport> GetImports(Rtti.ModuleInfo modInfo) => GetImports(modInfo.Name);
 
-    public IEnumerable<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo)
+    public IReadOnlyList<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo)
     {
         ProcessExports(modInfo);
         return _undecExportsCache[modInfo];

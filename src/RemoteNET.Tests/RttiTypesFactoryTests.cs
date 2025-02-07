@@ -259,7 +259,7 @@ namespace RemoteNET.Tests
             string childTypeLongName = "Peek::Child";
             TypeDump? typeDump = new TypeDump()
             {
-                Type = childTypeLongName,
+                FullTypeName = childTypeLongName,
                 Assembly = "libPeek_lies.dll"
             };
             RemoteRttiType? childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
@@ -290,7 +290,7 @@ namespace RemoteNET.Tests
             string childTypeLongName = "Peek::Child";
             TypeDump? typeDump = new TypeDump()
             {
-                Type = childTypeLongName,
+                FullTypeName = childTypeLongName,
                 Assembly = "libPeek_lies.dll"
             };
             RemoteRttiType? childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");
@@ -344,7 +344,7 @@ namespace RemoteNET.Tests
             string childTypeLongName = "Peek::WClass";
             TypeDump? typeDump = new TypeDump()
             {
-                Type = childTypeLongName,
+                FullTypeName = childTypeLongName,
                 Assembly = "libPeek_lies.dll"
             };
             RemoteRttiType? childType = new RemoteRttiType(null, childTypeLongName, "libPeek_lies.dll");

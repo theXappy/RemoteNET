@@ -549,7 +549,7 @@ namespace ScubaDiver
 
                 TypeDump td = new()
                 {
-                    Type = typeObj.FullName,
+                    FullTypeName = typeObj.FullName,
                     Assembly = typeObj.Assembly.GetName().Name,
                     Methods = methods,
                     Constructors = ctors,

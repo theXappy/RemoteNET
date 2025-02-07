@@ -69,6 +69,7 @@ namespace ScubaDiver
         private string MakeHelpResponse(ScubaDiverMessage arg)
         {
             var possibleCommands = _responseBodyCreators.Keys.ToList();
+            possibleCommands.Sort();
             return JsonConvert.SerializeObject(possibleCommands);
         }
 
@@ -127,6 +128,9 @@ namespace ScubaDiver
 
         private void HandleDispatchedRequest(object obj, ScubaDiverMessage request)
         {
+            if (request.UrlAbsolutePath != "/ping")
+                Logger.Debug($"[{DateTime.Now.ToLongTimeString()}][HandleDispatchedRequest] New request to {request.UrlAbsolutePath}");
+            Stopwatch sw = Stopwatch.StartNew();
             string body;
             if (_responseBodyCreators.TryGetValue(request.UrlAbsolutePath, out var respBodyGenerator))
             {
@@ -143,6 +147,9 @@ namespace ScubaDiver
             {
                 body = QuickError("Unknown Command");
             }
+            sw.Stop();
+            if (request.UrlAbsolutePath != "/ping")
+                Logger.Debug($"[{DateTime.Now.ToLongTimeString()}][HandleDispatchedRequest] Done with request to {request.UrlAbsolutePath}. Elapsed: {sw.ElapsedMilliseconds} ms");
 
             request.ResponseSender(body);
         }

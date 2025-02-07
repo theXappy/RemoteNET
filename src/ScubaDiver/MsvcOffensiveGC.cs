@@ -136,60 +136,62 @@ namespace ScubaDiver
         {
             // Make sure our C++ Helper is loaded before accessing anything from the `MsvcOffensiveGcHelper` class
             // otherwise the loading the P/Invoke methods will fail on "Failed to load DLL".
-            System.Reflection.Assembly assm = typeof(MsvcOffensiveGC).Assembly;
-            string assmDir = System.IO.Path.GetDirectoryName(assm.Location);
-            string helperPath = System.IO.Path.Combine(assmDir, "MsvcOffensiveGcHelper.dll");
-            FreeLibrarySafeHandle res = PInvoke.LoadLibrary(helperPath);
-            if (res.IsInvalid)
             {
-                throw new Exception($"LoadLibrary failed for {helperPath}");
+                System.Reflection.Assembly assm = typeof(MsvcOffensiveGC).Assembly;
+                string assmDir = System.IO.Path.GetDirectoryName(assm.Location);
+                string helperPath = System.IO.Path.Combine(assmDir, "MsvcOffensiveGcHelper.dll");
+                FreeLibrarySafeHandle res = PInvoke.LoadLibrary(helperPath);
+                if (res.IsInvalid)
+                {
+                    throw new Exception($"LoadLibrary failed for {helperPath}");
+                }
             }
 
-            int attemptedFreeFuncs = 0;
+            // Strategy:
+            // --------
+            // Free functions are exported from the CRT DLLs.
+            // Our target module is calling one of those whever it tries to free memory.
+            // We're going to hooking the IAT of the target module to point to our proxy function.
+            // The proxy method (from the C++ helper) will take care of monitoring for "frozen" objects
+            // and prevent them from being deallocated.
+            ModuleInfo targetModule = targetUndecoratedModule.ModuleInfo;
             foreach (string funcName in new[] { "free", "_free", "_free_dbg" })
             {
-                // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Starting to hook '{funcName}'s...");
-                Dictionary<ModuleInfo, DllExport> freeExportedFunctions = FreeFinder.Find(allModules, funcName);
-                if (freeExportedFunctions.Count == 0)
+                Dictionary<ModuleInfo, DllExport> modulesToExportedFreeFuncs = GetAllExportedFreeFuncs(allModules, funcName);
+                foreach (DllExport freeFunc in modulesToExportedFreeFuncs.Values)
                 {
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
-                    continue;
-                }
-                if (freeExportedFunctions.Count > 1)
-                {
-                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " + string.Join(", ", freeExportedFunctions.Keys.Select(a => a.Name).ToArray()));
-                }
-                foreach (var moduleToFreeExport in freeExportedFunctions)
-                {
-                    DllExport freeFunc = moduleToFreeExport.Value;
-                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Chose '{funcName}' from {kvp.Key.Name}");
+                    // Ask the C++ Helper to func a proxy function to the given "free" function.
+                    IntPtr proxyPtr = MsvcOffensiveGcHelper.GetOrAddReplacement((IntPtr)freeFunc.Address);
 
-                    // Find out native replacement function for the given func name
-                    IntPtr replacementPtr = MsvcOffensiveGcHelper.GetOrAddReplacement((IntPtr)freeFunc.Address);
+                    // Hook the IAT of the target module to point to the proxy function.
+                    bool replacementRes = Loader.HookIAT((IntPtr)(ulong)targetModule.BaseAddress, (IntPtr)freeFunc.Address, proxyPtr);
 
-                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Hooking '{funcName}' at 0x{freeFunc.Address:X16} (from {kvp.Key.Name}), " +
-                        //$"in the IAT of {target.Name}. " +
-                        //$"Replacement Address: 0x{replacementPtr:X16}");
-                    ModuleInfo targetModule = targetUndecoratedModule.ModuleInfo;
-                    bool replacementRes = Loader.HookIAT((IntPtr)(ulong)targetModule.BaseAddress, (IntPtr)freeFunc.Address, replacementPtr);
-
-
-                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] res = {replacementRes}");
                     if (replacementRes)
                     {
                         // Found the right import! Breaking so we don't override the "original free ptr" with wrong matches.
-                        // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] [@@@@@@@] Found the right import! Breaking.");
-                        attemptedFreeFuncs++;
                         break;
                     }
                     else
                     {
-                        // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] [xxxxxxx] Wrong import.");
+                        // Not sure when this happens....
+                        Logger.Debug($"[{nameof(MsvcOffensiveGC)}][ERROR] Failed to hook '{funcName}' at 0x{freeFunc.Address:x16}");
                     }
                 }
             }
+        }
 
-            // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Done hooking free funcs. attempted to hook: {attemptedFreeFuncs} funcs");
+        private static Dictionary<ModuleInfo, DllExport> GetAllExportedFreeFuncs(List<UndecoratedModule> allModules, string funcName)
+        {
+            Dictionary<ModuleInfo, DllExport> freeExportedFunctions = FreeFinder.Find(allModules, funcName);
+            if (freeExportedFunctions.Count == 0)
+            {
+                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
+            }
+            if (freeExportedFunctions.Count > 1)
+            {
+                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " + string.Join(", ", freeExportedFunctions.Keys.Select(a => a.Name).ToArray()));
+            }
+            return freeExportedFunctions;
         }
 
         private Dictionary<string, List<UndecoratedFunction>> GetNewOperators(List<UndecoratedModule> modules)
@@ -216,7 +218,7 @@ namespace ScubaDiver
                 }
                 else
                 {
-                    // Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Did NOT find {operatorNewName} in {module.Name}");
+                    Logger.Debug($"[{nameof(MsvcOffensiveGC)}] Did NOT find {operatorNewName} in {module.Name}");
                 }
 
                 if (tempList.Any())

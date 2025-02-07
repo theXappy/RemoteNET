@@ -91,7 +91,7 @@ namespace RemoteNET.Internal
         public InvocationResults InvokeMethod(string methodName, string[] genericArgsFullTypeNames, ObjectOrRemoteAddress[] args)
         {
             ThrowIfReleased();
-            string typeFullName = $"{_typeInfo.Assembly}!{_typeInfo.Type}";
+            string typeFullName = $"{_typeInfo.Assembly}!{_typeInfo.FullTypeName}";
             return CreatingCommunicator.InvokeMethod(RemoteObjectInfo.PinnedAddress, typeFullName, methodName, genericArgsFullTypeNames, args);
         }
 
@@ -132,7 +132,7 @@ namespace RemoteNET.Internal
         public override string ToString()
         {
             return $"RemoteObjectRef. Address: {RemoteObjectInfo.PinnedAddress} (0x{RemoteObjectInfo.PinnedAddress:x16}), " +
-                   $"TypeFullName: {_typeInfo.Type}";
+                   $"TypeFullName: {_typeInfo.FullTypeName}";
         }
 
         internal ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)

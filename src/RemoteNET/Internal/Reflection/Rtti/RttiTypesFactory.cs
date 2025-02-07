@@ -91,16 +91,16 @@ namespace RemoteNET.RttiReflection
 
         public Type Create(RemoteApp app, TypeDump typeDump)
         {
-            Type shortOutput = _resolver.Resolve(typeDump.Assembly, typeDump.Type);
+            Type shortOutput = _resolver.Resolve(typeDump.Assembly, typeDump.FullTypeName);
             if (shortOutput != null)
             {
                 return shortOutput;
             }
 
-            RemoteRttiType output = new RemoteRttiType(app, typeDump.Type, typeDump.Assembly);
+            RemoteRttiType output = new RemoteRttiType(app, typeDump.FullTypeName, typeDump.Assembly);
 
             // Temporarily indicate we are on-going creation
-            _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.Type)] = output;
+            _onGoingCreations[new Tuple<string, string>(typeDump.Assembly, typeDump.FullTypeName)] = output;
 
             string parentType = typeDump.ParentFullTypeName;
             if (parentType != null)
@@ -124,7 +124,7 @@ namespace RemoteNET.RttiReflection
             AddMembers(app, typeDump, output);
 
             // remove on-going creation indication
-            _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.Type));
+            _onGoingCreations.Remove(new Tuple<string, string>(typeDump.Assembly, typeDump.FullTypeName));
 
             // Register at resolver
             _resolver.RegisterType(output);

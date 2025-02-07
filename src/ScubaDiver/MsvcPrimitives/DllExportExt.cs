@@ -111,7 +111,7 @@ public static class DllExportExt
         else
         {
             // Not a function - assuming it's a field
-            output = new UndecoratedExportedField(input.Address, undecoratedName, undecoratedFullName, input, module);
+            output = new UndecoratedExportedField((nuint)input.Address, undecoratedName, undecoratedFullName, input, module);
             return true;
         }
     }

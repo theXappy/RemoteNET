@@ -25,7 +25,8 @@ public class UndecoratedExportedFunc : UndecoratedFunction
         }
     }
 
-    public override long Address => Export.Address;
+    public override nuint Address => (nuint)Export.Address;
+
     public override ModuleInfo Module => _module;
     public string ClassName { get; set; }
     public override string[] ArgTypes
@@ -51,6 +52,7 @@ public class UndecoratedExportedFunc : UndecoratedFunction
     public override int? NumArgs => ArgTypes.Length;
 
     public DllExport Export { get; set; }
+
 
     public UndecoratedExportedFunc(string className, string undecoratedName, string undecoratedFullName, Lazy<DemangledSignature> signatureParser, DllExport export, ModuleInfo module) 
         : base(export.Name, undecoratedName, undecoratedFullName)

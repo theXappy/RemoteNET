@@ -5,6 +5,7 @@ using ScubaDiver;
 using ScubaDiver.Rtti;
 using System.Linq;
 using Windows.Win32.Foundation;
+using System.Diagnostics;
 
 public static class VftableParser
 {
@@ -19,8 +20,9 @@ public static class VftableParser
     /// Assuming all function (3 in the example above) are exported, we'd find their names in <see cref="exportsList"/>
     /// and return them together with their names.
     /// </summary>
-    public static List<UndecoratedFunction> AnalyzeVftable(HANDLE process, ModuleInfo module, IReadOnlyList<UndecoratedSymbol> exportsList, long vftableAddress)
+    public static List<UndecoratedFunction> AnalyzeVftable(HANDLE process, ModuleInfo module, MsvcModuleExports moduleExports, nuint vftableAddress)
     {
+        Logger.Debug("[AnalyzeVftable] Called");
         List<UndecoratedFunction> virtualMethods = new List<UndecoratedFunction>();
 
         using var scanner = new RttiScanner(
@@ -30,18 +32,14 @@ public static class VftableParser
             module.ListSections()
             );
 
-        Dictionary<nuint, UndecoratedSymbol> exportsDict = exportsList
-                                                .DistinctBy(exp => exp.Address)
-                                                .ToDictionary(exp => (nuint)exp.Address);
-
         bool nextVftableFound = false;
         // Assuming at most 99 functions in the vftable.
         for (int i = 0; i < 100; i++)
         {
             // Check if this address is some other type's vftable address.
             // (Not checking the first one, since it's OUR vftable)
-            nuint nextEntryAddress = (nuint)(vftableAddress + (i * IntPtr.Size));
-            if (i != 0 && IsVftableAddress(nextEntryAddress))
+            nuint nextEntryAddress = (nuint)(vftableAddress + (nuint)(i * IntPtr.Size));
+            if (i != 0 && moduleExports.TryGetVftable(nextEntryAddress, out _))
             {
                 nextVftableFound = true;
                 break;
@@ -52,12 +50,12 @@ public static class VftableParser
             if (!readNext)
                 break;
 
-            if (!exportsDict.TryGetValue(entryContent, out UndecoratedSymbol undecSymbol))
+            if (!moduleExports.TryGetFunc(entryContent, out UndecoratedFunction undecFunc))
+            {
+                // TODO: This is possibly a non-exported method of our type. We should still add it to the list.
                 continue;
-
-            if (undecSymbol is not UndecoratedFunction undecFunc) 
-                continue;
-
+            }
+            
             // Found a new virtual method for our type!
             virtualMethods.Add(undecFunc);
         }
@@ -68,13 +66,6 @@ public static class VftableParser
         }
 
         return new();
-
-        bool IsVftableAddress(nuint addr)
-        {
-            if (!exportsDict.TryGetValue(addr, out UndecoratedSymbol undecoratedExport))
-                return false;
-            return undecoratedExport.UndecoratedName.EndsWith("`vftable'");
-        }
     }
 
     // TODO: Move somewhere else
