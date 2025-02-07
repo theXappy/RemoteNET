@@ -52,7 +52,9 @@ public static class VftableParser
 
             if (!moduleExports.TryGetFunc(entryContent, out UndecoratedFunction undecFunc))
             {
-                // TODO: This is possibly a non-exported method of our type. We should still add it to the list.
+                // Check for anon-exported method of our type. We should still add it to the list.
+                if (!PointsToTextSection(entryContent))
+
                 continue;
             }
             
@@ -66,6 +68,11 @@ public static class VftableParser
         }
 
         return new();
+    }
+
+    private static bool PointsToTextSection(nuint entryContent)
+    {
+        throw new NotImplementedException();
     }
 
     // TODO: Move somewhere else

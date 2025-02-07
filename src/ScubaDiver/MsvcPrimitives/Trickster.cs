@@ -167,8 +167,10 @@ public unsafe class Trickster : IDisposable
         _is32Bit = is32Bit;
     }
 
-    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(ModuleInfo module, List<ModuleSegment> segments, nuint segmentBaseAddress, nuint segmentSize)
+    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(ModuleInfo module, List<ModuleSection> sections, ModuleSection currSection)
     {
+        nuint sectionBaseAddress = (nuint)currSection.BaseAddress;
+        nuint sectionSize = (nuint)currSection.Size;
         List<TypeInfo> list = new();
 
         // Whether the "type_info" type was seen.
@@ -176,14 +178,14 @@ public unsafe class Trickster : IDisposable
         // is missing all our "findings" are actually false positives
         bool typeInfoSeen = false;
 
-        using (RttiScanner processMemory = new(_processHandle, module.BaseAddress, module.Size, segments))
+        using (RttiScanner processMemory = new(_processHandle, module.BaseAddress, module.Size, sections))
         {
             nuint inc = (nuint)(_is32Bit ? 4 : 8);
-            Func<ulong, List<ModuleSegment>, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
-            for (nuint offset = inc; offset < segmentSize; offset += inc)
+            Func<ulong, List<ModuleSection>, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
+            for (nuint offset = inc; offset < sectionSize; offset += inc)
             {
-                nuint possibleVftableAddress = segmentBaseAddress + offset;
-                if (getClassName(possibleVftableAddress, segments) is string fullClassName)
+                nuint possibleVftableAddress = sectionBaseAddress + offset;
+                if (getClassName(possibleVftableAddress, sections) is string fullClassName)
                 {
                     // Avoiding names with the "BEL" control ASCII char specifically.
                     // The heuristic search in this method finds a lot of garbage, but this one is particularly 
@@ -215,19 +217,19 @@ public unsafe class Trickster : IDisposable
         if (ScannedTypes != null)
             res = ScannedTypes;
 
-        Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = GetAllModulesSegments(res.Keys.ToList());
-        foreach (KeyValuePair<ModuleInfo, List<ModuleSegment>> kvp in dataSegments)
+        Dictionary<ModuleInfo, List<ModuleSection>> dataSections = GetAllModulesSections(res.Keys.ToList());
+        foreach (KeyValuePair<ModuleInfo, List<ModuleSection>> kvp in dataSections)
         {
             ModuleInfo module = kvp.Key;
-            List<ModuleSegment> segments = kvp.Value;
+            List<ModuleSection> sections = kvp.Value;
 
             bool typeInfoSeenInModule = false;
             List<TypeInfo> allModuleTypes = new();
-            foreach (ModuleSegment segment in segments)
+            foreach (ModuleSection section in sections)
             {
                 try
                 {
-                    (bool typeInfoSeenInSeg, List<TypeInfo> types) = ScanTypesCore(module, segments, (nuint)segment.BaseAddress, (nuint)segment.Size);
+                    (bool typeInfoSeenInSeg, List<TypeInfo> types) = ScanTypesCore(module, sections, section);
 
                     typeInfoSeenInModule = typeInfoSeenInModule || typeInfoSeenInSeg;
 
@@ -267,9 +269,9 @@ public unsafe class Trickster : IDisposable
 
         return res;
 
-        Dictionary<ModuleInfo, List<ModuleSegment>> GetAllModulesSegments(IReadOnlyList<ModuleInfo> skip)
+        Dictionary<ModuleInfo, List<ModuleSection>> GetAllModulesSections(IReadOnlyList<ModuleInfo> skip)
         {
-            Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
+            Dictionary<ModuleInfo, List<ModuleSection>> dataSections = new();
             foreach (ModuleInfo modInfo in UnmanagedModules)
             {
                 if (skip.Contains(modInfo))
@@ -278,22 +280,22 @@ public unsafe class Trickster : IDisposable
                     continue;
                 }
 
-                List<ModuleSegment> sections = ProcessModuleExtensions.ListSections(modInfo);
-                foreach (ModuleSegment moduleSegment in sections)
+                List<ModuleSection> sections = ProcessModuleExtensions.ListSections(modInfo);
+                foreach (ModuleSection moduleSection in sections)
                 {
-                    var name = moduleSegment.Name.ToUpperInvariant();
+                    var name = moduleSection.Name.ToUpperInvariant();
                     // It's probably only ever in ".rdata" but I'm a coward
                     if (name.Contains("DATA") || name.Contains("RTTI"))
                     {
-                        if (!dataSegments.ContainsKey(modInfo))
-                            dataSegments.Add(modInfo, new List<ModuleSegment>());
+                        if (!dataSections.ContainsKey(modInfo))
+                            dataSections.Add(modInfo, new List<ModuleSection>());
 
-                        dataSegments[modInfo].Add(moduleSegment);
+                        dataSections[modInfo].Add(moduleSection);
                     }
                 }
             }
 
-            return dataSegments;
+            return dataSections;
         }
     }
 
@@ -429,7 +431,7 @@ public unsafe class Trickster : IDisposable
         OperatorNewFuncs ??= new Dictionary<ModuleInfo, ModuleOperatorFunctions>();
         Dictionary<ModuleInfo, ModuleOperatorFunctions> res = new(OperatorNewFuncs);
 
-        Dictionary<ModuleInfo, List<ModuleSegment>> dataSegments = new();
+        Dictionary<ModuleInfo, List<ModuleSection>> dataSections = new();
         foreach (ModuleInfo modInfo in UnmanagedModules)
         {
             if (res.ContainsKey(modInfo))
@@ -438,7 +440,7 @@ public unsafe class Trickster : IDisposable
                 continue;
             }
 
-            List<ModuleSegment> sections;
+            List<ModuleSection> sections;
             try
             {
                 sections = ProcessModuleExtensions.ListSections(modInfo);
@@ -450,32 +452,32 @@ public unsafe class Trickster : IDisposable
                 continue;
             }
 
-            foreach (ModuleSegment moduleSegment in sections)
+            foreach (ModuleSection section in sections)
             {
-                if (!moduleSegment.Name.ToUpperInvariant().Contains(".TEXT"))
+                if (!section.Name.ToUpperInvariant().Contains(".TEXT"))
                     continue;
 
-                if (!dataSegments.ContainsKey(modInfo))
-                    dataSegments.Add(modInfo, new List<ModuleSegment>());
+                if (!dataSections.ContainsKey(modInfo))
+                    dataSections.Add(modInfo, new List<ModuleSection>());
 
-                dataSegments[modInfo].Add(moduleSegment);
+                dataSections[modInfo].Add(section);
             }
         }
 
-        foreach (var kvp in dataSegments)
+        foreach (var kvp in dataSections)
         {
             ModuleInfo module = kvp.Key;
-            var segments = kvp.Value;
+            List<ModuleSection> sections = kvp.Value;
 
             if (!res.ContainsKey(module))
                 res[module] = new ModuleOperatorFunctions();
 
-            foreach (ModuleSegment segment in segments)
+            foreach (ModuleSection section in sections)
             {
                 try
                 {
                     InnerCheckFunc(module.Name, module.BaseAddress, module.Size,
-                        segments, (nuint)segment.BaseAddress, (nuint)segment.Size,
+                        sections, (nuint)section.BaseAddress, (nuint)section.Size,
                         out List<nuint> newFuncs,
                         out List<nuint> deleteFuncs
                         );
@@ -502,7 +504,7 @@ public unsafe class Trickster : IDisposable
     public const ulong _first8bytes = 0x8B4820EC83485340;
 
     void InnerCheckFunc(string moduleName, nuint moduleBaseAddress, nuint moduleSize,
-            List<ModuleSegment> segments, nuint segmentBaseAddress, nuint segmentBSize,
+            List<ModuleSection> sections, nuint sectionBaseAddress, nuint sectionSize,
             out List<nuint> operatorNewFuncs,
             out List<nuint> operatorDeleteFuncs)
     {
@@ -511,12 +513,12 @@ public unsafe class Trickster : IDisposable
 
         byte[] tempData = new byte[opNewEncodedFuncEpilouge_x64_rel.Length];
 
-        using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize, segments))
+        using (RttiScanner processMemory = new(_processHandle, moduleBaseAddress, moduleSize, sections))
         {
             nuint inc = (nuint)IntPtr.Size;
-            for (nuint offset = inc; offset < segmentBSize; offset += inc)
+            for (nuint offset = inc; offset < sectionSize; offset += inc)
             {
-                nuint address = segmentBaseAddress + offset;
+                nuint address = sectionBaseAddress + offset;
                 if (!processMemory.TryRead<byte>(address, tempData))
                     continue;
                 if (tempData.AsSpan().SequenceEqual(opNewEncodedFuncEpilouge_x64_rel.AsSpan()))
@@ -549,13 +551,13 @@ public unsafe class Trickster : IDisposable
 }
 
 
-public class ModuleSegment
+public class ModuleSection
 {
     public string Name { get; private set; }
     public ulong BaseAddress { get; private set; }
     public ulong Size { get; private set; }
 
-    public ModuleSegment(string name, ulong baseAddress, ulong size)
+    public ModuleSection(string name, ulong baseAddress, ulong size)
     {
         Name = name;
         BaseAddress = baseAddress;
@@ -602,7 +604,7 @@ static class ProcessModuleExtensions
         return true;
     }
 
-    public static List<ModuleSegment> ListSections(this ModuleInfo module)
+    public static List<ModuleSection> ListSections(this ModuleInfo module)
     {
         // Get a pointer to the base address of the module
         IntPtr moduleHandle = new IntPtr((long)module.BaseAddress);
@@ -610,7 +612,7 @@ static class ProcessModuleExtensions
         if (!IsIntPtrValid(moduleHandle))
         {
             Logger.Debug($"[ListSections] == WARNING == Module unloaded! Name: {module.Name} Address: {moduleHandle}");
-            return new List<ModuleSegment>();
+            return new List<ModuleSection>();
         }
 
         // Read the DOS header from the module
@@ -624,7 +626,7 @@ static class ProcessModuleExtensions
         IntPtr sectionHeaders = new IntPtr(peHeader.ToInt64() + Marshal.SizeOf(typeof(IMAGE_NT_HEADERS))) + 16;
 
         // Print the details of each section
-        List<ModuleSegment> output = new List<ModuleSegment>();
+        List<ModuleSection> output = new List<ModuleSection>();
         for (int i = 0; i < ntHeaders.FileHeader.NumberOfSections; i++)
         {
             // Read the section header from the module
@@ -637,7 +639,7 @@ static class ProcessModuleExtensions
             uint alignment = (uint)ntHeaders.OptionalHeader.SectionAlignment;
             uint roundedVirtualSize = (section.VirtualSize + alignment - 1) & ~(alignment - 1);
             output.Add(
-                new ModuleSegment(Encoding.ASCII.GetString(section.Name).TrimEnd('\0'),
+                new ModuleSection(Encoding.ASCII.GetString(section.Name).TrimEnd('\0'),
                     (ulong)module.BaseAddress + section.VirtualAddress,
                     roundedVirtualSize));
         }

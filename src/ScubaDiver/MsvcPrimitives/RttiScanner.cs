@@ -17,7 +17,7 @@ public unsafe struct RttiScanner : IDisposable
     private nuint _size;
     private byte* _pointer;
 
-    public RttiScanner(HANDLE handle, nuint mainModuleBaseAddress, nuint mainModuleSize, List<ModuleSegment> segments)
+    public RttiScanner(HANDLE handle, nuint mainModuleBaseAddress, nuint mainModuleSize, List<ModuleSection> sections)
     {
         _baseAddress = mainModuleBaseAddress;
         _size = mainModuleSize;
@@ -25,12 +25,12 @@ public unsafe struct RttiScanner : IDisposable
         nuint numberOfBytesRead = 0;
         nuint* lpNumberOfBytesRead = &numberOfBytesRead;
         {
-            foreach (ModuleSegment segment in segments)
+            foreach (ModuleSection section in sections)
             {
-                ulong distance = segment.BaseAddress - mainModuleBaseAddress;
-                if (!PInvoke.ReadProcessMemory(handle, (void*)segment.BaseAddress,
+                ulong distance = section.BaseAddress - mainModuleBaseAddress;
+                if (!PInvoke.ReadProcessMemory(handle, (void*)section.BaseAddress,
                         _pointer + distance,
-                        (nuint)segment.Size,
+                        (nuint)section.Size,
                         lpNumberOfBytesRead))
                 {
                     int gle = Marshal.GetLastWin32Error();
@@ -44,7 +44,7 @@ public unsafe struct RttiScanner : IDisposable
                                    $"numberOfBytesRead was: 0x{numberOfBytesRead:x16}\n" +
                                    $"GetLastError: 0x{gle:x16}";
 
-                    //Logger.Debug($"[RTTI Scanner] Error reading segment {segment.Name} in module @0x{mainModuleBaseAddress}. Formatter error:\n" + error);
+                    //Logger.Debug($"[RTTI Scanner] Error reading section {section.Name} in module @0x{mainModuleBaseAddress}. Formatter error:\n" + error);
                     throw new ApplicationException(error);
                 }
                 else
@@ -95,14 +95,14 @@ public unsafe struct RttiScanner : IDisposable
 
     private const int BUFFER_SIZE = 256;
 
-    public string GetClassName64(ulong address, List<ModuleSegment> segments)
+    public string GetClassName64(ulong address, List<ModuleSection> sections)
     {
         if (!TryRead(address - 0x08, out ulong object_locator)) return null;
 
         // January 2025: Trying to optimize this
-        //bool IsInSegment(ModuleSegment segment) => object_locator >= segment.BaseAddress && object_locator <= segment.BaseAddress + segment.Size;
-        //bool isInOutOfTheSegment = segments.Any(IsInSegment);
-        //if (!isInOutOfTheSegment)
+        //bool IsInSection(ModuleSection section) => object_locator >= section.BaseAddress && object_locator <= section.BaseAddress + section.Size;
+        //bool isInOutOfTheSection = sections.Any(IsInSection);
+        //if (!isInOutOfTheSection)
         //    return null;
 
         if (!TryRead(object_locator + 0x14, out ulong base_offset)) return null;
@@ -135,7 +135,7 @@ public unsafe struct RttiScanner : IDisposable
         }
     }
 
-    public string GetClassName32(ulong address, List<ModuleSegment> segments)
+    public string GetClassName32(ulong address, List<ModuleSection> sections)
     {
         if (!TryRead(address - 0x04, out uint object_locator)) return null;
         if (!TryRead(object_locator + 0x06, out uint type_descriptor)) return null;
