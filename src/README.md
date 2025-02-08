@@ -13,7 +13,7 @@ But in case the internal structure interests you (or you want to contribute/fix 
 7. **DebuggableDummy** (C#) - A short program that runs a Diver in itself. Used for debugging.
 
 ### Architecture
-When using the program, you'll be running in one of two configurations, depending on the target's type.
+When using the program, you'll be running in one of two configurations, depending on the target's type.  
 The difference is "regular" apps vs UWP apps.
 
 For "regular" apps, this is where the different dlls/assemblies go:
