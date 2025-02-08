@@ -17,7 +17,7 @@ public unsafe struct RttiScanner : IDisposable
     private nuint _size;
     private byte* _pointer;
 
-    public RttiScanner(HANDLE handle, nuint mainModuleBaseAddress, nuint mainModuleSize, List<ModuleSection> sections)
+    public RttiScanner(HANDLE handle, nuint mainModuleBaseAddress, nuint mainModuleSize, IReadOnlyList<ModuleSection> sections)
     {
         _baseAddress = mainModuleBaseAddress;
         _size = mainModuleSize;
@@ -95,7 +95,7 @@ public unsafe struct RttiScanner : IDisposable
 
     private const int BUFFER_SIZE = 256;
 
-    public string GetClassName64(ulong address, List<ModuleSection> sections)
+    public string GetClassName64(ulong address, IReadOnlyList<ModuleSection> sections)
     {
         if (!TryRead(address - 0x08, out ulong object_locator)) return null;
 
@@ -135,7 +135,7 @@ public unsafe struct RttiScanner : IDisposable
         }
     }
 
-    public string GetClassName32(ulong address, List<ModuleSection> sections)
+    public string GetClassName32(ulong address, IReadOnlyList<ModuleSection> sections)
     {
         if (!TryRead(address - 0x04, out uint object_locator)) return null;
         if (!TryRead(object_locator + 0x06, out uint type_descriptor)) return null;

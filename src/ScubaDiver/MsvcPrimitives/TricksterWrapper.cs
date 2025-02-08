@@ -7,6 +7,7 @@ using ScubaDiver.Rtti;
 using ScubaDiver.API.Utils;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 using NtApiDotNet.Win32;
+using static ScubaDiver.Rtti.Trickster;
 
 namespace ScubaDiver;
 
@@ -30,11 +31,10 @@ public class TricksterWrapper
         {
             Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster0] Refreshing runtime!");
             Stopwatch sw = Stopwatch.StartNew();
-            Dictionary<ModuleInfo, Trickster.ModuleOperatorFunctions> operatorNewFuncs = null;
+            Dictionary<RichModuleInfo, ModuleOperatorFunctions> operatorNewFuncs = null;
             if (_trickster != null)
             {
                 operatorNewFuncs = _trickster.OperatorNewFuncs;
-                _trickster.Dispose();
                 _trickster = null;
             }
 
@@ -46,11 +46,6 @@ public class TricksterWrapper
             _trickster.ScanTypes();
             secondary.Stop();
             Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE ScanTypes Elapsed: {secondary.ElapsedMilliseconds} ms");
-
-            secondary.Restart();
-            _trickster.ReadRegions();
-            secondary.Stop();
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE ReadRegions Elapsed: {secondary.ElapsedMilliseconds} ms");
 
             secondary.Restart();
             _trickster.ScanOperatorNewFuncs();
@@ -69,11 +64,11 @@ public class TricksterWrapper
         }
     }
 
-    public bool TryGetOperatorNew(ModuleInfo moduleInfo, out List<nuint> operatorNewAddresses)
+    public bool TryGetOperatorNew(RichModuleInfo richModule, out List<nuint> operatorNewAddresses)
     {
         lock (_tricksterLock)
         {
-            if (_trickster.OperatorNewFuncs.TryGetValue(moduleInfo, out var moduleFuncs))
+            if (_trickster.OperatorNewFuncs.TryGetValue(richModule, out var moduleFuncs))
             {
                 operatorNewAddresses = moduleFuncs.OperatorNewFuncs;
                 return true;
@@ -83,7 +78,7 @@ public class TricksterWrapper
         }
     }
 
-    public Dictionary<ModuleInfo, List<TypeInfo>> GetDecoratedTypes()
+    public Dictionary<RichModuleInfo, List<TypeInfo>> GetDecoratedTypes()
     {
         lock (_tricksterLock)
         {
@@ -125,8 +120,8 @@ public class TricksterWrapper
     {
         lock (_tricksterLock)
         {
-            Dictionary<ModuleInfo, List<TypeInfo>> modulesAndTypes = GetDecoratedTypes();
-            if (!modulesAndTypes.Any(m => moduleNameFilter(m.Key.Name)))
+            Dictionary<RichModuleInfo, List<TypeInfo>> modulesAndTypes = GetDecoratedTypes();
+            if (!modulesAndTypes.Any(m => moduleNameFilter(m.Key.ModuleInfo.Name)))
             {
                 // No modules pass the filter... Try again after a refresh.
                 Refresh();
@@ -134,20 +129,21 @@ public class TricksterWrapper
             }
 
             List<UndecoratedModule> output = new();
-            foreach (KeyValuePair<ModuleInfo, List<TypeInfo>> kvp in modulesAndTypes)
+            foreach (KeyValuePair<RichModuleInfo, List<TypeInfo>> kvp in modulesAndTypes)
             {
                 // First check if module passes the filter
-                ModuleInfo module = kvp.Key;
-                if (!moduleNameFilter(module.Name))
+                RichModuleInfo module = kvp.Key;
+                ModuleInfo moduleInfo = module.ModuleInfo;
+                if (!moduleNameFilter(moduleInfo.Name))
                     continue;
 
                 // Check in the cache if we already processed this module
-                if (!_undecModeulesCache.TryGetValue(module.Name, out UndecoratedModule undecModule))
+                if (!_undecModeulesCache.TryGetValue(moduleInfo.Name, out UndecoratedModule undecModule))
                 {
                     // Unprocessed module. Processing now...
                     // Generate the undecorated module and save in cache
                     undecModule = GenerateUndecoratedModule(module, kvp.Value);
-                    _undecModeulesCache[module.Name] = undecModule;
+                    _undecModeulesCache[module.ModuleInfo.Name] = undecModule;
                 }
 
                 // store this module for the output
@@ -158,11 +154,11 @@ public class TricksterWrapper
         }
     }
 
-    private UndecoratedModule GenerateUndecoratedModule(ModuleInfo moduleInfo, List<TypeInfo> firstClassTypes)
+    private UndecoratedModule GenerateUndecoratedModule(RichModuleInfo richModule, List<TypeInfo> firstClassTypes)
     {
         lock (_tricksterLock)
         {
-            UndecoratedModule module = new UndecoratedModule(moduleInfo.Name, moduleInfo);
+            UndecoratedModule undecModule = new UndecoratedModule(richModule.ModuleInfo.Name, richModule);
 
             Dictionary<string, TypeInfo> allClassTypes = new();
             foreach (TypeInfo curr in firstClassTypes)
@@ -189,7 +185,7 @@ public class TricksterWrapper
 
             // First, going over exports and looking for constructors.
             // Getting all UNEDCORATED exports, type funcs and typeless
-            HashSet<UndecoratedSymbol> allUndecoratedExports = ExportsMaster.GetUndecoratedExports(moduleInfo).ToHashSet();
+            HashSet<UndecoratedSymbol> allUndecoratedExports = ExportsMaster.GetUndecoratedExports(undecModule.ModuleInfo).ToHashSet();
             foreach (UndecoratedSymbol undecSymbol in allUndecoratedExports)
             {
                 if (undecSymbol is not UndecoratedFunction ctor)
@@ -213,7 +209,7 @@ public class TricksterWrapper
                 string typeName = lastIndexOfColonColon == -1 ? nameAndNamespace : nameAndNamespace.Substring(lastIndexOfColonColon + 2);
 
                 // NEW 2nd-class type. Adding a new match!
-                TypeInfo ti = new SecondClassTypeInfo(module.Name, namespaceName, typeName);
+                TypeInfo ti = new SecondClassTypeInfo(undecModule.Name, namespaceName, typeName);
                 // Store aside as a member of this type
                 allClassTypes.Add(ti.FullTypeName, ti);
                 allClassTypesNames.Add(nameAndNamespace);
@@ -224,17 +220,17 @@ public class TricksterWrapper
             foreach (TypeInfo typeInfo in allClassTypes.Values)
             {
                 // $#@!: Is this a hack?
-                module.GetOrAddType(typeInfo);
+                undecModule.GetOrAddType(typeInfo);
 
                 // Find all exported members of the type
-                IEnumerable<UndecoratedSymbol> methods = ExportsMaster.GetExportedTypeMembers(moduleInfo, typeInfo.NamespaceAndName);
+                IEnumerable<UndecoratedSymbol> methods = ExportsMaster.GetExportedTypeMembers(undecModule.ModuleInfo, typeInfo.NamespaceAndName);
                 foreach (UndecoratedSymbol symbol in methods)
                 {
                     if (symbol is not UndecoratedExportedFunc undecFunc) // TODO: Fields
                         continue;
 
                     // Store aside as a member of this type
-                    module.AddTypeFunction(typeInfo, undecFunc);
+                    undecModule.AddTypeFunction(typeInfo, undecFunc);
 
                     // Removing type func from allExports
                     allUndecoratedExports.Remove(undecFunc);
@@ -251,35 +247,37 @@ public class TricksterWrapper
                     continue;
                 }
 
-                module.AddUndecoratedTypelessFunction(undecFunc);
+                undecModule.AddUndecoratedTypelessFunction(undecFunc);
             }
 
             // Which means C-style, non-class-associated funcs/variables.
-            List<DllExport> leftoverFunc = ExportsMaster.GetLeftoverExports(moduleInfo).ToList();
+            List<DllExport> leftoverFunc = ExportsMaster.GetLeftoverExports(undecModule.ModuleInfo).ToList();
             foreach (DllExport export in leftoverFunc)
             {
-                module.AddRegularTypelessFunction(export);
+                undecModule.AddRegularTypelessFunction(export);
             }
 
 
             // 'operator new' are most likely not exported. We need the trickster to tell us where they are.
-            if (TryGetOperatorNew(moduleInfo, out List<nuint> operatorNewAddresses))
+            if (TryGetOperatorNew(richModule, out List<nuint> operatorNewAddresses))
             {
                 foreach (nuint operatorNewAddr in operatorNewAddresses)
                 {
                     UndecoratedFunction undecFunction =
                         new UndecoratedInternalFunction(
+                            undecModule.ModuleInfo,
                             undecoratedName: "operator new",
                             undecoratedFullName: "operator new",
                             decoratedName: "operator new",
-                            operatorNewAddr, 1,
-                            moduleInfo);
+                            operatorNewAddr, 
+                            1,
+                            "void*");
                     // TODO: Add this is a "regular" typeless func
-                    module.AddUndecoratedTypelessFunction(undecFunction);
+                    undecModule.AddUndecoratedTypelessFunction(undecFunction);
                 }
             }
 
-            return module;
+            return undecModule;
         }
 
 
@@ -355,14 +353,6 @@ public class TricksterWrapper
         lock (_tricksterLock)
         {
             return _trickster._processHandle;
-        }
-    }
-
-    public Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(IEnumerable<FirstClassTypeInfo> allClassesToScanFor)
-    {
-        lock (_tricksterLock)
-        {
-            return TricksterScanHelper.Scan(_trickster, allClassesToScanFor);
         }
     }
 }

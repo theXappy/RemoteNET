@@ -3,6 +3,7 @@ using ScubaDiver.Rtti;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
@@ -206,6 +207,7 @@ namespace ScubaDiver
     public class MsvcTypesManager
     {
         private TricksterWrapper _tricksterWrapper = null;
+        private MemoryScanner _memoryScanner = null;
         private IReadOnlyExportsMaster _exportsMaster = null;
 
         // Types cache.
@@ -225,6 +227,7 @@ namespace ScubaDiver
         public MsvcTypesManager()
         {
             _tricksterWrapper = new TricksterWrapper();
+            _memoryScanner = new MemoryScanner();
             _exportsMaster = _tricksterWrapper.ExportsMaster;
             _exportsCache = new();
         }
@@ -246,14 +249,14 @@ namespace ScubaDiver
                 }
                 else
                 {
-                    results = results.Where(module => IsImportedInto(module, imports)).ToList();
+                    results = results.Where(module => IsImportedInto(module.ModuleInfo.Name, imports)).ToList();
                 }
             }
             return results;
 
-            bool IsImportedInto(UndecoratedModule module, IReadOnlyList<DllImport> imports)
+            bool IsImportedInto(string moduleName, IReadOnlyList<DllImport> imports)
             {
-                return imports.Any(imp => imp.DllName == module.Name);
+                return imports.Any(imp => imp.DllName == moduleName);
             }
         }
         public List<UndecoratedModule> GetUndecoratedModules(Predicate<string> moduleNameFilter) => GetUndecoratedModules(new MsvcModuleFilter() { NamePredicate = moduleNameFilter });
@@ -265,8 +268,9 @@ namespace ScubaDiver
         }
 
         private object _getTypesLock = new object();
-        public IEnumerable<MsvcTypeStub> GetTypes(MsvcModuleFilter moduleFilter, Predicate<string> typeFilter)
+        public IReadOnlyList<MsvcTypeStub> GetTypes(MsvcModuleFilter moduleFilter, Predicate<string> typeFilter)
         {
+            List<MsvcTypeStub> output = new List<MsvcTypeStub>();
             lock (_getTypesLock)
             {
                 RefreshIfNeeded();
@@ -277,16 +281,19 @@ namespace ScubaDiver
                 {
                     foreach (Rtti.TypeInfo type in undecoratedModule.Types)
                     {
-                        if (typeFilter(type.NamespaceAndName))
-                        {
-                            yield return GetOrCreateTypeStub(undecoratedModule.ModuleInfo, type);
-                        }
+                        if (!typeFilter(type.NamespaceAndName))
+                            continue;
+
+                        MsvcTypeStub t = GetOrCreateTypeStub(undecoratedModule.RichModule, type);
+                        output.Add(t);
                     }
                 }
             }
+            return output;
         }
 
-        public IEnumerable<MsvcTypeStub> GetTypes(Predicate<string> moduleNameFilter, Predicate<string> typeFilter) => GetTypes(new MsvcModuleFilter() { NamePredicate = moduleNameFilter }, typeFilter);
+        public IReadOnlyList<MsvcTypeStub> GetTypes(Predicate<string> moduleNameFilter, Predicate<string> typeFilter) 
+                    => GetTypes(new MsvcModuleFilter() { NamePredicate = moduleNameFilter }, typeFilter).ToList();
 
 
         public MsvcTypeStub GetType(MsvcModuleFilter moduleFilter, Predicate<string> typeFilter)
@@ -343,15 +350,15 @@ namespace ScubaDiver
             }
         }
 
-        private MsvcTypeStub GetOrCreateTypeStub(ModuleInfo module, Rtti.TypeInfo rawType)
+        private MsvcTypeStub GetOrCreateTypeStub(RichModuleInfo module, Rtti.TypeInfo rawType)
         {
             // Search cache
-            if (!_typesCache.TryGetValue(module.Name, out var moduleTypes))
+            if (!_typesCache.TryGetValue(module.ModuleInfo.Name, out var moduleTypes))
             {
                 moduleTypes = new Dictionary<string, MsvcTypeStub>();
-                _typesCache[module.Name] = moduleTypes;
+                _typesCache[module.ModuleInfo.Name] = moduleTypes;
             }
-            if (moduleTypes.TryGetValue(rawType.Name, out var cachedType))
+            if (moduleTypes.TryGetValue(rawType.NamespaceAndName, out MsvcTypeStub cachedType))
                 return cachedType; // Cache hit!
 
             // No hit, creating new type.
@@ -359,11 +366,11 @@ namespace ScubaDiver
             MsvcTypeStub newType = CreateTypeStub(module, rawType);
 
             // Cache and return
-            moduleTypes[rawType.Name] = newType;
+            moduleTypes[rawType.NamespaceAndName] = newType;
             return newType;
         }
 
-        private MsvcTypeStub CreateTypeStub(ModuleInfo module, Rtti.TypeInfo type)
+        private MsvcTypeStub CreateTypeStub(RichModuleInfo module, Rtti.TypeInfo type)
         {
             Func<MsvcType> upgrader = () =>
             {
@@ -374,19 +381,19 @@ namespace ScubaDiver
             return newType;
         }
 
-        private MsvcType CreateType(ModuleInfo module, Rtti.TypeInfo type)
+        private MsvcType CreateType(RichModuleInfo module, Rtti.TypeInfo type)
         {
-            if (!_modulesCache.TryGetValue(module.Name, out MsvcModule msvcModule))
+            if (!_modulesCache.TryGetValue(module.ModuleInfo.Name, out MsvcModule msvcModule))
             {
-                msvcModule = new MsvcModule(module);
-                _modulesCache[module.Name] = msvcModule;
+                msvcModule = new MsvcModule(module.ModuleInfo);
+                _modulesCache[module.ModuleInfo.Name] = msvcModule;
             }
 
             // Create hollow type
             MsvcType finalType = new MsvcType(msvcModule, type);
 
             // Get all exported members of the requseted type
-            List<UndecoratedSymbol> rawMembers = _exportsMaster.GetExportedTypeMembers(module, type.NamespaceAndName).ToList();
+            List<UndecoratedSymbol> rawMembers = _exportsMaster.GetExportedTypeMembers(module.ModuleInfo, type.NamespaceAndName).ToList();
             List<UndecoratedFunction> exportedFuncs = rawMembers.OfType<UndecoratedFunction>().ToList();
 
             // Find the first vftable within all members
@@ -401,10 +408,11 @@ namespace ScubaDiver
             List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
             foreach (UndecoratedExportedField vftable in vftables)
             {
-                MsvcModuleExports moduleExports = GetOrCreateModuleExports(module);
+                MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.ModuleInfo);
                 virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(),
                     module,
                     moduleExports,
+                    type,
                     vftable.Address);
 
                 // Remove duplicates - the methods which are both virtual and exported.
@@ -430,20 +438,11 @@ namespace ScubaDiver
             return exports;
         }
 
-
         //TODO: Move me
         public Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(IEnumerable<MsvcTypeStub> types)
         {
-            lock (_getTypesLock)
-            {
-                IEnumerable<FirstClassTypeInfo> allClassesToScanFor = types.Select(t => t.TypeInfo).OfType<FirstClassTypeInfo>();
-                return _tricksterWrapper.Scan(allClassesToScanFor);
-            }
-        }
-
-        internal object GetType(string methodOwnerTypeName)
-        {
-            throw new NotImplementedException();
+            IEnumerable<FirstClassTypeInfo> allClassesToScanFor = types.Select(t => t.TypeInfo).OfType<FirstClassTypeInfo>();
+            return _memoryScanner.Scan(allClassesToScanFor);
         }
     }
 

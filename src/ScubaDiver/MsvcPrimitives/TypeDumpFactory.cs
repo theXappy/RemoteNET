@@ -67,10 +67,7 @@ namespace ScubaDiver
                 {
                     TypeDump.TypeMethod typeMethod = VftableParser.ConvertToTypeMethod(undecoratedFunc);
                     if (typeMethod == null)
-                    {
-                        Logger.Debug($"[MsvcDiver] Failed to convert UndecoratedFunction: {undecoratedFunc.UndecoratedFullName}. Skipping.");
                         continue;
-                    }
 
                     // Check for inheritance.
                     // Heuristic: if the name this function was exported with does not start with this classes prefix, it's inherited

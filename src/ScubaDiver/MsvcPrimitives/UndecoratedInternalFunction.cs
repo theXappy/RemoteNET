@@ -15,18 +15,24 @@ public class UndecoratedInternalFunction : UndecoratedFunction
     private string[] _argTypes;
     public override string[] ArgTypes => _argTypes;
 
+    private string _retType;
+    public override string RetType => _retType;
+
+
     public UndecoratedInternalFunction(
-        string undecoratedName, 
-        string undecoratedFullName, 
+        ModuleInfo moduleInfo,
+        string undecoratedName,
+        string undecoratedFullName,
         string decoratedName,
-        nuint address, 
-        int numArgs, 
-        ModuleInfo moduleInfo) 
+        nuint address,
+        int numArgs,
+        string retType)
         : base(decoratedName, undecoratedName, undecoratedFullName, numArgs)
     {
         _address = address;
         _module = moduleInfo;
 
         _argTypes = Enumerable.Repeat("long", numArgs).ToArray();
+        _retType = retType;
     }
 }

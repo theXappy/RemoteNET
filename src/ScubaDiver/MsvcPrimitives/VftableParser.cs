@@ -6,6 +6,7 @@ using ScubaDiver.Rtti;
 using System.Linq;
 using Windows.Win32.Foundation;
 using System.Diagnostics;
+using System.ComponentModel;
 
 public static class VftableParser
 {
@@ -20,16 +21,19 @@ public static class VftableParser
     /// Assuming all function (3 in the example above) are exported, we'd find their names in <see cref="exportsList"/>
     /// and return them together with their names.
     /// </summary>
-    public static List<UndecoratedFunction> AnalyzeVftable(HANDLE process, ModuleInfo module, MsvcModuleExports moduleExports, nuint vftableAddress)
+    public static List<UndecoratedFunction> AnalyzeVftable(HANDLE process, RichModuleInfo module, MsvcModuleExports moduleExports, TypeInfo type, nuint vftableAddress)
     {
         Logger.Debug("[AnalyzeVftable] Called");
+
+        IReadOnlyList<ModuleSection> textSections = module.GetSections(".TEXT").ToList();
+
         List<UndecoratedFunction> virtualMethods = new List<UndecoratedFunction>();
 
         using var scanner = new RttiScanner(
             process,
-            module.BaseAddress,
-            module.Size,
-            module.ListSections()
+            module.ModuleInfo.BaseAddress,
+            module.ModuleInfo.Size,
+            module.Sections
             );
 
         bool nextVftableFound = false;
@@ -53,9 +57,26 @@ public static class VftableParser
             if (!moduleExports.TryGetFunc(entryContent, out UndecoratedFunction undecFunc))
             {
                 // Check for anon-exported method of our type. We should still add it to the list.
-                if (!PointsToTextSection(entryContent))
+                if (PointsToTextSection(textSections, entryContent))
+                {
+                    nuint subRelativeOffset = (nuint)(entryContent - module.ModuleInfo.BaseAddress);
 
-                continue;
+                    string trimmedHex = subRelativeOffset.ToString("x16").TrimStart('0');
+                    string subName = $"sub_{trimmedHex}";
+                    undecFunc = new UndecoratedInternalFunction(
+                        moduleInfo: module.ModuleInfo,
+                        decoratedName: subName,
+                        undecoratedFullName: $"{type.NamespaceAndName}::{subName}",
+                        undecoratedName: subName,
+                        address: entryContent,
+                        numArgs: 1, // TODO: This is 99% wrong
+                        retType: "void*" // TODO: Also XX% wrong
+                        );
+                }
+                else
+                {
+                    continue;
+                }
             }
             
             // Found a new virtual method for our type!
@@ -70,9 +91,16 @@ public static class VftableParser
         return new();
     }
 
-    private static bool PointsToTextSection(nuint entryContent)
+    private static bool PointsToTextSection(IReadOnlyList<ModuleSection> textSections, nuint entryContent)
     {
-        throw new NotImplementedException();
+        foreach (ModuleSection section in textSections)
+        {
+            if (section.BaseAddress <= entryContent && entryContent < section.BaseAddress + section.Size)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     // TODO: Move somewhere else

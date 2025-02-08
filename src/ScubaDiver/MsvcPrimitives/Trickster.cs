@@ -14,6 +14,8 @@ using System.Security.Cryptography;
 using ScubaDiver.Rtti;
 using ScubaDiver;
 using System.Drawing;
+using System.Diagnostics.CodeAnalysis;
+
 // ReSharper disable UnusedMember.Global
 // ReSharper disable InconsistentNaming
 // ReSharper disable IdentifierTypo
@@ -97,20 +99,6 @@ public class SecondClassTypeInfo : TypeInfo
     }
 }
 
-public unsafe struct MemoryRegionInfo
-{
-    public void* BaseAddress;
-    public nuint Size;
-    public MemoryRegionInfo(void* baseAddress, nuint size) { BaseAddress = baseAddress; Size = size; }
-}
-
-public unsafe struct MemoryRegion
-{
-    public void* Pointer { get; set; }
-    public void* BaseAddress { get; set; }
-    public nuint Size { get; set; }
-    public MemoryRegion(void* pointer, void* baseAddress, nuint size) { Pointer = pointer; BaseAddress = baseAddress; Size = size; }
-}
 
 public struct ModuleInfo
 {
@@ -125,9 +113,22 @@ public struct ModuleInfo
     }
 
     public override string ToString() => $"{Name} 0x({BaseAddress:x8}, {Size} bytes)";
+
+    public override bool Equals([NotNullWhen(true)] object obj)
+    {
+        return obj is ModuleInfo info &&
+               Name == info.Name &&
+               BaseAddress == info.BaseAddress &&
+               Size == info.Size;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Name, BaseAddress, Size);
+    }
 }
 
-public unsafe class Trickster : IDisposable
+public unsafe class Trickster
 {
     public HANDLE _processHandle;
 
@@ -135,11 +136,11 @@ public unsafe class Trickster : IDisposable
 
     private bool _is32Bit;
 
-    public Dictionary<ModuleInfo, List<TypeInfo>> ScannedTypes;
-    public Dictionary<ModuleInfo, ModuleOperatorFunctions> OperatorNewFuncs;
-    public MemoryRegion[] Regions;
+    public Dictionary<RichModuleInfo, List<TypeInfo>> ScannedTypes;
+    public Dictionary<RichModuleInfo, ModuleOperatorFunctions> OperatorNewFuncs;
 
     public List<ModuleInfo> UnmanagedModules;
+
 
     public Trickster(Process process)
     {
@@ -167,7 +168,7 @@ public unsafe class Trickster : IDisposable
         _is32Bit = is32Bit;
     }
 
-    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(ModuleInfo module, List<ModuleSection> sections, ModuleSection currSection)
+    private (bool typeInfoSeen, List<TypeInfo>) ScanTypesCore(RichModuleInfo richModule, ModuleSection currSection)
     {
         nuint sectionBaseAddress = (nuint)currSection.BaseAddress;
         nuint sectionSize = (nuint)currSection.Size;
@@ -178,10 +179,12 @@ public unsafe class Trickster : IDisposable
         // is missing all our "findings" are actually false positives
         bool typeInfoSeen = false;
 
+        ModuleInfo module = richModule.ModuleInfo;
+        IReadOnlyList<ModuleSection> sections = richModule.Sections;
         using (RttiScanner processMemory = new(_processHandle, module.BaseAddress, module.Size, sections))
         {
             nuint inc = (nuint)(_is32Bit ? 4 : 8);
-            Func<ulong, List<ModuleSection>, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
+            Func<ulong, IReadOnlyList<ModuleSection>, string> getClassName = _is32Bit ? processMemory.GetClassName32 : processMemory.GetClassName64;
             for (nuint offset = inc; offset < sectionSize; offset += inc)
             {
                 nuint possibleVftableAddress = sectionBaseAddress + offset;
@@ -211,17 +214,17 @@ public unsafe class Trickster : IDisposable
         return (typeInfoSeen, list);
     }
 
-    private Dictionary<ModuleInfo, List<TypeInfo>> ScanTypesCore()
+    private Dictionary<RichModuleInfo, List<TypeInfo>> ScanTypesCore()
     {
-        Dictionary<ModuleInfo, List<TypeInfo>> res = new Dictionary<ModuleInfo, List<TypeInfo>>();
-        if (ScannedTypes != null)
-            res = ScannedTypes;
+        Dictionary<RichModuleInfo, List<TypeInfo>> res = new Dictionary<RichModuleInfo, List<TypeInfo>>();
+        IReadOnlyList<RichModuleInfo> skip = ScannedTypes?.Keys.ToList() ?? new List<RichModuleInfo>();
 
-        Dictionary<ModuleInfo, List<ModuleSection>> dataSections = GetAllModulesSections(res.Keys.ToList());
-        foreach (KeyValuePair<ModuleInfo, List<ModuleSection>> kvp in dataSections)
+        List<RichModuleInfo> dataSections = GetRichModules(skip);
+        foreach (RichModuleInfo richModule in dataSections)
         {
-            ModuleInfo module = kvp.Key;
-            List<ModuleSection> sections = kvp.Value;
+            Func<ModuleSection, bool> filter = (s) => s.Name.ToUpper().Contains("DATA") ||
+                                                      s.Name.ToUpper().Contains("RTTI");
+            IReadOnlyList<ModuleSection> sections = richModule.GetSections(filter).ToList();
 
             bool typeInfoSeenInModule = false;
             List<TypeInfo> allModuleTypes = new();
@@ -229,7 +232,7 @@ public unsafe class Trickster : IDisposable
             {
                 try
                 {
-                    (bool typeInfoSeenInSeg, List<TypeInfo> types) = ScanTypesCore(module, sections, section);
+                    (bool typeInfoSeenInSeg, List<TypeInfo> types) = ScanTypesCore(richModule, section);
 
                     typeInfoSeenInModule = typeInfoSeenInModule || typeInfoSeenInSeg;
 
@@ -248,176 +251,46 @@ public unsafe class Trickster : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[Error] Couldn't scan for RTTI info in {module.Name}, EX: " + ex.GetType().Name);
+                    Console.WriteLine($"[Error] Couldn't scan for RTTI info in {richModule.ModuleInfo.Name}, EX: " + ex.GetType().Name);
                 }
             }
 
             if (typeInfoSeenInModule && allModuleTypes.Any())
             {
-                if (res.ContainsKey(module))
+                if (res.ContainsKey(richModule))
                 {
                     Logger.Debug("[ScanTypesCore] WTF module alraedy exists in final dictionary... ???");
                 }
-                res[module] = allModuleTypes;
+                res[richModule] = allModuleTypes;
             }
             else
             {
                 // No types in this module. Might just be non-MSVC one so we add a dummy
-                res[module] = new List<TypeInfo>();
+                res[richModule] = new List<TypeInfo>();
             }
         }
 
         return res;
+    }
+    private List<RichModuleInfo> GetRichModules(IReadOnlyList<RichModuleInfo> richModulesToSkip)
+    {
+        HashSet<ModuleInfo> modulesToSkip = richModulesToSkip?.Select(rmi => rmi.ModuleInfo).ToHashSet() ?? [];
 
-        Dictionary<ModuleInfo, List<ModuleSection>> GetAllModulesSections(IReadOnlyList<ModuleInfo> skip)
+        List<RichModuleInfo> richModules = new List<RichModuleInfo>();
+        foreach (ModuleInfo modInfo in UnmanagedModules)
         {
-            Dictionary<ModuleInfo, List<ModuleSection>> dataSections = new();
-            foreach (ModuleInfo modInfo in UnmanagedModules)
+            if (modulesToSkip.Contains(modInfo))
             {
-                if (skip.Contains(modInfo))
-                {
-                    Logger.Debug($"Skipping {modInfo.Name} :)");
-                    continue;
-                }
-
-                List<ModuleSection> sections = ProcessModuleExtensions.ListSections(modInfo);
-                foreach (ModuleSection moduleSection in sections)
-                {
-                    var name = moduleSection.Name.ToUpperInvariant();
-                    // It's probably only ever in ".rdata" but I'm a coward
-                    if (name.Contains("DATA") || name.Contains("RTTI"))
-                    {
-                        if (!dataSections.ContainsKey(modInfo))
-                            dataSections.Add(modInfo, new List<ModuleSection>());
-
-                        dataSections[modInfo].Add(moduleSection);
-                    }
-                }
+                continue;
             }
 
-            return dataSections;
+            IReadOnlyList<ModuleSection> sections = ProcessModuleExtensions.ListSections(modInfo);
+            richModules.Add(new RichModuleInfo(modInfo, sections.ToList()));
         }
+        return richModules;
     }
 
 
-    private MemoryRegionInfo[] ScanRegionInfoCore()
-    {
-        ulong stop = _is32Bit ? uint.MaxValue : 0x7ffffffffffffffful;
-        nuint size = (nuint)sizeof(MEMORY_BASIC_INFORMATION);
-
-        List<MemoryRegionInfo> list = new();
-
-        MEMORY_BASIC_INFORMATION mbi;
-        nuint address = 0;
-
-
-        while (address < stop && PInvoke.VirtualQueryEx(_processHandle, (void*)address, &mbi, size) > 0 && address + mbi.RegionSize > address)
-        {
-            if (mbi.State == VIRTUAL_ALLOCATION_TYPE.MEM_COMMIT &&
-                !mbi.Protect.HasFlag(PAGE_PROTECTION_FLAGS.PAGE_NOACCESS) &&
-                !mbi.Protect.HasFlag(PAGE_PROTECTION_FLAGS.PAGE_GUARD) &&
-                !mbi.Protect.HasFlag(PAGE_PROTECTION_FLAGS.PAGE_NOCACHE))
-                list.Add(new MemoryRegionInfo(mbi.BaseAddress, mbi.RegionSize));
-            address += mbi.RegionSize;
-        }
-
-        return list.ToArray();
-    }
-
-    private MemoryRegion[] ReadRegionsCore(MemoryRegionInfo[] infoArray)
-    {
-        MemoryRegion[] regionArray = new MemoryRegion[infoArray.Length];
-        for (int i = 0; i < regionArray.Length; i++)
-        {
-            void* baseAddress = infoArray[i].BaseAddress;
-            nuint size = infoArray[i].Size;
-            void* pointer = NativeMemory.AllocZeroed(size, 1);
-            PInvoke.ReadProcessMemory(_processHandle, baseAddress, pointer, size);
-            regionArray[i] = new(pointer, baseAddress, size);
-        }
-        return regionArray;
-    }
-
-    public void ReadRegions()
-    {
-        if (Regions is not null)
-        {
-            FreeRegionsCore(Regions);
-        }
-
-        MemoryRegionInfo[] scannedRegions = ScanRegionInfoCore();
-        Regions = ReadRegionsCore(scannedRegions);
-    }
-
-    public IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegions(IEnumerable<nuint> xoredVftables, nuint xorMask = 0x00000000)
-    {
-        Logger.Debug("[ScanRegions] Fetching Regions for ScanRegionsCore2");
-        var regions = Regions;
-        Logger.Debug("[ScanRegions] Fetching Regions for ScanRegionsCore2 -- DONE");
-        var res = ScanRegionsCore2(Regions, xoredVftables, xorMask);
-        Logger.Debug("[ScanRegions] Returned from ScanRegionsCore2");
-        return res;
-    }
-
-    private void FreeRegionsCore(MemoryRegion[] regionArray)
-    {
-        // Print call stack to find who called us
-        StackTrace stackTrace = new(true);
-        Logger.Debug($"[FreeRegionsCore] Called");
-
-        for (int i = 0; i < regionArray.Length; i++)
-        {
-            CryptographicOperations.ZeroMemory(new Span<byte>(regionArray[i].Pointer, (int)regionArray[i].Size));
-            IntPtr intPtr = new(regionArray[i].Pointer);
-            //Logger.Debug($"[FreeRegionsCore] Freeing 0x{((ulong)intPtr):X16}");
-            NativeMemory.Free(regionArray[i].Pointer);
-        }
-        Logger.Debug("[FreeRegionsCore] Done freeing regions");
-    }
-    private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegion[] regionArray, IEnumerable<nuint> xoredVftables, nuint xorMask)
-    {
-        ConcurrentDictionary<ulong, ConcurrentBag<ulong>> results = new();
-
-        foreach (nuint xoredVFtable in xoredVftables)
-        {
-            results[(ulong)xoredVFtable] = new ConcurrentBag<ulong>();
-        }
-
-        Parallel.For(0, regionArray.Length, i =>
-        {
-            MemoryRegion region = regionArray[i];
-            byte* start = (byte*)region.Pointer;
-            byte* end = start + region.Size;
-            if (_is32Bit)
-            {
-                for (byte* a = start; a < end; a += 4)
-                {
-                    ulong suspect = *(uint*)a;
-                    if (!results.TryGetValue(suspect ^ xorMask, out var bag))
-                        continue;
-                    ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
-                    bag.Add(result);
-                }
-            }
-            else
-            {
-                for (byte* a = start; a < end; a += 8)
-                {
-                    ulong suspect = *(ulong*)a;
-                    if (!results.TryGetValue(suspect ^ xorMask, out var bag))
-                        continue;
-                    ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
-                    bag.Add(result);
-                }
-            }
-        });
-
-        Dictionary<ulong, IReadOnlyCollection<ulong>> results2 =
-            results.ToDictionary(
-                kvp => kvp.Key,
-                kvp => (IReadOnlyCollection<ulong>)kvp.Value);
-        return results2;
-    }
 
     public class ModuleOperatorFunctions
     {
@@ -425,48 +298,24 @@ public unsafe class Trickster : IDisposable
         public List<nuint> OperatorDeleteFuncs { get; } = new();
     }
 
-    private Dictionary<ModuleInfo, ModuleOperatorFunctions> ScanOperatorNewFuncsCore()
+    private Dictionary<RichModuleInfo, ModuleOperatorFunctions> ScanOperatorNewFuncsCore()
     {
         // Start with any existing findings
-        OperatorNewFuncs ??= new Dictionary<ModuleInfo, ModuleOperatorFunctions>();
-        Dictionary<ModuleInfo, ModuleOperatorFunctions> res = new(OperatorNewFuncs);
+        OperatorNewFuncs ??= new Dictionary<RichModuleInfo, ModuleOperatorFunctions>();
 
-        Dictionary<ModuleInfo, List<ModuleSection>> dataSections = new();
-        foreach (ModuleInfo modInfo in UnmanagedModules)
-        {
-            if (res.ContainsKey(modInfo))
-            {
-                // Already processed this module. Modules don't "get" more new functions over time...
-                continue;
-            }
+        List<RichModuleInfo> richModules = GetRichModules(OperatorNewFuncs.Keys.ToList());
 
-            List<ModuleSection> sections;
-            try
-            {
-                sections = ProcessModuleExtensions.ListSections(modInfo);
-            }
-            catch (AccessViolationException)
-            {
-                // Probably an unloaded dll
-                Logger.Debug($"[Warning] Couldn't list sections of {modInfo.Name} at 0x{modInfo.BaseAddress:x16}");
-                continue;
-            }
+        Func<ModuleSection, bool> textFilter = (s) => s.Name.ToUpper() == ".TEXT";
+        Dictionary<RichModuleInfo, List<ModuleSection>> dataSections =
+            richModules.ToDictionary(
+                    keySelector: module => module,
+                    elementSelector: module => module.GetSections(".TEXT").ToList());
 
-            foreach (ModuleSection section in sections)
-            {
-                if (!section.Name.ToUpperInvariant().Contains(".TEXT"))
-                    continue;
-
-                if (!dataSections.ContainsKey(modInfo))
-                    dataSections.Add(modInfo, new List<ModuleSection>());
-
-                dataSections[modInfo].Add(section);
-            }
-        }
-
+        Dictionary<RichModuleInfo, ModuleOperatorFunctions> res = new(OperatorNewFuncs);
         foreach (var kvp in dataSections)
         {
-            ModuleInfo module = kvp.Key;
+            RichModuleInfo module = kvp.Key;
+            ModuleInfo moduleInfo = module.ModuleInfo;
             List<ModuleSection> sections = kvp.Value;
 
             if (!res.ContainsKey(module))
@@ -476,7 +325,7 @@ public unsafe class Trickster : IDisposable
             {
                 try
                 {
-                    InnerCheckFunc(module.Name, module.BaseAddress, module.Size,
+                    InnerCheckFunc(moduleInfo.Name, moduleInfo.BaseAddress, moduleInfo.Size,
                         sections, (nuint)section.BaseAddress, (nuint)section.Size,
                         out List<nuint> newFuncs,
                         out List<nuint> deleteFuncs
@@ -487,7 +336,7 @@ public unsafe class Trickster : IDisposable
                 catch (Exception ex)
                 {
                     if (ex is not ApplicationException)
-                        Console.WriteLine($"[Error] Couldn't scan for 'operator new' in {module.Name}, EX: " + ex.GetType().Name);
+                        Console.WriteLine($"[Error] Couldn't scan for 'operator new' in {moduleInfo.Name}, EX: " + ex.GetType().Name);
                 }
             }
         }
@@ -539,15 +388,6 @@ public unsafe class Trickster : IDisposable
     {
         OperatorNewFuncs = ScanOperatorNewFuncsCore();
     }
-
-
-    public void Dispose()
-    {
-        if (Regions is not null)
-        {
-            FreeRegionsCore(Regions);
-        }
-    }
 }
 
 
@@ -574,6 +414,44 @@ public class ModuleSection
     }
 }
 
+// Module Info + Sections
+public class RichModuleInfo
+{
+    public ModuleInfo ModuleInfo { get; }
+    public IReadOnlyList<ModuleSection> Sections { get; }
+    public RichModuleInfo(ModuleInfo moduleInfo, IReadOnlyList<ModuleSection> sections)
+    {
+        ModuleInfo = moduleInfo;
+        Sections = sections;
+    }
+
+    //public IEnumerable<ModuleSection> GetRttiRelevantSections()
+    //{
+    //    return Sections.Where(s => s.Name.Contains("DATA") || s.Name.Contains("RTTI"));
+    //}
+
+    public IEnumerable<ModuleSection> GetSections(Func<ModuleSection, bool> predicate)
+    {
+        return Sections.Where(predicate);
+    }
+
+    internal IEnumerable<ModuleSection> GetSections(string uppercaseName)
+    {
+        return Sections.Where(s => s.Name.ToUpper().Contains(uppercaseName.ToUpper()));
+    }
+
+    public override string ToString()
+    {
+        StringBuilder sb = new();
+        sb.AppendLine(ModuleInfo.ToString());
+        foreach (ModuleSection section in Sections)
+        {
+            sb.AppendLine(section.ToString());
+        }
+        return sb.ToString();
+    }
+
+}
 
 static class ProcessModuleExtensions
 {

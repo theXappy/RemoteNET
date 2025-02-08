@@ -341,7 +341,9 @@ namespace ScubaDiver
 
         private TypeDump GetTypeDump(string rawAssemblyFilter, string rawTypeFilter)
         {
-            MsvcType matchingType = _typesManager.GetType(rawAssemblyFilter, rawTypeFilter).Upgrade();
+            Predicate<string> moduleNameFilter = Filter.CreatePredicate(rawAssemblyFilter);
+            Predicate<string> typeFilter = Filter.CreatePredicate(rawTypeFilter);
+            MsvcType matchingType = _typesManager.GetType(moduleNameFilter, typeFilter)?.Upgrade();
             if (matchingType == null)
                 return null;
             return TypeDumpFactory.ConvertMsvcTypeToTypeDump(matchingType);

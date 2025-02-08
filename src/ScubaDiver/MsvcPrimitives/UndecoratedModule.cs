@@ -10,6 +10,7 @@ namespace ScubaDiver;
 public class UndecoratedModule
 {
     public string Name { get; private set; }
+    public Rtti.RichModuleInfo RichModule { get; private set; }
     public Rtti.ModuleInfo ModuleInfo { get; private set; }
 
     private Dictionary<string, Rtti.TypeInfo> _namesToTypes;
@@ -17,14 +18,15 @@ public class UndecoratedModule
     private Dictionary<string, UndecoratedMethodGroup> _undecoratedTypelessFunctions;
     private Dictionary<string, List<DllExport>> _leftoverTypelessFunctions;
 
-    public UndecoratedModule(string name, Rtti.ModuleInfo moduleInfo)
+    public UndecoratedModule(string name, Rtti.RichModuleInfo richModule)
     {
         Name = name;
         _namesToTypes = new Dictionary<string, TypeInfo>();
         _types = new Dictionary<Rtti.TypeInfo, UndecoratedType>();
         _undecoratedTypelessFunctions = new Dictionary<string, UndecoratedMethodGroup>();
         _leftoverTypelessFunctions = new Dictionary<string, List<DllExport>>();
-        ModuleInfo = moduleInfo;
+        RichModule = richModule;
+        ModuleInfo = richModule.ModuleInfo;
     }
 
     public IEnumerable<Rtti.TypeInfo> Types => _types.Keys;
