@@ -486,7 +486,7 @@ namespace ScubaDiver
 
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
-                MsvcType matchingType = _typesManager.GetType((nuint)vftable).Upgrade();
+                MsvcType matchingType = _typesManager.GetType((nuint)vftable)?.Upgrade();
                 Rtti.TypeInfo typeInfo = matchingType?.TypeInfo;
                 if (typeInfo == null)
                 {
