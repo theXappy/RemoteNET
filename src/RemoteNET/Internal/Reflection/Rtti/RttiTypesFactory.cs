@@ -216,7 +216,7 @@ namespace RemoteNET.RttiReflection
 
                 // Not using declaringType.FullName because it contains the module name as well
                 string declaringTypeNameWithNamespace = $"{declaringType.Namespace}::{declaringType.Name}";
-                if (!func.UndecoratedFullName.StartsWith(declaringTypeNameWithNamespace))
+                if (!func.UndecoratedFullName.StartsWith(declaringTypeNameWithNamespace) && func.UndecoratedFullName.Contains("::"))
                 {
                     string type = func.UndecoratedFullName.Substring(0, func.UndecoratedFullName.LastIndexOf("::"));
                     Lazy<Type> declaringTypeFactory = CreateTypeFactory(type, moduleName);
