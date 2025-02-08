@@ -12,6 +12,55 @@ But in case the internal structure interests you (or you want to contribute/fix 
 6. **RemoteNET** (C#) - The one to rule them all. This library handles both injecting the Diver into the target and further communication with it (querying objects, examining them, creating new ones...).
 7. **DebuggableDummy** (C#) - A short program that runs a Diver in itself. Used for debugging.
 
+### Architecture
+When using the program, you'll be running in one of two configurations, depending on the target's type.
+The difference is "regular" apps vs UWP apps.
+
+For "regular" apps, this is where the different dlls/assemblies go:
+```mermaid
+graph LR;
+    subgraph Attacker["Attacker Process"]
+        AInner["RemoteNET"]
+    end
+    
+    subgraph Target["Target Process"]
+        TInner["ScubaDiver"]
+    end
+    
+    AInner -->|HTTP Req| TInner
+    TInner -->|HTTP Resp| AInner
+```
+
+UWP apps are run sandboxed with less networking capabilities.  
+Running a HTTP server in an arbitrary UWP app was too hard to figure out, so we use a "trick" for those:  
+Creating outgoing TCP Connections from UWP apps is often permitted. We'll abuse that to connect to a reverse proxy process called "Lifeboat".
+
+```mermaid
+graph LR;
+    subgraph Attacker["Attacker Process"]
+        AInner["RemoteNET"]
+    end
+    
+    subgraph Sanbox["UWP Sandbox"]
+        subgraph Target["UWP Target Process"]
+            TInner["ScubaDiver"]
+        end
+    end
+
+    subgraph Lifeboat["Lifeboat"]
+        LBInner["Reverse Proxy"]
+    end
+    
+    AInner -->|HTTP Req| LBInner
+    LBInner -->|HTTP Resp| AInner
+    LBInner -->|HTTP Req| TInner
+    TInner -->|HTTP Resp| LBInner
+
+    %% Custom Styling
+    classDef redBackground fill:#8B0000,stroke:#000,color:#FFF;
+    class Sanbox redBackground;
+```
+
 
 ### Diver communication
 The `ScubaDiver.Diver` class does all the heavy lifting within the target process.  
@@ -41,7 +90,7 @@ Luckily, [KeeFarce](https://github.com/denandz/KeeFarce) had this figured out. I
 It uses a trick of compiling a function directly from IL to return the `IntPtr` it recieves as the "result's address".  
  Luckily the runtime auto-magiclly converts this to an `object` when returned.  
 Getting that `object` gives us a lot of power - We can now use `.GetType()` on it, explore it's `MethodInfo`s and `PropertyInfos` and invoke them :)  
-Unfortunatly this power comes with a cost. Converting `IntPtr`s back to objects without the runtime to hold our hands is a very risky task.  
+Unfortunatly this power comes with a cost. Converting `IntPtr`s back to objects without the runtime to hold our hands is a risky task.  
 .NET's GC just turned from our best friend into our enemy.  
 If GC happens between retrival of the `IntPtr` address to actually making it into a reference the object might move around the program memory.  
 That means the address we are now going to "dereference" might be just about anything!  
