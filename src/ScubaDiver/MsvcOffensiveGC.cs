@@ -185,11 +185,11 @@ namespace ScubaDiver
             Dictionary<ModuleInfo, DllExport> freeExportedFunctions = FreeFinder.Find(allModules, funcName);
             if (freeExportedFunctions.Count == 0)
             {
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
+                //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! '{funcName}' was not found.");
             }
             if (freeExportedFunctions.Count > 1)
             {
-                Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " + string.Join(", ", freeExportedFunctions.Keys.Select(a => a.Name).ToArray()));
+                //Logger.Debug($"[{nameof(MsvcOffensiveGC)}] WARNING! Found '{funcName}' in more then 1 module: " + string.Join(", ", freeExportedFunctions.Keys.Select(a => a.Name).ToArray()));
             }
             return freeExportedFunctions;
         }

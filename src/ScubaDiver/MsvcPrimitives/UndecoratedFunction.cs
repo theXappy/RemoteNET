@@ -49,5 +49,5 @@ public abstract class UndecoratedFunction : UndecoratedSymbol
         NumArgs = numArgs;
     }
 
-    public override string ToString() => UndecoratedFullName;
+    public override string ToString() => $"Func: " + UndecoratedFullName;
 }

@@ -156,7 +156,8 @@ namespace ScubaDiver
         public override MemberInfo[] GetMembers(BindingFlags bindingAttr) => [.. GetVftables(), .. GetMethods()];
         public override string ToString() => FullName;
 
-        public override ConstructorInfo[] GetConstructors(BindingFlags bindingAttr) => throw new NotImplementedException();
+        // TODO: we CAN add the constructors here, right now they're just shoved into the methods list
+        public override ConstructorInfo[] GetConstructors(BindingFlags bindingAttr) => Array.Empty<ConstructorInfo>();
         public override FieldInfo GetField(string name, BindingFlags bindingAttr) => throw new NotImplementedException();
         public override FieldInfo[] GetFields(BindingFlags bindingAttr) => throw new NotImplementedException();
         public override PropertyInfo[] GetProperties(BindingFlags bindingAttr) => throw new NotImplementedException();
@@ -326,7 +327,7 @@ namespace ScubaDiver
                 return null;
 
             // Extract name of type
-            string typeName = vftableSymbol.UndecoratedName;
+            string typeName = vftableSymbol.UndecoratedFullName;
             if (!typeName.Contains("::`vftable'"))
                 return null;
             typeName = typeName.Substring(0, typeName.Length - "::`vftable'".Length);

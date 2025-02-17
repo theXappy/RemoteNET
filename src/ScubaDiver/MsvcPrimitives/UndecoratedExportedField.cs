@@ -24,4 +24,6 @@ public class UndecoratedExportedField : UndecoratedSymbol
         Export = export;
         _module = module;
     }
+
+    public override string ToString() => $"Field: {UndecoratedFullName} 0x{Address:X16}";
 }

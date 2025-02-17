@@ -18,6 +18,7 @@ using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 using NtApiDotNet.Win32;
 using System.Reflection;
 using System.Web;
+using System.Reflection.Metadata;
 
 namespace ScubaDiver
 {
@@ -442,7 +443,7 @@ namespace ScubaDiver
         protected override string MakeObjectResponse(ScubaDiverMessage arg)
         {
             string objAddrStr = arg.QueryString.Get("address");
-            string typeName = arg.QueryString.Get("type_name");
+            string fullTypeName = arg.QueryString.Get("type_name");
             bool pinningRequested = arg.QueryString.Get("pinRequest").ToUpper() == "TRUE";
             bool hashCodeFallback = arg.QueryString.Get("hashcode_fallback").ToUpper() == "TRUE";
             string hashCodeStr = arg.QueryString.Get("hashcode");
@@ -476,7 +477,7 @@ namespace ScubaDiver
                     Logger.Debug($"[MsvcDiver][MakeObjectResponse] Object at 0x{objAddr:X16} is already frozen.");
                     ObjectDump alreadyFrozenObjDump = new ObjectDump()
                     {
-                        Type = typeName,
+                        Type = fullTypeName,
                         RetrivalAddress = objAddr,
                         PinnedAddress = objAddr,
                         HashCode = 0x0bad0bad
@@ -484,14 +485,23 @@ namespace ScubaDiver
                     return JsonConvert.SerializeObject(alreadyFrozenObjDump);
                 }
 
+                // Search by vftable
                 // TODO: Wrong for x86
                 long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
                 MsvcType matchingType = _typesManager.GetType((nuint)vftable)?.Upgrade();
-                Rtti.TypeInfo typeInfo = matchingType?.TypeInfo;
-                if (typeInfo == null)
+                if (matchingType == null)
                 {
-                    throw new Exception("Failed to resolve vftable of target to any RTTI type.");
+                    // Search by name instead
+                    ParseFullTypeName(fullTypeName, out string assemblyFilter, out string typeFilter);
+                    Predicate<string> typeFilterPredicate = Filter.CreatePredicate(typeFilter);
+                    Predicate<string> moduleFilterPredicate = Filter.CreatePredicate(assemblyFilter);
+                    matchingType = _typesManager.GetType(moduleFilterPredicate, typeFilterPredicate).Upgrade();
+                    if (matchingType == null)
+                    {
+                        throw new Exception("Failed to resolve RTTI type by neither name not vftable value.");
+                    }
                 }
+                Rtti.TypeInfo typeInfo = matchingType.TypeInfo;
 
                 ulong pinningAddress = objAddr;
                 if (pinningRequested)
@@ -535,7 +545,6 @@ namespace ScubaDiver
             // Need to figure target instance and the target type.
             ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
             MsvcType msvcType = _typesManager.GetType(rawAssemblyFilter, rawTypeFilter).Upgrade();
-            TypeDump dumpedObjType = GetRttiType(request.TypeFullName);
             // Check if we have this objects in our pinned pool
             // TODO: Pull from freezer?
 
@@ -550,9 +559,10 @@ namespace ScubaDiver
             }
 
             // Search the method/ctor with the matching signature
-            List<TypeDump.TypeMethod> overloads = dumpedObjType.Methods.Concat(dumpedObjType.Constructors)
-                .Where(m => m.Name == request.MethodName || m.DecoratedName == request.MethodName)
-                .Where(m => m.Parameters.Count == paramsList.Count + 1) // TODO: Check types
+            List<MsvcMethod> overloads =
+                msvcType.GetMethods()
+                .Where(m => m.Name == request.MethodName || m.UndecoratedFunc.DecoratedName == request.MethodName)
+                .Where(m => m.UndecoratedFunc.NumArgs == paramsList.Count + 1) // TODO: Check types
                 .ToList();
 
             if (overloads.Count == 0)
@@ -567,7 +577,7 @@ namespace ScubaDiver
                 Logger.Debug($"[MsvcDiver] Failed to Resolved method :/");
                 return QuickError($"Too many matches for {request.MethodName} in type {request.TypeFullName}. Got: {overloads.Count}");
             }
-            TypeDump.TypeMethod method = overloads.Single();
+            UndecoratedFunction method = overloads.Single().UndecoratedFunc;
 
 
             List<UndecoratedFunction> typeFuncs = msvcType.GetMethods().Select(msvcMethod => msvcMethod.UndecoratedFunc).ToList();
@@ -581,7 +591,7 @@ namespace ScubaDiver
                 // Extracting the "owning" type of the method, which we now assume is different then the object's type.
                 // Turning `namespace::method_owner_type::func` to `namespace::method_owner_type`
                 string methodFullName = method.UndecoratedFullName;
-                string methodOwnerTypeFullName = methodFullName.Substring(0, methodFullName.IndexOf(method.Name)).TrimEnd(':');
+                string methodOwnerTypeFullName = methodFullName.Substring(0, methodFullName.LastIndexOf(method.UndecoratedName)).TrimEnd(':');
 
                 ParseFullTypeName(methodOwnerTypeFullName, out string methodOwnerModuleName, out string methodOwnerTypeName);
                 MsvcType methodOwnerType = _typesManager.GetType(methodOwnerModuleName, methodOwnerTypeName).Upgrade();
@@ -603,17 +613,17 @@ namespace ScubaDiver
             //
 
             // TODO: What about doubles/floats return vaslues?
-            Type retType = method.ReturnTypeName.Equals("void", StringComparison.OrdinalIgnoreCase)
+            Type retType = method.RetType.Equals("void", StringComparison.OrdinalIgnoreCase)
                 ? typeof(void)
                 : typeof(nuint);
-            int floatsBitmap = NativeDelegatesFactory.GetFloatsBitmap(method.Parameters, p => p.FullTypeName == "float" || p.FullTypeName == "double");
-            var delegateType = NativeDelegatesFactory.GetDelegateType(retType, method.Parameters.Count, floatsBitmap);
+            int floatsBitmap = NativeDelegatesFactory.GetFloatsBitmap(method.ArgTypes, p => p == "float" || p == "double");
+            var delegateType = NativeDelegatesFactory.GetDelegateType(retType, method.NumArgs.Value, floatsBitmap);
             var methodPtr = Marshal.GetDelegateForFunctionPointer(new IntPtr((long)targetMethod.Address), delegateType);
 
             //
             // Prepare parameters
             //
-            object[] invocationArgs = new object[method.Parameters.Count];
+            object[] invocationArgs = new object[method.NumArgs.Value];
             invocationArgs[0] = objAddress;
             for (int i = 0; i < paramsList.Count; i++)
             {
@@ -663,13 +673,28 @@ namespace ScubaDiver
             //
             // Prepare invocation results for response
             //
-            TypeDump returnTypeDump = null;
+            MsvcTypeStub returnTypeDump = null;
             if (!resIsDouble)
             {
+                // TODO: The '::' check is a hack to determine if it's a pointer.
+                // Types don't have to be defined within a namespace, so this is not a good check.
                 if (targetMethod.RetType.Contains("::") && /*Is a pointer */ targetMethod.RetType.EndsWith("*"))
                 {
-                    string normalizedRetType = method.ReturnTypeName[..^1]; // Remove '*' suffix
-                    returnTypeDump = GetRttiType(normalizedRetType);
+                    string normalizedRetType = method.RetType[..^1]; // Remove '*' suffix
+                    ParseFullTypeName(normalizedRetType, out var retTypeAssemblyFilter, out var retTypeFilter);
+                    Predicate<string> moduleNameFilter = Filter.CreatePredicate(retTypeAssemblyFilter);
+                    Predicate<string> typeNameFilter = Filter.CreatePredicate(retTypeFilter);
+                    returnTypeDump = _typesManager.GetType(moduleNameFilter, typeNameFilter);
+                    if (returnTypeDump == null)
+                    {
+                        // Retry with "importing module filter" (Will only help if we found TOO MANY results, and not zero)
+                        MsvcModuleFilter moduleFilter = new MsvcModuleFilter()
+                        {
+                            NamePredicate = moduleNameFilter,
+                            ImportingModule = msvcType.Module.Name
+                        };
+                        returnTypeDump = _typesManager.GetType(moduleFilter, typeNameFilter);
+                    }
                 }
             }
 
@@ -695,21 +720,14 @@ namespace ScubaDiver
             }
             else
             {
-                string normalizedRetType = targetMethod.RetType;
-                // Remove a single '*' suffix, if exists.
-                // Example: "int*" -> "int"
-                // But Also: "int**" -> "int*"
-                if (normalizedRetType.EndsWith('*'))
+                MsvcType matchingType = returnTypeDump?.Upgrade();
+                if (matchingType == null) // TODO: This is dead code, I think
                 {
-                    normalizedRetType = normalizedRetType[..^1];
-                    normalizedRetType = normalizedRetType.TrimEnd(' ');
+                    // This vftable resolution USED to work, but I think it broke in the great "types" refactor.
+                    // TODO: Wrong for x86
+                    long vftable = Marshal.ReadInt64(new IntPtr((long)resultsNuint.Value));
+                    _typesManager.GetType((nuint)vftable)?.Upgrade();
                 }
-
-                ParseFullTypeName(normalizedRetType, out string retTypeRawAssemblyFilter, out string retTypeRawTypeFilter);
-
-                // TODO: Wrong for x86
-                long vftable = Marshal.ReadInt64(new IntPtr((long)resultsNuint.Value));
-                MsvcType matchingType = _typesManager.GetType((nuint)vftable).Upgrade();
                 Rtti.TypeInfo retTypeInfo = matchingType?.TypeInfo;
 
                 if (retTypeInfo != null)
