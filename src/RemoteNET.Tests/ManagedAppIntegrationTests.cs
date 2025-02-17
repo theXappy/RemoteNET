@@ -6,8 +6,7 @@ namespace RemoteNET.Tests
 {
 
     [TestFixture]
-    [Parallelizable(scope: ParallelScope.All)]
-    internal class IntegrationTests
+    internal class ManagedAppIntegrationTests
     {
         private Random r = new Random();
         private string TestTargetExe => Path.ChangeExtension(typeof(TestClass).Assembly.Location, "exe");
