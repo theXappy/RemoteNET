@@ -53,7 +53,8 @@ public class TricksterWrapper
             Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE ScanOperatorNewFuncs Elapsed: {secondary.ElapsedMilliseconds} ms");
 
             sw.Stop();
-            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}. Total Elapsed: {sw.ElapsedMilliseconds} ms");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. Num Modules: {_trickster.ScannedTypes.Count}.");
+            Logger.Debug($"[{DateTime.Now}][MsvcDiver][Trickster] DONE refreshing runtime. *** Total Elapsed: {sw.ElapsedMilliseconds} ms");
 
             // Update "identifiers"
             Process p = Process.GetCurrentProcess();
