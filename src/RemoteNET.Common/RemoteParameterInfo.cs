@@ -11,6 +11,7 @@ namespace RemoteNET.Common
     {
         private LazyRemoteTypeResolver _paramType;
         public override Type ParameterType => _paramType.Value;
+        public string TypeFullName => _paramType.TypeFullName;
 
         // TODO: Type needs to be converted to a remote type ?
         public RemoteParameterInfo(ParameterInfo pi) : this(pi.Name, new LazyRemoteTypeResolver(pi.ParameterType))
