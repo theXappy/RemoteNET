@@ -237,7 +237,8 @@ namespace ScubaDiver.API.Interactions.Dumps
 
         public class TypeMethodTable
         {
-            public string Name { get; set; }
+            public string DecoratedName { get; set; }
+            public string UndecoratedFullName { get; set; }
             public long Address { get; set; }
         }
 

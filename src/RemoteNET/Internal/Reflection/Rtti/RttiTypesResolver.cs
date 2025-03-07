@@ -27,9 +27,9 @@ public class RttiTypesResolver
         // Register by Method Table address (only for RTTI)
         if (type is RemoteRttiType rttiType)
         {
-            foreach (KeyValuePair<string, long> methodTable in rttiType.MethodTables)
+            foreach (var methodTable in rttiType.GetMethodTables())
             {
-                long methodTableAddress = methodTable.Value;
+                long methodTableAddress = methodTable.StartAddress;
                 RegisterType(methodTableAddress, type);
             }
 

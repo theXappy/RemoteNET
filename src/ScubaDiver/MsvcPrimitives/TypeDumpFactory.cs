@@ -54,7 +54,8 @@ namespace ScubaDiver
                 // Keep vftable aside so we can also gather functions from it
                 vftables.Add(new TypeDump.TypeMethodTable
                 {
-                    Name = undecField.DecoratedName,
+                    DecoratedName = undecField.DecoratedName,
+                    UndecoratedFullName = undecField.UndecoratedName,
                     Address = (long)undecField.Address,
                 });
                 continue;
@@ -99,6 +100,7 @@ namespace ScubaDiver
             List<TypeDump.TypeField> fields)
         {
             // vftable gets a special treatment because we need it outside this func.
+            // TODO: BUG?? What if it's a "special" vfatble for specific parent??
             if (undecField.UndecoratedFullName != vftableName)
                 return false;
 

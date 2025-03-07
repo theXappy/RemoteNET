@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using RemoteNET.Common;
 using RemoteNET.Internal.Reflection;
+using RemoteNET.Internal.Reflection.Rtti;
 
 namespace RemoteNET.RttiReflection
 {
@@ -19,14 +20,13 @@ namespace RemoteNET.RttiReflection
         public override string Name => _name;
         public override string FullName => $"{_assembly}!{_fullName}";
 
+        private List<RemoteRttiMethodTableInfo> _methodTables = new();
         private List<FieldInfo> _fields = new();
         private List<MethodInfo> _methods = new();
         private List<ConstructorInfo> _ctors = new();
         private Lazy<Type> _parent;
         public override Type BaseType => _parent?.Value;
         public RemoteApp App { get; set; }
-        private Dictionary<string, long> _methodTables = new();
-        public IReadOnlyDictionary<string, long> MethodTables => _methodTables;
         public List<string> UnresolvedMembers { get; private set; }
 
         public RemoteRttiType(RemoteApp app, string fullTypeName, string assemblyName)
@@ -66,8 +66,8 @@ namespace RemoteNET.RttiReflection
         public void AddConstructor(ConstructorInfo ci) => _ctors.Add(ci);
         public void AddMethod(MethodInfo mi) => _methods.Add(mi);
         public void AddField(FieldInfo fi) => _fields.Add(fi);
+        public void AddMethodTable(RemoteRttiMethodTableInfo mt) => _methodTables.Add(mt);
         public void AddUnresolvedMember(string member) => UnresolvedMembers.Add(member);
-        public void AddVftable(string name, long addr) => _methodTables.Add(name, addr);
 
         public override object[] GetCustomAttributes(bool inherit)
         {
@@ -101,6 +101,13 @@ namespace RemoteNET.RttiReflection
             return _ctors.ToArray();
         }
 
+        public RemoteRttiMethodTableInfo[] GetMethodTables()
+        {
+            return _methodTables.ToArray();
+        }
+
+        public RemoteRttiMethodTableInfo[] GetMethodTables(BindingFlags bindingAttr) => GetMethodTables();
+
         public override Type GetElementType()
         {
             throw new NotImplementedException();
@@ -132,6 +139,10 @@ namespace RemoteNET.RttiReflection
         public override MemberInfo[] GetMembers(BindingFlags bindingAttr) => GetMembersInner(bindingAttr).ToArray();
         private IEnumerable<MemberInfo> GetMembersInner(BindingFlags bf)
         {
+            foreach (var ctor in GetMethodTables(bf))
+            {
+                yield return ctor;
+            }
             foreach (var ctor in GetConstructors(bf))
             {
                 yield return ctor;

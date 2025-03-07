@@ -6,6 +6,7 @@ using System.Reflection;
 using RemoteNET.Common;
 using RemoteNET.Internal.Reflection;
 using RemoteNET.Internal.Reflection.DotNet;
+using RemoteNET.Internal.Reflection.Rtti;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 
@@ -140,7 +141,11 @@ namespace RemoteNET.RttiReflection
 
             foreach (TypeDump.TypeMethodTable methodTable in typeDump.MethodTables)
             {
-                output.AddVftable(methodTable.Name, methodTable.Address);
+                var methodTableInfo = new RemoteRttiMethodTableInfo(output, 
+                    methodTable.UndecoratedFullName, 
+                    methodTable.DecoratedName, 
+                    methodTable.Address);
+                output.AddMethodTable(methodTableInfo);
             }
         }
 
