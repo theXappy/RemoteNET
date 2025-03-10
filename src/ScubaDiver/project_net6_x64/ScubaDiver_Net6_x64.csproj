@@ -138,7 +138,7 @@
 		<PackageReference Include="NtApiDotNet" Version="1.1.33" />
 		<PackageReference Include="System.Drawing.Common" Version="8.0.10" />
 		<PackageReference Include="System.Formats.Asn1" Version="8.0.1" />
-		<PackageReference Include="System.Text.Json" Version="9.0.1" />
+		<PackageReference Include="System.Text.Json" Version="9.0.2" />
 	</ItemGroup>
 
 	<ItemGroup>
