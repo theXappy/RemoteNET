@@ -23,7 +23,7 @@
 		<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
 		<PackageReference Include="System.IO.FileSystem.AccessControl" Version="5.0.0" />
 		<PackageReference Include="System.Security.AccessControl" Version="6.0.1" />
-		<PackageReference Include="Vanara.PInvoke.IpHlpApi" Version="4.0.4" />
+		<PackageReference Include="Vanara.PInvoke.IpHlpApi" Version="4.1.1" />
 	</ItemGroup>
 
 	<ItemGroup>
