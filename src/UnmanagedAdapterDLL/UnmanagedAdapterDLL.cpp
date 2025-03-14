@@ -7,6 +7,7 @@
 #pragma comment(lib, "mscoree.lib")
 
 #include "UnmanagedAdapter.h"
+#include "promptf.h"
 #include <stdio.h>
 
 void DebugOut(wchar_t* fmt, ...)
@@ -73,19 +74,21 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 	if (ShouldOpenDebugConosle()) {
 		// All of this code is to spawn a console.
 		consoleAllocated = AllocConsole();
-		DebugOut(L"[UnmanagedAdapter] AllocConsole returned: %s\n", consoleAllocated ? L"True" : L"False");
 		if (consoleAllocated) {
 			HANDLE stdHandle;
 			int hConsole;
 			FILE* fp;
 			stdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-			DebugOut(L"[UnmanagedAdapter] stdHandle = %d\n", stdHandle);
 			hConsole = _open_osfhandle((intptr_t)stdHandle, _O_TEXT);
-			DebugOut(L"[UnmanagedAdapter] hConsole = %d\n", hConsole);
-			fflush(stdout);
 			fp = _fdopen(hConsole, "w");
 			freopen_s(&fp, "CONOUT$", "w", stdout);
-			// End of cosole spawning
+			// End of console spawning
+			DebugOut(L"[UnmanagedAdapter] ConsoleAllocated and redirected in UnmanagedAdapter\n");
+			DebugOut(L"[UnmanagedAdapter] WARNING: Console allocation from UA might be buggy.Consider using Diver's console allocation\n");
+			DebugOut(L"[UnmanagedAdapter] WARNING: Consider using Diver's console allocation (Enable .NET env var and disable UA env var)\n");
+		}
+		else {
+			DebugOut(L"[UnmanagedAdapter] AllocConsole returned False. Console already existed.\n");
 		}
 		DebugOut(L"[UnmanagedAdapter] Can you see me? v2\n");
 		DebugOut(L"[UnmanagedAdapter] managedDllLocation = %s\n", managedDllLocation.c_str());
@@ -100,7 +103,7 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 	if (frameworkType == FrameworkType::NET_CORE)
 	{
 		DebugOut(L"[UnmanagedAdapter] Securing a handle to the Core (3/5/6/7/8) CLR \n");
-		// Secure a handle to the Core (3/5/6) CLR 
+		// Secure a handle to the Core (3/5/6/7/...) CLR 
 		pClr = StartCLRCore();
 		DebugOut(L"[UnmanagedAdapter] StartCLRCore ended with res: %p\n", pClr);
 	}
@@ -145,6 +148,48 @@ DllExport void AdapterEntryPoint(const wchar_t* adapterDllArg)
 		msgboxf("[UnmanagedAdapter] could not spawn CLR\n");
 	}
 
+}
+
+
+DllExport void PromptEntryPoint()
+{
+	size_t size = 1024;
+	char* prompt = new char[size];
+	wchar_t* wcprompt = new wchar_t[size];
+
+	promptf(prompt, "Insert UnmanagedAdapter's arguments:");
+	// Convert to wchar_t
+	size_t convertedChars = 0;
+	mbstowcs_s(&convertedChars, wcprompt, size, prompt, _TRUNCATE);
+	AdapterEntryPoint(wcprompt);
+}
+
+typedef HRESULT(STDAPICALLTYPE* FnGetNETCoreCLRRuntimeHost)(REFIID riid, IUnknown** pUnk);
+
+ICLRRuntimeHost* StartCLRCore()
+{
+	auto* const coreCLRModule = ::GetModuleHandle(L"coreclr.dll");
+
+	if (!coreCLRModule)
+	{
+		return nullptr;
+	}
+
+	const auto pfnGetCLRRuntimeHost = reinterpret_cast<FnGetNETCoreCLRRuntimeHost>(::GetProcAddress(coreCLRModule, "GetCLRRuntimeHost"));
+	if (!pfnGetCLRRuntimeHost)
+	{
+		return nullptr;
+	}
+
+	ICLRRuntimeHost* clrRuntimeHost = nullptr;
+	const auto hr = pfnGetCLRRuntimeHost(IID_ICLRRuntimeHost, reinterpret_cast<IUnknown**>(&clrRuntimeHost));
+
+	if (FAILED(hr))
+	{
+		return nullptr;
+	}
+
+	return clrRuntimeHost;
 }
 
 ICLRRuntimeHost* StartCLR(LPCWSTR dotNetVersion)
@@ -204,33 +249,4 @@ ICLRRuntimeHost* StartCLR(LPCWSTR dotNetVersion)
 	}
 
 	return NULL;
-}
-
-
-typedef HRESULT(STDAPICALLTYPE* FnGetNETCoreCLRRuntimeHost)(REFIID riid, IUnknown** pUnk);
-
-ICLRRuntimeHost* StartCLRCore()
-{
-	auto* const coreCLRModule = ::GetModuleHandle(L"coreclr.dll");
-
-	if (!coreCLRModule)
-	{
-		return nullptr;
-	}
-
-	const auto pfnGetCLRRuntimeHost = reinterpret_cast<FnGetNETCoreCLRRuntimeHost>(::GetProcAddress(coreCLRModule, "GetCLRRuntimeHost"));
-	if (!pfnGetCLRRuntimeHost)
-	{
-		return nullptr;
-	}
-
-	ICLRRuntimeHost* clrRuntimeHost = nullptr;
-	const auto hr = pfnGetCLRRuntimeHost(IID_ICLRRuntimeHost, reinterpret_cast<IUnknown**>(&clrRuntimeHost));
-
-	if (FAILED(hr))
-	{
-		return nullptr;
-	}
-
-	return clrRuntimeHost;
 }
