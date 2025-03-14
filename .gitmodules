@@ -4,3 +4,6 @@
 [submodule "InjectableDotNetHost"]
 	path = InjectableDotNetHost
 	url = https://github.com/theXappy/InjectableDotNetHost.git
+[submodule "SharpDllProxy"]
+	path = SharpDllProxy
+	url = https://github.com/theXappy/SharpDllProxy.git
