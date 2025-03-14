@@ -149,7 +149,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
         protected override PropertyInfo GetPropertyImpl(string name, BindingFlags bindingAttr, Binder binder, Type returnType, Type[] types,
             ParameterModifier[] modifiers)
         {
-            return GetProperties().Single(prop => prop.Name == name);
+            return GetProperties().SingleOrDefault(prop => prop.Name == name);
         }
 
         public override PropertyInfo[] GetProperties(BindingFlags bindingAttr)
@@ -180,7 +180,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
 
             // Need to filer also by types
-            return methodGroup.Single(overloadsComparer);
+            return methodGroup.SingleOrDefault(overloadsComparer);
         }
 
 
@@ -191,7 +191,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
 
         public override FieldInfo GetField(string name, BindingFlags bindingAttr)
         {
-            return GetFields().Single(field => field.Name == name);
+            return GetFields().SingleOrDefault(field => field.Name == name);
         }
 
         public override FieldInfo[] GetFields(BindingFlags bindingAttr)
