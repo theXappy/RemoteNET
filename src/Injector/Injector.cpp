@@ -27,21 +27,19 @@ int main(int argc, char** argv)
 	// Unmanaged Adapter
 	char DllName[MAX_PATH];
 	GetCurrentDirectoryA(MAX_PATH, DllName);
+#ifdef _WIN64
+	strcat_s(DllName, "\\UnmanagedAdapterDLL_x64.dll");
+#else
+	strcat_s(DllName, "\\UnmanagedAdapterDLL.dll");
+#endif
 
 	// Convert arguments to wchar_t[] and concat
 	wchar_t adapterDllArg[MAX_PATH];
 	size_t convertedChars = 0;
 	mbstowcs_s(&convertedChars, adapterDllArg, MAX_PATH, argv[2], _TRUNCATE);
 
-
 	// printf("UnmanagedAdapterDLL encoded argument: %ls\n", adapterDllArg);
-
 	DWORD Pid = atoi(argv[1]);
-#ifdef _WIN64
-	strcat_s(DllName, "\\UnmanagedAdapterDLL_x64.dll");
-#else
-	strcat_s(DllName, "\\UnmanagedAdapterDLL.dll");
-#endif
 
 	// printf("[.] Injecting UnmanagedAdapterDLL into %d\n", Pid);
 	BOOL success = InjectAndRunThenUnload(Pid, DllName, "AdapterEntryPoint", adapterDllArg);
