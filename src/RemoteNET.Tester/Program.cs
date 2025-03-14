@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using RemoteNET;
+using RemoteNET.Access;
 using RemoteNET.Common;
 using RemoteNET.Internal.Reflection;
 using ScubaDiver.API;
