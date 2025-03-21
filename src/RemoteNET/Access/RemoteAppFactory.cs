@@ -208,10 +208,10 @@ namespace RemoteNET.Access
             var hostInjector = new DotNetHostInjector(new DotNetHostInjectorOptions());
             var results = hostInjector.Inject(target, kit.InjectableDummyPath, "InjectableDummy.DllMain, InjectableDummy");
             Debug.WriteLine("hostInjector.Inject RESULTS: " + results);
-            if (!results.IsSuccess)
+            if (results != 0)
                 throw new Exception(
                     $"DotNetHostInjector failed to host the .NET runtime in the target (PID={target.Id}).\nRaw error:\n" +
-                    results.Error.Message);
+                    results);
         }
 
         private static void RunLifeboat(string lifeboatExePath, ushort diverPort)
