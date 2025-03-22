@@ -1,6 +1,5 @@
 ﻿using InjectableDotNetHost.Injector;
 using RemoteNET.Internal.Extensions;
-using RemoteNET.Internal.Utils;
 using RemoteNET.Properties;
 using System;
 using System.Diagnostics;
