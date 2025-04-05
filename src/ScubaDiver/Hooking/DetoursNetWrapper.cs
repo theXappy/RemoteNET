@@ -1,14 +1,8 @@
 using System;
 using System.Collections.Concurrent;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Transactions;
 using DetoursNet;
-using ScubaDiver.API;
 using ScubaDiver.API.Hooking;
-using ScubaDiver.Rtti;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 
 namespace ScubaDiver.Hooking;

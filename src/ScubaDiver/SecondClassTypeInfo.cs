@@ -1,7 +1,4 @@
 namespace ScubaDiver.Rtti;
-
-using System.Diagnostics.CodeAnalysis;
-
 /// <summary>
 /// Information about a "Second-Class Type" - Types which don't have a full RTTI entry and, most importantly, a vftable.
 /// The existence of these types is inferred from their exported functions.

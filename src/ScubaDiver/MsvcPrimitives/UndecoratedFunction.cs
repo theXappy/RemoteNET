@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using ScubaDiver.Rtti;
+﻿using ScubaDiver.Rtti;
 
 namespace ScubaDiver;
 

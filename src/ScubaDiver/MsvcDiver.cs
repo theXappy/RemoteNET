@@ -12,13 +12,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.Hooking;
-using Windows.Win32.Foundation;
 using ScubaDiver.API.Hooking;
-using TypeInfo = ScubaDiver.Rtti.TypeInfo;
-using NtApiDotNet.Win32;
-using System.Reflection;
-using System.Web;
-using System.Reflection.Metadata;
 
 namespace ScubaDiver
 {

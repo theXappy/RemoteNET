@@ -2,7 +2,6 @@
 using System.Linq;
 using NtApiDotNet.Win32;
 using ScubaDiver.Rtti;
-using static ScubaDiver.DllExportExt;
 
 namespace ScubaDiver;
 

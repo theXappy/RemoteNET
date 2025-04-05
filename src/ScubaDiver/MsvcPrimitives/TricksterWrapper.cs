@@ -7,7 +7,6 @@ using ScubaDiver.Rtti;
 using ScubaDiver.API.Utils;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 using NtApiDotNet.Win32;
-using static ScubaDiver.Rtti.Trickster;
 
 namespace ScubaDiver;
 

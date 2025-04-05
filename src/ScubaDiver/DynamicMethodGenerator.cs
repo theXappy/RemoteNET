@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using System.Xml.Linq;
 using DetoursNet;
 using ScubaDiver.API;
 using ScubaDiver.API.Hooking;

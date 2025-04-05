@@ -1,7 +1,4 @@
 namespace ScubaDiver.Rtti;
-
-using System.Diagnostics.CodeAnalysis;
-
 public abstract class TypeInfo
 {
     public static TypeInfo Dummy = new SecondClassTypeInfo("DummyModule", "DummyNamespace", "DummyType");

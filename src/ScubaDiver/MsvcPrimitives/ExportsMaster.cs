@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using NtApiDotNet.Win32;
-using ScubaDiver.Demangle.Demangle.Core.Hll.Pascal;
 
 namespace ScubaDiver;
 

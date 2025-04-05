@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using ScubaDiver.Demangle.Demangle;
 using ScubaDiver.Demangle.Demangle.Core.Serialization;
-using Microsoft.Extensions.Primitives;
 
 namespace ScubaDiver;
 

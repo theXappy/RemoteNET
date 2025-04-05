@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Text;
 
 // X is never assigned to, and will always have its default value 0
 #pragma warning disable CS0649

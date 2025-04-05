@@ -5,8 +5,6 @@ using ScubaDiver;
 using ScubaDiver.Rtti;
 using System.Linq;
 using Windows.Win32.Foundation;
-using System.Diagnostics;
-using System.ComponentModel;
 
 public static class VftableParser
 {
