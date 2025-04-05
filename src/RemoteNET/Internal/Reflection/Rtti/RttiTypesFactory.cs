@@ -144,7 +144,7 @@ namespace RemoteNET.RttiReflection
                 var methodTableInfo = new RemoteRttiMethodTableInfo(output, 
                     methodTable.UndecoratedFullName, 
                     methodTable.DecoratedName, 
-                    methodTable.Address);
+                    methodTable.XoredAddress ^ TypeDump.TypeMethodTable.XorMask);
                 output.AddMethodTable(methodTableInfo);
             }
         }
