@@ -136,7 +136,7 @@ namespace ScubaDiver
 
             // Maps xored vftables to instances
             IDictionary<ulong, IReadOnlyCollection<ulong>> xoredVftablesToInstances =
-                    ScanRegions(xoredVftableToType.Keys, FirstClassVftableInfo.XorMask);
+                    ScanRegions(xoredVftableToType.Keys, FirstClassTypeInfo.XorMask);
 
             Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> res = new();
             foreach (var kvp in xoredVftablesToInstances)

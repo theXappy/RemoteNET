@@ -450,7 +450,10 @@ namespace ScubaDiver
 
             bool IsNotExport(ulong addr)
             {
-                return (_exportsMaster as ExportsMaster)?.QueryExportByAddress((nuint)addr) == null;
+                bool res = (_exportsMaster as ExportsMaster)?.QueryExportByAddress((nuint)addr) == null;
+                if (res)
+                    1.ToString();
+                return res;
             }
         }
     }
