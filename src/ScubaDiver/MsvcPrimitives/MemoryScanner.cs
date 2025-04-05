@@ -58,12 +58,22 @@ namespace ScubaDiver
         {
             // Get regions
             Logger.Debug("[ScanRegions] Fetching Regions for ScanRegionsCore2");
+            Logger.Debug($"[ScanRegions] Fetching Regions for ScanRegionsCore2. xorMask = 0x{xorMask:x16}");
+            if (xorMask == 0)
+            {
+                Logger.Debug("[ScanRegions] XOR MASK is ZEROOOOOOOOOOOOOOO !!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+                Logger.Debug("[ScanRegions] XOR MASK is ZEROOOOOOOOOOOOOOO !!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+                Logger.Debug("[ScanRegions] XOR MASK is ZEROOOOOOOOOOOOOOO !!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+            }
             MemoryRegionInfo[] scannedRegions = ScanRegionInfoCore();
+            Logger.Debug($"[ScanRegions] Scanned {scannedRegions.Length} regions INFOs");
+
             MemoryRegion[] regions = ReadRegionsCore(scannedRegions);
-            Logger.Debug("[ScanRegions] Fetching Regions for ScanRegionsCore2 -- DONE");
+            Logger.Debug($"[ScanRegions] Read {regions.Length} regions' bytes");
 
             // Scan regions
-            var res = ScanRegionsCore2(regions, xoredVftables, xorMask);
+            IDictionary<ulong, IReadOnlyCollection<ulong>> res = ScanRegionsCore2(regions, xoredVftables, xorMask);
+            Logger.Debug($"[ScanRegions] Scanned {res.Count} regions");
 
             // Free regions
             FreeRegionsCore(regions);
@@ -161,16 +171,15 @@ namespace ScubaDiver
         /// <returns></returns>
         public Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(IEnumerable<FirstClassTypeInfo> typeInfos)
         {
-
-            Dictionary< /*xored vftable*/ nuint, FirstClassTypeInfo> xoredVftableToType = new();
-            foreach (var typeInfo in typeInfos)
+            Dictionary<nuint, FirstClassTypeInfo> xoredVftableToType = new();
+            foreach (FirstClassTypeInfo typeInfo in typeInfos)
             {
-                if (xoredVftableToType.TryGetValue(typeInfo.XoredVftableAddress, out var old))
-                {
+                if (xoredVftableToType.ContainsKey(typeInfo.XoredVftableAddress))
                     continue;
-                }
+
                 xoredVftableToType[typeInfo.XoredVftableAddress] = typeInfo;
             }
+
             // Maps xored vftables to instances
             IDictionary<ulong, IReadOnlyCollection<ulong>> xoredVftablesToInstances =
                     ScanRegions(xoredVftableToType.Keys, FirstClassTypeInfo.XorMask);

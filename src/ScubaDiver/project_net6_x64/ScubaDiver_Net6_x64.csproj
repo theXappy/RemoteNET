@@ -60,6 +60,22 @@
 		<Compile Include="..\IRequestsListener.cs" />
 		<Compile Include="..\ScubaDiverMessage.cs" />
 		<Compile Include="..\DynamicMethodGenerator.cs" />
+		<Compile Include="..\MsvcPrimitives\FirstClassTypeInfo.cs" Link="MsvcPrimitives\FirstClassTypeInfo.cs" />
+		<Compile Include="..\TricksterException.cs" Link="TricksterException.cs" />
+		<Compile Include="..\FunctionInfo.cs" Link="FunctionInfo.cs" />
+		<Compile Include="..\TypeInfo.cs" Link="TypeInfo.cs" />
+		<Compile Include="..\SecondClassTypeInfo.cs" Link="SecondClassTypeInfo.cs" />
+		<Compile Include="..\ModuleInfo.cs" Link="ModuleInfo.cs" />
+		<Compile Include="..\RichModuleInfo.cs" Link="RichModuleInfo.cs" />
+		<Compile Include="..\ModuleOperatorFunctions.cs" Link="ModuleOperatorFunctions.cs" />
+		<Compile Include="..\ModuleSection.cs" Link="ModuleSection.cs" />
+		<Compile Include="..\PEFormat\IMAGE_DOS_HEADER.cs" Link="PEFormat\IMAGE_DOS_HEADER.cs" />
+		<Compile Include="..\PEFormat\IMAGE_NT_HEADERS.cs" Link="PEFormat\IMAGE_NT_HEADERS.cs" />
+		<Compile Include="..\PEFormat\IMAGE_FILE_HEADER.cs" Link="PEFormat\IMAGE_FILE_HEADER.cs" />
+		<Compile Include="..\PEFormat\IMAGE_OPTIONAL_HEADER32.cs" Link="PEFormat\IMAGE_OPTIONAL_HEADER32.cs" />
+		<Compile Include="..\PEFormat\IMAGE_DATA_DIRECTORY.cs" Link="PEFormat\IMAGE_DATA_DIRECTORY.cs" />
+		<Compile Include="..\PEFormat\IMAGE_SECTION_HEADER.cs" Link="PEFormat\IMAGE_SECTION_HEADER.cs" />
+		<Compile Include="..\ProcessModuleExtensions.cs" Link="ProcessModuleExtensions.cs" />
 	</ItemGroup>
 
 	<!-- DetoursNET for DEBUG configuration -->

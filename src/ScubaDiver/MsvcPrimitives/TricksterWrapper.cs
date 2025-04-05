@@ -344,7 +344,6 @@ public class TricksterWrapper
                 return true;
             }
 
-            Logger.Debug("[TricksterWrapper.RefreshRequired] Refresh is NOT required.");
             return false;
         }
     }

@@ -151,7 +151,7 @@ namespace ScubaDiver
 
 
         public override MsvcMethod[] GetMethods(BindingFlags bindingAttr) => _methods;
-        public MsvcMethod[] GetMethods() => GetMethods(0);
+        public new MsvcMethod[] GetMethods() => GetMethods(0);
         public VftableInfo[] GetVftables() => _vftables;
         public override MemberInfo[] GetMembers(BindingFlags bindingAttr) => [.. GetVftables(), .. GetMethods()];
         public override string ToString() => FullName;

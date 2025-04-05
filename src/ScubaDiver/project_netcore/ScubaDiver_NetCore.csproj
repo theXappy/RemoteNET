@@ -28,7 +28,22 @@
 		<Compile Include="..\HttpRequestsListener.cs" />
 		<Compile Include="..\IRequestsListener.cs" />
 		<Compile Include="..\ScubaDiverMessage.cs" />
-
+		<Compile Include="..\MsvcPrimitives\FirstClassTypeInfo.cs" />
+		<Compile Include="..\TricksterException.cs" />
+		<Compile Include="..\FunctionInfo.cs" />
+		<Compile Include="..\TypeInfo.cs" />
+		<Compile Include="..\SecondClassTypeInfo.cs" />
+		<Compile Include="..\ModuleInfo.cs" />
+		<Compile Include="..\RichModuleInfo.cs" />
+		<Compile Include="..\ModuleOperatorFunctions.cs" />
+		<Compile Include="..\ModuleSection.cs" />
+		<Compile Include="..\PEFormat\IMAGE_DOS_HEADER.cs" />
+		<Compile Include="..\PEFormat\IMAGE_NT_HEADERS.cs" />
+		<Compile Include="..\PEFormat\IMAGE_FILE_HEADER.cs" />
+		<Compile Include="..\PEFormat\IMAGE_OPTIONAL_HEADER32.cs" />
+		<Compile Include="..\PEFormat\IMAGE_DATA_DIRECTORY.cs" />
+		<Compile Include="..\PEFormat\IMAGE_SECTION_HEADER.cs" />
+		<Compile Include="..\ProcessModuleExtensions.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
