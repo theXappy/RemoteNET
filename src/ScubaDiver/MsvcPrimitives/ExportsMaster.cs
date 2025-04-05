@@ -113,7 +113,9 @@ public class ExportsMaster : IReadOnlyExportsMaster
 
     public UndecoratedSymbol? QueryExportByAddress(nuint address)
     {
-        nuint xoredQuery = (nuint)(address) ^ UndecoratedExportedField.XorMask;
+        nuint valueAtAddress = 0; // TODO: Read content at <address>, avoiding access violations!!
+        nuint xoredValue = (nuint)(valueAtAddress) ^ UndecoratedExportedField.XorMask;
+        uint ordinal = 0; // TODO: Read ordinal at <address + ptr_size>, avoiding access violations!!
 
         foreach (KeyValuePair<Rtti.ModuleInfo, List<UndecoratedSymbol>> kvp in _undecExportsCache)
         {
@@ -123,10 +125,14 @@ public class ExportsMaster : IReadOnlyExportsMaster
 
             foreach (UndecoratedSymbol export in kvp.Value)
             {
-                if (export.XoredAddress == xoredQuery)
-                {
-                    return export;
-                }
+                if (export.XoredAddress != xoredValue)
+                    continue;
+                if (export is not UndecoratedExportedField undecField)
+                    continue;
+                if (undecField.Export.Ordinal != ordinal)
+                    continue;
+
+                return export;
             }
         }
 
