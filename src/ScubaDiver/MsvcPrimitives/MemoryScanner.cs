@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
@@ -68,96 +68,76 @@ namespace ScubaDiver
             MemoryRegionInfo[] scannedRegions = ScanRegionInfoCore();
             Logger.Debug($"[ScanRegions] Scanned {scannedRegions.Length} regions INFOs");
 
-            MemoryRegion[] regions = ReadRegionsCore(scannedRegions);
-            Logger.Debug($"[ScanRegions] Read {regions.Length} regions' bytes");
-
             // Scan regions
-            IDictionary<ulong, IReadOnlyCollection<ulong>> res = ScanRegionsCore2(regions, xoredVftables, xorMask);
+            IDictionary<ulong, IReadOnlyCollection<ulong>> res = ScanRegionsCore2(scannedRegions, xoredVftables, xorMask);
             Logger.Debug($"[ScanRegions] Scanned {res.Count} regions");
-
-            // Free regions
-            FreeRegionsCore(regions);
 
             Logger.Debug("[ScanRegions] Returned from ScanRegionsCore2");
             return res;
-
-
-            void FreeRegionsCore(MemoryRegion[] regionArray)
-            {
-                // Print call stack to find who called us
-                StackTrace stackTrace = new(true);
-                Logger.Debug($"[FreeRegionsCore] Called");
-
-                for (int i = 0; i < regionArray.Length; i++)
-                {
-                    CryptographicOperations.ZeroMemory(new Span<byte>(regionArray[i].Pointer, (int)regionArray[i].Size));
-                    IntPtr intPtr = new(regionArray[i].Pointer);
-                    //Logger.Debug($"[FreeRegionsCore] Freeing 0x{((ulong)intPtr):X16}");
-                    NativeMemory.Free(regionArray[i].Pointer);
-                }
-                Logger.Debug("[FreeRegionsCore] Done freeing regions");
-            }
         }
 
-        private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegion[] regionArray, IEnumerable<nuint> xoredVftables, nuint xorMask)
+private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegionInfo[] regionInfoArray, IEnumerable<nuint> xoredVftables, nuint xorMask)
+{
+    ConcurrentDictionary<ulong, ConcurrentBag<ulong>> results = new();
+
+    foreach (nuint xoredVFtable in xoredVftables)
+    {
+        results[(ulong)xoredVFtable] = new ConcurrentBag<ulong>();
+    }
+
+    Parallel.For(0, regionInfoArray.Length, i =>
+    {
+        MemoryRegionInfo regionInfo = regionInfoArray[i];
+        void* baseAddress = regionInfo.BaseAddress;
+        nuint size = regionInfo.Size;
+        void* pointer = NativeMemory.AllocZeroed(size, 1);
+        PInvoke.ReadProcessMemory(_processHandle, baseAddress, pointer, size);
+
+        byte* start = (byte*)pointer;
+        byte* end = start + size;
+        if (_is32Bit)
         {
-            ConcurrentDictionary<ulong, ConcurrentBag<ulong>> results = new();
-
-            foreach (nuint xoredVFtable in xoredVftables)
+            for (byte* a = start; a < end; a += 4)
             {
-                results[(ulong)xoredVFtable] = new ConcurrentBag<ulong>();
+                ulong suspect = *(uint*)a;
+                if (!results.TryGetValue(suspect ^ xorMask, out var bag))
+                    continue;
+                ulong result = (ulong)baseAddress + (ulong)(a - start);
+
+                Logger.Debug($"<PING> Found a vftable at 0x{result:x16}");
+
+                // TODO: Uncomment
+                //bag.Add(result);
             }
-
-            Parallel.For(0, regionArray.Length, i =>
-            {
-                MemoryRegion region = regionArray[i];
-                byte* start = (byte*)region.Pointer;
-                byte* end = start + region.Size;
-                if (_is32Bit)
-                {
-                    for (byte* a = start; a < end; a += 4)
-                    {
-                        ulong suspect = *(uint*)a;
-                        if (!results.TryGetValue(suspect ^ xorMask, out var bag))
-                            continue;
-                        ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
-                        bag.Add(result);
-                    }
-                }
-                else
-                {
-                    for (byte* a = start; a < end; a += 8)
-                    {
-                        ulong suspect = *(ulong*)a;
-                        if (!results.TryGetValue(suspect ^ xorMask, out var bag))
-                            continue;
-                        ulong result = (ulong)region.BaseAddress + (ulong)(a - start);
-                        bag.Add(result);
-                    }
-                }
-            });
-
-            Dictionary<ulong, IReadOnlyCollection<ulong>> results2 =
-                results.ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => (IReadOnlyCollection<ulong>)kvp.Value);
-            return results2;
         }
-
-
-        private MemoryRegion[] ReadRegionsCore(MemoryRegionInfo[] infoArray)
+        else
         {
-            MemoryRegion[] regionArray = new MemoryRegion[infoArray.Length];
-            for (int i = 0; i < regionArray.Length; i++)
+            for (byte* a = start; a < end; a += 8)
             {
-                void* baseAddress = infoArray[i].BaseAddress;
-                nuint size = infoArray[i].Size;
-                void* pointer = NativeMemory.AllocZeroed(size, 1);
-                PInvoke.ReadProcessMemory(_processHandle, baseAddress, pointer, size);
-                regionArray[i] = new(pointer, baseAddress, size);
+                ulong suspect = *(ulong*)a;
+                if (!results.TryGetValue(suspect ^ xorMask, out var bag))
+                    continue;
+                ulong result = (ulong)baseAddress + (ulong)(a - start);
+                
+                Logger.Debug($"<PING> Found a vftable at 0x{result:x16}");
+
+                // TODO: Uncomment
+                //bag.Add(result);
             }
-            return regionArray;
         }
+
+        CryptographicOperations.ZeroMemory(new Span<byte>((byte*)pointer, (int)size));
+        NativeMemory.Free(pointer);
+    });
+
+    Dictionary<ulong, IReadOnlyCollection<ulong>> results2 =
+        results.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlyCollection<ulong>)kvp.Value);
+    return results2;
+}
+
+
 
 
 

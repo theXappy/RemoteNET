@@ -495,7 +495,7 @@ namespace ScubaDiver
                     string assembly = matchingAssembly.GetName().Name;
                     string fullTypeName = type.FullName;
                     ulong? methodTable = null; // Not yet supported in DotNetDiver
-                    types.Add(new TypesDump.TypeIdentifiers(assembly, fullTypeName, methodTable));
+                    types.Add(new TypesDump.TypeIdentifiers(assembly, fullTypeName, methodTable ^ TypesDump.TypeIdentifiers.XorMask));
                 }
             }
 

@@ -140,7 +140,10 @@ namespace RemoteNET
             }
             foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
             {
-                yield return new CandidateType(RuntimeType.Managed, type.FullTypeName, type.Assembly, type.MethodTable);
+                ulong? xoredMethodTable = null;
+                if (type.XoredMethodTable.HasValue)
+                    xoredMethodTable = type.XoredMethodTable ^ TypesDump.TypeIdentifiers.XorMask;
+                yield return new CandidateType(RuntimeType.Managed, type.FullTypeName, type.Assembly, xoredMethodTable);
             }
         }
 

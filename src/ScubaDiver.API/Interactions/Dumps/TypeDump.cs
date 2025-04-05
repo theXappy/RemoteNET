@@ -237,9 +237,11 @@ namespace ScubaDiver.API.Interactions.Dumps
 
         public class TypeMethodTable
         {
+            public const uint XorMask = 0xaabbccdd;
+
             public string DecoratedName { get; set; }
             public string UndecoratedFullName { get; set; }
-            public long Address { get; set; }
+            public long XoredAddress { get; set; }
         }
 
         public string FullTypeName { get; set; }

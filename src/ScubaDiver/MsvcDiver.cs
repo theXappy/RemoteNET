@@ -286,8 +286,8 @@ namespace ScubaDiver
                 string assembly = typeStub.TypeInfo.ModuleName;
                 string fullTypeName = typeStub.TypeInfo.FullTypeName;
                 // TODO: We might have multiple vftable addresses...
-                ulong? vftable = (typeStub.TypeInfo as FirstClassTypeInfo)?.VftableAddress;
-                types.Add(new TypesDump.TypeIdentifiers(assembly, fullTypeName, vftable));
+                ulong? xoredVftable = (typeStub.TypeInfo as FirstClassTypeInfo)?.XoredVftableAddress;
+                types.Add(new TypesDump.TypeIdentifiers(assembly, fullTypeName, xoredVftable));
             }
 
             TypesDump dump = new()

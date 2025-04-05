@@ -53,7 +53,7 @@ namespace ScubaDiver
                 {
                     DecoratedName = undecField.DecoratedName,
                     UndecoratedFullName = undecField.UndecoratedName,
-                    Address = (long)undecField.Address,
+                    XoredAddress = (long)undecField.XoredAddress,
                 });
                 continue;
             }
