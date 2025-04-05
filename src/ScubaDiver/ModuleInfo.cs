@@ -17,7 +17,7 @@ public struct ModuleInfo
 
     public override string ToString() => $"{Name} 0x({BaseAddress:x8}, {Size} bytes)";
 
-    public override bool Equals([NotNullWhen(true)] object obj)
+    public override bool Equals(object obj)
     {
         return obj is ModuleInfo info &&
                Name == info.Name &&
@@ -27,6 +27,10 @@ public struct ModuleInfo
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Name, BaseAddress, Size);
+        int hash = 17;
+        hash = hash * 31 + (Name?.GetHashCode() ?? 0);
+        hash = hash * 31 + BaseAddress.GetHashCode();
+        hash = hash * 31 + Size.GetHashCode();
+        return hash;
     }
 }
