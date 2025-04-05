@@ -441,7 +441,17 @@ namespace ScubaDiver
         public Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(IEnumerable<MsvcTypeStub> types)
         {
             IEnumerable<FirstClassTypeInfo> allClassesToScanFor = types.Select(t => t.TypeInfo).OfType<FirstClassTypeInfo>();
-            return _memoryScanner.Scan(allClassesToScanFor);
+            var rawMatches = _memoryScanner.Scan(allClassesToScanFor);
+
+            // Filtering out the matches which are just exports (not instances)
+            return rawMatches.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlyCollection<ulong>)kvp.Value.Where(IsNotExport).ToList());
+
+            bool IsNotExport(ulong addr)
+            {
+                return (_exportsMaster as ExportsMaster)?.QueryExportByAddress((nuint)addr) == null;
+            }
         }
     }
 

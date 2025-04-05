@@ -111,4 +111,25 @@ public class ExportsMaster : IReadOnlyExportsMaster
         return GetExportedTypeMembers(module, typeFullName).OfType<UndecoratedFunction>();
     }
 
+    public UndecoratedSymbol? QueryExportByAddress(nuint address)
+    {
+        nuint xoredQuery = (nuint)(address) ^ UndecoratedExportedField.XorMask;
+
+        foreach (KeyValuePair<Rtti.ModuleInfo, List<UndecoratedSymbol>> kvp in _undecExportsCache)
+        {
+            Rtti.ModuleInfo module = kvp.Key;
+            if (module.BaseAddress > address || address >= module.BaseAddress + module.Size)
+                continue;
+
+            foreach (UndecoratedSymbol export in kvp.Value)
+            {
+                if (export.XoredAddress == xoredQuery)
+                {
+                    return export;
+                }
+            }
+        }
+
+        return null;
+    }
 }
