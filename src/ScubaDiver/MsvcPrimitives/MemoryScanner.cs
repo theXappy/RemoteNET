@@ -54,94 +54,68 @@ namespace ScubaDiver
             return list.ToArray();
         }
 
-        public IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegions(IEnumerable<nuint> xoredVftables, nuint xorMask = 0x00000000)
+        public IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegions(IEnumerable<nuint> xoredVftables, nuint xorMask)
         {
             // Get regions
-            Logger.Debug("[ScanRegions] Fetching Regions for ScanRegionsCore2");
-            Logger.Debug($"[ScanRegions] Fetching Regions for ScanRegionsCore2. xorMask = 0x{xorMask:x16}");
-            if (xorMask == 0)
-            {
-                Logger.Debug("[ScanRegions] XOR MASK is ZEROOOOOOOOOOOOOOO !!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-                Logger.Debug("[ScanRegions] XOR MASK is ZEROOOOOOOOOOOOOOO !!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-                Logger.Debug("[ScanRegions] XOR MASK is ZEROOOOOOOOOOOOOOO !!!!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-            }
             MemoryRegionInfo[] scannedRegions = ScanRegionInfoCore();
-            Logger.Debug($"[ScanRegions] Scanned {scannedRegions.Length} regions INFOs");
 
             // Scan regions
             IDictionary<ulong, IReadOnlyCollection<ulong>> res = ScanRegionsCore2(scannedRegions, xoredVftables, xorMask);
-            Logger.Debug($"[ScanRegions] Scanned {res.Count} regions");
-
-            Logger.Debug("[ScanRegions] Returned from ScanRegionsCore2");
             return res;
         }
 
-private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegionInfo[] regionInfoArray, IEnumerable<nuint> xoredVftables, nuint xorMask)
-{
-    ConcurrentDictionary<ulong, ConcurrentBag<ulong>> results = new();
-
-    foreach (nuint xoredVFtable in xoredVftables)
-    {
-        results[(ulong)xoredVFtable] = new ConcurrentBag<ulong>();
-    }
-
-    Parallel.For(0, regionInfoArray.Length, i =>
-    {
-        MemoryRegionInfo regionInfo = regionInfoArray[i];
-        void* baseAddress = regionInfo.BaseAddress;
-        nuint size = regionInfo.Size;
-        void* pointer = NativeMemory.AllocZeroed(size, 1);
-        PInvoke.ReadProcessMemory(_processHandle, baseAddress, pointer, size);
-
-        byte* start = (byte*)pointer;
-        byte* end = start + size;
-        if (_is32Bit)
+        private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRegionInfo[] regionInfoArray, IEnumerable<nuint> xoredVftables, nuint xorMask)
         {
-            for (byte* a = start; a < end; a += 4)
+            ConcurrentDictionary<ulong, ConcurrentBag<ulong>> results = new();
+
+            foreach (nuint xoredVFtable in xoredVftables)
             {
-                ulong suspect = *(uint*)a;
-                if (!results.TryGetValue(suspect ^ xorMask, out var bag))
-                    continue;
-                ulong result = (ulong)baseAddress + (ulong)(a - start);
-
-                Logger.Debug($"<PING> Found a vftable at 0x{result:x16}");
-
-                // TODO: Uncomment
-                //bag.Add(result);
+                results[(ulong)xoredVFtable] = new ConcurrentBag<ulong>();
             }
-        }
-        else
-        {
-            for (byte* a = start; a < end; a += 8)
+
+            Parallel.For(0, regionInfoArray.Length, i =>
             {
-                ulong suspect = *(ulong*)a;
-                if (!results.TryGetValue(suspect ^ xorMask, out var bag))
-                    continue;
-                ulong result = (ulong)baseAddress + (ulong)(a - start);
-                
-                Logger.Debug($"<PING> Found a vftable at 0x{result:x16}");
+                MemoryRegionInfo regionInfo = regionInfoArray[i];
+                void* baseAddress = regionInfo.BaseAddress;
+                nuint size = regionInfo.Size;
+                void* pointer = NativeMemory.AllocZeroed(size, 1);
+                PInvoke.ReadProcessMemory(_processHandle, baseAddress, pointer, size);
 
-                // TODO: Uncomment
-                //bag.Add(result);
-            }
+                byte* start = (byte*)pointer;
+                byte* end = start + size;
+                if (_is32Bit)
+                {
+                    for (byte* a = start; a < end; a += 4)
+                    {
+                        ulong suspect = *(uint*)a;
+                        if (!results.TryGetValue(suspect ^ xorMask, out var bag))
+                            continue;
+                        ulong result = (ulong)baseAddress + (ulong)(a - start);
+                        bag.Add(result);
+                    }
+                }
+                else
+                {
+                    for (byte* a = start; a < end; a += 8)
+                    {
+                        ulong suspect = *(ulong*)a;
+                        if (!results.TryGetValue(suspect ^ xorMask, out var bag))
+                            continue;
+                        ulong result = (ulong)baseAddress + (ulong)(a - start);
+                        bag.Add(result);
+                    }
+                }
+
+                CryptographicOperations.ZeroMemory(new Span<byte>((byte*)pointer, (int)size));
+                NativeMemory.Free(pointer);
+            });
+
+            Dictionary<ulong, IReadOnlyCollection<ulong>> results2 =
+                results.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => (IReadOnlyCollection<ulong>)kvp.Value);
+            return results2;
         }
-
-        CryptographicOperations.ZeroMemory(new Span<byte>((byte*)pointer, (int)size));
-        NativeMemory.Free(pointer);
-    });
-
-    Dictionary<ulong, IReadOnlyCollection<ulong>> results2 =
-        results.ToDictionary(
-            kvp => kvp.Key,
-            kvp => (IReadOnlyCollection<ulong>)kvp.Value);
-    return results2;
-}
-
-
-
-
-
-
 
         /// <summary>
         /// Scan the process memory for vftables to spot instances of First-Class types.
@@ -162,7 +136,7 @@ private IDictionary<ulong, IReadOnlyCollection<ulong>> ScanRegionsCore2(MemoryRe
 
             // Maps xored vftables to instances
             IDictionary<ulong, IReadOnlyCollection<ulong>> xoredVftablesToInstances =
-                    ScanRegions(xoredVftableToType.Keys, FirstClassTypeInfo.XorMask);
+                    ScanRegions(xoredVftableToType.Keys, FirstClassVftableInfo.XorMask);
 
             Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> res = new();
             foreach (var kvp in xoredVftablesToInstances)
