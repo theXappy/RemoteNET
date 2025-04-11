@@ -154,7 +154,7 @@ The limitations:
 ## Thanks
 [denandz/KeeFarce](https://github.com/denandz/KeeFarce): Which was a major inspiration for this project.  
 Also, multiple parts of this project were adapted from ones in KeeFarce (DLL Injection, Bootstrap, IntPtr-to-Object converter).  
-[TheLeftExit/Trickster](https://github.com/TheLeftExit/Trickster): Which I used for the MSVC Diver's base (for C++ targets).  Mainly C++ object searching in the heap.
+[TheLeftExit/Trickster](https://github.com/TheLeftExit/Trickster): Which I used for the MSVC Diver's base (for C++ targets).  Mainly C++ object searching in the heap.  
 [pardeike/Harmony](https://github.com/pardeike/Harmony): Which I used for hooking .NET methods.  
 [microsoft/Detours](https://github.com/microsoft/Detours): Which I used for hooking native methods.  
 [citronneur/detours.net](https://github.com/citronneur/detours.net): Which I used as a wrapper for Detours.  
