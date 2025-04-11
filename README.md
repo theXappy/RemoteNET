@@ -3,8 +3,6 @@
 This library lets you examine, create and interact with remote objects in other .NET/Visual C++ processes.  
 The target app doesn't need to be explicitly compiled (or consent) to support it.
 
-Basically this library lets you mess with objects of any other .NET app without asking for permissions :)
-
 ### 👉 Try It Now: Download the [RemoteNET Spy](https://github.com/theXappy/rnet-kit) app to see this lib in action! 👈
 
 
