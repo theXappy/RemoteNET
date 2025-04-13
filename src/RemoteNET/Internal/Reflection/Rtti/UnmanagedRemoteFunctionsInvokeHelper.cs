@@ -29,7 +29,7 @@ namespace RemoteNET.RttiReflection
             {
                 return ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetRemoteType().FullName);
             }
-            else if (parameter is DynamicRemoteObject dro)
+            else if (parameter is IDynamicRemoteObject dro)
             {
                 RemoteObject originRemoteObject = dro.__ro;
                 return ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetRemoteType().FullName);
@@ -84,7 +84,7 @@ namespace RemoteNET.RttiReflection
                 switch (obj)
                 {
                     // obj is NOT null. Make sure it's a RemoteObject.
-                    case DynamicUnmanagedRemoteObject dro:
+                    case IDynamicRemoteObject dro:
                         (hasResults, oora) = (dro.__ro as UnmanagedRemoteObject).InvokeMethod(funcName, remoteParams);
                         break;
                     case UnmanagedRemoteObject ro:
@@ -125,7 +125,7 @@ namespace RemoteNET.RttiReflection
             else
             {
                 RemoteObject ro = app.GetRemoteObject(oora);
-                return ro.Dynamify();
+                return ro;
             }
         }
 

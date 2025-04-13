@@ -10,7 +10,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
     /// <summary>
     /// In this context: "function" = Methdods + Constructors.
     /// </summary>
-    internal static class ManagedRemoteFunctionsInvokeHelper
+    public static class ManagedRemoteFunctionsInvokeHelper
     {
         public static ObjectOrRemoteAddress CreateRemoteParameter(object parameter)
         {
@@ -26,7 +26,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             {
                 return ObjectOrRemoteAddress.FromToken(remoteArg.RemoteToken, remoteArg.GetRemoteType().FullName);
             }
-            else if (parameter is DynamicRemoteObject dro)
+            else if (parameter is IDynamicRemoteObject dro)
             {
                 RemoteObject originRemoteObject = dro.__ro;
                 return ObjectOrRemoteAddress.FromToken(originRemoteObject.RemoteToken, originRemoteObject.GetRemoteType().FullName);
@@ -117,7 +117,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             else
             {
                 ManagedRemoteObject ro = app.GetRemoteObject(oora) as ManagedRemoteObject;
-                return ro.Dynamify();
+                return ro;
             }
         }
 

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net7.0-windows</TargetFramework>
@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\RemoteNET.Dynamic\RemoteNET.Dynamic.csproj" />
     <ProjectReference Include="..\RemoteNET\RemoteNET.csproj" />
     <ProjectReference Include="..\ScubaDiver\project_net6_x64\ScubaDiver_Net6_x64.csproj" />
     <ProjectReference Include="..\Tests\TestTarget\TestTarget.csproj" />

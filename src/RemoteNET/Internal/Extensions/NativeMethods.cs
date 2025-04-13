@@ -23,5 +23,6 @@ namespace RemoteNET.Internal.Extensions
         [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool IsWow64Process([In] IntPtr process, [Out] out bool wow64Process);
+
     }
 }

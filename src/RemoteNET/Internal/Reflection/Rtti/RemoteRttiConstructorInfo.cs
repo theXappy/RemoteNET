@@ -24,6 +24,14 @@ public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
     public override Type DeclaringType => LazyDeclaringType.Value;
 
     public override string Name => DeclaringType.Name;
+    public string UndecoratedSignature
+    {
+        get
+        {
+            string args = string.Join(", ", LazyParamInfos.Select(resolver => resolver.ToString()));
+            return $"{LazyRetType.TypeFullName ?? LazyRetType.TypeName} {Name}({args})";
+        }
+    }
 
     public override Type ReflectedType => throw new NotImplementedException();
 

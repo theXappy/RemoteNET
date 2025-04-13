@@ -11,6 +11,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\..\RemoteNET.Dynamic\RemoteNET.Dynamic.csproj" />
 		<ProjectReference Include="..\RemoteNET\RemoteNET.csproj" />
 	</ItemGroup>
 

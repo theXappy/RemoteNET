@@ -2,6 +2,9 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using ScubaDiver.API.Memory;
+using RemoteNET.Extensions;
+using System.Linq;
+using System.Net.Mime;
 
 namespace RemoteNET;
 
@@ -16,6 +19,8 @@ public class RemoteMarshal
     private readonly MethodInfo _remoteRead;
     private readonly MethodInfo _remotePtrToStringAnsi;
 
+    private readonly MethodInfo _toBase64;
+
     public RemoteMarshal(ManagedRemoteApp app)
     {
         _app = app;
@@ -26,6 +31,9 @@ public class RemoteMarshal
         _remoteWrite = _remoteMarshalType.GetMethod(nameof(SafeMarshal.Copy), (BindingFlags)0xffff, new[] { typeof(byte[]), typeof(int), typeof(IntPtr), typeof(int) });
         _remoteRead = _remoteMarshalType.GetMethod(nameof(SafeMarshal.Copy), (BindingFlags)0xffff, new[] { typeof(IntPtr), typeof(byte[]), typeof(int), typeof(int) });
         _remotePtrToStringAnsi = _remoteMarshalType.GetMethod(nameof(SafeMarshal.PtrToStringAnsi), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
+
+        Type ConvertType = _app.GetRemoteType(typeof(Convert));
+        _toBase64 = ConvertType.GetMethods().Single(mi => mi.Name == nameof(Convert.ToBase64String) && mi.GetParameters().Length == 1);
     }
 
     public IntPtr AllocHGlobal(int cb)
@@ -61,11 +69,18 @@ public class RemoteMarshal
         var remoteArray = _app.Activator.CreateInstance(typeof(byte[]), length);
         _remoteRead.Invoke(obj: null, new object[4] { source, remoteArray, 0, length });
 
-        // Casting to byte[] causes a copy to the local process
-        var dro = remoteArray.Dynamify();
-        byte[] copiedLocal = (byte[])dro;
+        // Ugly cast-to-string remotely, then fetch and convert back to byte[].
+        byte[] copiedLocal = __cast_to_byte_array(remoteArray);
 
         Array.Copy(copiedLocal, 0, destination, startIndex, length);
+        return;
+
+        byte[] __cast_to_byte_array(RemoteObject ro)
+        {
+            // Invoke remote Convert.ToBase64String(byte[])
+            string base64 = _toBase64.Invoke(null, [ro]) as string;
+            return Convert.FromBase64String(base64);
+        }
     }
 
     public void Read(IntPtr source, byte[] destination, int startIndex, int length)
@@ -80,9 +95,9 @@ public class RemoteMarshal
 
     public string PtrToStringAnsi(IntPtr ptr)
     {
-        if(ptr == IntPtr.Zero)
+        if (ptr == IntPtr.Zero)
             return null;
 
-        return _remotePtrToStringAnsi.Invoke(null, new object[1] {ptr}) as string;
+        return _remotePtrToStringAnsi.Invoke(null, new object[1] { ptr }) as string;
     }
 }

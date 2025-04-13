@@ -10,8 +10,8 @@ internal interface IReadOnlyExportsMaster
     // Everything
     public IReadOnlyList<DllExport> GetExports(Rtti.ModuleInfo modInfo);
 
-    // Split intot Undecorated and "other"
-    public IReadOnlyList<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo);
+    // Split into Undecorated and "other"
+    public ICollection<UndecoratedSymbol> GetUndecoratedExports(Rtti.ModuleInfo modInfo);
     public IEnumerable<DllExport> GetLeftoverExports(Rtti.ModuleInfo modInfo);
 
     // By specific type

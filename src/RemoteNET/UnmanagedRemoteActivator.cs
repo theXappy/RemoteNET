@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using RemoteNET.Internal;
 using RemoteNET.RttiReflection;
 
 namespace RemoteNET
@@ -15,7 +16,7 @@ namespace RemoteNET
         public override RemoteObject CreateInstance(Type t, params object[] parameters)
             => CreateInstance(t.Assembly.GetName().Name, t.FullName, parameters);
 
-        public override UnmanagedRemoteObject CreateInstance(string assembly, string typeFullName, params object[] parameters)
+        public override RemoteObject CreateInstance(string assembly, string typeFullName, params object[] parameters)
         {
             Type type = _app.GetRemoteType(typeFullName, assembly);
 
@@ -37,7 +38,7 @@ namespace RemoteNET
             nint buf = _app.Marshal.AllocHGlobalZero(100); // TODO: Not a random size
             object results = ctor.Invoke(buf, []);
 
-            if (results is DynamicUnmanagedRemoteObject dro)
+            if (results is IDynamicRemoteObject dro)
                 return dro.__ro as UnmanagedRemoteObject;
             throw new Exception("Invoked remote ctor but the results wasn't a DRO");
         }

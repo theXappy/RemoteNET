@@ -19,6 +19,14 @@ namespace RemoteNET.Internal.Reflection
 
         public override ICustomAttributeProvider ReturnTypeCustomAttributes => throw new NotImplementedException();
         public override string Name { get; }
+        public string UndecoratedSignature
+        {
+            get
+            {
+                string args = string.Join(", ", LazyParamInfos.Select(resolver => resolver.ToString()));
+                return $"{LazyRetType.TypeFullName ?? LazyRetType.TypeName} {Name}({args})";
+            }
+        }
 
         protected LazyRemoteTypeResolver _lazyDeclaringType;
         public LazyRemoteTypeResolver LazyDeclaringType => _lazyDeclaringType;

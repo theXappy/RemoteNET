@@ -1,24 +1,21 @@
 using System;
 using ScubaDiver.API;
+using ScubaDiver.API.Interactions.Dumps;
 
 namespace RemoteNET;
 
 public class RemoteCharStar : RemoteObject
 {
     public override ulong RemoteToken { get; }
-    private string _val;
-    private ManagedRemoteApp _app;
+    public string _val;
+    public ManagedRemoteApp _app;
+    public override object App => _app;
 
     public RemoteCharStar(ManagedRemoteApp app, ulong remoteToken, string val)
     {
         _app = app;
         RemoteToken = remoteToken;
         _val = val;
-    }
-
-    public override dynamic Dynamify()
-    {
-        return new DynamicRemoteCharStar(_app, RemoteToken, _val);
     }
 
     public override ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)
@@ -34,5 +31,10 @@ public class RemoteCharStar : RemoteObject
     public override RemoteObject Cast(Type t)
     {
         throw new NotImplementedException("Not implemented for char* remote objects");
+    }
+
+    public override TypeDump GetTypeDump()
+    {
+        throw new NotImplementedException();
     }
 }

@@ -147,7 +147,7 @@ namespace RemoteNET
         // Getting Remote Objects
         //
 
-        public override UnmanagedRemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
+        public override RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
         {
             _logger($"[GetRemoteObject] Enter with Address = {remoteAddress:X16}, TypeName = {typeName}");
 
@@ -180,7 +180,7 @@ namespace RemoteNET
                 return new RemoteCharStar(_hub[RuntimeType.Managed] as ManagedRemoteApp, oora.RemoteAddress, oora.EncodedObject);
             }
 
-            UnmanagedRemoteObject results = GetRemoteObject(oora.RemoteAddress, oora.Type);
+            UnmanagedRemoteObject results = GetRemoteObject(oora.RemoteAddress, oora.Type) as UnmanagedRemoteObject;
             _logger($"[GetRemoteObject] Enter with OORA -- DONE");
             return results;
         }

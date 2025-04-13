@@ -18,7 +18,7 @@ namespace RemoteNET
         }
 
 
-        public override ManagedRemoteObject CreateInstance(string assembly, string typeFullName, params object[] parameters)
+        public override RemoteObject CreateInstance(string assembly, string typeFullName, params object[] parameters)
         {
             object[] paramsNoEnums = parameters.ToArray();
             for (int i = 0; i < paramsNoEnums.Length; i++)

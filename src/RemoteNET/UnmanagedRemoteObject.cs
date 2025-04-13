@@ -19,6 +19,8 @@ public class UnmanagedRemoteObject : RemoteObject
     private readonly Dictionary<Delegate, DiverCommunicator.LocalEventCallback> _eventCallbacksAndProxies;
 
     public override ulong RemoteToken => _ref.Token;
+    public override object App => _app;
+    public override TypeDump GetTypeDump() => _ref.GetTypeDump();
 
     internal UnmanagedRemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
     {
@@ -31,15 +33,6 @@ public class UnmanagedRemoteObject : RemoteObject
     public override Type GetRemoteType()
     {
         return _type ??= _app.GetRemoteType(_ref.GetTypeDump());
-    }
-
-    public override dynamic Dynamify()
-    {
-        // Adding fields 
-        TypeDump typeDump = _ref.GetTypeDump();
-
-        var factory = new DynamicRemoteObjectFactory();
-        return factory.Create(_app, this, typeDump);
     }
 
     public override ObjectOrRemoteAddress GetItem(ObjectOrRemoteAddress key)

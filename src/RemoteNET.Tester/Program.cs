@@ -116,7 +116,7 @@ namespace ScubaDiver.Tester
                             {
                                 try
                                 {
-                                    ManagedRemoteObject remoteObject = remoteApp.GetRemoteObject(addr, typeName);
+                                    ManagedRemoteObject remoteObject = remoteApp.GetRemoteObject(addr, typeName) as ManagedRemoteObject;
                                     remoteObjects.Add(remoteObject);
                                     Console.WriteLine($"Get back this object: {remoteObject}");
                                     Console.WriteLine($"This object's local index is {remoteObjects.IndexOf(remoteObject)}");

@@ -66,7 +66,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             {
                 // obj is NOT null. Make sure it's a RemoteObject or DynamicRemoteObject.
                 ManagedRemoteObject ro = obj as ManagedRemoteObject;
-                ro ??= (obj as DynamicRemoteObject)?.__ro as ManagedRemoteObject;
+                ro ??= (obj as IDynamicRemoteObject)?.__ro as ManagedRemoteObject;
                 if (ro != null)
                 {
                     oora = ro.GetField(Name);
@@ -74,7 +74,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 else
                 {
                     throw new NotImplementedException(
-                        $"{nameof(RemoteFieldInfo)}.{nameof(GetValue)} only supports {nameof(ManagedRemoteObject)} or {nameof(DynamicRemoteObject)} targets.");
+                        $"{nameof(RemoteFieldInfo)}.{nameof(GetValue)} only supports {nameof(ManagedRemoteObject)} or {nameof(IDynamicRemoteObject)} targets.");
                 }
             }
 
@@ -90,7 +90,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                     // I only support managed here because I don't think I'll implement "Field Infos" for unmanaged
                     // objects any time soon.
                     var remoteObject = App.GetRemoteObject(oora);
-                    return remoteObject.Dynamify();
+                    return remoteObject;
                 }
                 else if (oora.IsNull)
                 {
@@ -135,7 +135,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
 
             // obj is NOT null. Make sure it's a RemoteObject or DynamicRemoteObject.
             ManagedRemoteObject ro = obj as ManagedRemoteObject;
-            ro ??= (obj as DynamicRemoteObject)?.__ro as ManagedRemoteObject;
+            ro ??= (obj as IDynamicRemoteObject)?.__ro as ManagedRemoteObject;
             if (ro != null)
             {
                 ro.SetField(Name, remoteNewValue);
@@ -143,7 +143,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             }
 
             throw new NotImplementedException(
-                $"{nameof(RemoteFieldInfo)}.{nameof(SetValue)} only supports {nameof(ManagedRemoteObject)} or {nameof(DynamicRemoteObject)} targets.");
+                $"{nameof(RemoteFieldInfo)}.{nameof(SetValue)} only supports {nameof(ManagedRemoteObject)} or {nameof(IDynamicRemoteObject)} targets.");
         }
 
         public override FieldAttributes Attributes { get; }

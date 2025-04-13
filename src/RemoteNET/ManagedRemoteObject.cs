@@ -20,6 +20,9 @@ namespace RemoteNET
 
         public override ulong RemoteToken => _ref.Token;
 
+        public override object App => _app;
+        public override TypeDump GetTypeDump() => _ref.GetTypeDump();
+
         internal ManagedRemoteObject(RemoteObjectRef reference, RemoteApp remoteApp)
         {
             Index = NextIndex++;
@@ -59,16 +62,6 @@ namespace RemoteNET
             return (true, invokeRes.ReturnedObjectOrAddress);
         }
 
-        public override dynamic Dynamify()
-        {
-            // Adding fields 
-            TypeDump typeDump = _ref.GetTypeDump();
-
-            var factory = new DynamicRemoteObjectFactory();
-            return factory.Create(_app, this, typeDump);
-        }
-
-
         ~ManagedRemoteObject()
         {
             _ref?.RemoteRelease();
@@ -92,15 +85,13 @@ namespace RemoteNET
 
             DiverCommunicator.LocalEventCallback callbackProxy = (ObjectOrRemoteAddress[] args, ObjectOrRemoteAddress retVal) =>
             {
-                DynamicRemoteObject[] droParameters = new DynamicRemoteObject[args.Length];
+                RemoteObject[] droParameters = new RemoteObject[args.Length];
                 for (int i = 0; i < args.Length; i++)
                 {
                     RemoteObject ro = _app.GetRemoteObject(args[i]);
-                    DynamicRemoteObject dro = ro.Dynamify() as DynamicRemoteObject;
-
-                    droParameters[i] = dro;
+                    droParameters[i] = ro;
                 }
-                DynamicRemoteObject droRetValue = _app.GetRemoteObject(retVal).Dynamify() as DynamicRemoteObject;
+                RemoteObject droRetValue = _app.GetRemoteObject(retVal);
 
                 // Call the callback with the proxied parameters (using DynamicRemoteObjects)
                 callback.DynamicInvoke(droParameters, droRetValue);

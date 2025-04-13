@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using RemoteNET.Internal.Extensions;
 using ScubaDiver.API;
 using static Vanara.PInvoke.IpHlpApi;
@@ -36,7 +37,7 @@ namespace RemoteNET.Internal
             bool diverPortIsUse = false;
             try
             {
-                if (OperatingSystem.IsWindows())
+                if (IsWindows()) // Replaced OperatingSystem.IsWindows() with IsWindows()
                 {
                     // On Windows, can we confirm the suspected port is OPENED by the SPECIFIC TARGET PROCESS.
                     using MIB_TCPTABLE_OWNER_MODULE openedListenPorts = GetExtendedTcpTable<MIB_TCPTABLE_OWNER_MODULE>(TCP_TABLE_CLASS.TCP_TABLE_OWNER_MODULE_LISTENER);
@@ -98,6 +99,12 @@ namespace RemoteNET.Internal
                 return DiverState.Corpse;
             }
             return DiverState.NoDiver;
+        }
+
+        // Helper method to detect if the OS is Windows
+        private static bool IsWindows()
+        {
+            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
         }
     }
 }

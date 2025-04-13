@@ -25,9 +25,5 @@ namespace RemoteNET.Internal.Reflection.DotNet
             return verboseField.GetValue(null);
         }
 
-        public dynamic Dynamify()
-        {
-            return new DynamicRemoteEnum(this);
-        }
     }
 }

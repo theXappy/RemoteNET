@@ -225,7 +225,7 @@ namespace RemoteNET
         // Getting Remote Objects
         //
 
-        public override ManagedRemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
+        public override RemoteObject GetRemoteObject(ulong remoteAddress, string typeName, int? hashCode = null)
         {
             return _remoteObjects.GetRemoteObject(remoteAddress, typeName, hashCode);
         }

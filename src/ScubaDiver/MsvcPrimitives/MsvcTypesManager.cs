@@ -430,7 +430,7 @@ namespace ScubaDiver
         {
             if (!_exportsCache.TryGetValue(module, out MsvcModuleExports exports))
             {
-                IReadOnlyList<UndecoratedSymbol> rawExports = _exportsMaster.GetUndecoratedExports(module);
+                ICollection<UndecoratedSymbol> rawExports = _exportsMaster.GetUndecoratedExports(module);
                 exports = new MsvcModuleExports(rawExports);
                 _exportsCache[module] = exports;
             }
@@ -441,19 +441,17 @@ namespace ScubaDiver
         public Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> Scan(IEnumerable<MsvcTypeStub> types)
         {
             IEnumerable<FirstClassTypeInfo> allClassesToScanFor = types.Select(t => t.TypeInfo).OfType<FirstClassTypeInfo>();
-            var rawMatches = _memoryScanner.Scan(allClassesToScanFor);
+            Dictionary<FirstClassTypeInfo, IReadOnlyCollection<ulong>> rawMatches = _memoryScanner.Scan(allClassesToScanFor);
 
             // Filtering out the matches which are just exports (not instances)
-            return rawMatches.ToDictionary(
+            var matchesWithoutExports = rawMatches.ToDictionary(
                 kvp => kvp.Key,
-                kvp => (IReadOnlyCollection<ulong>)kvp.Value.Where(IsNotExport).ToList());
+                kvp => (IReadOnlyCollection<ulong>)kvp.Value.Where(m => !IsExport(m)).ToList());
+            return matchesWithoutExports;
 
-            bool IsNotExport(ulong addr)
+            bool IsExport(ulong addr)
             {
-                bool res = (_exportsMaster as ExportsMaster)?.QueryExportByAddress((nuint)addr) == null;
-                if (res)
-                    1.ToString();
-                return res;
+                return (_exportsMaster as ExportsMaster)?.QueryExportByAddress((nuint)addr) != null;
             }
         }
     }
@@ -463,7 +461,7 @@ namespace ScubaDiver
         Dictionary<nuint, UndecoratedExportedField> _exportedFields = new Dictionary<nuint, UndecoratedExportedField>();
         Dictionary<nuint, UndecoratedFunction> _exportedFunctions = new();
 
-        public MsvcModuleExports(IReadOnlyList<UndecoratedSymbol> exportsList)
+        public MsvcModuleExports(ICollection<UndecoratedSymbol> exportsList)
         {
             _exportedFields = new Dictionary<nuint, UndecoratedExportedField>();
             _exportedFunctions = new();

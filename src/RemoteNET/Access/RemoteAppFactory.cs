@@ -286,7 +286,7 @@ namespace RemoteNET.Access
             }
             string trimmed = commandLine.Trim();
 
-            if (trimmed.StartsWith('"'))
+            if (trimmed.StartsWith("\""))
                 return trimmed.Substring(trimmed.IndexOf('"', 1)).Trim();
 
             return trimmed.Substring(trimmed.IndexOf(' ')).Trim();

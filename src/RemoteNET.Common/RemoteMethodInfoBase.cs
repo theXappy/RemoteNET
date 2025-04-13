@@ -22,10 +22,6 @@ public interface IRttiMethodBase
 
     public string UndecoratedSignature
     {
-        get
-        {
-            string args = string.Join(", ", LazyParamInfos.Select(resolver => resolver.ToString()));
-            return $"{LazyRetType.TypeFullName ?? LazyRetType.TypeName} {Name}({args})";
-        }
+        get;
     }
 }

@@ -179,7 +179,7 @@ namespace RemoteNET.RttiReflection
             foreach (TypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
             {
                 // TODO: No support for methods with reference parameters for now.
-                if (restarizedParameter.FullTypeName.EndsWith('&'))
+                if (restarizedParameter.FullTypeName.EndsWith("&"))
                     return;
 
                 string fakeParamName = $"a{i}";

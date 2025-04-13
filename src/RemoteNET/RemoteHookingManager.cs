@@ -103,7 +103,7 @@ public class RemoteHookingManager
                     try
                     {
                         RemoteObject roInstance = this._app.GetRemoteObject(oora);
-                        o = roInstance.Dynamify();
+                        o = roInstance;
                     }
                     catch (Exception)
                     {
