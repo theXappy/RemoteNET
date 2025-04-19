@@ -6,7 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AdditionalFiles Include="NativeMethods.txt" />
+    <None Remove="InspectedTypes.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="InspectedDlls.txt" />
+    <AdditionalFiles Include="InspectedTypes.txt" />
   </ItemGroup>
 
   <ItemGroup>
