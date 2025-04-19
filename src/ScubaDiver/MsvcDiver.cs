@@ -1,18 +1,19 @@
+using ScubaDiver.API;
+using ScubaDiver.API.Hooking;
+using ScubaDiver.API.Interactions;
+using ScubaDiver.API.Interactions.Callbacks;
 using ScubaDiver.API.Interactions.Dumps;
+using ScubaDiver.API.Utils;
+using ScubaDiver.Hooking;
+using ScubaDiver.Rtti;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
-using ScubaDiver.API.Utils;
-using ScubaDiver.Rtti;
-using ScubaDiver.API.Interactions;
-using ScubaDiver.API;
 using System.Runtime.InteropServices;
 using System.Threading;
-using ScubaDiver.API.Interactions.Callbacks;
-using ScubaDiver.Hooking;
-using ScubaDiver.API.Hooking;
 
 namespace ScubaDiver
 {
@@ -86,8 +87,19 @@ namespace ScubaDiver
         protected override string MakeInjectDllResponse(ScubaDiverMessage req)
         {
             string dllPath = req.QueryString.Get("dll_path");
+            if (string.IsNullOrEmpty(dllPath))
+            {
+                return QuickError("Missing 'dll_path' parameter");
+            }
+
             try
             {
+                string dllDirectory = Path.GetDirectoryName(dllPath);
+                if (!Windows.Win32.PInvoke.SetDllDirectory(dllDirectory))
+                {
+                    Logger.Debug($"SetDllDirectory failed for: {dllDirectory} with error code: {Marshal.GetLastWin32Error()}");
+                }
+                
                 var handle = Windows.Win32.PInvoke.LoadLibrary(dllPath);
 
                 if (handle.IsInvalid)
