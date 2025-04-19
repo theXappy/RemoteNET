@@ -60,10 +60,13 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -82,6 +85,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalOptions>/Brepro %(AdditionalOptions)</AdditionalOptions>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
