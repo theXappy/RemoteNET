@@ -40,8 +40,8 @@ namespace ScubaDiver
 
             string className = typeInfo.Name;
             string classMembersPrefix = $"{typeInfo.NamespaceAndName}::";
-            string ctorName = $"{typeInfo}{className}"; // Constructing NameSpace::ClassName::ClassName
-            string vftableName = $"{typeInfo}`vftable'"; // Constructing NameSpace::ClassName::`vftable'
+            string ctorName = $"{classMembersPrefix}{className}"; // Constructing NameSpace::ClassName::ClassName
+            string vftableName = $"{classMembersPrefix}`vftable'"; // Constructing NameSpace::ClassName::`vftable'
 
             foreach (VftableInfo vftable in type.GetVftables())
             {
