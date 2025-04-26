@@ -552,7 +552,8 @@ namespace ScubaDiver
 
             // Need to figure target instance and the target type.
             ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
-            MsvcType msvcType = _typesManager.GetType(rawAssemblyFilter, rawTypeFilter).Upgrade();
+            MsvcTypeStub msvcTypeStub = _typesManager.GetType(rawAssemblyFilter, rawTypeFilter);
+            MsvcType msvcType = msvcTypeStub.Upgrade();
             // Check if we have this objects in our pinned pool
             // TODO: Pull from freezer?
 
@@ -702,6 +703,14 @@ namespace ScubaDiver
                             ImportingModule = msvcType.Module.Name
                         };
                         returnTypeDump = _typesManager.GetType(moduleFilter, typeNameFilter);
+                        if (returnTypeDump == null)
+                        {
+                            // Maybe it's just our current type
+                            if (typeNameFilter(msvcTypeStub.TypeInfo.NamespaceAndName))
+                            {
+                                returnTypeDump = msvcTypeStub;
+                            }
+                        }
                     }
                 }
             }
