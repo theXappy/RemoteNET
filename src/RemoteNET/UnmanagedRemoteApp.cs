@@ -159,7 +159,15 @@ namespace RemoteNET
             try
             {
                 od = _unmanagedCommunicator.DumpObject(remoteAddress, typeName, true, hashCode);
-                td = _unmanagedCommunicator.DumpType(od.Type);
+                string namespaceAndType = od.Type;
+                string assembly = null;
+                if (namespaceAndType.Contains("!"))
+                {
+                    var split = namespaceAndType.Split('!');
+                    assembly = split[0];
+                    namespaceAndType = split[1].Trim();
+                }
+                td = _unmanagedCommunicator.DumpType(namespaceAndType, assembly);
             }
             catch (Exception e)
             {
