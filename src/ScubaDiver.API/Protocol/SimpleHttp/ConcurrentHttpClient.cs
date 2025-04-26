@@ -118,7 +118,7 @@ namespace ScubaDiver.API.Protocol.SimpleHttp
             // Wait for response
             are.WaitOne();
             if (!_responses.TryRemove(myId, out HttpResponseSummary val))
-                throw new Exception("AutoResetEvent was signaled but a resposne wasn't found in the responses dict.");
+                throw new Exception("AutoResetEvent was signaled but a response wasn't found in the responses dict.");
 
             return val;
         }
