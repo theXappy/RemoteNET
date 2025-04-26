@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using RemoteNET.Common;
@@ -32,7 +34,7 @@ namespace RemoteNET.RttiReflection
             new Dictionary<Tuple<string, string>, Type>();
 
 
-        public Type ResolveTypeWhileCreating(RemoteApp app, string typeInProgress, string methodName, string assembly, string type)
+        public Type ResolveTypeWhileCreating(RemoteApp app, string typeInProgress, string assembly, string type)
         {
             if (type.Length > 500)
             {
@@ -53,7 +55,7 @@ namespace RemoteNET.RttiReflection
                     if (dumpedArgType == null)
                     {
                         throw new Exception(
-                            $"{nameof(RttiTypesFactory)} tried to dump type {type} when handling method {methodName} of type" +
+                            $"{nameof(RttiTypesFactory)} tried to dump type {type} when handling method XXX of type" +
                             $"{typeInProgress} but the {nameof(DiverCommunicator)}.{nameof(DiverCommunicator.DumpType)} function failed.");
                     }
 
@@ -62,7 +64,7 @@ namespace RemoteNET.RttiReflection
                     {
                         // remove on-going creation indication
                         throw new Exception(
-                            $"{nameof(RttiTypesFactory)} tried to dump type {type} when handling method {methodName} of type" +
+                            $"{nameof(RttiTypesFactory)} tried to dump type {type} when handling method XXX of type" +
                             $"{typeInProgress} but the inner {nameof(RttiTypesFactory)}.{nameof(RttiTypesFactory.Create)} function failed.");
                     }
                     paramType = newCreatedType;
@@ -141,9 +143,9 @@ namespace RemoteNET.RttiReflection
 
             foreach (TypeDump.TypeMethodTable methodTable in typeDump.MethodTables)
             {
-                var methodTableInfo = new RemoteRttiMethodTableInfo(output, 
-                    methodTable.UndecoratedFullName, 
-                    methodTable.DecoratedName, 
+                var methodTableInfo = new RemoteRttiMethodTableInfo(output,
+                    methodTable.UndecoratedFullName,
+                    methodTable.DecoratedName,
                     methodTable.XoredAddress ^ TypeDump.TypeMethodTable.XorMask);
                 output.AddMethodTable(methodTableInfo);
             }
@@ -239,15 +241,23 @@ namespace RemoteNET.RttiReflection
                 // Get rid of '*' in pointers so it's NOT treated as a wildcard
                 string originalNamespaceAndTypeName = namespaceAndTypeName;
                 namespaceAndTypeName = namespaceAndTypeName.TrimEnd('*');
+                int pointerLevel = originalNamespaceAndTypeName.Length - namespaceAndTypeName.Length;
                 // If no module name is given, use a wildcard
                 moduleName ??= "*";
 
-                return new Lazy<Type>(() =>
+                var innerResolver = new Lazy<Type>(() =>
                 {
-                    if (_shittyCache.TryGetValue(namespaceAndTypeName, out var t))
-                        return t;
+                    if (_dotNetPrimitivesMap.TryGetValue(namespaceAndTypeName, out Type resultType))
+                        return resultType;
 
-                    Debug.WriteLine($"[@@@][RttiTypeFactory] Trying to resolve non-cached sub-type: `{namespaceAndTypeName}`");
+                    if (_shittyCache.TryGetValue(namespaceAndTypeName, out resultType))
+                        return resultType;
+
+                    resultType = RttiTypesResolver.Instance.Resolve(typeDump.Assembly, $"{typeDump.Assembly}!{namespaceAndTypeName}");
+                    if (resultType != null)
+                        return resultType;
+
+                    Debug.WriteLine($"[{DateTime.Now.ToLongTimeString()}][@@@][RttiTypeFactory] Trying to resolve non-cached sub-type: `{namespaceAndTypeName}`");
 
                     var possibleParamTypes = app.QueryTypes(namespaceAndTypeName).ToArray();
                     if (possibleParamTypes.Length != 1 && !namespaceAndTypeName.Contains('!'))
@@ -283,26 +293,222 @@ namespace RemoteNET.RttiReflection
 
                     var paramTypeInSameAssembly =
                         possibleParamTypes.Where(t => t.Assembly == typeDump.Assembly).ToArray();
-                    if (paramTypeInSameAssembly.Length == 0)
+                    if (paramTypeInSameAssembly.Length > 0)
                     {
-                        return app.GetRemoteType(possibleParamTypes.Single());
+                        if (paramTypeInSameAssembly.Length > 1)
+                        {
+                            string candidates =
+                                string.Join(", ",
+                                    paramTypeInSameAssembly.Select(cand => $"{cand.Assembly}!{cand.TypeFullName}"));
+                            throw new Exception(
+                                $"Too many matches for the sub-type '{namespaceAndTypeName}' in the signature of {func.UndecoratedFullName} .\n" +
+                                $"Candidates: " + candidates);
+                        }
+
+                        return app.GetRemoteType(paramTypeInSameAssembly.Single());
                     }
 
-                    if (paramTypeInSameAssembly.Length > 1)
-                    {
-                        string candidates =
-                            string.Join(", ",
-                                paramTypeInSameAssembly.Select(cand => $"{cand.Assembly}!{cand.TypeFullName}"));
-                        throw new Exception(
-                            $"Too many matches for the sub-type '{namespaceAndTypeName}' in the signature of {func.UndecoratedFullName} .\n" +
-                            $"Candidates: " + candidates);
-                    }
-
-                    return app.GetRemoteType(paramTypeInSameAssembly.Single());
+                    return app.GetRemoteType(possibleParamTypes.Single());
                 });
+
+                var pointerResolver = new Lazy<Type>(() =>
+                {
+                    Type inner = innerResolver.Value;
+                    if (pointerLevel == 0)
+                        return inner;
+                    Type pointerType = PointerType.CreateRecursive(inner, pointerLevel);
+                    return pointerType;
+                });
+
+                return pointerResolver;
             }
         }
 
         public static Dictionary<string, Type> _shittyCache = new Dictionary<string, Type>();
+
+        // C++ types that were mapped to C# ones
+        public static Dictionary<string, Type> _dotNetPrimitivesMap = new Dictionary<string, Type>()
+        {
+            ["char"] = typeof(char),
+            ["bool"] = typeof(bool),
+            ["int"] = typeof(int),
+            ["long"] = typeof(long),
+            ["short"] = typeof(short),
+            ["float"] = typeof(float),
+            ["double"] = typeof(double),
+            ["void"] = typeof(void),
+            ["void*"] = typeof(ulong),
+            ["char*"] = typeof(CharStar),
+            ["int64_t"] = typeof(long),
+            ["uint64_t"] = typeof(ulong),
+            ["int32_t"] = typeof(int),
+            ["uint32_t"] = typeof(uint),
+            ["int16_t"] = typeof(short),
+            ["uint16_t"] = typeof(ushort)
+        };
+    }
+
+    public class PointerType : Type
+    {
+        public override string Name => $"{Inner.Name}*";
+        public override string FullName => $"{Inner.FullName}*";
+        public override string Namespace => Inner.Namespace;
+        public override Type BaseType => Inner.BaseType;
+        public override Assembly Assembly => Inner.Assembly;
+        public override string AssemblyQualifiedName => throw new NotImplementedException();
+        public override Guid GUID => throw new NotImplementedException();
+        public override Module Module => throw new NotImplementedException();
+        public override Type UnderlyingSystemType => null;
+
+        Type Inner { get; set; }
+
+        public PointerType(Type inner)
+        {
+            Inner = inner;
+        }
+
+        public static Type CreateRecursive(Type inner, int pointerLevel)
+        {
+            if (pointerLevel == 0)
+                return inner;
+            Type pointerType = new PointerType(inner);
+            return CreateRecursive(pointerType, pointerLevel - 1);
+        }
+
+        protected override TypeAttributes GetAttributeFlagsImpl()
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override ConstructorInfo GetConstructorImpl(BindingFlags bindingAttr, Binder binder, CallingConventions callConvention, Type[] types, ParameterModifier[] modifiers)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override ConstructorInfo[] GetConstructors(BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override Type GetElementType()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override EventInfo GetEvent(string name, BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override EventInfo[] GetEvents(BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override FieldInfo GetField(string name, BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override FieldInfo[] GetFields(BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        [return: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
+        public override Type GetInterface(string name, bool ignoreCase)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override Type[] GetInterfaces()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override MemberInfo[] GetMembers(BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override MethodInfo GetMethodImpl(string name, BindingFlags bindingAttr, Binder binder, CallingConventions callConvention, Type[] types, ParameterModifier[] modifiers)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override MethodInfo[] GetMethods(BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override Type GetNestedType(string name, BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override Type[] GetNestedTypes(BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override PropertyInfo[] GetProperties(BindingFlags bindingAttr)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override PropertyInfo GetPropertyImpl(string name, BindingFlags bindingAttr, Binder binder, Type returnType, Type[] types, ParameterModifier[] modifiers)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override bool HasElementTypeImpl()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override object InvokeMember(string name, BindingFlags invokeAttr, Binder binder, object target, object[] args, ParameterModifier[] modifiers, CultureInfo culture, string[] namedParameters)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override bool IsArrayImpl()
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override bool IsByRefImpl()
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override bool IsCOMObjectImpl()
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override bool IsPointerImpl()
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override bool IsPrimitiveImpl()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override object[] GetCustomAttributes(bool inherit)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override object[] GetCustomAttributes(Type attributeType, bool inherit)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override bool IsDefined(Type attributeType, bool inherit)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
