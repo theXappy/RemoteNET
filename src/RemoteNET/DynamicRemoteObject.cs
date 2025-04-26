@@ -84,10 +84,20 @@ public abstract class DynamicRemoteObject : DynamicObject
             }
             else if (overloads.Count > 1)
             {
-                // Multiple overloads. This sucks because we need to... return some "Router" func...
+                // We have multiple overloads with the same name and same amount of parameters
+                // We need to check the types of the parameters and see if we can find a match
+                var deepMatches = overloads.Where(DeepCompareMethods).ToList();
+                if (deepMatches.Count == 1)
+                {
+                    // OK, invoking without generic arguments
+                    result = deepMatches.Single().Invoke(_parent.__ro, args);
+                }
+                else
+                {
+                    throw new NotImplementedException($"Multiple overloads aren't supported at the moment. " +
+                                      $"Method `{_methods[0]}` had {overloads.Count} overloads registered.");
+                }
 
-                throw new NotImplementedException($"Multiple overloads aren't supported at the moment. " +
-                                                  $"Method `{_methods[0]}` had {overloads.Count} overloads registered.");
             }
             else // This case is for "overloads.Count == 0"
             {
@@ -95,6 +105,43 @@ public abstract class DynamicRemoteObject : DynamicObject
                                             $"After filtering all overloads with given amount of parameters ({args.Length}) we were left with 0 overloads.");
             }
             return true;
+
+            bool DeepCompareMethods(RemoteMethodInfoBase overload)
+            {
+                var parameters = overload.GetParameters();
+                if (parameters.Length != args.Length)
+                    return false;
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    // Check if the parameter type is assignable from the argument type
+                    Type query = args[i].GetType();
+                    Type paramType = parameters[i].ParameterType;
+                    // Check if both are LOCAL types: meaning the the "Type" classes themselves are RuntimeTypes
+                    // If they are not, we need to check if the argument is a DynamicRemoteObject
+                    bool queryIsRuntimeType = query.GetType().FullName is "System.RuntimeType";
+                    bool paramIsRuntimeType = paramType.GetType().FullName is "System.RuntimeType";
+
+                    // Mismatches are instance FALSE
+                    if (queryIsRuntimeType != paramIsRuntimeType)
+                        return false;
+
+                    // Check if both are RuntiemTypes
+                    if (queryIsRuntimeType && paramIsRuntimeType)
+                    {
+                        // Is Assignable bulshit
+                        if (!query.IsAssignableFrom(paramType))
+                            return false;
+                    }
+                    else
+                    {
+                        // Both are NOT runtime types
+                        // Check if full names match exactly
+                        if (query.FullName != paramType.FullName)
+                            return false;
+                    }
+                }
+                return true;
+            }
         }
 
         public override bool Equals(object obj)
