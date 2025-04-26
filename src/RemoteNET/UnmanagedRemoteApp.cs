@@ -109,6 +109,9 @@ namespace RemoteNET
                 new RttiTypesFactory(resolver, _unmanagedCommunicator);
             var dumpedType = _unmanagedCommunicator.DumpType(typeFullName, assembly);
             Type results = rtf.Create(this, dumpedType);
+            if (results != null)
+                resolver.RegisterType(assembly, typeFullName, results);
+
             _logger($"[GetRemoteType] Enter with filter = {typeFullName}, Assembly = {assembly ?? "null"} -- DONE");
             return results;
         }
