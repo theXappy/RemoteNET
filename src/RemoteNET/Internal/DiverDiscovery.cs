@@ -1,10 +1,11 @@
-﻿using System;
+﻿using RemoteNET.Internal.Extensions;
+using ScubaDiver.API;
+using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using RemoteNET.Internal.Extensions;
-using ScubaDiver.API;
+using System.Runtime.Versioning;
 using static Vanara.PInvoke.IpHlpApi;
 
 namespace RemoteNET.Internal
@@ -32,44 +33,7 @@ namespace RemoteNET.Internal
         public static DiverState QueryStatus(Process target, string diverAddr, int diverPort)
         {
             using DiverCommunicator com = new DiverCommunicator(diverAddr, diverPort, timeout: 500 /* ms */);
-
-            bool diverPortIsUse = false;
-            try
-            {
-                if (OperatingSystem.IsWindows())
-                {
-                    // On Windows, can we confirm the suspected port is OPENED by the SPECIFIC TARGET PROCESS.
-                    using MIB_TCPTABLE_OWNER_MODULE openedListenPorts = GetExtendedTcpTable<MIB_TCPTABLE_OWNER_MODULE>(TCP_TABLE_CLASS.TCP_TABLE_OWNER_MODULE_LISTENER);
-                    ushort swappedPort = (ushort)((diverPort >> 8) | (diverPort << 8));
-                    var targetOpenedListenPorts = openedListenPorts.Where(row => row.dwLocalPort == diverPort || row.dwLocalPort == swappedPort).ToList();
-                    if (targetOpenedListenPorts.Any())
-                    {
-                        // I only ever expect a single process (or none) to hold the target port opened, but the API here is sh*t
-                        // and MIB_TCPROW_OWNER_MODULE is not comparable to `default`
-                        diverPortIsUse = targetOpenedListenPorts.Any(t => t.dwOwningPid == target.Id);
-
-                        // Fallback - Port might be held in use by the Lifeboat
-                        if (!diverPortIsUse)
-                        {
-                            var ownerProcs = targetOpenedListenPorts.Select(t => (int)t.dwOwningPid).Select(Process.GetProcessById);
-                            diverPortIsUse = ownerProcs.Any(proc => proc.ProcessName == "Lifeboat");
-                        }
-                    }
-                }
-                else
-                {
-                    // Fallback for when we support non-windows hosts (yeah, right)
-                    // On non-Windows, can we only confirm the suspected port is OPENED by SOME process.
-                    IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
-                    IPEndPoint[] tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
-                    diverPortIsUse = tcpConnInfoArray.Any(conInfo => conInfo.Port == diverPort);
-
-                }
-            }
-            catch
-            {
-                // Had some issues, perhaps it's the diver holding that port.
-            }
+            bool diverPortIsUse = CheckPort(target, diverPort);
 
             if (diverPortIsUse)
             {
@@ -98,6 +62,55 @@ namespace RemoteNET.Internal
                 return DiverState.Corpse;
             }
             return DiverState.NoDiver;
+        }
+
+        private static bool CheckPort(Process target, int diverPort)
+        {
+            try
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    return CheckPortWindowsSpecific(target, diverPort);
+                }
+                else
+                {
+                    // Fallback for when we support non-windows hosts (yeah, right)
+                    // On non-Windows, can we only confirm the suspected port is OPENED by SOME process.
+                    IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+                    IPEndPoint[] tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
+                    return tcpConnInfoArray.Any(conInfo => conInfo.Port == diverPort);
+                }
+            }
+            catch
+            {
+                // Had some issues, perhaps it's the diver holding that port.
+                throw;
+            }
+        }
+
+        [SupportedOSPlatform("windows")]
+        private static bool CheckPortWindowsSpecific(Process target, int diverPort)
+        {
+            // On Windows, can we confirm the suspected port is OPENED by the SPECIFIC TARGET PROCESS.
+            MIB_TCPTABLE_OWNER_MODULE openedListenPorts = GetExtendedTcpTable<MIB_TCPTABLE_OWNER_MODULE>(TCP_TABLE_CLASS.TCP_TABLE_OWNER_MODULE_LISTENER);
+            ushort swappedPort = (ushort)((diverPort >> 8) | (diverPort << 8));
+            var targetOpenedListenPorts = openedListenPorts.Where(row => row.dwLocalPort == diverPort || row.dwLocalPort == swappedPort).ToList();
+            if (targetOpenedListenPorts.Any())
+            {
+                // I only ever expect a single process (or none) to hold the target port opened, but the API here is sh*t
+                // and MIB_TCPROW_OWNER_MODULE is not comparable to `default`
+                bool diverPortIsUse = targetOpenedListenPorts.Any(t => t.dwOwningPid == target.Id);
+
+                // Fallback - Port might be held in use by the Lifeboat
+                if (!diverPortIsUse)
+                {
+                    var ownerProcs = targetOpenedListenPorts.Select(t => (int)t.dwOwningPid).Select(Process.GetProcessById);
+                    diverPortIsUse = ownerProcs.Any(proc => proc.ProcessName == "Lifeboat");
+                }
+                return diverPortIsUse;
+            }
+
+            return false;
         }
     }
 }

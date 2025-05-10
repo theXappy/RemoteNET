@@ -111,7 +111,7 @@ public class ExportsMaster : IReadOnlyExportsMaster
         return GetExportedTypeMembers(module, typeFullName).OfType<UndecoratedFunction>();
     }
 
-    public UndecoratedSymbol? QueryExportByAddress(nuint address)
+    public UndecoratedSymbol QueryExportByAddress(nuint address)
     {
         nuint valueAtAddress = 0; // TODO: Read content at <address>, avoiding access violations!!
         nuint xoredValue = (nuint)(valueAtAddress) ^ UndecoratedExportedField.XorMask;

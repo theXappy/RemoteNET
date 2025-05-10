@@ -9,6 +9,7 @@
 		<Platforms>AnyCPU;x86</Platforms>
 		<DefineConstants>NET_6</DefineConstants>
 		<GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+		<SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
 	</PropertyGroup>
 
 	<ItemGroup>

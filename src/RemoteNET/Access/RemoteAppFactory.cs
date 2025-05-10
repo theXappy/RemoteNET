@@ -273,6 +273,9 @@ namespace RemoteNET.Access
 
         public static string GetCommandLineArgs(int processId)
         {
+            if (!OperatingSystem.IsWindows())
+                throw new PlatformNotSupportedException("This method is only supported on Windows.");
+
             string commandLine = null;
 
             using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(
@@ -284,6 +287,10 @@ namespace RemoteNET.Access
                     break;
                 }
             }
+
+            if (string.IsNullOrWhiteSpace(commandLine))
+                return string.Empty;
+
             string trimmed = commandLine.Trim();
 
             if (trimmed.StartsWith('"'))

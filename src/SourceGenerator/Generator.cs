@@ -213,7 +213,7 @@ namespace SourceGenerator
             {
                 Process.GetProcessById(victim.ProcessId).Kill();
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // Don't really care
             }
