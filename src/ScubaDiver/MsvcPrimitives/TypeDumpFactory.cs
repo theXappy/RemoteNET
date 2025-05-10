@@ -12,7 +12,6 @@ namespace ScubaDiver
             TypeInfo typeInfo = matchingType.TypeInfo;
             ModuleInfo module = matchingType.Module.ModuleInfo;
 
-            UndecoratedSymbol vftable;
             List<TypeDump.TypeField> fields = new();
             List<TypeDump.TypeMethod> methods = new();
             List<TypeDump.TypeMethod> constructors = new();
