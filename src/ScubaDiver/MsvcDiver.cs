@@ -342,7 +342,7 @@ namespace ScubaDiver
 
         private TypeDump GetTypeDump(nuint methodTableAddress)
         {
-            MsvcType matchingType = _typesManager.GetType(methodTableAddress).Upgrade();
+            MsvcType matchingType = _typesManager.GetType(methodTableAddress)?.Upgrade();
             if (matchingType == null)
                 return null;
             return TypeDumpFactory.ConvertMsvcTypeToTypeDump(matchingType);
@@ -503,7 +503,7 @@ namespace ScubaDiver
                     ParseFullTypeName(fullTypeName, out string assemblyFilter, out string typeFilter);
                     Predicate<string> typeFilterPredicate = Filter.CreatePredicate(typeFilter);
                     Predicate<string> moduleFilterPredicate = Filter.CreatePredicate(assemblyFilter);
-                    matchingType = _typesManager.GetType(moduleFilterPredicate, typeFilterPredicate).Upgrade();
+                    matchingType = _typesManager.GetType(moduleFilterPredicate, typeFilterPredicate)?.Upgrade();
                     if (matchingType == null)
                     {
                         throw new Exception("Failed to resolve RTTI type by neither name not vftable value.");
