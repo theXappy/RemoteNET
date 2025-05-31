@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.CSharp.RuntimeBinder;
 using RemoteNET.Common;
 using RemoteNET.Internal.ProxiedReflection;
+using RemoteNET.RttiReflection;
 using RemoteNET.Utils;
 using Binder = Microsoft.CSharp.RuntimeBinder.Binder;
 
@@ -79,7 +80,19 @@ public abstract class DynamicRemoteObject : DynamicObject
                         throw new ArgumentException("A generic method was intialized with no generic arguments.");
                     }
                     // OK, invoking without generic arguments
-                    result = overloads.Single().Invoke(_parent.__ro, args);
+                    result = overload.Invoke(_parent.__ro, args);
+
+                    // Allow 1 level of pointer-ness in return values
+                    Type retType = overload.ReturnType;
+                    if (retType is PointerType ptrType)
+                        retType = ptrType.Inner;
+
+                    if (result is UIntPtr uPtr && retType is RemoteRttiType remoteObjType)
+                    {
+                        // Heuristic. Fuck it let's try to resolve as the ret type
+                        var ro = _parent.__ra.GetRemoteObject((ulong)uPtr, remoteObjType.FullName);
+                        result = ro.Dynamify();
+                    }
                 }
             }
             else if (overloads.Count > 1)
