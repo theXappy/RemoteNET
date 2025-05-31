@@ -76,7 +76,7 @@
 	
 	<Target Name="ZipFolders" BeforeTargets="BeforeBuild">
 		<ItemGroup>
-			<ZipOperations Include="$(ProjectDir)\..\Lifeboat\bin\$(Configuration)\net6.0-windows">
+			<ZipOperations Include="$(ProjectDir)\..\Lifeboat\bin\$(Configuration)\net8.0">
 				<ZipFileName>$(ProjectDir)\Resources\Lifeboat.zip</ZipFileName>
 			</ZipOperations>
 			<ZipOperations Include="$(SolutionDir)\dist\$(Configuration)\ScubaDivers">
