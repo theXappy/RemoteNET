@@ -360,7 +360,7 @@ namespace RemoteNET.RttiReflection
         public override Module Module => throw new NotImplementedException();
         public override Type UnderlyingSystemType => null;
 
-        Type Inner { get; set; }
+        public Type Inner { get; set; }
 
         public PointerType(Type inner)
         {
