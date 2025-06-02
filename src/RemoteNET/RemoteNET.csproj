@@ -94,7 +94,7 @@
 		<ZipDirectory SourceDirectory="@(ZipOperations)" DestinationFile="%(ZipOperations.ZipFileName)" Overwrite="true" />
 	</Target>
 
-	<Target Name="DeleteDebugSymbolFile" AfterTargets="Build">
+	<Target Name="DeleteDebugSymbolFile" AfterTargets="Build" Condition="'$(GITHUB_ACTIONS)' != 'true'">
 		<ItemGroup>
 			<FilesToDelete Include="$(ProjectDir)\Resources\*.exe" />
 			<FilesToDelete Include="$(ProjectDir)\Resources\*.dll" />
