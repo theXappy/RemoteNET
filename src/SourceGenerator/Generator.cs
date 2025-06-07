@@ -1,5 +1,4 @@
-﻿using CliWrap.Buffered;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System;
@@ -83,7 +82,7 @@ namespace SourceGenerator
             string inspectedTypesContent = File.ReadAllText(inspectedTypesFilePath);
             
             // Get rnet-class-dump.exe version
-            string dumpExePath = @"C:\git\rnet-kit\rnet-class-dump\bin\Debug\net8.0-windows\rnet-class-dump.exe";
+            string dumpExePath = @"C:\git\rnet-kit\rnet-class-dump\bin\Debug\net8.0\rnet-class-dump.exe";
             string dumpExeVersion = FileVersionInfo.GetVersionInfo(dumpExePath).FileVersion ?? "unknown";
             
             // Check if cache is valid
@@ -111,6 +110,9 @@ namespace SourceGenerator
 
             if (!cacheHit)
             {
+                Log(">> Cache MISS. Starting to spawn and analyze...\n");
+                Log($"InspectedDlls: {inspectedDllsContent}\n");
+                Log($"InspectedTypes: {inspectedTypesContent}\n");
                 stdout = SpawnAndAnalyze(inspectedDllsFilePath, inspectedTypesFilePath);
                 if (string.IsNullOrEmpty(stdout))
                     return;
@@ -130,12 +132,17 @@ namespace SourceGenerator
             //var compilation = context.Compilation;
 
             Log(">> Starting to write files\n");
+
+            Log(">> Adding Source all_finds.cs\n");
             context.AddSource($"all_finds.cs", SourceText.From($"// {generatedFiles.Length} num of lines", Encoding.UTF8));
+            Log(">> Adding Source all_finds.cs -- added\n");
             foreach (string[] generatedFile in generatedFiles)
             {
-                Log($">> Writing: {generatedFile}\n");
+                Log($">> Trying to add next line. Array size is {generatedFile.Length}, we need 2 items\n");
+                Log($">> Trying to add next line. DUMPED: " + string.Join(", ", generatedFile) + "\n");
                 string classFullNameNormalized = generatedFile[0].Replace('!', '_');
                 string filePath = generatedFile[1];
+                Log($">> Writing: {filePath}\n");
                 context.AddSource($"{classFullNameNormalized}.cs", SourceText.From(File.ReadAllText(filePath), Encoding.UTF8));
             }
             Log(">> Done writing files\n");
@@ -145,11 +152,25 @@ namespace SourceGenerator
 
         private string SpawnAndAnalyze(string inspectedDllsFilePath, string inspectedTypesFilePath)
         {
-            // Create target with required DLLs
-            var victim = CliWrap.Cli.Wrap(@"C:\git\rnet-kit\RemoteNET\src\Tests\TestTarget\bin\Debug\net8.0-windows\TestTarget.exe")
-            .WithWorkingDirectory(@"C:\git\rnet-kit\RemoteNET\src\Tests\TestTarget\bin\Debug\net8.0-windows")
-            .WithValidation(CliWrap.CommandResultValidation.None)
-            .ExecuteBufferedAsync();
+            // Start TestTarget.exe process
+            var victimStartInfo = new ProcessStartInfo
+            {
+                FileName = @"C:\git\rnet-kit\RemoteNET\src\Tests\TestTarget\bin\Debug\net8.0\TestTarget.exe",
+                WorkingDirectory = @"C:\git\rnet-kit\RemoteNET\src\Tests\TestTarget\bin\Debug\net8.0",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            //Log the start of the process
+            Log("Starting TestTarget.exe...\n");
+            var victimProc = Process.Start(victimStartInfo);
+            if (victimProc == null)
+            {
+                Log("Failed to start TestTarget.exe\n");
+                return null;
+            }
 
             List<string> targetDlls;
             try
@@ -160,58 +181,83 @@ namespace SourceGenerator
             {
                 Log($"Error reading target list: {e.Message}\n");
                 Debug.WriteLine("Error reading target list: " + e.Message);
+                victimProc.Kill();
                 return null;
             }
 
             foreach (string dllPath in targetDlls)
             {
                 Log($"GENERATOR Injecting: {dllPath}\n");
-                var injectCommand =
-                    CliWrap.Cli.Wrap(@"C:\git\rnet-kit\rnet-inject\bin\Debug\net8.0-windows\rnet-inject.exe")
-                    .WithWorkingDirectory(@"C:\git\rnet-kit\rnet-inject\bin\Debug\net8.0-windows\")
-                    .WithArguments($"-u -t {victim.ProcessId} -d \"{dllPath}\"")
-                    .WithValidation(CliWrap.CommandResultValidation.None)
-                    .ExecuteBufferedAsync();
-
-                injectCommand.Task.Wait();
-                Log($"rnet-inject STDERR: {injectCommand.Task.Result.StandardError}\n");
-                Log($"rnet-inject STDOUT: {injectCommand.Task.Result.StandardOutput}\n");
-
-                if (injectCommand.Task.Result.ExitCode != 0)
+                var injectStartInfo = new ProcessStartInfo
                 {
-                    Log($"rnet-inject failed with exit code {injectCommand.Task.Result.ExitCode}\n");
-                    // Print whether Test Target is dead or not + STDERR
-                    if (victim.Task.Result.ExitCode != 0)
+                    FileName = @"C:\git\rnet-kit\rnet-inject\bin\Debug\net8.0\rnet-inject.exe",
+                    WorkingDirectory = @"C:\git\rnet-kit\rnet-inject\bin\Debug\net8.0\",
+                    Arguments = $"-u -t {victimProc.Id} -d \"{dllPath}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                var injectProc = Process.Start(injectStartInfo);
+                if (injectProc == null)
+                {
+                    Log("Failed to start rnet-inject.exe\n");
+                    victimProc.Kill();
+                    return null;
+                }
+                injectProc.WaitForExit();
+                string injectStdErr = injectProc.StandardError.ReadToEnd();
+                string injectStdOut = injectProc.StandardOutput.ReadToEnd();
+                Log($"rnet-inject STDERR: {injectStdErr}\n");
+                Log($"rnet-inject STDOUT: {injectStdOut}\n");
+
+                if (injectProc.ExitCode != 0)
+                {
+                    Log($"rnet-inject failed with exit code {injectProc.ExitCode}\n");
+                    if (victimProc.HasExited)
                     {
                         Log($"Test Target is dead\n");
-                        Log($"Test Target STDERR: {victim.Task.Result.StandardError}\n");
-                        Log($"Test Target STDOUT: {victim.Task.Result.StandardOutput}\n");
+                        Log($"Test Target STDERR: {victimProc.StandardError.ReadToEnd()}\n");
+                        Log($"Test Target STDOUT: {victimProc.StandardOutput.ReadToEnd()}\n");
                     }
                     else
                     {
                         Log($"Test Target is alive...\n");
                     }
+                    victimProc.Kill();
                     return null;
                 }
             }
+            Log(">> All DLLs injected successfully\n");
 
-            var dumpCommand =
-                CliWrap.Cli.Wrap(@"C:\git\rnet-kit\rnet-class-dump\bin\Debug\net8.0-windows\rnet-class-dump.exe")
-                .WithArguments($"-u -t {victim.ProcessId} -l \"{inspectedTypesFilePath}\"")
-                .WithValidation(CliWrap.CommandResultValidation.None)
-                .ExecuteBufferedAsync();
-
-            dumpCommand.Task.Wait();
-            Log($"rnet-class-dump STDERR: {dumpCommand.Task.Result.StandardError}\n");
-            string stdout = dumpCommand.Task.Result.StandardOutput;
+            var dumpStartInfo = new ProcessStartInfo
+            {
+                FileName = @"C:\git\rnet-kit\rnet-class-dump\bin\Debug\net8.0\rnet-class-dump.exe",
+                Arguments = $"-u -t {victimProc.Id} -l \"{inspectedTypesFilePath}\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            Log("Starting rnet-class-dump.exe...\n");
+            var dumpProc = Process.Start(dumpStartInfo);
+            if (dumpProc == null)
+            {
+                Log("Failed to start rnet-class-dump.exe\n");
+                victimProc.Kill();
+                return null;
+            }
+            dumpProc.WaitForExit();
+            string dumpStdErr = dumpProc.StandardError.ReadToEnd();
+            string stdout = dumpProc.StandardOutput.ReadToEnd();
+            Log($"rnet-class-dump STDERR: {dumpStdErr}\n");
             Log($"rnet-class-dump STDOUT: {stdout}\n");
-
-
 
             // Try to cleanup dummy target
             try
             {
-                Process.GetProcessById(victim.ProcessId).Kill();
+                if (!victimProc.HasExited)
+                    victimProc.Kill();
             }
             catch (Exception)
             {
