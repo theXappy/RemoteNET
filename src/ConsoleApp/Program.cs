@@ -22,92 +22,51 @@ namespace ConsoleApp
             // Connect to the C++ target process named "gN"  
             RemoteApp remoteApp = RemoteAppFactory.Connect("gN", RuntimeType.Unmanaged);
             Console.WriteLine("Successfully connected to the target process");
-
-            SPen.Uuid dummyUuid = new Uuid(remoteApp);
-            SPen.String dummyStr = new SPen.String(remoteApp);
-            dummyStr.Construct(1);
-            dummyUuid.ToString(dummyStr);
-
-            // Dump bytes of String
-            ulong address = dummyStr.__address;
-            Console.WriteLine($"String address: 0x{address:X16} (Allocated by us)");
-            remoteApp.Marshal.QuickDump(address, 0x30);
-            // Print content of dummy string
-            Console.WriteLine("Dummy string: " + ReadString(dummyStr));
-
-            NoteZip noteZip = new NoteZip(remoteApp);
-            Dictionary<ulong, ulong> stringAddresses = new Dictionary<ulong, ulong>();
-            for (int i = 0; i < 4096; i++)
+            // Fetch the WNote object from the target process
+            remoteApp.Communicator.StartOffensiveGC("Samsung.SPenNative.Glue.dll.dll");
+            CandidateObject cand = remoteApp.QueryInstances("Samsung.SPenNative.Glue.dll!SPen::WNote").FirstOrDefault();
+            if (cand == null)
             {
-                remoteApp.Marshal.WriteQword(address, 0);
+                Console.WriteLine("Failed to find WNote object");
+                return;
+            }
+            // Upgrading to RemoteObject
+            RemoteObject ro = remoteApp.GetRemoteObject(cand);
+            // Cast
+            Type target = remoteApp.GetRemoteType("libSpen_worddoc.dll!SPen::WNote");
+            RemoteObject castedRo = ro.Cast(target);
+            // Upgrading to DRO
+            DynamicRemoteObject dro = castedRo.Dynamify();
+            // Upgrade to WNote
+            SPen.WNote wNote = new SPen.WNote(dro);
+            Console.WriteLine("Successfully fetched WNote object");
 
-                ulong zeroTest = remoteApp.Marshal.ReadQword(address);
-                if (zeroTest != 0)
-                {
-                    throw new Exception("Failed to zero out the address");
-                }
-
-                noteZip.Construct(dummyStr);
-                // Dump bytes of NoteZip
-                address = noteZip.__address;
-                //Console.WriteLine($"NoteZip address: 0x{address:X16} (Allocated by us)");
-                //remoteApp.Marshal.QuickDump(address, 0x30);
-                // Read first 8 bytes - those are the pointer to the unnamed inner struct
-                ulong innerStructAddress = remoteApp.Marshal.ReadQword(address);
-                ulong strAddress = innerStructAddress + 8;
-                ulong vmtAddress = remoteApp.Marshal.ReadQword(strAddress);
-
-
-                //var spenStringRo = remoteApp.GetRemoteObject(strAddress, "libSpen_base.dll!SPen::String");
-                //SPen.String s = new SPen.String(spenStringRo.Dynamify());
-                Console.WriteLine($"[{i:d2}]String address: 0x{strAddress:X16} (Allocated by remote lib)");
-                ulong rangeStart = strAddress & 0xFFFFFFFFFFFFFF00;
-                stringAddresses[rangeStart] = strAddress;
+            int pageCount = wNote.GetPageCount();
+            Console.WriteLine($"Page count: {pageCount}");
+            // Fetch the first page
+            SPen.WPage wPage = null;
+            try
+            {
+                wPage = wNote.GetPage(0);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to fetch WPage object: {ex.Message}");
+                return;
+            }
+            if (wPage == null)
+            {
+                Console.WriteLine("Failed to fetch WPage object");
+                return;
             }
 
-            int uuidCount = 0;
-            // Define the hook callback that will be called when the method is invoked  
-            HookAction callback = (HookContext context, dynamic instance, dynamic[] args, dynamic retValue) =>
-            {
-                uuidCount++;
+            Console.WriteLine("Successfully fetched WPage object");
+            // Num of objects within
+            int objectCount = wPage.GetObjectCount(true);
+            Console.WriteLine($"Object count (true?): {objectCount}");
+            objectCount = wPage.GetObjectCount(false);
+            Console.WriteLine($"Object count (false?): {objectCount}");
 
-                // Target
-                ulong? instanceAddress = null;
-                if (instance is ulong ul)
-                    instanceAddress = ul;
-                else if (instance is DynamicRemoteObject dro)
-                    instanceAddress = dro.__ro.RemoteToken;
-
-                if (instanceAddress == null)
-                {
-                    return;
-                }
-
-                // Check if any string address is adjacent to the instance address
-                ulong rangeStart = instanceAddress.Value & 0xFFFFFFFFFFFFFF00;
-                if (stringAddresses.TryGetValue(rangeStart, out ulong strAddress))
-                {
-                    Console.WriteLine($"[uuidCount={uuidCount}] Found string address: 0x{strAddress:X16} (Allocated by remote lib) !!!");
-                    //var spenStringRo = remoteApp.GetRemoteObject(strAddress, "libSpen_base.dll!SPen::String");
-                    //SPen.String s = new SPen.String(spenStringRo.Dynamify());
-                    //Console.WriteLine("String content: " + ReadString(s));
-                }
-                else
-                {
-                    Console.WriteLine($"[uuidCount={uuidCount}] No string found in the range 0x{rangeStart:X16}");
-                }
-            };
-
-            // Get the type and method to hook  
-            var type = remoteApp.GetRemoteType("SPen::Uuid");
-            var method = type.GetMethod("ApplyBinary", new Type[1] { typeof(byte[]) });
-            remoteApp.HookingManager.Patch(method, prefix: callback);
-
-            Console.WriteLine("Hook registered successfully. Press Enter to exit...");
-            Console.ReadLine();
-
-            Console.WriteLine("Unhooking");
-            remoteApp.HookingManager.UnhookMethod(method, callback);
 
             // Clean up  
             Console.WriteLine("Disposing Remote App");
