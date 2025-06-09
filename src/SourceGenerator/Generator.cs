@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SourceGenerator
@@ -26,7 +27,7 @@ namespace SourceGenerator
 
         public void Execute(GeneratorExecutionContext context)
         {
-            // Cal Unsafe Executer with a try-catch and write the exception to the log
+            // Call Unsafe Executer with a try-catch and write the exception to the log
             try
             {
                 UnsafeExecute(context);
@@ -247,9 +248,38 @@ namespace SourceGenerator
                 victimProc.Kill();
                 return null;
             }
+
+            // Read STDOUT and STDERR on background threads to avoid deadlock
+            StringBuilder stdoutBuilder = new StringBuilder();
+            StringBuilder stderrBuilder = new StringBuilder();
+            System.Threading.Thread stdoutThread = new System.Threading.Thread(() => {
+                string line;
+                while ((line = dumpProc.StandardOutput.ReadLine()) != null)
+                {
+                    stdoutBuilder.AppendLine(line);
+                }
+            });
+            System.Threading.Thread stderrThread = new System.Threading.Thread(() => {
+                string line;
+                while ((line = dumpProc.StandardError.ReadLine()) != null)
+                {
+                    stderrBuilder.AppendLine(line);
+                }
+            });
+            Log("Starting threads to read STDOUT and STDERR...\n");
+            stdoutThread.Start();
+            stderrThread.Start();
+            Log("Threads started\n");
+
+            Log("Waiting for rnet-class-dump.exe to finish...\n");
             dumpProc.WaitForExit();
-            string dumpStdErr = dumpProc.StandardError.ReadToEnd();
-            string stdout = dumpProc.StandardOutput.ReadToEnd();
+            Log("rnet-class-dump.exe finished\n");
+            stdoutThread.Join();
+            stderrThread.Join();
+            Log("Threads joined\n");
+
+            string dumpStdErr = stderrBuilder.ToString();
+            string stdout = stdoutBuilder.ToString();
             Log($"rnet-class-dump STDERR: {dumpStdErr}\n");
             Log($"rnet-class-dump STDOUT: {stdout}\n");
 
