@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "TestTarget": {
+    "RemoteNET.Vessel": {
       "commandName": "Project",
       "commandLineArgs": "wowowowoowowwA wowowowoowowwB"
     }
