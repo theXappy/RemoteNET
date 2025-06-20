@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace TestTarget
+namespace RemoteNET.Vessel
 {
     public class TestClass
     {
