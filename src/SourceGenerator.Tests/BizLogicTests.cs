@@ -12,7 +12,7 @@ namespace SourceGenerator.Tests
             var biz = new BizLogic();
             var files = new List<string>();
             bool addSourceCalled = false;
-            biz.UnsafeExecuteFromFilePaths(files, (name, text) => { addSourceCalled = true; });
+            biz.UnsafeExecuteFromFilePaths(files, (name, text) => { addSourceCalled = true; }, s => Console.Error.WriteLine(s));
             Assert.IsFalse(addSourceCalled);
         }
 
