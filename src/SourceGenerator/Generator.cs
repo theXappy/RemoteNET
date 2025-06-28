@@ -51,6 +51,7 @@ namespace SourceGenerator
 
                 return;
             }
+
         }
 
         public void UnsafeExecute(GeneratorExecutionContext context)
@@ -58,7 +59,22 @@ namespace SourceGenerator
             List<string> additionalFilesPaths = context.AdditionalFiles.Select(x => x.Path).ToList();
             Action<string, SourceText> addSource = context.AddSource;
             BizLogic bizLogic = new BizLogic();
-            bizLogic.UnsafeExecuteFromFilePaths(additionalFilesPaths, addSource);
+            bizLogic.UnsafeExecuteFromFilePaths(additionalFilesPaths, addSource, ReportError);
+            return;
+
+            void ReportError(string message)
+            {
+                var descriptor = new DiagnosticDescriptor(
+                    id: "GEN0001",
+                    title: "RemoteNET Source Generator Error",
+                    messageFormat: "{0}",
+                    category: "RemoteNETSourceGenerator",
+                    DiagnosticSeverity.Error,
+                    isEnabledByDefault: true);
+
+                var diagnostic = Diagnostic.Create(descriptor, Location.None, message);
+                context.ReportDiagnostic(diagnostic);
+            }
         }
     }
 }

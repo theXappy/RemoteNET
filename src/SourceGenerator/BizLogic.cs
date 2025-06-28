@@ -1,8 +1,9 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Security.Principal;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -43,7 +44,7 @@ public class BizLogic
     }
 
     // Wrapper: old signature, does file access
-    public void UnsafeExecuteFromFilePaths(List<string> additionalFiles, Action<string, SourceText> addSourceFile)
+    public void UnsafeExecuteFromFilePaths(List<string> additionalFiles, Action<string, SourceText> addSourceFile, Action<string> reportError)
     {
         Log("============ Listing Additional Files\n");
         foreach (var additionalFile in additionalFiles)
@@ -59,12 +60,28 @@ public class BizLogic
         var (inspectedDllsContent, inspectedTypesContent) = ReadInputFiles(inspectedDllsFilePath, inspectedTypesFilePath);
         var inspectedDlls = inspectedDllsContent.Split(new[] { '\n', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
         var inspectedTypes = inspectedTypesContent.Split(new[] { '\n', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
-        UnsafeExecute(inspectedDlls, inspectedTypes, addSourceFile);
+        UnsafeExecute(inspectedDlls, inspectedTypes, addSourceFile, reportError);
     }
 
     // New method: main logic, takes contents
-    public void UnsafeExecute(List<string> inspectedDlls, List<string> inspectedTypes, Action<string, SourceText> addSourceFile)
+    public void UnsafeExecute(
+        List<string> inspectedDlls,
+        List<string> inspectedTypes,
+        Action<string, SourceText> addSourceFile,
+        Action<string> reportError = null
+    )
     {
+        // Check for admin privileges
+        Log("[Admin Privileges Check] Started\n");
+        if (!AdminCheck.IsRunningAsAdmin())
+        {
+            string msg = "RemoteNET Source Generator requires administrator privileges. Please restart Visual Studio as Administrator.";
+            Log($"[Admin Privileges Check] Failed! {msg}");
+            reportError?.Invoke(msg);
+            return;
+        }
+        Log("[Admin Privileges Check]] Success.\n");
+
         string dumpExeVersion = FileVersionInfo.GetVersionInfo(DumpExePath).FileVersion ?? "unknown";
         string stdout = null;
 
@@ -202,6 +219,7 @@ public class BizLogic
 
     public Process StartVictimProcess()
     {
+        Log("Starting Vessel.exe...\n");
         var victimStartInfo = new ProcessStartInfo
         {
             FileName = VesselExePath,
@@ -209,8 +227,9 @@ public class BizLogic
             UseShellExecute = true,
             CreateNoWindow = true
         };
-        Log("Starting Vessel.exe...\n");
-        return Process.Start(victimStartInfo);
+        var proc = Process.Start(victimStartInfo);
+        Log($"Started Vessel.exe. PID: {proc.Id}\n");
+        return proc;
     }
 
     public List<string> ReadTargetDlls(string inspectedDllsFilePath, Process victimProc)
