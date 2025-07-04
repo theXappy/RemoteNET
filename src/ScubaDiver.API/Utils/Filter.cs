@@ -36,10 +36,18 @@ namespace ScubaDiver.API.Utils
             Predicate<string> matchesFilter = (testee) => true;
             if (filter != null)
             {
-                Regex r = SimpleFilterToRegex(filter);
-                string noStartsFilter = filter.Trim('*');
-                // Filter has no wildcards - looking for specific type
-                matchesFilter = r.IsMatch;
+                if (filter.Contains("*"))
+                {
+                    Regex r = SimpleFilterToRegex(filter);
+                    string noStartsFilter = filter.Trim('*');
+                    // Filter has no wildcards - looking for specific type
+                    matchesFilter = r.IsMatch;
+                }
+                else if (filter.Length > 0)
+                {
+                    // Filter has no wildcards - looking for specific type
+                    matchesFilter = (testee) => testee.Equals(filter, StringComparison.Ordinal);
+                }
             }
             return matchesFilter;
         }
