@@ -277,7 +277,6 @@ namespace ScubaDiver
                 importerModule = null;
 
             string typeFilter = req.QueryString.Get("type_filter");
-            Logger.Debug("[MsvcDiver][Make<<<Types>>>>Response] filter: " + typeFilter);
             if (string.IsNullOrWhiteSpace(typeFilter))
                 return QuickError("Missing parameter 'type_filter'");
             ParseFullTypeName(typeFilter, out var assemblyFilter, out typeFilter);
