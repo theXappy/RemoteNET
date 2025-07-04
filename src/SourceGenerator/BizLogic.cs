@@ -13,10 +13,10 @@ public class BizLogic
     // Centralized hardcoded paths as const fields
     private const string LogFilePath = @"C:\Users\Shai\AppData\Local\Temp\logz\a.txt";
     private const string DumpExePath = @"C:\git\rnet-kit\rnet-class-dump\bin\Debug\net8.0\rnet-class-dump.exe";
-    private const string VesselExePath = @"C:\git\rnet-kit\rnet-kit\bin\Debug\net8.0\RemoteNET.Vessel.exe";
+    private const string VesselDllPath = @"C:\git\rnet-kit\rnet-kit\bin\Debug\net8.0\RemoteNET.Vessel.dll";
     private const string InjectExePath = @"C:\git\rnet-kit\rnet-inject\bin\Debug\net8.0\rnet-inject.exe";
 
-    private static string VesselWorkingDir => Path.GetDirectoryName(VesselExePath);
+    private static string VesselWorkingDir => Path.GetDirectoryName(VesselDllPath);
     private static string InjectWorkingDir => Path.GetDirectoryName(InjectExePath);
 
     private void Log(string l)
@@ -219,16 +219,55 @@ public class BizLogic
 
     public Process StartVictimProcess()
     {
-        Log("Starting Vessel.exe...\n");
+        Log("Starting `dotnet Vessel.exe`...\n");
         var victimStartInfo = new ProcessStartInfo
         {
-            FileName = VesselExePath,
+            FileName = "dotnet",
+            Arguments = VesselDllPath,
             WorkingDirectory = VesselWorkingDir,
-            UseShellExecute = true,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
             CreateNoWindow = true
         };
         var proc = Process.Start(victimStartInfo);
-        Log($"Started Vessel.exe. PID: {proc.Id}\n");
+        Log($"Started `dotnet Vessel.exe`. PID: {proc.Id}\n");
+
+        // Start background tasks to read STDOUT and STDERR and log them
+        Log("Starting background tasks to read Vessel STDOUT and STDERR...\n");
+        Log("Starting background tasks to read Vessel STDOUT and STDERR...\n");
+        Log("Starting background tasks to read Vessel STDOUT and STDERR...\n");
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                string line;
+                while ((line = proc.StandardOutput.ReadLine()) != null)
+                {
+                    Log($"[Vessel STDOUT] {line}\n");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[Vessel STDOUT] Exception: {ex.Message}\n");
+            }
+        });
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                string line;
+                while ((line = proc.StandardError.ReadLine()) != null)
+                {
+                    Log($"[Vessel STDERR] {line}\n");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[Vessel STDERR] Exception: {ex.Message}\n");
+            }
+        });
+
         return proc;
     }
 
