@@ -128,7 +128,16 @@ public abstract class DynamicRemoteObject : DynamicObject
                 {
                     // Check if the parameter type is assignable from the argument type
                     Type query = args[i].GetType();
+                    if (args[i] is DynamicRemoteObject dro)
+                    {
+                        query = dro.__type;
+                    }
+
                     Type paramType = parameters[i].ParameterType;
+                    // Allow 1 level of pointer-ness in parameter types
+                    if (paramType is PointerType ptrType)
+                        paramType = ptrType.Inner;
+
                     // Check if both are LOCAL types: meaning the the "Type" classes themselves are RuntimeTypes
                     // If they are not, we need to check if the argument is a DynamicRemoteObject
                     bool queryIsRuntimeType = query.GetType().FullName is "System.RuntimeType";
