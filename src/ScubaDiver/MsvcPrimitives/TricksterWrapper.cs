@@ -7,6 +7,8 @@ using ScubaDiver.Rtti;
 using ScubaDiver.API.Utils;
 using TypeInfo = ScubaDiver.Rtti.TypeInfo;
 using NtApiDotNet.Win32;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ScubaDiver;
 
@@ -22,6 +24,21 @@ public class TricksterWrapper
         _trickster = null;
         _tricksterLock = new object();
         ExportsMaster = new ExportsMaster();
+
+        _refreshTask = new Task(() =>
+        {
+            try
+            {
+                RefreshMonitorTask();
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"[TricksterWrapper][!!!] Exception in RefreshMonitorTask: {ex}");
+                Logger.Debug($"[TricksterWrapper][!!!] Exception in RefreshMonitorTask: {ex}");
+                Logger.Debug($"[TricksterWrapper][!!!] Exception in RefreshMonitorTask: {ex}");
+                Logger.Debug($"[TricksterWrapper][!!!] Exception in RefreshMonitorTask: {ex}");
+            }
+        });
     }
 
     public void Refresh()
@@ -318,31 +335,67 @@ public class TricksterWrapper
 
     private int _lastRefreshModulesCount = 0;
     private HashSet<string> _lastRefreshModules = new HashSet<string>();
+    private object _refreshRequiredLock = new object();
+    private bool _refreshRequired = false;
+    private Task _refreshTask = null;
+
+    public void RefreshMonitorTask()
+    {
+        while(true)
+        {
+            // STILL need an old refresh, no reason to re-check
+            if (_refreshRequired == true)
+                continue;
+            lock (_refreshRequiredLock)
+            {
+                if (_refreshRequired == true)
+                    continue;
+                _refreshRequired = InternalCheck();
+            }
+
+            Thread.Sleep(1000);
+        }
+
+        bool InternalCheck()
+        {
+            lock (_tricksterLock)
+            {
+                if (_trickster == null || !_trickster.ScannedTypes.Any())
+                {
+                    Logger.Debug("[TricksterWrapper.RefreshRequired] Refresh is required because Trickster is null or no types were scanned.");
+                    return true;
+                }
+
+                Process p = Process.GetCurrentProcess();
+                if (p.Modules.Count != _lastRefreshModulesCount)
+                {
+                    Logger.Debug("[TricksterWrapper.RefreshRequired] Refresh is required because module count changed.");
+                    return true;
+                }
+                var currModules = p.Modules.Cast<ProcessModule>()
+                    .Select(pModule => pModule.ModuleName)
+                    .ToHashSet();
+                if (!currModules.SetEquals(_lastRefreshModules))
+                {
+                    Logger.Debug("[TricksterWrapper.RefreshRequired] Refresh is required because module names changed.");
+                    return true;
+                }
+
+                return false;
+            }
+        }
+    }
+
     public bool RefreshRequired()
     {
-        lock (_tricksterLock)
+        lock (_refreshRequiredLock)
         {
-            if (_trickster == null || !_trickster.ScannedTypes.Any())
+            if (_refreshRequired)
             {
-                Logger.Debug("[TricksterWrapper.RefreshRequired] Refresh is required because Trickster is null or no types were scanned.");
+                _refreshRequired = false;
+                _refreshTask.Start();
                 return true;
             }
-
-            Process p = Process.GetCurrentProcess();
-            if (p.Modules.Count != _lastRefreshModulesCount)
-            {
-                Logger.Debug("[TricksterWrapper.RefreshRequired] Refresh is required because module count changed.");
-                return true;
-            }
-            var currModules = p.Modules.Cast<ProcessModule>()
-                .Select(pModule => pModule.ModuleName)
-                .ToHashSet();
-            if (!currModules.SetEquals(_lastRefreshModules))
-            {
-                Logger.Debug("[TricksterWrapper.RefreshRequired] Refresh is required because module names changed.");
-                return true;
-            }
-
             return false;
         }
     }
