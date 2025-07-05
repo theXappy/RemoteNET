@@ -582,7 +582,19 @@ public abstract class DynamicRemoteObject : DynamicObject
     public override string ToString()
     {
         if (GetSingleMethod(nameof(ToString)) != null)
-            return InvokeMethod<string>(nameof(ToString));
+        {
+            try
+            {
+                return InvokeMethod<string>(nameof(ToString));
+            }
+            catch (InvalidCastException)
+            {
+                // Some objects (Mainly C++ ones) might implement ToString but return a non-string type.
+                // Usually UIntPtr to something.
+                // In this case, we fallback to ToString of the type itself.
+            }
+        }
+
         // No "ToString" method, target is not a .NET object
         return __type.ToString();
     }
