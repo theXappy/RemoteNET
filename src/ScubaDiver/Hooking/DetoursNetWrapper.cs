@@ -12,9 +12,6 @@ public class DetoursNetWrapper
     private static DetoursNetWrapper _instance = null;
     public static DetoursNetWrapper Instance => _instance ??= new();
 
-    /// <returns>Skip original</returns>
-    public delegate bool HookCallback(DetoursMethodGenerator.DetouredFuncInfo tramp, object[] args, out nuint overridenReturnValue);
-
     private ConcurrentDictionary<UndecoratedFunction, MethodInfo> _methodsToGenMethods = new ConcurrentDictionary<UndecoratedFunction, MethodInfo>();
 
     public bool AddHook(TypeInfo typeInfo, UndecoratedFunction methodToHook, HarmonyWrapper.HookCallback realCallback, HarmonyPatchPosition hookPosition)

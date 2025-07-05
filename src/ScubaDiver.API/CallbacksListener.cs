@@ -172,48 +172,11 @@ namespace ScubaDiver.API
             }
             if (request.Url.AbsolutePath == "/invoke_callback")
             {
-                using (StreamReader sr = new(request.InputStream))
-                {
-                    body = sr.ReadToEnd();
-                }
-                CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
-                if (_tokensToEventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
-                {
-                    (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction(res.Parameters.ToArray(), res.RetValue);
-
-                    InvocationResults ir = new()
-                    {
-                        VoidReturnType = voidReturnType,
-                        ReturnedObjectOrAddress = voidReturnType ? null : callbackRes
-                    };
-
-                    body = JsonConvert.SerializeObject(ir);
-                }
-                else if (_tokensToHookCallbacks.TryGetValue(res.Token, out LocalHookCallback hook))
-                {
-                    HookContext hookContext = new(res.StackTrace, res.ThreadID);
-
-                    // Run hook. No results expected directly (it might alter variabels inside the hook)
-                    hook(hookContext, res.Parameters.FirstOrDefault(), res.Parameters.Skip(1).ToArray(), res.RetValue);
-
-                    // Report back whether to call the original function or no (Harmony wants this as the return value)
-                    InvocationResults ir = new()
-                    {
-                        VoidReturnType = false,
-                        ReturnedObjectOrAddress = ObjectOrRemoteAddress.FromObj(hookContext.skipOriginal)
-                    };
-
-                    body = JsonConvert.SerializeObject(ir);
-                }
-                else
-                {
-                    Console.WriteLine($"[WARN] Diver tried to trigger a callback with unknown token value: {res.Token}");
-
-                    // TODO: I'm not sure the usage of 'DiverError' here is good. It's sent from the Communicator's side
-                    // to the Diver's side...
-                    DiverError errResults = new("Unknown Token", String.Empty);
-                    body = JsonConvert.SerializeObject(errResults);
-                }
+                body = HandleEventCallback(request);
+            }
+            if (request.Url.AbsolutePath == "/invoke_hook_callback")
+            {
+                body = HandleHookCallback(request);
             }
             else
             {
@@ -232,6 +195,83 @@ namespace ScubaDiver.API
             output.Write(buffer, 0, buffer.Length);
             // You must close the output stream.
             output.Close();
+        }
+
+        private string HandleEventCallback(HttpListenerRequest request)
+        {
+            string body;
+            using (StreamReader sr = new(request.InputStream))
+            {
+                body = sr.ReadToEnd();
+            }
+            CallbackInvocationRequest res = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
+            if (_tokensToEventHandlers.TryGetValue(res.Token, out LocalEventCallback callbackFunction))
+            {
+                (bool voidReturnType, ObjectOrRemoteAddress callbackRes) = callbackFunction.Invoke(
+                                                                                                res.Parameters.ToArray(),
+                                                                                                res.RetValue);
+
+                InvocationResults ir = new()
+                {
+                    VoidReturnType = voidReturnType,
+                    ReturnedObjectOrAddress = voidReturnType ? null : callbackRes
+                };
+
+                body = JsonConvert.SerializeObject(ir);
+            }
+            else
+            {
+                Console.WriteLine($"[WARN] Diver tried to trigger an event callback with unknown token value: {res.Token}");
+
+                // TODO: I'm not sure the usage of 'DiverError' here is good. It's sent from the Communicator's side
+                // to the Diver's side...
+                DiverError errResults = new("Unknown Token", String.Empty);
+                body = JsonConvert.SerializeObject(errResults);
+            }
+
+            return body;
+        }
+
+        private string HandleHookCallback(HttpListenerRequest httpRequest)
+        {
+            string body;
+            using (StreamReader sr = new(httpRequest.InputStream))
+            {
+                body = sr.ReadToEnd();
+            }
+            CallbackInvocationRequest invokeRequest = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
+            if (_tokensToHookCallbacks.TryGetValue(invokeRequest.Token, out LocalHookCallback hook))
+            {
+                HookContext hookContext = new(invokeRequest.StackTrace, invokeRequest.ThreadID);
+
+                // Run hook. No results expected directly (it might alter "retValue" or the variables passed as pointers)
+                ObjectOrRemoteAddress retValue = invokeRequest.RetValue;
+                hook.Invoke(
+                    hookContext, 
+                    invokeRequest.Parameters.FirstOrDefault(),
+                    invokeRequest.Parameters.Skip(1).ToArray(),
+                    ref retValue);
+
+                // Report back whether to call the original function or no (Harmony wants this as the return value)
+                HookResponse hookResponse = new()
+                {
+                    SkipOriginal = hookContext.skipOriginal,
+                    ReturnValue = retValue
+                };
+
+                body = JsonConvert.SerializeObject(hookResponse);
+            }
+            else
+            {
+                Console.WriteLine($"[WARN] Diver tried to trigger a hook callback with unknown token value: {invokeRequest.Token}");
+
+                // TODO: I'm not sure the usage of 'DiverError' here is good. It's sent from the Communicator's side
+                // to the Diver's side...
+                DiverError errResults = new("Unknown Token", String.Empty);
+                body = JsonConvert.SerializeObject(errResults);
+            }
+
+            return body;
         }
 
         public void EventSubscribe(LocalEventCallback callback, int token)

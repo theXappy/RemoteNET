@@ -71,8 +71,8 @@ namespace ScubaDiver.API
                 return false;
             }
         }
-        
-        public InvocationResults InvokeCallback(int token, string stackTrace, int threadId,
+
+        public InvocationResults InvokeEventCallback(int token, string stackTrace, int threadId,
             ObjectOrRemoteAddress retValue,
             params ObjectOrRemoteAddress[] args)
         {
@@ -88,12 +88,37 @@ namespace ScubaDiver.API
 
             var resJson = SendRequest("invoke_callback", null, requestJsonBody);
 
-            if(resJson.Contains("\"error\":"))
+            if (resJson.Contains("\"error\":"))
             {
                 return null;
             }
 
             InvocationResults res = JsonConvert.DeserializeObject<InvocationResults>(resJson, _withErrors);
+            return res;
+        }
+
+        public HookResponse InvokeHookCallback(int token, string stackTrace, int threadId,
+            ObjectOrRemoteAddress retValue,
+            params ObjectOrRemoteAddress[] args)
+        {
+            CallbackInvocationRequest invocReq = new()
+            {
+                StackTrace = stackTrace,
+                Token = token,
+                ThreadID = threadId,
+                RetValue = retValue,
+                Parameters = args.ToList()
+            };
+            var requestJsonBody = JsonConvert.SerializeObject(invocReq);
+
+            var resJson = SendRequest("invoke_hook_callback", null, requestJsonBody);
+
+            if (resJson.Contains("\"error\":"))
+            {
+                return null;
+            }
+
+            HookResponse res = JsonConvert.DeserializeObject<HookResponse>(resJson, _withErrors);
             return res;
         }
     }

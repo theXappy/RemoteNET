@@ -12,6 +12,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -193,16 +194,12 @@ namespace ScubaDiver
         }
 
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="callbacksEndpoint"></param>
-        /// <param name="token"></param>
-        /// <param name="stackTrace"></param>
-        /// <param name="parameters"></param>
-        /// <returns>Any results returned from the</returns>
-        protected override ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
+        protected override ObjectOrRemoteAddress InvokeEventCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
+            => throw new Exception("InvokeEventCallback is not implemented in MsvcDiver. This should never be called.");
+
+        protected override HookResponse InvokeHookCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
         {
+            Logger.Debug($"[{nameof(MsvcDiver)}] InvokeHookCallback Entered. EndPoint: {callbacksEndpoint} Token: {token}");
             ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
@@ -265,9 +262,17 @@ namespace ScubaDiver
 
 
             // Call callback at controller
-            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, retValueOora, remoteParams);
+            HookResponse hookCallbackResults = reverseCommunicator.InvokeHookCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, retValueOora, remoteParams);
 
-            return hookCallbackResults.ReturnedObjectOrAddress;
+            return hookCallbackResults;
+        }
+
+        public override object ResolveHookReturnValue(ObjectOrRemoteAddress oora)
+        {
+            if (!oora.IsRemoteAddress)
+                return PrimitivesEncoder.Decode(oora.EncodedObject, oora.Type);
+
+            return oora.RemoteAddress;
         }
 
         protected override string MakeTypesResponse(ScubaDiverMessage req)

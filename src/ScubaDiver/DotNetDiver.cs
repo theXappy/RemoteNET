@@ -755,7 +755,7 @@ namespace ScubaDiver
             // assign subscriber unique id
             int token = AssignCallbackToken();
 
-            EventHandler eventHandler = (obj, args) => InvokeControllerCallback(endpoint, token, "UNUSED", new object[2] { obj, args });
+            EventHandler eventHandler = (obj, args) => InvokeEventCallback(endpoint, token, "UNUSED", new object[2] { obj, args });
 
             Logger.Debug($"[DotNetDiver] Adding event handler to event {eventName}...");
             eventObj.AddEventHandler(target, eventHandler);
@@ -775,6 +775,63 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(erResults);
         }
 
+
+        protected override HookResponse InvokeHookCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
+        {
+            ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
+
+            ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                object parameter = parameters[i];
+                if (parameter == null)
+                {
+                    remoteParams[i] = ObjectOrRemoteAddress.Null;
+                }
+                else if (parameter.GetType().IsPrimitiveEtc())
+                {
+                    remoteParams[i] = ObjectOrRemoteAddress.FromObj(parameter);
+                }
+                else // Not primitive
+                {
+                    // Check if the object was pinned
+                    if (!_freezer.TryGetPinningAddress(parameter, out ulong addr))
+                    {
+                        // Pin and mark for unpinning later
+                        addr = _freezer.Pin(parameter);
+                    }
+
+                    remoteParams[i] = ObjectOrRemoteAddress.FromToken(addr, parameter.GetType().FullName);
+                }
+            }
+
+            ObjectOrRemoteAddress remoteRetVal;
+            if (retValue == null)
+            {
+                remoteRetVal = ObjectOrRemoteAddress.Null;
+            }
+            else if (retValue.GetType().IsPrimitiveEtc())
+            {
+                remoteRetVal = ObjectOrRemoteAddress.FromObj(retValue);
+            }
+            else // Not primitive
+            {
+                // Check if the object was pinned
+                if (!_freezer.TryGetPinningAddress(retValue, out ulong addr))
+                {
+                    // Pin and mark for unpinning later
+                    addr = _freezer.Pin(retValue);
+                }
+                remoteRetVal = ObjectOrRemoteAddress.FromToken(addr, retValue.GetType().FullName);
+            }
+
+
+            // Call callback at controller
+            var response = reverseCommunicator.InvokeHookCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, remoteRetVal, remoteParams);
+
+            return response;
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -783,7 +840,7 @@ namespace ScubaDiver
         /// <param name="stackTrace"></param>
         /// <param name="parameters"></param>
         /// <returns>Any results returned from the</returns>
-        protected override ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
+        protected override ObjectOrRemoteAddress InvokeEventCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
         {
             ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
@@ -834,7 +891,7 @@ namespace ScubaDiver
             
             
             // Call callback at controller
-            InvocationResults hookCallbackResults = reverseCommunicator.InvokeCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, remoteRetVal, remoteParams);
+            InvocationResults hookCallbackResults = reverseCommunicator.InvokeEventCallback(token, stackTrace, Thread.CurrentThread.ManagedThreadId, remoteRetVal, remoteParams);
 
             return hookCallbackResults.ReturnedObjectOrAddress;
         }
@@ -875,6 +932,15 @@ namespace ScubaDiver
                 return QuickError("Failed Getting the object for the user. Error: " + e.Message);
             }
         }
+
+        public override object ResolveHookReturnValue(ObjectOrRemoteAddress oora)
+        {
+            if (!oora.IsRemoteAddress)
+                return PrimitivesEncoder.Decode(oora.EncodedObject, oora.Type);
+
+            return GetObject(oora.RemoteAddress, false, oora.Type).instance;
+        }
+
         protected override string MakeCreateObjectResponse(ScubaDiverMessage arg)
         {
             if (string.IsNullOrEmpty(arg.Body))
@@ -1509,6 +1575,5 @@ namespace ScubaDiver
             _remoteHooks.Clear();
             Logger.Debug("[DotNetDiver] Removed all event subscriptions & hooks");
         }
-
     }
 }
