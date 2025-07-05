@@ -18,8 +18,8 @@ public static class DetoursMethodGenerator
     public class DetouredFuncInfo
     {
         public TypeInfo DeclaringClass { get; set; }
-        public HarmonyWrapper.HookCallback PreHook { get; set; }
-        public HarmonyWrapper.HookCallback PostHook { get; set; }
+        public List<HarmonyWrapper.HookCallback> PreHooks { get; set; }
+        public List<HarmonyWrapper.HookCallback> PostHooks { get; set; }
 
         public UndecoratedFunction Target { get; set; }
         public MethodInfo GenerateMethodInfo { get; set; }
@@ -37,6 +37,8 @@ public static class DetoursMethodGenerator
             GeneratedDelegate = generatedDelegate;
             DelegateType = delegateType;
             Name = name;
+            PreHooks = new List<HarmonyWrapper.HookCallback>();
+            PostHooks = new List<HarmonyWrapper.HookCallback>();
         }
 
         public T GetRealMethod<T>() where T : Delegate
@@ -63,7 +65,7 @@ public static class DetoursMethodGenerator
         if (!TryGetMethod(generatedMethodName, out var detouredFuncInfo))
             return;
 
-        if (detouredFuncInfo.PreHook != null || detouredFuncInfo.PostHook != null)
+        if (detouredFuncInfo.PreHooks.Count > 0 || detouredFuncInfo.PostHooks.Count > 0)
             throw new Exception(
                 $"DetouredFuncInfo to remove still had one or more hooks. Func Name: {detouredFuncInfo.Name} Class: {detouredFuncInfo.DeclaringClass}");
 
@@ -297,20 +299,26 @@ public static class DetoursMethodGenerator
 
         if (position == HarmonyPatchPosition.Prefix)
         {
-            if (hookedFunc.PreHook != null)
+            if (hookedFunc.PreHooks != null)
             {
-                bool callOriginal = hookedFunc.PreHook(self, argsToForward, ref newRetVal);
-                skipOriginal = !callOriginal;
-                retValModified = skipOriginal;
+                // Multi hooks is hard: Last one determines `skipOriginal` and ret val for all of them.
+                foreach (HarmonyWrapper.HookCallback preHook in hookedFunc.PreHooks)
+                {
+                    bool callOriginal = preHook.Invoke(self, argsToForward, ref newRetVal);
+                    skipOriginal = !callOriginal;
+                    retValModified = retValModified || skipOriginal;
+                };
             }
         }
         else if (position == HarmonyPatchPosition.Postfix)
         {
-            if (hookedFunc.PostHook != null)
+            if (hookedFunc.PostHooks != null)
             {
-                // Post hook can't ask to "Skip Original", it was already invoke.
-                // It can only signal to use if the return value changes.
-                retValModified = hookedFunc.PostHook(self, argsToForward, ref newRetVal);
+                // Multi hooks is hard: Last one determines `skipOriginal` and ret val for all of them.
+                foreach (HarmonyWrapper.HookCallback postHook in hookedFunc.PostHooks)
+                {
+                    retValModified = postHook.Invoke(self, argsToForward, ref newRetVal);
+                };
             }
         }
         else

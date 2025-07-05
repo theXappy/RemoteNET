@@ -26,16 +26,10 @@ public class DetoursNetWrapper
         switch (hookPosition)
         {
             case HarmonyPatchPosition.Prefix:
-                if (tramp.PreHook != null)
-                    throw new InvalidOperationException(
-                        $"Can not set 2 hooks on the same method ({methodToHook.UndecoratedFullName}) in the same position ({hookPosition})");
-                tramp.PreHook = realCallback;
+                tramp.PreHooks.Add(realCallback);
                 break;
             case HarmonyPatchPosition.Postfix:
-                if (tramp.PostHook != null)
-                    throw new InvalidOperationException(
-                        $"Can not set 2 hooks on the same method ({methodToHook.UndecoratedFullName}) in the same position ({hookPosition})");
-                tramp.PostHook = realCallback;
+                tramp.PostHooks.Add(realCallback);
                 break;
             case HarmonyPatchPosition.Finalizer:
             default:
@@ -91,22 +85,16 @@ public class DetoursNetWrapper
                 out DetoursMethodGenerator.DetouredFuncInfo funcInfo)) 
             return false;
 
-        if (funcInfo.PreHook == callback)
-        {
-            funcInfo.PreHook = null;
-        }
-        else if (funcInfo.PostHook == callback)
-        {
-            funcInfo.PostHook = null;
-        }
-        else
+        bool removed = funcInfo.PreHooks.Remove(callback);
+        removed = removed || funcInfo.PostHooks.Remove(callback);
+        if (!removed)
         {
             throw new ArgumentException(
                 $"Trying to unhook a hook that doesn't match neither the pre nor post hooks. Func: {methodToUnhook.UndecoratedName}");
         }
 
         // Check if the hook is retired
-        if (funcInfo.PostHook == null && funcInfo.PreHook == null)
+        if (funcInfo.PostHooks.Count == 0 && funcInfo.PreHooks.Count == 0)
         {
             DetoursMethodGenerator.Remove(key);
             _methodsToGenMethods.TryRemove(methodToUnhook, out _);
