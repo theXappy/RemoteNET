@@ -196,12 +196,30 @@ public class InjectionToolKit
         // Creating directory to dump the toolkit into: %localappdata%\RemoteNET
         string locaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         string assemblyName = typeof(ManagedRemoteApp).Assembly.GetName().Name;
-        string toolKitDir = Path.Combine(locaAppData, assemblyName);
+        string baseToolKitDir = Path.Combine(locaAppData, assemblyName);
 
-        var remoteNetAppDataDirInfo = new DirectoryInfo(toolKitDir);
-        if (!remoteNetAppDataDirInfo.Exists)
-            remoteNetAppDataDirInfo.Create();
+        for (int i = 0; i < 10; i++)
+        {
+            string toolKitDir = baseToolKitDir + (i == 0 ? String.Empty : $"_{i}");
 
-        return new InjectionToolKit(toolKitDir, target.Is64Bit(), targetDotNetVer);
+            var remoteNetAppDataDirInfo = new DirectoryInfo(toolKitDir);
+            if (!remoteNetAppDataDirInfo.Exists)
+                remoteNetAppDataDirInfo.Create();
+
+            try
+            {
+                return new InjectionToolKit(toolKitDir, target.Is64Bit(), targetDotNetVer);
+            }
+            catch (IOException)
+            {
+                // Already in use by another process, but we just try again with a different directory name.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Already in use by another process, but we just try again with a different directory name.
+            }
+        }
+
+        throw new IOException($"Failed to create RemoteNET AppData directory after 10 attempts: {baseToolKitDir}");
     }
 }
