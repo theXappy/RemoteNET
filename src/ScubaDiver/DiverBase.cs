@@ -214,6 +214,7 @@ namespace ScubaDiver
 
             int port = request.Port;
             IPEndPoint endpoint = new IPEndPoint(ipAddress, port);
+            Logger.Debug($"[DiverBase][MakeHookMethodResponse] Hook Method request - endpoint: {endpoint}");
 
             return HookFunctionWrapper(request, endpoint);
         }
@@ -224,6 +225,7 @@ namespace ScubaDiver
             // assign subscriber unique id
             int token = AssignCallbackToken();
             Logger.Debug($"[DiverBase] Hook Method - Assigned Token: {token}");
+            Logger.Debug($"[DiverBase] Hook Method - endpoint: {endpoint}");
 
 
             // Preparing a proxy method that Harmony will invoke
@@ -234,15 +236,13 @@ namespace ScubaDiver
                 Array.Copy(args, 0, parameters, 1, args.Length);
 
                 // Shift control to remote hook (Other process)
-                var res = InvokeControllerCallback(endpoint, token, new StackTrace().ToString(), retValue, parameters: parameters);
+                HookResponse res = InvokeHookCallback(endpoint, token, new StackTrace().ToString(), retValue, parameters: parameters);
 
                 // Remote hook returned, examine it's return value.
-                bool skipOriginal = false;
-                if (res != null && !res.IsRemoteAddress)
+                bool skipOriginal = res.SkipOriginal;
+                if (res.ReturnValue != null)
                 {
-                    object decodedRes = PrimitivesEncoder.Decode(res);
-                    if (decodedRes is bool boolRes)
-                        skipOriginal = boolRes;
+                    retValue = ResolveHookReturnValue(res.ReturnValue);
                 }
 
                 // Silly mix up...
@@ -278,11 +278,15 @@ namespace ScubaDiver
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
+
+        public abstract object ResolveHookReturnValue(ObjectOrRemoteAddress oora);
+
         public int AssignCallbackToken() => Interlocked.Increment(ref _nextAvailableCallbackToken);
 
         protected abstract Action HookFunction(FunctionHookRequest req, HarmonyWrapper.HookCallback patchCallback);
 
-        protected abstract ObjectOrRemoteAddress InvokeControllerCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters);
+        protected abstract ObjectOrRemoteAddress InvokeEventCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters);
+        protected abstract HookResponse InvokeHookCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters);
 
 
 

@@ -1,13 +1,14 @@
+using RemoteNET.Common;
+using RemoteNET.Internal;
+using RemoteNET.RttiReflection;
+using ScubaDiver.API;
+using ScubaDiver.API.Hooking;
+using ScubaDiver.API.Utils;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using RemoteNET.Common;
-using RemoteNET.Internal;
-using ScubaDiver.API;
-using ScubaDiver.API.Hooking;
-using ScubaDiver.API.Utils;
 
 namespace RemoteNET;
 
@@ -23,17 +24,17 @@ public class RemoteHookingManager
     /// </summary>
     private class PositionedLocalHook
     {
-        public HookAction HookAction { get; set; }
-        public LocalHookCallback WrappedHookActio { get; private set; }
+        public DynamifiedHookCallback HookAction { get; set; }
+        public LocalHookCallback WrappedHookAction { get; private set; }
         public HarmonyPatchPosition Position { get; private set; }
-        public PositionedLocalHook(HookAction action, LocalHookCallback callback, HarmonyPatchPosition pos)
+        public PositionedLocalHook(DynamifiedHookCallback action, LocalHookCallback callback, HarmonyPatchPosition pos)
         {
             HookAction = action;
-            WrappedHookActio = callback;
+            WrappedHookAction = callback;
             Position = pos;
         }
     }
-    private class MethodHooks : Dictionary<HookAction, PositionedLocalHook>
+    private class MethodHooks : Dictionary<DynamifiedHookCallback, PositionedLocalHook>
     {
     }
 
@@ -47,7 +48,7 @@ public class RemoteHookingManager
 
     /// <returns>True on success, false otherwise</returns>
 
-    public bool HookMethod(MethodBase methodToHook, HarmonyPatchPosition pos, HookAction hookAction)
+    public bool HookMethod(MethodBase methodToHook, HarmonyPatchPosition pos, DynamifiedHookCallback hookAction)
     {
         // Wrapping the callback which uses `dynamic`s in a callback that handles `ObjectOrRemoteAddresses`
         // and converts them to DROs
@@ -87,9 +88,9 @@ public class RemoteHookingManager
         return _app.Communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappedHook, parametersTypeFullNames);
     }
 
-    private LocalHookCallback WrapCallback(HookAction callback)
+    private LocalHookCallback WrapCallback(DynamifiedHookCallback hookAction)
     {
-        LocalHookCallback hookProxy = (HookContext context, ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args, ObjectOrRemoteAddress retValue) =>
+        LocalHookCallback hookProxy = (HookContext context, ObjectOrRemoteAddress instance, ObjectOrRemoteAddress[] args, ref ObjectOrRemoteAddress retValue) =>
         {
             dynamic DecodeOora(ObjectOrRemoteAddress oora)
             {
@@ -136,15 +137,17 @@ public class RemoteHookingManager
             }
 
             // Call the callback with the proxied parameters (using DynamicRemoteObjects)
-            callback.DynamicInvoke(new object[4] { context, droInstance, decodedParameters, droRetValue });
+            hookAction(context, droInstance, decodedParameters, ref droRetValue );
+
+            retValue = UnmanagedRemoteFunctionsInvokeHelper.CreateRemoteParameter(droRetValue);
         };
         return hookProxy;
     }
 
     public void Patch(MethodBase original,
-        HookAction prefix = null,
-        HookAction postfix = null,
-        HookAction finalizer = null)
+        DynamifiedHookCallback prefix = null,
+        DynamifiedHookCallback postfix = null,
+        DynamifiedHookCallback finalizer = null)
     {
         if (prefix == null &&
             postfix == null &&
@@ -167,7 +170,7 @@ public class RemoteHookingManager
         }
     }
 
-    public bool UnhookMethod(MethodBase methodToHook, HookAction callback)
+    public bool UnhookMethod(MethodBase methodToHook, DynamifiedHookCallback callback)
     {
         if (!_callbacksToProxies.TryGetValue(methodToHook, out MethodHooks hooks))
         {
@@ -179,7 +182,7 @@ public class RemoteHookingManager
             return false;
         }
 
-        _app.Communicator.UnhookMethod(positionedHookWrapper.WrappedHookActio);
+        _app.Communicator.UnhookMethod(positionedHookWrapper.WrappedHookAction);
         hooks.Remove(callback);
         if (hooks.Count == 0)
         {
