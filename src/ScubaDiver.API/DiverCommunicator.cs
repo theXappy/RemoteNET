@@ -490,8 +490,6 @@ namespace ScubaDiver.API
 
             var requestJsonBody = JsonConvert.SerializeObject(req);
 
-            Console.WriteLine("[@@@][HookMethod] Sending request to hook method: " + requestJsonBody);
-
             var resJson = SendRequest("hook_method", null, requestJsonBody);
             if (resJson.Contains("\"error\":"))
             {
