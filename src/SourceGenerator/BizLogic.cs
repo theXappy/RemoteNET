@@ -28,6 +28,10 @@ public class BizLogic
         {
             try
             {
+                string dir = Path.GetDirectoryName(LogFilePath);
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
                 using (var fs = new FileStream(LogFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
                 using (var sw = new StreamWriter(fs))
                 {
@@ -37,6 +41,7 @@ public class BizLogic
             }
             catch (IOException)
             {
+                Debugger.Launch();
                 if (i == maxRetries - 1) throw;
                 System.Threading.Thread.Sleep(delayMs);
             }
