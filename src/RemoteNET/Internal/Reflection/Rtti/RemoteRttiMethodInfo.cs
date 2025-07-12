@@ -26,7 +26,8 @@ namespace RemoteNET.Internal.Reflection
         public override Type ReturnType => LazyRetType.Value;
         public override Type ReflectedType => throw new NotImplementedException();
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
-        public override MethodAttributes Attributes => throw new NotImplementedException();
+        private MethodAttributes _attributes;
+        public override MethodAttributes Attributes => _attributes;
 
         public override bool IsGenericMethod => AssignedGenericArgs.Length > 0;
         public override bool IsGenericMethodDefinition => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
@@ -44,7 +45,8 @@ namespace RemoteNET.Internal.Reflection
             LazyRemoteTypeResolver returnType, 
             string name, 
             string mangledName, 
-            LazyRemoteParameterResolver[] lazyParamInfos)
+            LazyRemoteParameterResolver[] lazyParamInfos,
+            bool isStatic = false)
         {
             Name = name;
             MangledName = mangledName;
@@ -53,6 +55,10 @@ namespace RemoteNET.Internal.Reflection
             _lazyRetTypeImpl = returnType;
 
             AssignedGenericArgs = Type.EmptyTypes;
+
+            _attributes = 0;
+            if (isStatic)
+                _attributes |= MethodAttributes.Static;
         }
 
 
