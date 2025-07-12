@@ -80,7 +80,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoteNET.Tests", "RemoteNE
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{829E03C1-9657-44BA-B049-798854A0D6C2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestTarget", "Tests\TestTarget\TestTarget.csproj", "{BE9B7BC2-B65D-470F-8D64-E1BA9911105E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoteNET.Vessel", "Tests\RemoteNET.Vessel\RemoteNET.Vessel.csproj", "{BE9B7BC2-B65D-470F-8D64-E1BA9911105E}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MsvcOffensiveGcHelper", "MsvcOffensiveGcHelper\MsvcOffensiveGcHelper.vcxproj", "{BD00310B-63F7-4356-9669-7035AFF6B9D3}"
 EndProject
