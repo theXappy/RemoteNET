@@ -33,7 +33,7 @@ namespace RemoteNET.RttiReflection
         {
             App = app;
             _assembly = assemblyName;
-            Assembly =  new RemoteAssemblyDummy(assemblyName);
+            Assembly = new RemoteAssemblyDummy(assemblyName);
             UnresolvedMembers = new List<string>();
 
 
@@ -260,5 +260,11 @@ namespace RemoteNET.RttiReflection
         }
 
         public override string ToString() => FullName;
+
+        // I hope this is good enough
+        public override int GetHashCode()
+        {
+            return FullName.GetHashCode();
+        }
     }
 }

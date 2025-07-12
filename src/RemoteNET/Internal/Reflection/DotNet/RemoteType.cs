@@ -288,5 +288,11 @@ namespace RemoteNET.Internal.Reflection.DotNet
         }
 
         public override string ToString() => FullName;
+
+        // I hope this is good enough
+        public override int GetHashCode()
+        {
+            return FullName.GetHashCode();
+        }
     }
 }
