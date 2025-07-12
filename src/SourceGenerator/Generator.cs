@@ -15,7 +15,7 @@ namespace SourceGenerator
     {
         void Log(string l)
         {
-            File.AppendAllText(@"C:\Users\Shai\AppData\Local\Temp\logz\a.txt", l);
+            BizLogic.Log(l);
         }
 
         public void Initialize(GeneratorInitializationContext context)

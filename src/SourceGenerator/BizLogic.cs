@@ -19,7 +19,7 @@ public class BizLogic
     private static string VesselWorkingDir => Path.GetDirectoryName(VesselDllPath);
     private static string InjectWorkingDir => Path.GetDirectoryName(InjectExePath);
 
-    private void Log(string l)
+    public static void Log(string l)
     {
         // Allow concurrent writes from multiple processes using FileShare.Write and retry on IOException
         const int maxRetries = 10;
