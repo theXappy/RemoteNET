@@ -10,11 +10,27 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.1.0" />
-    <PackageReference Include="Vanara.PInvoke.IpHlpApi" Version="4.1.1" />
+    <PackageReference Include="CliWrap" Version="3.8.2" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.1" GeneratePathProperty="true" />
+    <PackageReference Include="System.Management" Version="9.0.1" GeneratePathProperty="true" />
+	<PackageReference Include="System.Memory" Version="4.6.0" GeneratePathProperty="true" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" GeneratePathProperty="true" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\RemoteNET\RemoteNET.csproj" />
-  </ItemGroup>
-
+	<!-- The following are necessary because SGs have a special behaviour for transient dependencies. The solution provided in the cookbook does not work.
+  But this is what they do in their own examples:
+  https://github.com/dotnet/roslyn-sdk/blob/main/samples/CSharp/SourceGenerators/SourceGeneratorSamples/CSharpSourceGeneratorSamples.csproj-->
+	<PropertyGroup>
+		<GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+	</PropertyGroup>
+	<Target Name="GetDependencyTargetPaths">
+		<ItemGroup Condition=" '$(Configuration)' == 'Debug' ">
+			<TargetPathWithTargetPlatformMoniker Include="$(PKGCliWrap)\lib\netstandard2.0\CliWrap.dll" IncludeRuntimeDependency="false" />
+			<TargetPathWithTargetPlatformMoniker Include="$(PKGMicrosoft_Bcl_AsyncInterfaces)\lib\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" IncludeRuntimeDependency="false" />
+			<TargetPathWithTargetPlatformMoniker Include="$(PKGSystem_Management)\lib\netstandard2.0\System.Management.dll" IncludeRuntimeDependency="false" />
+			<TargetPathWithTargetPlatformMoniker Include="$(PKGSystem_Memory)\lib\netstandard2.0\System.Memory.dll" IncludeRuntimeDependency="false" />
+			<TargetPathWithTargetPlatformMoniker Include="$(PKGSystem_Threading_Tasks_Extensions)\lib\netstandard2.0\System.Threading.Tasks.Extensions.dll" IncludeRuntimeDependency="false" />
+		</ItemGroup>
+	</Target>
+	
 </Project>
