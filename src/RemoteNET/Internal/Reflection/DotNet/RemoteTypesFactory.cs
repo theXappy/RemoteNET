@@ -379,7 +379,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
 
                     // Regular method
                     RemoteMethodInfo methodInfo =
-                        new RemoteMethodInfo(declaringType, retTypeResolver, func.Name, genericArgs, parameters.ToArray());
+                        new RemoteMethodInfo(declaringType, retTypeResolver, func.Name, genericArgs, parameters.ToArray(), (MethodAttributes)func.Attributes);
                     declaringType.AddMethod(methodInfo);
                 }
             }

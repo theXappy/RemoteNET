@@ -17,7 +17,9 @@ namespace RemoteNET.Internal.Reflection.DotNet
         public override Type ReturnType => _retType.Value;
         public override Type ReflectedType => throw new NotImplementedException();
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
-        public override MethodAttributes Attributes => throw new NotImplementedException();
+
+        private MethodAttributes _attributes;
+        public override MethodAttributes Attributes => _attributes;
 
         public override bool IsGenericMethod => AssignedGenericArgs.Length > 0;
         public override bool IsGenericMethodDefinition => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
@@ -34,10 +36,17 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 new LazyRemoteTypeResolver(mi.ReturnType),
                 mi.Name,
                 mi.GetGenericArguments(),
-                mi.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
+                mi.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray(),
+                mi.Attributes)
         {
         }
-        public RemoteMethodInfo(Type declaringType, LazyRemoteTypeResolver returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos)
+
+        public RemoteMethodInfo(Type declaringType,
+            LazyRemoteTypeResolver returnType,
+            string name,
+            Type[] genericArgs,
+            ParameterInfo[] paramInfos,
+            MethodAttributes attributes)
         {
             Name = name;
             DeclaringType = declaringType;
@@ -46,16 +55,18 @@ namespace RemoteNET.Internal.Reflection.DotNet
 
             genericArgs ??= Type.EmptyTypes;
             AssignedGenericArgs = genericArgs;
+
+            _attributes = attributes;
         }
 
-        public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos) :
-            this(declaringType, new LazyRemoteTypeResolver(returnType), name, genericArgs, paramInfos)
+        public RemoteMethodInfo(Type declaringType, Type returnType, string name, Type[] genericArgs, ParameterInfo[] paramInfos, MethodAttributes attributes) :
+            this(declaringType, new LazyRemoteTypeResolver(returnType), name, genericArgs, paramInfos, attributes)
         {
         }
 
         public override MethodInfo MakeGenericMethod(params Type[] typeArguments)
         {
-            return new RemoteMethodInfo(DeclaringType, ReturnType, Name, typeArguments, _paramInfos);
+            return new RemoteMethodInfo(DeclaringType, ReturnType, Name, typeArguments, _paramInfos, _attributes);
         }
 
         public override object[] GetCustomAttributes(bool inherit)

@@ -89,7 +89,7 @@ namespace ScubaDiver.API.Interactions.Dumps
             public string ReturnTypeName { get; set; }
             public bool IsReturnTypeGenericParameter { get; set; }
             public bool IsInherited { get; set; }
-
+            public ulong Attributes { get; set; } // MethodAttributes flags
 
             public TypeMethod()
             {
@@ -98,6 +98,7 @@ namespace ScubaDiver.API.Interactions.Dumps
             public TypeMethod(MethodBase methodBase)
             {
                 Visibility = methodBase.IsPublic ? "Public" : "Private";
+                Attributes = (ulong)methodBase.Attributes;
                 GenericArgs = new List<string>();
                 if (methodBase.ContainsGenericParameters && methodBase is not ConstructorInfo)
                 {

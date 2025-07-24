@@ -129,7 +129,8 @@ public static class VftableParser
             DecoratedName = undecFunc.DecoratedName,
             Parameters = parameters,
             ReturnTypeName = undecFunc.RetType,
-            Visibility = "Public" // Because it's exported
+            Visibility = "Public", // Because it's exported
+            Attributes = 0 // Not sure about this one
         };
         return method;
     }
