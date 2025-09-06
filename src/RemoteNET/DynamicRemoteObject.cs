@@ -627,11 +627,7 @@ public abstract class DynamicRemoteObject : DynamicObject
     }
     private static byte[] __cast_to_byte_array(DynamicRemoteObject dro)
     {
-        // Invoke remote Convert.ToBase64String(byte[])
-        Type ConvertType = dro.__ra.GetRemoteType(typeof(Convert));
-        MethodInfo toBase64 = ConvertType.GetMethods().Single(mi => mi.Name == nameof(Convert.ToBase64String) && mi.GetParameters().Length == 1);
-
-        string base64 = toBase64.Invoke(null, new object[] { dro }) as string;
+        string base64 = dro.__ra.ConvertToBase64.Invoke(null, new object[] { dro }) as string;
 
         return Convert.FromBase64String(base64);
     }

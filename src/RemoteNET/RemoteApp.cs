@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 
@@ -12,6 +14,22 @@ public abstract class RemoteApp : IDisposable
     public abstract RemoteMarshal Marshal { get; }
     public abstract RemoteActivator Activator { get; }
 
+
+
+    // TODO: Find a less ugly place for this
+    private MethodInfo toBase64 = null;
+    public MethodInfo ConvertToBase64 
+    {
+        get
+        {
+            if (toBase64 == null)
+            {
+                Type ConvertType = GetRemoteType(typeof(Convert));
+                toBase64 = ConvertType.GetMethods().Single(mi => mi.Name == nameof(Convert.ToBase64String) && mi.GetParameters().Length == 1);
+            }
+            return toBase64;
+        }
+    }
 
     public abstract IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter);
 
