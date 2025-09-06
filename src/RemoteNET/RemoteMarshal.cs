@@ -14,6 +14,7 @@ public class RemoteMarshal
     private readonly MethodInfo _remoteFree;
     private readonly MethodInfo _remoteWrite;
     private readonly MethodInfo _remoteRead;
+    private readonly MethodInfo _remoteMemSetZero;
     private readonly MethodInfo _remotePtrToStringAnsi;
 
     public RemoteMarshal(ManagedRemoteApp app)
@@ -25,24 +26,25 @@ public class RemoteMarshal
         _remoteFree = _remoteMarshalType.GetMethod(nameof(SafeMarshal.FreeHGlobal), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
         _remoteWrite = _remoteMarshalType.GetMethod(nameof(SafeMarshal.Copy), (BindingFlags)0xffff, new[] { typeof(byte[]), typeof(int), typeof(IntPtr), typeof(int) });
         _remoteRead = _remoteMarshalType.GetMethod(nameof(SafeMarshal.Copy), (BindingFlags)0xffff, new[] { typeof(IntPtr), typeof(byte[]), typeof(int), typeof(int) });
+        _remoteMemSetZero = _remoteMarshalType.GetMethod(nameof(SafeMarshal.MemSetZero), (BindingFlags)0xffff, new[] { typeof(byte[]) });
         _remotePtrToStringAnsi = _remoteMarshalType.GetMethod(nameof(SafeMarshal.PtrToStringAnsi), (BindingFlags)0xffff, new[] { typeof(IntPtr) });
     }
 
     public IntPtr AllocHGlobal(int cb)
     {
-        object results = _remoteAlloc.Invoke(obj: null, new object[1] { cb });
+        object results = _remoteAlloc.Invoke(obj: null, [cb]);
         return (IntPtr)results;
     }
 
     public IntPtr AllocHGlobalZero(int cb)
     {
-        object results = _remoteAllocZero.Invoke(obj: null, new object[1] { cb });
+        object results = _remoteAllocZero.Invoke(obj: null, [cb]);
         return (IntPtr)results;
     }
 
     public void FreeHGlobal(IntPtr hglobal)
     {
-        _remoteFree.Invoke(obj: null, new object[1] { hglobal });
+        _remoteFree.Invoke(obj: null, [hglobal]);
     }
 
     public void Copy(byte[] source, int startIndex, IntPtr destination, int length)
@@ -59,11 +61,15 @@ public class RemoteMarshal
         // We use a temporary array in the target because the Copy method modifies "destination" but out "Invoke" flow
         // only makes a copy of our local one, so the changes to the remote one aren't reflected back.
         var remoteArray = _app.Activator.CreateInstance(typeof(byte[]), length);
-        _remoteRead.Invoke(obj: null, new object[4] { source, remoteArray, 0, length });
+        _remoteRead.Invoke(obj: null, [source, remoteArray, 0, length]);
 
         // Casting to byte[] causes a copy to the local process
         var dro = remoteArray.Dynamify();
         byte[] copiedLocal = (byte[])dro;
+
+        // Now destroy the remote array since we don't want the heap scan to mistakenly 
+        // find any vftables of objects within it.
+        _remoteMemSetZero.Invoke(obj: null, [remoteArray]);
 
         Array.Copy(copiedLocal, 0, destination, startIndex, length);
     }
@@ -83,6 +89,6 @@ public class RemoteMarshal
         if(ptr == IntPtr.Zero)
             return null;
 
-        return _remotePtrToStringAnsi.Invoke(null, new object[1] {ptr}) as string;
+        return _remotePtrToStringAnsi.Invoke(null, [ptr]) as string;
     }
 }

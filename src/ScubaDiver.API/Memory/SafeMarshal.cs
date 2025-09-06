@@ -50,6 +50,15 @@ namespace ScubaDiver.API.Memory
             return Marshal.PtrToStringAnsi(ptr);
         }
 
+        /// <summary>
+        /// Sets a byte[] to zero.
+        /// </summary>
+        public static void MemSetZero(byte[] arr)
+        {
+            for (int i = 0; i < arr.Length; i++)
+                arr[i] = 0x00;
+        }
+
         private static void CheckMemoryAccess(IntPtr ptr, int length, bool read)
         {
             IntPtr processHandle = Process.GetCurrentProcess().Handle;
