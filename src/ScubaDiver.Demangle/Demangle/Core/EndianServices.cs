@@ -243,9 +243,11 @@ namespace ScubaDiver.Demangle.Demangle.Core
             {
                 // Little endian memory accesses are least significant first,
                 // so we must reverse the array before returning.
+                var reversed = accesses.ToArray();
+                reversed.Reverse();
                 return new MkSequence(
                     dataType,
-                    accesses.Reverse().ToArray());
+                    reversed.ToArray());
             }
 
             public override Slice MakeSlice(DataType dataType, Expression expr, int loOffset, int bitsPerUnit)
