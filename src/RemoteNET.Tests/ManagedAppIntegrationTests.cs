@@ -1,6 +1,6 @@
 ﻿using RemoteNET.Access;
+using RemoteNET.Vessel;
 using System.Text;
-using TestTarget;
 
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
 namespace RemoteNET.Tests
