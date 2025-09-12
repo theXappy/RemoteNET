@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RemoteNET\RemoteNET.csproj" />
+    <ProjectReference Include="..\ScubaDiver\project_net6_x64\ScubaDiver_Net6_x64.csproj" />
     <ProjectReference Include="..\Tests\RemoteNET.Vessel\RemoteNET.Vessel.csproj" />
   </ItemGroup>
 
