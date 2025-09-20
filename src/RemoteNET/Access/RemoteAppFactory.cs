@@ -21,12 +21,14 @@ namespace RemoteNET.Access
 
     public static partial class RemoteAppFactory
     {
-        public static RemoteApp Connect(string targetQuery, RuntimeType runtime, ConnectionStrategy strat = ConnectionStrategy.Unknown)
+        public static RemoteApp Connect(string targetQuery, RuntimeType runtime, ConnectionConfig config = null)
         {
+            config ??= ConnectionConfig.Default;
+
             try
             {
                 Process target = ProcessHelper.GetSingleRoot(targetQuery);
-                return Connect(target, runtime, strat);
+                return Connect(target, runtime, config);
             }
             catch (TooManyProcessesException tooManyProcsEx)
             {
@@ -40,11 +42,15 @@ namespace RemoteNET.Access
         /// Creates a new provider.
         /// </summary>
         /// <param name="target">Process to create the provider for</param>
+        /// <param name="runtime">Runtime type to connect to</param>
+        /// <param name="config">Connection configuration including strategy and DLL proxy settings</param>
         /// <returns>A provider for the given process</returns>
-        public static RemoteApp Connect(Process target, RuntimeType runtime, ConnectionStrategy strat = ConnectionStrategy.Unknown)
+        public static RemoteApp Connect(Process target, RuntimeType runtime, ConnectionConfig config = null)
         {
-            if (strat == ConnectionStrategy.Unknown)
-                strat = ConnectionStrategy.DllInjection;
+            config ??= ConnectionConfig.Default;
+
+            if (config.Strategy == ConnectionStrategy.Unknown)
+                config.Strategy = ConnectionStrategy.DllInjection;
 
             //
             // First Try: Use discovery to check for existing diver
@@ -68,9 +74,12 @@ namespace RemoteNET.Access
                 case DiverState.HollowSnapshot:
                     throw new Exception("Failed to connect to remote app. Hollow Snapshot.");
                 case DiverState.NoDiver:
-                    RunStrategy(target, diverPort, strat);
+                    target = RunStrategy(target, diverPort, config);
                     break;
             }
+
+            // Port might've changed if the strategy re-started the app
+            diverPort = (ushort)target.Id;
 
             // Now register our program as a "client" of the diver
             string diverAddr = "127.0.0.1";
@@ -103,10 +112,52 @@ namespace RemoteNET.Access
                     throw new ArgumentOutOfRangeException(nameof(runtime), runtime, null);
             }
 
-            throw new Exception("Registering our current app as a client in the Diver failed.");
+            // Enhanced error information
+            bool isTargetAlive = !target.HasExited;
+            string aliveStatus = isTargetAlive ? "ALIVE" : "EXITED";
+            
+            string targetInfo = $"Target Process: PID={target.Id}, Name='{target.ProcessName}', Status={aliveStatus}";
+            if (isTargetAlive)
+            {
+                try 
+                {
+                    targetInfo += $", Path='{target.MainModule?.FileName ?? "Unknown"}'";
+                }
+                catch (Exception ex)
+                {
+                    targetInfo += $", Path=<Error: {ex.Message}>";
+                }
+            }
+            
+            string connectionInfo = $"Connection: DiverAddress={diverAddr}, DiverPort={diverPort}, RequestedRuntime={runtime}";
+            string strategyInfo = $"Strategy: {config.Strategy}" + (config.TargetDllToProxy != null ? $", TargetDll='{config.TargetDllToProxy}'" : "");
+            string diverStates = $"DiverDiscovery: ManagedState={managedState}, UnmanagedState={unmanagedState}";
+            string clientRegInfo = $"ClientRegistration: ManagedClient={managedApp != null}, RequestedRuntime={runtime}";
+            
+            throw new Exception($"Registering our current app as a client in the Diver failed.\n" +
+                               $"{targetInfo}\n" +
+                               $"{connectionInfo}\n" +
+                               $"{strategyInfo}\n" +
+                               $"{diverStates}\n" +
+                               $"{clientRegInfo}");
         }
 
-        private static void RunStrategy(Process target, ushort diverPort, ConnectionStrategy strat)
+        // Legacy overloads for backward compatibility
+        [Obsolete("Use Connect(target, runtime, ConnectionConfig) instead")]
+        public static RemoteApp Connect(string targetQuery, RuntimeType runtime, ConnectionStrategy strat, string targetDllToProxy = null)
+        {
+            var config = new ConnectionConfig { Strategy = strat, TargetDllToProxy = targetDllToProxy };
+            return Connect(targetQuery, runtime, config);
+        }
+
+        [Obsolete("Use Connect(target, runtime, ConnectionConfig) instead")]
+        public static RemoteApp Connect(Process target, RuntimeType runtime, ConnectionStrategy strat, string targetDllToProxy = null)
+        {
+            var config = new ConnectionConfig { Strategy = strat, TargetDllToProxy = targetDllToProxy };
+            return Connect(target, runtime, config);
+        }
+
+        private static Process RunStrategy(Process target, ushort diverPort, ConnectionConfig config)
         {
             // Determine if we are dealing with .NET Framework vs .NET Core
             string targetDotNetVer = target.GetSupportedTargetFramework();
@@ -114,21 +165,23 @@ namespace RemoteNET.Access
             // Get different injection kit (for .NET Framework vs .NET Core & x86 vs x64)
             InjectionToolKit kit = InjectionToolKit.GetKit(target, targetDotNetVer);
 
-            switch (strat)
+            switch (config.Strategy)
             {
                 case ConnectionStrategy.DllInjection:
                     InjectDiver(target, diverPort, targetDotNetVer, kit);
                     break;
                 case ConnectionStrategy.DllHijack:
-                    HijackDllAndRelaunch(target, kit);
+                    target = HijackDllAndRelaunch(target, kit, config.TargetDllToProxy);
                     break;
                 case ConnectionStrategy.Unknown:
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(strat), strat, null);
+                    throw new ArgumentOutOfRangeException(nameof(config.Strategy), config.Strategy, null);
             }
+
+            return target;
         }
 
-        private static void HijackDllAndRelaunch(Process target, InjectionToolKit kit)
+        private static Process HijackDllAndRelaunch(Process target, InjectionToolKit kit, string targetDllToProxy)
         {
             // Store command line arguments of the target process
             string exePath = target.MainModule.FileName;
@@ -139,27 +192,34 @@ namespace RemoteNET.Access
             bool alreadyHijacked = File.Exists(hijackInfoFilePath);
             if (!alreadyHijacked)
             {
-                // Find a target module to proxy
-                var targetModules = SharpDllProxy.VictimModuleFinder.Search(target);
-                SharpDllProxy.VictimModuleFinder.VictimModuleInfo victim = targetModules.First();
+                string dllToProxy = targetDllToProxy;
+
+                if (string.IsNullOrWhiteSpace(dllToProxy))
+                {
+                    // Find a target module to proxy
+                    var targetModules = SharpDllProxy.VictimModuleFinder.Search(target);
+                    SharpDllProxy.VictimModuleFinder.VictimModuleInfo victim = targetModules.First();
+                    dllToProxy = victim.OriginalFilePath;
+                }
+
                 SharpDllProxy.ProxyCreator proxyCreator = new SharpDllProxy.ProxyCreator(s => Debug.WriteLine(s));
-                SharpDllProxy.ProxyCreatorResults proxyResults = proxyCreator.CreateProxy(victim.OriginalFilePath, kit.UnmanagedAdapterPath, "PromptEntryPoint");
+                SharpDllProxy.ProxyCreatorResults proxyResults = proxyCreator.CreateProxy(dllToProxy, kit.UnmanagedAdapterPath, "PromptEntryPoint");
 
                 // Terminate target process
                 target.Kill();
 
                 // Rename original victim module (Keep adding "_bak" extensions until it's unique, up to 3 times)
-                string victimBackupPath = victim.OriginalFilePath;
+                string victimBackupPath = dllToProxy;
                 for (int i = 0; File.Exists(victimBackupPath) && i < 3; i++)
                     victimBackupPath += "_bak";
-                File.Move(victim.OriginalFilePath, victimBackupPath);
+                File.Move(dllToProxy, victimBackupPath);
 
                 // Copy the output DLL, replacing the victim module
-                File.Copy(proxyResults.OutputDll, victim.OriginalFilePath);
+                File.Copy(proxyResults.OutputDll, dllToProxy);
 
                 // Copy proxied DLL alongside of it
                 string proxiedFileName = Path.GetFileName(proxyResults.ProxiedDll);
-                string proxyDllPath = Path.Combine(Path.GetDirectoryName(victim.OriginalFilePath), proxiedFileName);
+                string proxyDllPath = Path.Combine(Path.GetDirectoryName(dllToProxy), proxiedFileName);
                 File.Copy(proxyResults.ProxiedDll, proxyDllPath);
             }
             else
@@ -169,11 +229,18 @@ namespace RemoteNET.Access
             }
 
             // Relaunch the target process with the same command line arguments
-            ProcessStartInfo psi = new ProcessStartInfo(exePath, targetCmdLine);
-            Process.Start(psi);
+            // Set working directory to the directory containing the target executable
+            string exeDirectory = Path.GetDirectoryName(exePath);
+            ProcessStartInfo psi = new ProcessStartInfo(exePath, targetCmdLine)
+            {
+                WorkingDirectory = exeDirectory,
+                UseShellExecute = false
+            };
+            Process newProc = Process.Start(psi);
 
             // Write hijack indicator: <output_dll_path>;<proxied_dll_path>
             File.WriteAllText(hijackInfoFilePath, $"{kit.UnmanagedAdapterPath};{kit.UnmanagedAdapterPath}");
+            return newProc;
         }
 
         private static void InjectDiver(Process target, ushort diverPort, string targetDotNetVer, InjectionToolKit kit)
