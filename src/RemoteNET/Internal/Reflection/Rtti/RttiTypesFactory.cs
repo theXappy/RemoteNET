@@ -180,20 +180,18 @@ namespace RemoteNET.RttiReflection
             int i = 1;
             foreach (TypeDump.TypeMethod.MethodParameter restarizedParameter in func.Parameters)
             {
-                // TODO: No support for methods with reference parameters for now.
-                if (restarizedParameter.FullTypeName.EndsWith('&'))
-                    return;
+                string fullTypeName = restarizedParameter.FullTypeName;                
 
                 string fakeParamName = $"a{i}";
                 i++;
-                Lazy<Type> paramFactory = CreateTypeFactory(restarizedParameter.FullTypeName, moduleName);
+                Lazy<Type> paramFactory = CreateTypeFactory(fullTypeName, moduleName);
                 LazyRemoteTypeResolver paramTypeResolver = new LazyRemoteTypeResolver(paramFactory,
                     //methodParameter.Assembly,
                     //methodParameter.FullTypeName,
                     //methodParameter.TypeName
                     null,
-                    restarizedParameter.FullTypeName,
-                    restarizedParameter.FullTypeName
+                    fullTypeName,
+                    fullTypeName
                 );
                 LazyRemoteParameterResolver paramResolver =
                     new LazyRemoteParameterResolver(paramTypeResolver, fakeParamName);
@@ -241,6 +239,8 @@ namespace RemoteNET.RttiReflection
                 // Get rid of '*' in pointers so it's NOT treated as a wildcard
                 string originalNamespaceAndTypeName = namespaceAndTypeName;
                 namespaceAndTypeName = namespaceAndTypeName.TrimEnd('*');
+                // Get rid of '&' in references
+                namespaceAndTypeName = namespaceAndTypeName.TrimEnd('&');
                 int pointerLevel = originalNamespaceAndTypeName.Length - namespaceAndTypeName.Length;
                 // If no module name is given, use a wildcard
                 moduleName ??= "*";
