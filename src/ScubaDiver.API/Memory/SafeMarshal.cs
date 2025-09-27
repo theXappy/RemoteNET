@@ -23,7 +23,7 @@ namespace ScubaDiver.API.Memory
         {
             IntPtr ptr = Marshal.AllocHGlobal(cb);
             for (int i = 0; i < cb; i++)
-                Marshal.WriteByte(ptr, 0x00);
+                Marshal.WriteByte(ptr + i, 0x00);
             return ptr;
         }
 
