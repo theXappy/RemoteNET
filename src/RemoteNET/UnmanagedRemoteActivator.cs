@@ -34,7 +34,7 @@ namespace RemoteNET
             //
             // Allocate
             //
-            nint buf = _app.Marshal.AllocHGlobalZero(100); // TODO: Not a random size
+            nint buf = _app.Marshal.AllocHGlobalZero(4096); // TODO: Not a random size
             object results = ctor.Invoke(buf, []);
 
             if (results is DynamicUnmanagedRemoteObject dro)
