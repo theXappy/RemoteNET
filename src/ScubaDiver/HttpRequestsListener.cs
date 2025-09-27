@@ -193,7 +193,7 @@ public class RnetRequestsListener : IRequestsListener
             ScubaDiverMessage req =
                 new ScubaDiverMessage(request.QueryString, request.Url, request.BodyString, RespondFunc);
 
-            RequestReceived?.Invoke(this, req);
+            Task.Run(() => RequestReceived?.Invoke(this, req));
         }
     }
 
