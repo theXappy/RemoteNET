@@ -221,9 +221,19 @@ public static class DetoursMethodGenerator
         nuint finalRetVal = 0;
         if (tempRetValue is nuint nuintVal2)
             finalRetVal = nuintVal2;
-        if (tempRetValue is double doubleVal2)
+        else if (tempRetValue is nint nintVal2)
+            finalRetVal = (nuint)nintVal2;
+        else if (tempRetValue is int intVal2)
+            finalRetVal = (nuint)intVal2;
+        else if (tempRetValue is uint uintVal2)
+            finalRetVal = (nuint)uintVal2;
+        else if (tempRetValue is long longVal2)
+            finalRetVal = (nuint)longVal2;
+        else if (tempRetValue is ulong ulongVal2)
+            finalRetVal = (nuint)ulongVal2;
+        else if (tempRetValue is double doubleVal2)
             finalRetVal = (nuint)BitConverter.DoubleToUInt64Bits(doubleVal2);
-        if (tempRetValue is float floatVal2)
+        else if (tempRetValue is float floatVal2)
             finalRetVal = (nuint)BitConverter.SingleToUInt32Bits(floatVal2);
 
         return finalRetVal;
