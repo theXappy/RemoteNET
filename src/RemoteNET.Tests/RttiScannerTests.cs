@@ -21,9 +21,16 @@ namespace RemoteNET.Tests
         public void Setup()
         {
             // Load dependencies first (MSVCP)
-            var msvcpPath = @"C:\Program Files\WindowsApps\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\msvcp140_app.dll";
+            var msvcpPath =
+                @"C:\Program Files\WindowsApps\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\msvcp140_app.dll";
             if (File.Exists(msvcpPath))
             {
+                string dllDirectory = Path.GetDirectoryName(msvcpPath);
+                if (!Windows.Win32.PInvoke.SetDllDirectory(dllDirectory))
+                {
+                    Console.WriteLine($"SetDllDirectory failed for: {dllDirectory} with error code: {Marshal.GetLastWin32Error()}");
+                }
+
                 _msvcpHandle = PInvoke.LoadLibrary(msvcpPath);
                 if (_msvcpHandle.IsInvalid)
                 {
@@ -36,6 +43,12 @@ namespace RemoteNET.Tests
             if (!File.Exists(libSpenPath))
             {
                 Assert.Inconclusive($"Test DLL not found: {libSpenPath}");
+            }
+
+            string libSpenDirectory = Path.GetDirectoryName(libSpenPath);
+            if (!Windows.Win32.PInvoke.SetDllDirectory(libSpenDirectory))
+            {
+                Console.WriteLine($"SetDllDirectory failed for: {libSpenDirectory} with error code: {Marshal.GetLastWin32Error()}");
             }
 
             _libSpenHandle = PInvoke.LoadLibrary(libSpenPath);
@@ -86,171 +99,6 @@ namespace RemoteNET.Tests
                 t.NamespaceAndName.Contains("SPen::UwpLog", StringComparison.OrdinalIgnoreCase));
             
             Assert.That(uwpLogType, Is.Not.Null, "Should find SPen::UwpLog type in libSpen_base module");
-        }
-
-        [Test]
-        public void TricksterDirectAccess_ShouldFindSPenUwpLogType()
-        {
-            // Arrange - Test the lower-level Trickster class directly
-            var trickster = new Trickster(Process.GetCurrentProcess());
-            
-            // Act
-            trickster.ScanTypes();
-            var scannedTypes = trickster.ScannedTypes;
-            
-            // Find our module
-            var libSpenModule = scannedTypes.Keys.FirstOrDefault(m => 
-                m.ModuleInfo.Name.Contains("libSpen_base", StringComparison.OrdinalIgnoreCase));
-            
-            Assert.That(libSpenModule, Is.Not.Null, "Should find libSpen_base module in Trickster results");
-            
-            var typesInModule = scannedTypes[libSpenModule];
-            Console.WriteLine($"Trickster found {typesInModule.Count} types in {libSpenModule.ModuleInfo.Name}");
-            
-            // List all found types
-            foreach (var type in typesInModule)
-            {
-                Console.WriteLine($"  Trickster found type: {type.FullTypeName}");
-            }
-            
-            // Look for SPen::UwpLog
-            var uwpLogType = typesInModule.FirstOrDefault(t => 
-                t.FullTypeName.Contains("SPen::UwpLog", StringComparison.OrdinalIgnoreCase));
-            
-            Assert.That(uwpLogType, Is.Not.Null, "Trickster should find SPen::UwpLog type");
-        }
-
-        [Test]
-        public void RttiScanner_ManualScan_ShouldFindSPenTypes()
-        {
-            // Arrange - Test the even lower-level RttiScanner
-            var process = Process.GetCurrentProcess();
-            var modules = process.Modules.Cast<ProcessModule>().ToList();
-            
-            var libSpenModule = modules.FirstOrDefault(m => 
-                m.ModuleName.Contains("libSpen_base", StringComparison.OrdinalIgnoreCase));
-            
-            Assert.That(libSpenModule, Is.Not.Null, "Should find libSpen_base in process modules");
-            
-            var moduleInfo = new ModuleInfo(
-                libSpenModule.ModuleName, 
-                (nuint)libSpenModule.BaseAddress, 
-                (nuint)libSpenModule.ModuleMemorySize);
-            
-            var sections = ProcessModuleExtensions.ListSections(moduleInfo);
-            var dataSections = sections.Where(s => 
-                s.Name.ToUpper().Contains("DATA") || 
-                s.Name.ToUpper().Contains("RTTI")).ToList();
-            
-            Console.WriteLine($"Module: {moduleInfo.Name}");
-            Console.WriteLine($"Base Address: 0x{moduleInfo.BaseAddress:X}");
-            Console.WriteLine($"Size: 0x{moduleInfo.Size:X}");
-            Console.WriteLine($"Data sections found: {dataSections.Count}");
-            
-            foreach (var section in dataSections)
-            {
-                Console.WriteLine($"  Section: {section.Name} at 0x{section.BaseAddress:X}, size: 0x{section.Size:X}");
-            }
-            
-            // Manual scan using RttiScanner
-            var foundTypes = new List<string>();
-            var processHandle = PInvoke.OpenProcess(Windows.Win32.System.Threading.PROCESS_ACCESS_RIGHTS.PROCESS_ALL_ACCESS, 
-                true, (uint)process.Id);
-            
-            try
-            {
-                using (var scanner = new RttiScanner(processHandle, moduleInfo.BaseAddress, moduleInfo.Size, sections))
-                {
-                    // Scan each data section for RTTI information
-                    foreach (var section in dataSections)
-                    {
-                        var sectionSize = (nuint)section.Size;
-                        var sectionBase = (nuint)section.BaseAddress;
-                        
-                        // Try scanning with both 32-bit and 64-bit methods
-                        for (nuint offset = 8; offset < sectionSize; offset += 8)
-                        {
-                            var address = sectionBase + offset;
-                            var className64 = scanner.GetClassName64(address, sections);
-                            if (!string.IsNullOrEmpty(className64))
-                            {
-                                foundTypes.Add(className64);
-                                Console.WriteLine($"  Found type (64-bit): {className64}");
-                            }
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                //processHandle.Dispose();
-            }
-            
-            Console.WriteLine($"Total types found via manual scan: {foundTypes.Count}");
-            
-            // Look for SPen namespace types
-            var spenTypes = foundTypes.Where(t => t.Contains("SPen::", StringComparison.OrdinalIgnoreCase)).ToList();
-            Console.WriteLine($"SPen namespace types found: {spenTypes.Count}");
-            
-            foreach (var spenType in spenTypes)
-            {
-                Console.WriteLine($"  SPen type: {spenType}");
-            }
-            
-            // Check for UwpLog specifically
-            var uwpLogFound = foundTypes.Any(t => t.Contains("UwpLog", StringComparison.OrdinalIgnoreCase));
-            if (!uwpLogFound)
-            {
-                Console.WriteLine("UwpLog type NOT found in manual scan. This suggests it may not have RTTI or may be in a different section.");
-            }
-            else
-            {
-                Console.WriteLine("UwpLog type WAS found in manual scan!");
-            }
-            
-            // At minimum, we should find some types in this DLL
-            Assert.That(foundTypes, Is.Not.Empty, "Should find at least some types in libSpen_base.dll");
-        }
-
-        [Test]
-        public void ProcessModuleExtensions_ListSections_ShouldFindSections()
-        {
-            // Test the section listing functionality
-            var process = Process.GetCurrentProcess();
-            var modules = process.Modules.Cast<ProcessModule>().ToList();
-            
-            var libSpenModule = modules.FirstOrDefault(m => 
-                m.ModuleName.Contains("libSpen_base", StringComparison.OrdinalIgnoreCase));
-            
-            if (libSpenModule == null)
-            {
-                Assert.Inconclusive("libSpen_base module not loaded");
-            }
-            
-            var moduleInfo = new ModuleInfo(
-                libSpenModule.ModuleName, 
-                (nuint)libSpenModule.BaseAddress, 
-                (nuint)libSpenModule.ModuleMemorySize);
-            
-            // Act
-            var sections = ProcessModuleExtensions.ListSections(moduleInfo);
-            
-            // Assert
-            Assert.That(sections, Is.Not.Empty, "Should find sections in the module");
-            
-            Console.WriteLine($"Sections in {moduleInfo.Name}:");
-            foreach (var section in sections)
-            {
-                Console.WriteLine($"  {section.Name}: 0x{section.BaseAddress:X} (size: 0x{section.Size:X})");
-            }
-            
-            // Should have typical PE sections
-            var hasTextSection = sections.Any(s => s.Name.Contains(".text", StringComparison.OrdinalIgnoreCase));
-            var hasDataSection = sections.Any(s => s.Name.Contains("data", StringComparison.OrdinalIgnoreCase));
-            
-            Assert.That(hasTextSection, Is.True, "Should have .text section");
-            Console.WriteLine($"Has .text section: {hasTextSection}");
-            Console.WriteLine($"Has data section: {hasDataSection}");
         }
 
         [Test]

@@ -232,6 +232,47 @@ public class TricksterWrapper
                 allClassTypesNames.Add(nameAndNamespace);
             }
 
+            // Let's find "static" exported classes
+            HashSet<string> staticClassNames = new();
+            foreach (UndecoratedSymbol undecSymbol in allUndecoratedExports)
+            {
+                if (undecSymbol is not UndecoratedFunction ctor)
+                    continue;
+
+                string undecExportName = ctor.UndecoratedFullName;
+                IsCtorName(undecExportName, out int lastDoubleColonIndex);
+                if (lastDoubleColonIndex == -1)
+                {
+                    // No C++ name format: namespace::classname
+                    continue;
+                }
+
+                string nameAndNamespace = undecExportName[..lastDoubleColonIndex];
+                if (allClassTypesNames.Contains(nameAndNamespace))
+                {
+                    // This export belond to a previously found first-class/second-class type (last loop)
+                    continue;
+                }
+
+                if (staticClassNames.Contains(nameAndNamespace))
+                {
+                    // Already found this static class (this loop)
+                    continue;
+                }
+
+                // Split fullTypeName to namespace & type name
+                int lastIndexOfColonColon = nameAndNamespace.LastIndexOf("::");
+                // take into consideration that "::" might no be present at all, and the namespace is empty
+                string namespaceName = lastIndexOfColonColon == -1 ? "" : nameAndNamespace.Substring(0, lastIndexOfColonColon);
+                string typeName = lastIndexOfColonColon == -1 ? nameAndNamespace : nameAndNamespace.Substring(lastIndexOfColonColon + 2);
+
+                // NEW 2nd-class type. Adding a new match!
+                TypeInfo ti = new SecondClassTypeInfo(undecModule.Name, namespaceName, typeName);
+                // Store aside as a member of this type
+                allClassTypes.Add(ti.FullTypeName, ti);
+                staticClassNames.Add(nameAndNamespace);
+            }
+
 
             // Now iterate all class Types & search any exports that match their names
             foreach (TypeInfo typeInfo in allClassTypes.Values)

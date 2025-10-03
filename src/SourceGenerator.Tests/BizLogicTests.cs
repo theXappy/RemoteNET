@@ -199,12 +199,14 @@ namespace SourceGenerator.Tests
             var injectedDlls = new List<string>
             {
                 @"C:\\Program Files\\WindowsApps\\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\\msvcp140_app.dll",
+                @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_base.dll",
                 @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_worddoc.dll",
                 @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_document.dll"
             };
             // Provided types
             var typesToInspect = new List<string>
             {
+                "*!SPen::UwpLog",
                 "*!SPen::String",
                 "*!SPen::BaseData",
                 "*!SPen::NoteZip",
