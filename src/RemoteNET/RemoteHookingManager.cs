@@ -75,9 +75,10 @@ public class RemoteHookingManager
         List<string> parametersTypeFullNames;
         if (methodToHook is IRttiMethodBase rttiMethod)
         {
-            // Skipping 'this'
+            // Skipping 'this' parameter for instance methods
+            int skipCount = methodToHook.IsStatic ? 0 : 1;
             parametersTypeFullNames =
-                rttiMethod.LazyParamInfos.Skip(1).Select(prm => prm.TypeResolver.TypeFullName).ToList();
+                rttiMethod.LazyParamInfos.Skip(skipCount).Select(prm => prm.TypeResolver.TypeFullName).ToList();
         }
         else
         {
@@ -85,7 +86,7 @@ public class RemoteHookingManager
                 methodToHook.GetParameters().Select(prm => prm.ParameterType.FullName).ToList();
         }
 
-        return _app.Communicator.HookMethod(methodToHook.DeclaringType.FullName, methodToHook.Name, pos, wrappedHook, parametersTypeFullNames);
+        return _app.Communicator.HookMethod(methodToHook, pos, wrappedHook, parametersTypeFullNames);
     }
 
     private LocalHookCallback WrapCallback(DynamifiedHookCallback hookAction)

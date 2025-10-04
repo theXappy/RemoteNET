@@ -230,7 +230,7 @@ namespace RemoteNET.RttiReflection
 
                 RemoteRttiMethodInfo methodInfo =
                     new RemoteRttiMethodInfo(declaringTypeResolver, returnTypeResolver, func.Name, mangledName,
-                        parameters.ToArray());
+                        parameters.ToArray(), (MethodAttributes)func.Attributes);
                 declaringType.AddMethod(methodInfo);
             }
 

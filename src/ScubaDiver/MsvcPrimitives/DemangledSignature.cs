@@ -8,4 +8,6 @@ public class DemangledSignature
     public string RetType { get; set; }
     // If the return value is a "real" struct (not a pointer to a struct)
     public bool IsRetNonRefStruct { get; set; }
+    public bool IsInstanceMethod { get; set; }
+    public bool IsGlobal { get; set; }
 }

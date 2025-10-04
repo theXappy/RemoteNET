@@ -260,6 +260,14 @@ public class TricksterWrapper
                     continue;
                 }
 
+                // Trying to spot global methods (Might be directly under the first namespace)
+                if (!nameAndNamespace.Contains("::"))
+                {
+                    if (undecSymbol is UndecoratedExportedFunc exportedFunc && exportedFunc.IsGlobal)
+                        continue;
+                }
+
+
                 // Split fullTypeName to namespace & type name
                 int lastIndexOfColonColon = nameAndNamespace.LastIndexOf("::");
                 // take into consideration that "::" might no be present at all, and the namespace is empty
@@ -269,6 +277,12 @@ public class TricksterWrapper
                 // NEW 2nd-class type. Adding a new match!
                 TypeInfo ti = new SecondClassTypeInfo(undecModule.Name, namespaceName, typeName);
                 // Store aside as a member of this type
+                if (nameAndNamespace == "SPen")
+                {
+                    1.ToString();
+                    continue;
+                }
+
                 allClassTypes.Add(ti.FullTypeName, ti);
                 staticClassNames.Add(nameAndNamespace);
             }

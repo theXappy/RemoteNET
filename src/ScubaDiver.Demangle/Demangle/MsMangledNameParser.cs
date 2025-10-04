@@ -60,19 +60,23 @@ namespace ScubaDiver.Demangle.Demangle
         public string? Scope { get; set; }
         private bool _isConstructor;
 
-        public static bool IsFunction(string str)
+        public static bool IsFunction(string str, out bool isInstanceMethod, out bool isGlobal)
         {
+            isInstanceMethod = false;
+            isGlobal = false;
             try
             {
-                return (new MsMangledNameParser(str)).IsFunction();
+                return (new MsMangledNameParser(str)).IsFunction(out isInstanceMethod, out isGlobal);
             }
             catch
             {
                 return false;
             }
         }
-        private bool IsFunction()
+        private bool IsFunction(out bool isInstanceMethod, out bool isGlobal)
         {
+            isInstanceMethod = false;
+            isGlobal = false;
             // Optimization: If we call "Expect" it throws an exception...
             if (str[i] != '?')
                 return false;
@@ -86,16 +90,18 @@ namespace ScubaDiver.Demangle.Demangle
             {
                 this.compoundArgs = new List<Argument_v1>();
                 isFunction = PeekAndDiscard('Y');
+                // wtf is this case? I'm gonna wing it and bet it's an instance method...
+                isInstanceMethod = true;
             }
             else
             {
                 string[] qualification = ParseQualification();
-                isFunction = ParseQualifiedTypeCode_IsFunc(basicName, qualification);
+                isFunction = ParseQualifiedTypeCode_IsFunc(basicName, qualification, out isInstanceMethod, out isGlobal);
             }
             return isFunction;
         }
 
-        public bool ParseQualifiedTypeCode_IsFunc(string basicName, string[] qualification)
+        public bool ParseQualifiedTypeCode_IsFunc(string basicName, string[] qualification, out bool isInstanceMethod, out bool isGlobal)
         {
             this.compoundArgs = new List<Argument_v1>();
             this.Scope = string.Join("::", qualification);
@@ -105,33 +111,42 @@ namespace ScubaDiver.Demangle.Demangle
                 case '1':
                 case '2':
                 case '3':
+                    isInstanceMethod = false;
+                    isGlobal = false;
                     return false;
                 case '6':   // Compiler-generated static
                     //$TODO: deal with const/volatile modifier
+                    isInstanceMethod = false;
+                    isGlobal = false;
                     return false; // SS: Might be wrong
-                case 'A':
-                case 'B':
-                case 'C':
-                case 'D':
-                case 'E':
-                case 'F':
-
-                case 'I':
-                case 'J':
-                case 'K':
-                case 'L':
-                case 'M':
-                case 'N':
-
-                case 'Q':
-                case 'R':
-                case 'S':
-                case 'T':
-                case 'U':
-                case 'V':
-
-                case 'Y':
-                case 'Z':
+                case 'A': // ParseInstanceMethod("private")
+                case 'B': // ParseInstanceMethod("private far")
+                case 'E': // ParseInstanceMethod("private virtual")
+                case 'F': // ParseInstanceMethod("private virtual far")
+                case 'I': // ParseInstanceMethod("protected")
+                case 'J': // ParseInstanceMethod("protected far")
+                case 'M': // ParseInstanceMethod("protected virtual")
+                case 'N': // ParseInstanceMethod("protected virtual far")
+                case 'Q': // ParseInstanceMethod("public")
+                case 'R': // ParseInstanceMethod("public far")
+                case 'U': // ParseInstanceMethod("public virtual")
+                case 'V': // ParseInstanceMethod("public virtual far")
+                    isInstanceMethod = true;
+                    isGlobal = false;
+                    return true;
+                case 'C': // ParseStaticMethod("private static")
+                case 'D': // ParseStaticMethod("private static far")
+                case 'K': // ParseStaticMethod("protected static")
+                case 'L': // ParseStaticMethod("protected static far")
+                case 'S': // ParseStaticMethod("public static")
+                case 'T': // ParseStaticMethod("public static far")
+                    isInstanceMethod = false;
+                    isGlobal = false;
+                    return true;
+                case 'Y': // ParseGlobalFunction("")
+                case 'Z': // ParseGlobalFunction("far")
+                    isInstanceMethod = false;
+                    isGlobal = true;
                     return true;
                 default: throw new NotImplementedException(string.Format("Character '{0}' not supported", str[i - 1]));
             }

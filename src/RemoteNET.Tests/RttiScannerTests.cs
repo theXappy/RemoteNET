@@ -102,6 +102,48 @@ namespace RemoteNET.Tests
         }
 
         [Test]
+        public void TricksterWrapper_ShouldNotCreateSPenClass()
+        {
+            // Arrange
+            var tricksterWrapper = new TricksterWrapper();
+            
+            // Act - Force a refresh to pick up newly loaded modules
+            tricksterWrapper.Refresh();
+            
+            // Get all modules that contain "libSpen" 
+            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains("libSpen", StringComparison.OrdinalIgnoreCase));
+            
+            if (!modules.Any())
+            {
+                Assert.Inconclusive("No libSpen modules found for this test");
+            }
+            
+            var libSpenModule = modules.FirstOrDefault(m => m.Name.Contains("libSpen_base", StringComparison.OrdinalIgnoreCase));
+            if (libSpenModule == null)
+            {
+                Assert.Inconclusive("libSpen_base module not found for this test");
+            }
+            
+            // Act - Look for any type that is just "SPen" (without namespace qualifiers)
+            var incorrectSPenTypes = libSpenModule.Types.Where(t => 
+                string.Equals(t.FullTypeName, "SPen", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(t.NamespaceAndName, "SPen", StringComparison.OrdinalIgnoreCase) ||
+                (t.FullTypeName.EndsWith("SPen", StringComparison.OrdinalIgnoreCase) && 
+                 !t.FullTypeName.Contains("::", StringComparison.OrdinalIgnoreCase))).ToList();
+            
+            Console.WriteLine($"Found {incorrectSPenTypes.Count} types that might be incorrectly parsed as standalone 'SPen' class:");
+            foreach (var type in incorrectSPenTypes)
+            {
+                Console.WriteLine($"  Suspicious type: '{type.FullTypeName}' (NamespaceAndName: '{type.NamespaceAndName}')");
+            }
+            
+            // Assert - We should NOT find any standalone "SPen" class
+            // SPen should always be a namespace (e.g., "SPen::SomeClass"), never a standalone class
+            Assert.That(incorrectSPenTypes, Is.Empty, 
+                "Should not create a standalone 'SPen' class. SPen should be a namespace containing other classes like 'SPen::UwpLog'.");
+        }
+
+        [Test]
         public void ExportsMaster_ShouldFindExportedSymbols()
         {
             // Test if the issue is with exports parsing

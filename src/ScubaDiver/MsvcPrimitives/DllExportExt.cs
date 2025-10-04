@@ -41,7 +41,7 @@ public static class DllExportExt
             return false;
         }
 
-        bool isFunc = MsMangledNameParser.IsFunction(input.Name);
+        bool isFunc = MsMangledNameParser.IsFunction(input.Name, out bool isInstanceMethod, out bool isGlobal);
 
         if (isFunc)
         {
@@ -101,6 +101,8 @@ public static class DllExportExt
                     ArgTypes = argTypes,
                     RetType = retType,
                     IsRetNonRefStruct = isRetNonRefStruct,
+                    IsInstanceMethod = isInstanceMethod,
+                    IsGlobal = isGlobal
                 };
             });
 

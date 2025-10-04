@@ -46,7 +46,7 @@ namespace RemoteNET.Internal.Reflection
             string name, 
             string mangledName, 
             LazyRemoteParameterResolver[] lazyParamInfos,
-            bool isStatic = false)
+            MethodAttributes attributes)
         {
             Name = name;
             MangledName = mangledName;
@@ -56,9 +56,7 @@ namespace RemoteNET.Internal.Reflection
 
             AssignedGenericArgs = Type.EmptyTypes;
 
-            _attributes = 0;
-            if (isStatic)
-                _attributes |= MethodAttributes.Static;
+            _attributes = attributes;
         }
 
 
@@ -79,13 +77,22 @@ namespace RemoteNET.Internal.Reflection
 
         public override ParameterInfo[] GetParameters()
         {
-            // (-1) because we're skipping 'this'
-            ParameterInfo[] parameters = new ParameterInfo[_lazyParamInfosImpl.Length - 1];
+            int start = 0;
+            int amount = _lazyParamInfosImpl.Length;
+            if (!IsStatic)
+            {
+                // (-1) because we're skipping 'this' for instance methods
+                start = 1;
+                amount -= 1;
+            }
+            ParameterInfo[] parameters = new ParameterInfo[amount];
 
-            for (int i = 1; i < _lazyParamInfosImpl.Length; i++)
+            int j = 0;
+            for (int i = start; i < _lazyParamInfosImpl.Length; i++)
             {
                 LazyRemoteParameterResolver lazyResolver = _lazyParamInfosImpl[i];
-                parameters[i - 1] = new RemoteParameterInfo(lazyResolver.Name, lazyResolver.TypeResolver);
+                parameters[j] = new RemoteParameterInfo(lazyResolver.Name, lazyResolver.TypeResolver);
+                j++;
             }
 
             return parameters;

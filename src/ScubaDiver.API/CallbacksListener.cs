@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using ScubaDiver.API.Hooking;
@@ -29,7 +30,7 @@ namespace ScubaDiver.API
         private readonly Dictionary<int, LocalEventCallback> _tokensToEventHandlers = new();
         private readonly Dictionary<LocalEventCallback, int> _eventHandlersToToken = new();
 
-        private readonly Dictionary<int, LocalHookCallback> _tokensToHookCallbacks = new();
+        private readonly Dictionary<int, Tuple<LocalHookCallback, MethodBase>> _tokensToHookCallbacks = new();
         private readonly Dictionary<LocalHookCallback, int> _hookCallbacksToTokens = new();
 
         DiverCommunicator _communicator;
@@ -240,16 +241,29 @@ namespace ScubaDiver.API
                 body = sr.ReadToEnd();
             }
             CallbackInvocationRequest invokeRequest = JsonConvert.DeserializeObject<CallbackInvocationRequest>(body, _withErrors);
-            if (_tokensToHookCallbacks.TryGetValue(invokeRequest.Token, out LocalHookCallback hook))
+            if (_tokensToHookCallbacks.TryGetValue(invokeRequest.Token, out var hookAndMethod))
             {
+                var hook = hookAndMethod.Item1;
+                var methodInfo = hookAndMethod.Item2;
+
                 HookContext hookContext = new(invokeRequest.StackTrace, invokeRequest.ThreadID);
 
                 // Run hook. No results expected directly (it might alter "retValue" or the variables passed as pointers)
                 ObjectOrRemoteAddress retValue = invokeRequest.RetValue;
+
+
+                ObjectOrRemoteAddress instance = ObjectOrRemoteAddress.Null;
+                IEnumerable<ObjectOrRemoteAddress> args = invokeRequest.Parameters;
+                if (!methodInfo.IsStatic)
+                {
+                    instance = invokeRequest.Parameters.FirstOrDefault();
+                    args = invokeRequest.Parameters.Skip(1);
+                }
+
                 hook.Invoke(
                     hookContext, 
-                    invokeRequest.Parameters.FirstOrDefault(),
-                    invokeRequest.Parameters.Skip(1).ToArray(),
+                    instance,
+                    args.ToArray(),
                     ref retValue);
 
                 // Report back whether to call the original function or no (Harmony wants this as the return value)
@@ -294,9 +308,9 @@ namespace ScubaDiver.API
             }
         }
 
-        public void HookSubscribe(LocalHookCallback callback, int token)
+        public void HookSubscribe(LocalHookCallback callback, MethodBase mi, int token)
         {
-            _tokensToHookCallbacks[token] = callback;
+            _tokensToHookCallbacks[token] = new Tuple<LocalHookCallback, MethodBase>(callback, mi);
             _hookCallbacksToTokens[callback] = token;
         }
 

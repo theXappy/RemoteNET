@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -471,7 +472,7 @@ namespace ScubaDiver.API
             }
         }
 
-        public bool HookMethod(string type, string methodName, HarmonyPatchPosition pos, LocalHookCallback callback, List<string> parametersTypeFullNames = null)
+        public bool HookMethod(MethodBase methodBase, HarmonyPatchPosition pos, LocalHookCallback callback, List<string> parametersTypeFullNames = null)
         {
             if (!_listener.IsOpen)
             {
@@ -482,8 +483,8 @@ namespace ScubaDiver.API
             {
                 IP = _listener.IP.ToString(),
                 Port = _listener.Port,
-                TypeFullName = type,
-                MethodName = methodName,
+                TypeFullName = methodBase.DeclaringType.FullName,
+                MethodName = methodBase.Name,
                 HookPosition = pos.ToString(),
                 ParametersTypeFullNames = parametersTypeFullNames
             };
@@ -497,7 +498,7 @@ namespace ScubaDiver.API
             }
             EventRegistrationResults regRes = JsonConvert.DeserializeObject<EventRegistrationResults>(resJson);
 
-            _listener.HookSubscribe(callback, regRes.Token);
+            _listener.HookSubscribe(callback, methodBase, regRes.Token);
             // Getting back the token tells us the hook was registered successfully.
             return true;
         }

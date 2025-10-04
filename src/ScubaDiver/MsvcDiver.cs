@@ -174,7 +174,20 @@ namespace ScubaDiver
             IEnumerable<UndecoratedFunction> overloadsUndecFuncs = overloads.Select(func => func.UndecoratedFunc);
             // Find the specific overload with the right argument types
             UndecoratedFunction methodToHook = overloadsUndecFuncs.SingleOrDefault(method =>
-                method.ArgTypes.Skip(1).SequenceEqual(request.ParametersTypeFullNames, TypesComparer));
+            {
+                bool isStatic = false;
+                if (method is UndecoratedExportedFunc exportedFunc)
+                {
+                    isStatic = exportedFunc.IsStatic;
+                }
+                var actualArgs = method.ArgTypes;
+                if (!isStatic)
+                {
+                    // Skip "this" pointer
+                    actualArgs = actualArgs.Skip(1).ToArray();
+                }
+                return actualArgs.SequenceEqual(request.ParametersTypeFullNames, TypesComparer);
+            });
 
             if (methodToHook == null)
                 throw new Exception($"No matches for {methodName} in type {targetType}");

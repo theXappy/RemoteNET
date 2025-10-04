@@ -41,14 +41,19 @@ public class UndecoratedExportedFunc : UndecoratedFunction
             if (_lazySignatureParse.Value.IsRetNonRefStruct)
                 args = args.Prepend($"{_lazySignatureParse.Value.RetType}*").ToArray();
 
-            if (args != null)
-                args = args.Prepend($"{ClassName}*").ToArray(); // TODO: Assuming instance method
+            if (IsInstanceMethod)
+                if (args != null)
+                    args = args.Prepend($"{ClassName}*").ToArray(); // Adding the "this" pointer
 
             return args;
         }
     }
 
     public override int? NumArgs => ArgTypes.Length;
+
+    public bool IsInstanceMethod => _lazySignatureParse.Value.IsInstanceMethod;
+    public bool IsStatic => !IsInstanceMethod;
+    public bool IsGlobal => _lazySignatureParse.Value.IsGlobal;
 
     public DllExport Export { get; set; }
 

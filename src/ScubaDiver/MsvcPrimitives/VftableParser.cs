@@ -122,6 +122,15 @@ public static class VftableParser
             return null;
         }
 
+        ulong attributes = 0;
+        if (undecFunc is UndecoratedExportedFunc exportFunc)
+        {
+            if (exportFunc.IsStatic)
+            {
+                attributes |= (int)System.Reflection.MethodAttributes.Static;
+            }
+        }
+
         TypeDump.TypeMethod method = new()
         {
             Name = undecFunc.UndecoratedName,
@@ -130,7 +139,7 @@ public static class VftableParser
             Parameters = parameters,
             ReturnTypeName = undecFunc.RetType,
             Visibility = "Public", // Because it's exported
-            Attributes = 0 // Not sure about this one
+            Attributes = attributes // Not sure about this one
         };
         return method;
     }

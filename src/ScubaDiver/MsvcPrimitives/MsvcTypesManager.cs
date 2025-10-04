@@ -79,7 +79,18 @@ namespace ScubaDiver
         public override MsvcType DeclaringType => _type;
         public override string Name => UndecoratedFunc.UndecoratedName;
         public override Type ReturnType => throw new NotImplementedException();
-        public override MethodAttributes Attributes => throw new NotImplementedException();
+        public override MethodAttributes Attributes
+        {
+            get
+            {
+                if (this.UndecoratedFunc is UndecoratedExportedFunc expFunc)
+                {
+                    if (expFunc.IsStatic)
+                        return MethodAttributes.Static;
+                }
+                return 0;
+            }
+        }
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
         public override Type ReflectedType => throw new NotImplementedException();
         public override ICustomAttributeProvider ReturnTypeCustomAttributes => throw new NotImplementedException();

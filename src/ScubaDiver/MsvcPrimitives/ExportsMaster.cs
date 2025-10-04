@@ -104,7 +104,10 @@ public class ExportsMaster : IReadOnlyExportsMaster
     {
         string membersPrefix = $"{typeFullName}::";
         ProcessExports(module);
-        return _undecExportsCache[module].Where(sym => sym.UndecoratedFullName.StartsWith(membersPrefix));
+        return _undecExportsCache[module].Where(sym => 
+            sym.UndecoratedFullName.StartsWith(membersPrefix) &&
+            sym.UndecoratedFullName.IndexOf("::", startIndex: membersPrefix.Length) == -1 // Only direct members, no nested types
+            );
     }
     public IEnumerable<UndecoratedFunction> GetExportedTypeFunctions(Rtti.ModuleInfo module, string typeFullName)
     {
