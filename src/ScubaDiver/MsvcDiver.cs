@@ -564,10 +564,9 @@ namespace ScubaDiver
             if (request == null)
                 return QuickError("Failed to deserialize body");
             nuint objAddress = (nuint)request.ObjAddress;
-            if (objAddress == 0)
-                return QuickError("Calling a instance-less function is not implemented for MSVC");
+            bool isStaticCall = objAddress == 0;
 
-            // Need to figure target instance and the target type.
+            // Need to figure target type.
             ParseFullTypeName(request.TypeFullName, out string rawAssemblyFilter, out string rawTypeFilter);
             MsvcTypeStub msvcTypeStub = _typesManager.GetType(rawAssemblyFilter, rawTypeFilter);
             MsvcType msvcType = msvcTypeStub.Upgrade();
@@ -585,10 +584,12 @@ namespace ScubaDiver
             }
 
             // Search the method/ctor with the matching signature
+            // For static methods, we don't add 1 to paramsList.Count (no 'this' pointer)
+            int expectedArgCount = isStaticCall ? paramsList.Count : paramsList.Count + 1;
             List<MsvcMethod> overloads =
                 msvcType.GetMethods()
                 .Where(m => m.Name == request.MethodName || m.UndecoratedFunc.DecoratedName == request.MethodName)
-                .Where(m => m.UndecoratedFunc.NumArgs == paramsList.Count + 1) // TODO: Check types
+                .Where(m => m.UndecoratedFunc.NumArgs == expectedArgCount)
                 .ToList();
 
             if (overloads.Count == 0)
@@ -605,6 +606,23 @@ namespace ScubaDiver
             }
             UndecoratedFunction method = overloads.Single().UndecoratedFunc;
 
+
+            // Verify that the method's static nature matches our call type
+            bool methodIsStatic = false;
+            if (method is UndecoratedExportedFunc exportedFunc)
+            {
+                methodIsStatic = exportedFunc.IsStatic;
+            }
+            
+            // Check consistency: if we're calling static, the method should be static, and vice versa
+            if (isStaticCall && !methodIsStatic)
+            {
+                return QuickError($"Attempted to call method {request.MethodName} as static, but it is an instance method.");
+            }
+            if (!isStaticCall && methodIsStatic)
+            {
+                return QuickError($"Attempted to call method {request.MethodName} as instance method, but it is static.");
+            }
 
             List<UndecoratedFunction> typeFuncs = msvcType.GetMethods().Select(msvcMethod => msvcMethod.UndecoratedFunc).ToList();
             UndecoratedFunction targetMethod = typeFuncs.SingleOrDefault(m => m.DecoratedName == method.DecoratedName);
@@ -650,14 +668,22 @@ namespace ScubaDiver
             // Prepare parameters
             //
             object[] invocationArgs = new object[method.NumArgs.Value];
-            invocationArgs[0] = objAddress;
+            int argStartIndex = 0;
+            
+            // For instance methods, add the object address as the first parameter ('this' pointer)
+            if (!isStaticCall)
+            {
+                invocationArgs[0] = objAddress;
+                argStartIndex = 1;
+            }
+            
             for (int i = 0; i < paramsList.Count; i++)
             {
                 var decodedParam = paramsList[i];
                 if (decodedParam is float || decodedParam is double)
                 {
                     double doubleParam = (double)Convert.ToDouble(decodedParam);
-                    invocationArgs[i + 1] = doubleParam;
+                    invocationArgs[i + argStartIndex] = doubleParam;
                 }
                 else
                 {
@@ -667,7 +693,7 @@ namespace ScubaDiver
                         nuintParam = (nuint)(Convert.ToUInt64(decodedParam));
                     }
 
-                    invocationArgs[i + 1] = nuintParam;
+                    invocationArgs[i + argStartIndex] = nuintParam;
                 }
             }
 
