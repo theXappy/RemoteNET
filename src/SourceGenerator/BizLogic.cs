@@ -346,6 +346,11 @@ public class BizLogic
             RedirectStandardError = true,
             CreateNoWindow = true
         };
+        if (Debugger.IsAttached)
+        {
+            dumpStartInfo.Arguments += " --launchdebugger";
+        }
+
         Log("Starting rnet-class-dump.exe...\n");
         var dumpProc = Process.Start(dumpStartInfo);
         if (dumpProc == null)
