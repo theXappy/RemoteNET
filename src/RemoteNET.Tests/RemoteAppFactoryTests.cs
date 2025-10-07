@@ -15,7 +15,12 @@ namespace RemoteNET.Tests
             // Arrange
 
             // Act
-            var remoteApp = RemoteAppFactory.Connect("notepad++", RuntimeType.Unmanaged, ConnectionStrategy.DllHijack);
+            ConnectionConfig cc = new ConnectionConfig
+            {
+                Strategy = ConnectionStrategy.DllHijack,
+                TargetDllToProxy = "TODO"
+            };
+            var remoteApp = RemoteAppFactory.Connect("notepad++", RuntimeType.Unmanaged, cc);
 
             // Assert
         }
