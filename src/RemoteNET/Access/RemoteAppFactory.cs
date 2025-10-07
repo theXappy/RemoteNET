@@ -21,6 +21,8 @@ namespace RemoteNET.Access
 
     public static partial class RemoteAppFactory
     {
+        public static event Action<RemoteApp> NewAppCreated;
+
         public static RemoteApp Connect(string targetQuery, RuntimeType runtime, ConnectionConfig config = null)
         {
             config ??= ConnectionConfig.Default;
@@ -100,12 +102,19 @@ namespace RemoteNET.Access
             {
                 case RuntimeType.Managed:
                     if (managedApp != null)
+                    {
+                        NewAppCreated?.Invoke(managedApp);
                         return managedApp;
+                    }
                     break;
                 case RuntimeType.Unmanaged:
                     DiverCommunicator unmanagedCom = new DiverCommunicator(diverAddr, diverPort + 2);
                     if (unmanagedCom.RegisterClient())
-                        return new UnmanagedRemoteApp(target, unmanagedCom, hub);
+                    {
+                        var unmanagedApp = new UnmanagedRemoteApp(target, unmanagedCom, hub);
+                        NewAppCreated?.Invoke(unmanagedApp);
+                        return unmanagedApp;
+                    }
                     break;
                 case RuntimeType.Unknown:
                 default:
@@ -140,21 +149,6 @@ namespace RemoteNET.Access
                                $"{strategyInfo}\n" +
                                $"{diverStates}\n" +
                                $"{clientRegInfo}");
-        }
-
-        // Legacy overloads for backward compatibility
-        [Obsolete("Use Connect(target, runtime, ConnectionConfig) instead")]
-        public static RemoteApp Connect(string targetQuery, RuntimeType runtime, ConnectionStrategy strat, string targetDllToProxy = null)
-        {
-            var config = new ConnectionConfig { Strategy = strat, TargetDllToProxy = targetDllToProxy };
-            return Connect(targetQuery, runtime, config);
-        }
-
-        [Obsolete("Use Connect(target, runtime, ConnectionConfig) instead")]
-        public static RemoteApp Connect(Process target, RuntimeType runtime, ConnectionStrategy strat, string targetDllToProxy = null)
-        {
-            var config = new ConnectionConfig { Strategy = strat, TargetDllToProxy = targetDllToProxy };
-            return Connect(target, runtime, config);
         }
 
         private static Process RunStrategy(Process target, ushort diverPort, ConnectionConfig config)
@@ -336,7 +330,6 @@ namespace RemoteNET.Access
             }
             Debug.WriteLine($"[RemoteAppFactory] Finished waiting on Injector. Finished: {injectorProc.HasExited}, Code: {injectorProc.ExitCode}");
         }
-
 
         public static string GetCommandLineArgs(int processId)
         {
