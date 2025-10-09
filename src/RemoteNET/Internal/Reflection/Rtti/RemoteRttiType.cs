@@ -168,14 +168,18 @@ namespace RemoteNET.RttiReflection
         protected override MethodInfo GetMethodImpl(string name, BindingFlags bindingAttr, Binder binder, CallingConventions callConvention,
             Type[] types, ParameterModifier[] modifiers)
         {
-            int requestTypesCount = types?.Length ?? 0;
-            var matches = _methods.Where(m => m.Name == name && m.GetParameters().Length == requestTypesCount).ToArray();
+            MethodInfo[] matches = _methods.Where(m => m.Name == name).ToArray();
+            if (types != null)
+            {
+                matches = matches.Where(m => m.GetParameters().Length == types.Length).ToArray();
+            }
+
             if (matches.Length == 0)
                 return null;
             if (matches.Length == 1)
                 return matches[0];
             // If we have multiple matches, we throw
-            throw new AmbiguousMatchException($"Multiple methods found with name {name} and {requestTypesCount} parameters");
+            throw new AmbiguousMatchException($"Multiple methods found with name {name} and {(types?.Length ?? -1)} parameters");
         }
 
         public override MethodInfo[] GetMethods(BindingFlags bindingAttr)
