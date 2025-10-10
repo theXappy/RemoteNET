@@ -280,17 +280,7 @@ namespace RemoteNET.RttiReflection
                         }
                     }
 
-                    if (possibleParamTypes.Length == 0)
-                    {
-                        // No luck here. This might be defined in a different module
-                        // OR and MORE LIKELY this is a pointer to some primitive.
-                        // for example char* or int**.
-                        Type temp = new DummyRttiType(originalNamespaceAndTypeName);
-                        _shittyCache[originalNamespaceAndTypeName] = temp;
-                        return temp;
-                    }
-
-
+                    // Prefer any matches in the existing assembly
                     var paramTypeInSameAssembly =
                         possibleParamTypes.Where(t => t.Assembly == typeDump.Assembly).ToArray();
                     if (paramTypeInSameAssembly.Length > 0)
@@ -306,6 +296,26 @@ namespace RemoteNET.RttiReflection
                         }
 
                         return app.GetRemoteType(paramTypeInSameAssembly.Single());
+                    }
+
+
+
+                    if (possibleParamTypes.Length == 0)
+                    {
+                        // No luck here. This might be defined in a different module
+                        // OR and MORE LIKELY this is a pointer to some primitive.
+                        // for example char* or int**.
+                        Type temp = new DummyRttiType(originalNamespaceAndTypeName);
+                        _shittyCache[originalNamespaceAndTypeName] = temp;
+                        return temp;
+                    }
+                    if (possibleParamTypes.Length > 1)
+                    {
+                        // We have multiple matches and all narrowing down logic failed.
+                        // We're using a dummy.
+                        Type temp = new DummyRttiType(originalNamespaceAndTypeName);
+                        _shittyCache[originalNamespaceAndTypeName] = temp;
+                        return temp;
                     }
 
                     return app.GetRemoteType(possibleParamTypes.Single());
