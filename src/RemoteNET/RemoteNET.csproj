@@ -91,7 +91,7 @@
 			</ZipOperations>
 		</ItemGroup>
 		<Message Text="[~] Zip Op: @(ZipOperations)" Importance="high" />
-		<ZipDirectory SourceDirectory="@(ZipOperations)" DestinationFile="%(ZipOperations.ZipFileName)" Overwrite="true" />
+		<ZipDirectory SourceDirectory="@(ZipOperations)" DestinationFile="%(ZipOperations.ZipFileName)" Overwrite="true" CompressionLevel="NoCompression"/>
 	</Target>
 
 	<Target Name="DeleteDebugSymbolFile" AfterTargets="Build" Condition="'$(GITHUB_ACTIONS)' != 'true'">
