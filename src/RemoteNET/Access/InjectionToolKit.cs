@@ -162,12 +162,13 @@ public class InjectionToolKit
         }
 
         // Going over unzipped files and checking which of those we need to copy to our AppData directory
+        DirectoryInfo dirToCopy = tempDirInfo;
         if (subFolderInZip != null)
         {
-            tempDirInfo = new DirectoryInfo(Path.Combine(tempDir, subFolderInZip));
+            dirToCopy = new DirectoryInfo(Path.Combine(tempDir, subFolderInZip));
         }
 
-        foreach (FileInfo fileInfo in tempDirInfo.GetFiles())
+        foreach (FileInfo fileInfo in dirToCopy.GetFiles())
         {
             string destPath = Path.Combine(scubaDestDirInfo.FullName, fileInfo.Name);
             if (File.Exists(destPath))
