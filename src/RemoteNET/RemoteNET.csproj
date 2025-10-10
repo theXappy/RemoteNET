@@ -90,8 +90,17 @@
 				<ZipFileName>$(ProjectDir)\Resources\DetoursNet.zip</ZipFileName>
 			</ZipOperations>
 		</ItemGroup>
-		<Message Text="[~] Zip Op: @(ZipOperations)" Importance="high" />
-		<ZipDirectory SourceDirectory="@(ZipOperations)" DestinationFile="%(ZipOperations.ZipFileName)" Overwrite="true" CompressionLevel="NoCompression"/>
+		<!-- Print MSBuild version for debugging -->
+		<Message Text="[~] MSBuild Version: $(MSBuildVersion)" Importance="high" />
+		<Message Text="[~] Zip Op (No Compression): @(ZipOperations)" Importance="high" Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0'))" />
+		
+		<!-- Use CompressionLevel only if MSBuild version supports it (VS 2026+) -->
+		<!-- MSBuild 18.0+ supports CompressionLevel parameter -->
+		<ZipDirectory SourceDirectory="@(ZipOperations)" DestinationFile="%(ZipOperations.ZipFileName)" Overwrite="true" CompressionLevel="NoCompression" Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0'))" />
+		
+		<!-- Fallback for older MSBuild versions (VS 2022) without CompressionLevel -->
+		<Message Text="[~] Zip Op (Default Compression Algorith): @(ZipOperations)" Importance="high" Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0'))" />
+		<ZipDirectory SourceDirectory="@(ZipOperations)" DestinationFile="%(ZipOperations.ZipFileName)" Overwrite="true" Condition="$([MSBuild]::VersionLessThan('$(MSBuildVersion)', '18.0'))" />
 	</Target>
 
 	<Target Name="DeleteDebugSymbolFile" AfterTargets="Build" Condition="'$(GITHUB_ACTIONS)' != 'true'">
