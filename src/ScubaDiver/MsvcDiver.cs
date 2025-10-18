@@ -585,6 +585,8 @@ namespace ScubaDiver
 
             // Search the method/ctor with the matching signature
             // For static methods, we don't add 1 to paramsList.Count (no 'this' pointer)
+            
+
             int expectedArgCount = isStaticCall ? paramsList.Count : paramsList.Count + 1;
             List<MsvcMethod> overloads =
                 msvcType.GetMethods()
@@ -690,7 +692,17 @@ namespace ScubaDiver
                     nuint nuintParam = 0;
                     if (decodedParam != null)
                     {
-                        nuintParam = (nuint)(Convert.ToUInt64(decodedParam));
+                        try
+                        {
+                            nuintParam = (nuint)(Convert.ToUInt64(decodedParam));
+                        }
+                        catch (System.OverflowException)
+                        {
+                            // If this is a negative number, we need to cast 
+                            // first to long, then to nuint.
+                            long longParam = Convert.ToInt64(decodedParam);
+                            nuintParam = (nuint)(longParam);
+                        }
                     }
 
                     invocationArgs[i + argStartIndex] = nuintParam;
