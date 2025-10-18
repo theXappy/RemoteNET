@@ -350,6 +350,19 @@ namespace ScubaDiver.API
             }
         }
 
+        public bool LaunchDebugger()
+        {
+            try
+            {
+                string body = SendRequest("launch_debugger");
+                return body.Contains("debugger launched");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public ObjectOrRemoteAddress GetItem(ulong token, ObjectOrRemoteAddress key)
         {
             IndexedItemAccessRequest indexedItemAccess = new()

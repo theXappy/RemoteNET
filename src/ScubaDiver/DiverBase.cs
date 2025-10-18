@@ -42,6 +42,7 @@ namespace ScubaDiver
                 {"/register_client", MakeRegisterClientResponse},
                 {"/unregister_client", MakeUnregisterClientResponse},
                 {"/help", MakeHelpResponse},
+                {"/launch_debugger", MakeLaunchDebuggerResponse},
                 // DLL Injection
                 {"/inject_assembly", MakeInjectAssemblyResponse},
                 {"/inject_dll", MakeInjectDllResponse},
@@ -337,6 +338,23 @@ namespace ScubaDiver
             };
 
             return JsonConvert.SerializeObject(ucResponse);
+        }
+
+        #endregion
+
+        #region Debugger Handler
+
+        private string MakeLaunchDebuggerResponse(ScubaDiverMessage arg)
+        {
+            try
+            {
+                Debugger.Launch();
+                return "{\"status\":\"debugger launched\"}";
+            }
+            catch (Exception ex)
+            {
+                return QuickError(ex.Message, ex.StackTrace);
+            }
         }
 
         #endregion

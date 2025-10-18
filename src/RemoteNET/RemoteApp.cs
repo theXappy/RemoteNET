@@ -73,5 +73,10 @@ public abstract class RemoteApp : IDisposable
 
     public abstract bool InjectDll(string path);
 
+    /// <summary>
+    /// Launches a debugger in the remote process
+    /// </summary>
+    public virtual bool LaunchDebugger() => Communicator.LaunchDebugger();
+
     public abstract void Dispose();
 }
