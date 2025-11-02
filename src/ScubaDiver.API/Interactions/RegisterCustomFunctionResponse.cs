@@ -1,3 +1,5 @@
+using ScubaDiver.API.Interactions.Dumps;
+
 namespace ScubaDiver.API.Interactions
 {
     /// <summary>
@@ -14,5 +16,10 @@ namespace ScubaDiver.API.Interactions
         /// Error message if registration failed
         /// </summary>
         public string ErrorMessage { get; set; }
+
+        /// <summary>
+        /// The method dump for the registered function (when successful)
+        /// </summary>
+        public TypeDump.TypeMethod RegisteredMethod { get; set; }
     }
 }

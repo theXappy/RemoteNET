@@ -1,4 +1,5 @@
 using ScubaDiver.API.Interactions;
+using ScubaDiver.API.Interactions.Dumps;
 using System.Collections.Generic;
 
 namespace ScubaDiver.API.Tests
@@ -54,15 +55,23 @@ namespace ScubaDiver.API.Tests
         public void RegisterCustomFunctionResponse_Success_SetsPropertiesCorrectly()
         {
             // Arrange
+            var methodDump = new TypeDump.TypeMethod
+            {
+                Name = "TestMethod",
+                ReturnTypeFullName = "int"
+            };
             var response = new RegisterCustomFunctionResponse
             {
                 Success = true,
-                ErrorMessage = null
+                ErrorMessage = null,
+                RegisteredMethod = methodDump
             };
 
             // Assert
             Assert.That(response.Success, Is.True);
             Assert.That(response.ErrorMessage, Is.Null);
+            Assert.That(response.RegisteredMethod, Is.Not.Null);
+            Assert.That(response.RegisteredMethod.Name, Is.EqualTo("TestMethod"));
         }
 
         [Test]
@@ -72,12 +81,14 @@ namespace ScubaDiver.API.Tests
             var response = new RegisterCustomFunctionResponse
             {
                 Success = false,
-                ErrorMessage = "Failed to register custom function"
+                ErrorMessage = "Failed to register custom function",
+                RegisteredMethod = null
             };
 
             // Assert
             Assert.That(response.Success, Is.False);
             Assert.That(response.ErrorMessage, Is.EqualTo("Failed to register custom function"));
+            Assert.That(response.RegisteredMethod, Is.Null);
         }
     }
 }

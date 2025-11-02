@@ -147,11 +147,13 @@ The limitations:
 For unmanaged (MSVC C++) targets, you can register custom functions that aren't automatically discovered by the RTTI scanner.  
 This is useful when you know the address of a function in the target process and want to call it through RemoteNET.
 
+**Important:** The type must be a `RemoteRttiType` instance that was fetched from the remote process. Any existing instances of that type will be automatically updated with the new method.
+
 ```C#
 // Connect to an unmanaged target
 UnmanagedRemoteApp unmanagedApp = (UnmanagedRemoteApp)RemoteAppFactory.Connect("MyNativeTarget.exe", RuntimeType.Unmanaged);
 
-// Get a remote type
+// Get a remote type (this creates a RemoteRttiType)
 Type remoteType = unmanagedApp.GetRemoteType("MyNamespace::MyClass", "MyModule.dll");
 
 // Register a custom function on the type
@@ -165,14 +167,16 @@ bool success = unmanagedApp.RegisterCustomFunction(
 );
 
 // After registration, the function can be invoked like any other remote method
+// All existing instances of this type will have the new method available
 dynamic dynamicObj = remoteObject.Dynamify();
 int result = dynamicObj.MyCustomFunction(42, 3.14f);
 ```
 
 **Notes:**
 - This feature is only available for unmanaged (C++) targets
+- The parent type must be a RemoteRttiType (obtained via `UnmanagedRemoteApp.GetRemoteType()`)
 - You need to know the module name and offset where the function is located
-- The function will be added to the type's method list and can be invoked normally
+- The function will be added to the type's method list and available on all instances
 - Parameter and return types should be specified as .NET types
 
 ## TODOs

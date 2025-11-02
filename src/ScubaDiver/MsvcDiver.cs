@@ -895,10 +895,41 @@ namespace ScubaDiver
                     request.ReturnTypeFullName,
                     argTypeFullNames);
 
+                if (!success)
+                {
+                    RegisterCustomFunctionResponse failResponse = new RegisterCustomFunctionResponse
+                    {
+                        Success = false,
+                        ErrorMessage = "Failed to register custom function"
+                    };
+                    return JsonConvert.SerializeObject(failResponse);
+                }
+
+                // Create a TypeMethod dump from the registered function
+                TypeDump.TypeMethod methodDump = new TypeDump.TypeMethod
+                {
+                    Name = request.FunctionName,
+                    DecoratedName = request.FunctionName,
+                    UndecoratedFullName = request.FunctionName,
+                    ReturnTypeFullName = request.ReturnTypeFullName,
+                    ReturnTypeAssembly = request.ReturnTypeAssembly,
+                    ReturnTypeName = request.ReturnTypeFullName,
+                    Visibility = "Public",
+                    Attributes = 0,
+                    Parameters = request.Parameters?.Select((p, idx) => new TypeDump.TypeMethod.MethodParameter
+                    {
+                        Name = p.Name ?? $"a{idx}",
+                        FullTypeName = p.TypeFullName,
+                        TypeName = p.TypeFullName,
+                        Assembly = p.Assembly
+                    }).ToList() ?? new List<TypeDump.TypeMethod.MethodParameter>()
+                };
+
                 RegisterCustomFunctionResponse response = new RegisterCustomFunctionResponse
                 {
-                    Success = success,
-                    ErrorMessage = success ? null : "Failed to register custom function"
+                    Success = true,
+                    ErrorMessage = null,
+                    RegisteredMethod = methodDump
                 };
 
                 return JsonConvert.SerializeObject(response);

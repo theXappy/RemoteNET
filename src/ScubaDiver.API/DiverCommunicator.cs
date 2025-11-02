@@ -539,12 +539,22 @@ namespace ScubaDiver.API
 
         public bool RegisterCustomFunction(RegisterCustomFunctionRequest request)
         {
+            return RegisterCustomFunction(request, out _);
+        }
+
+        public bool RegisterCustomFunction(RegisterCustomFunctionRequest request, out TypeDump.TypeMethod methodDump)
+        {
+            methodDump = null;
             var requestJsonBody = JsonConvert.SerializeObject(request);
             var resJson = SendRequest("register_custom_function", null, requestJsonBody);
 
             try
             {
                 RegisterCustomFunctionResponse response = JsonConvert.DeserializeObject<RegisterCustomFunctionResponse>(resJson, _withErrors);
+                if (response?.Success == true)
+                {
+                    methodDump = response.RegisteredMethod;
+                }
                 return response?.Success ?? false;
             }
             catch (Exception ex)

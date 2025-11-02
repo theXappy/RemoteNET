@@ -223,7 +223,7 @@ namespace RemoteNET
         /// <summary>
         /// Registers a custom function on a remote type for unmanaged targets
         /// </summary>
-        /// <param name="parentType">The type to add the function to</param>
+        /// <param name="parentType">The type to add the function to (must be a RemoteRttiType)</param>
         /// <param name="functionName">Name of the function</param>
         /// <param name="moduleName">Module name where the function is located (e.g., "MyModule.dll")</param>
         /// <param name="offset">Offset within the module where the function is located</param>
@@ -245,10 +245,16 @@ namespace RemoteNET
             if (string.IsNullOrEmpty(moduleName))
                 throw new ArgumentException("Module name cannot be null or empty", nameof(moduleName));
 
+            // Verify the type is a RemoteRttiType
+            if (!(parentType is RemoteRttiType rttiType))
+            {
+                throw new ArgumentException("The parent type must be a RemoteRttiType. Only remote RTTI types created by UnmanagedRemoteApp can have custom functions registered.", nameof(parentType));
+            }
+
             var request = new RegisterCustomFunctionRequest
             {
-                ParentTypeFullName = parentType.FullName,
-                ParentAssembly = parentType.Assembly?.GetName()?.Name,
+                ParentTypeFullName = rttiType.Namespace + "::" + rttiType.Name, // Use namespace::name format for RTTI types
+                ParentAssembly = rttiType.Assembly?.GetName()?.Name,
                 FunctionName = functionName,
                 ModuleName = moduleName,
                 Offset = offset,
@@ -262,7 +268,22 @@ namespace RemoteNET
                 }).ToList() ?? new List<RegisterCustomFunctionRequest.ParameterTypeInfo>()
             };
 
-            return _unmanagedCommunicator.RegisterCustomFunction(request);
+            bool success = _unmanagedCommunicator.RegisterCustomFunction(request, out var methodDump);
+            
+            if (success && methodDump != null)
+            {
+                // Create a TypeDump for the parent type to pass to AddFunctionImpl
+                TypeDump parentTypeDump = new TypeDump
+                {
+                    Assembly = rttiType.Assembly?.GetName()?.Name,
+                    FullTypeName = rttiType.Namespace + "::" + rttiType.Name
+                };
+
+                // Use the existing factory method to add the function to the RemoteRttiType
+                RttiTypesFactory.AddFunctionImpl(this, parentTypeDump, methodDump, rttiType, areConstructors: false);
+            }
+
+            return success;
         }
 
         //
