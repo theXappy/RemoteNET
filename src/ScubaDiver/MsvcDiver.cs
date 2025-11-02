@@ -884,7 +884,7 @@ namespace ScubaDiver
             try
             {
                 // Extract parameter type names from the request
-                string[] argTypeFullNames = request.Parameters?.Select(p => p.TypeFullName).ToArray() ?? new string[0];
+                string[] argTypeFullNames = request.Parameters?.Select(p => p.TypeFullName).ToArray() ?? Array.Empty<string>();
 
                 bool success = _typesManager.RegisterCustomFunction(
                     request.ParentTypeFullName,

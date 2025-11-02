@@ -509,10 +509,8 @@ namespace ScubaDiver
                 if (modules.Count == 0)
                     return false;
 
-                UndecoratedModule targetModule = modules.FirstOrDefault();
-                if (targetModule == null)
-                    return false;
-
+                // Since we've verified the list is not empty, we can safely access the first element
+                UndecoratedModule targetModule = modules[0];
                 nuint moduleBaseAddress = targetModule.ModuleInfo.BaseAddress;
 
                 // Create a custom undecorated function
