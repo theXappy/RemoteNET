@@ -168,7 +168,7 @@ namespace RemoteNET.RttiReflection
             }
         }
 
-        public static void AddFunctionImpl(RemoteApp app, TypeDump typeDump, TypeDump.TypeMethod func, RemoteRttiType declaringType, bool areConstructors)
+        public static MethodInfo AddFunctionImpl(RemoteApp app, TypeDump typeDump, TypeDump.TypeMethod func, RemoteRttiType declaringType, bool areConstructors)
         {
             string mangledName = func.DecoratedName;
             if (string.IsNullOrEmpty(mangledName))
@@ -211,6 +211,7 @@ namespace RemoteNET.RttiReflection
                 RemoteRttiConstructorInfo ctorInfo =
                     new RemoteRttiConstructorInfo(declaringTypeResolver, parameters.ToArray());
                 declaringType.AddConstructor(ctorInfo);
+                return ctorInfo;
             }
             else
             {
@@ -232,6 +233,7 @@ namespace RemoteNET.RttiReflection
                     new RemoteRttiMethodInfo(declaringTypeResolver, returnTypeResolver, func.Name, mangledName,
                         parameters.ToArray(), (MethodAttributes)func.Attributes);
                 declaringType.AddMethod(methodInfo);
+                return methodInfo;
             }
 
             Lazy<Type> CreateTypeFactory(string namespaceAndTypeName, string moduleName)

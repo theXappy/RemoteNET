@@ -284,12 +284,8 @@ namespace RemoteNET
             };
 
             // Use the existing factory method to add the function to the RemoteRttiType
-            // AddFunctionImpl will add the method to rttiType's internal methods list
-            RttiTypesFactory.AddFunctionImpl(this, parentTypeDump, methodDump, rttiType, areConstructors: false);
-
-            // Find and return the newly added method
-            var methods = rttiType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-            return methods.FirstOrDefault(m => m.Name == functionName);
+            // AddFunctionImpl returns the newly created MethodInfo
+            return RttiTypesFactory.AddFunctionImpl(this, parentTypeDump, methodDump, rttiType, areConstructors: false);
         }
 
         //
