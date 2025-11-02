@@ -156,8 +156,8 @@ UnmanagedRemoteApp unmanagedApp = (UnmanagedRemoteApp)RemoteAppFactory.Connect("
 // Get a remote type (this creates a RemoteRttiType)
 Type remoteType = unmanagedApp.GetRemoteType("MyNamespace::MyClass", "MyModule.dll");
 
-// Register a custom function on the type
-bool success = unmanagedApp.RegisterCustomFunction(
+// Register a custom function on the type - returns the MethodInfo or null on error
+MethodInfo customMethod = unmanagedApp.RegisterCustomFunction(
     parentType: remoteType,
     functionName: "MyCustomFunction",
     moduleName: "MyModule.dll",
@@ -166,10 +166,13 @@ bool success = unmanagedApp.RegisterCustomFunction(
     parameterTypes: new[] { typeof(int), typeof(float) }
 );
 
-// After registration, the function can be invoked like any other remote method
-// All existing instances of this type will have the new method available
-dynamic dynamicObj = remoteObject.Dynamify();
-int result = dynamicObj.MyCustomFunction(42, 3.14f);
+if (customMethod != null)
+{
+    // After registration, the function can be invoked like any other remote method
+    // All existing instances of this type will have the new method available
+    dynamic dynamicObj = remoteObject.Dynamify();
+    int result = dynamicObj.MyCustomFunction(42, 3.14f);
+}
 ```
 
 **Notes:**
@@ -178,6 +181,7 @@ int result = dynamicObj.MyCustomFunction(42, 3.14f);
 - You need to know the module name and offset where the function is located
 - The function will be added to the type's method list and available on all instances
 - Parameter and return types should be specified as .NET types
+- Returns the `MethodInfo` for the registered method, or `null` if registration fails
 
 ## TODOs
 1. Static members

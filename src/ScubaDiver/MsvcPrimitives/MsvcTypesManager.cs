@@ -1,4 +1,5 @@
 ﻿using NtApiDotNet.Win32;
+using ScubaDiver.API.Utils;
 using ScubaDiver.Rtti;
 using System;
 using System.Collections.Generic;

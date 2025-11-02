@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using RemoteNET.Common;
 using RemoteNET.Internal;
 using RemoteNET.RttiReflection;
@@ -229,8 +230,8 @@ namespace RemoteNET
         /// <param name="offset">Offset within the module where the function is located</param>
         /// <param name="returnType">Return type of the function</param>
         /// <param name="parameterTypes">Parameter types of the function</param>
-        /// <returns>True if registration was successful, false otherwise</returns>
-        public bool RegisterCustomFunction(
+        /// <returns>The MethodInfo for the registered function, or null if registration failed</returns>
+        public MethodInfo RegisterCustomFunction(
             Type parentType,
             string functionName,
             string moduleName,
@@ -270,20 +271,25 @@ namespace RemoteNET
 
             bool success = _unmanagedCommunicator.RegisterCustomFunction(request, out var methodDump);
             
-            if (success && methodDump != null)
+            if (!success || methodDump == null)
             {
-                // Create a TypeDump for the parent type to pass to AddFunctionImpl
-                TypeDump parentTypeDump = new TypeDump
-                {
-                    Assembly = rttiType.Assembly?.GetName()?.Name,
-                    FullTypeName = rttiType.Namespace + "::" + rttiType.Name
-                };
-
-                // Use the existing factory method to add the function to the RemoteRttiType
-                RttiTypesFactory.AddFunctionImpl(this, parentTypeDump, methodDump, rttiType, areConstructors: false);
+                return null;
             }
 
-            return success;
+            // Create a TypeDump for the parent type to pass to AddFunctionImpl
+            TypeDump parentTypeDump = new TypeDump
+            {
+                Assembly = rttiType.Assembly?.GetName()?.Name,
+                FullTypeName = rttiType.Namespace + "::" + rttiType.Name
+            };
+
+            // Use the existing factory method to add the function to the RemoteRttiType
+            // AddFunctionImpl will add the method to rttiType's internal methods list
+            RttiTypesFactory.AddFunctionImpl(this, parentTypeDump, methodDump, rttiType, areConstructors: false);
+
+            // Find and return the newly added method
+            var methods = rttiType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+            return methods.FirstOrDefault(m => m.Name == functionName);
         }
 
         //
