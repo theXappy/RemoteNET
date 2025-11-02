@@ -22,9 +22,15 @@ namespace ScubaDiver
             : base(functionName, functionName, functionName, argTypes?.Length)
         {
             _module = new ModuleInfo { Name = moduleName, BaseAddress = baseAddress };
-            _address = baseAddress + offset;
+            
+            // Check for potential overflow when adding baseAddress and offset
+            checked
+            {
+                _address = baseAddress + offset;
+            }
+            
             _retType = returnType;
-            _argTypes = argTypes ?? new string[0];
+            _argTypes = argTypes ?? Array.Empty<string>();
         }
 
         public override ModuleInfo Module => _module;

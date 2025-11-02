@@ -509,7 +509,10 @@ namespace ScubaDiver
                 if (modules.Count == 0)
                     return false;
 
-                UndecoratedModule targetModule = modules.First();
+                UndecoratedModule targetModule = modules.FirstOrDefault();
+                if (targetModule == null)
+                    return false;
+
                 nuint moduleBaseAddress = targetModule.ModuleInfo.BaseAddress;
 
                 // Create a custom undecorated function
@@ -527,8 +530,10 @@ namespace ScubaDiver
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                // Log the exception for debugging purposes
+                Logger.Debug($"[MsvcTypesManager][RegisterCustomFunction] Failed to register custom function. Exception: {ex}");
                 return false;
             }
         }

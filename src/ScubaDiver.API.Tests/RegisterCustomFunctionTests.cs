@@ -1,4 +1,5 @@
 using ScubaDiver.API.Interactions;
+using System.Collections.Generic;
 
 namespace ScubaDiver.API.Tests
 {
