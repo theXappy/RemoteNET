@@ -49,6 +49,7 @@
 		<Compile Include="..\MsvcPrimitives\UndecoratedExport.cs" Link="MsvcPrimitives\UndecoratedExport.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedExportedField.cs" Link="MsvcPrimitives\UndecoratedExportedField.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedFunction.cs" Link="MsvcPrimitives\UndecoratedFunction.cs" />
+		<Compile Include="..\MsvcPrimitives\CustomUndecoratedFunction.cs" Link="MsvcPrimitives\CustomUndecoratedFunction.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedInternalFunction.cs" Link="MsvcPrimitives\UndecoratedInternalFunction.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedMethodGroup.cs" Link="MsvcPrimitives\UndecoratedMethodGroup.cs" />
 		<Compile Include="..\MsvcPrimitives\UndecoratedModule.cs" Link="MsvcPrimitives\UndecoratedModule.cs" />
