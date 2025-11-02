@@ -135,6 +135,7 @@ namespace ScubaDiver
         private MsvcModule _module;
         private MsvcMethod[] _methods;
         private VftableInfo[] _vftables;
+        private List<MsvcMethod> _customMethods = new List<MsvcMethod>();
         public Rtti.TypeInfo TypeInfo { get; set; }
 
         public MsvcType(MsvcModule module, Rtti.TypeInfo typeInfo)
@@ -152,6 +153,11 @@ namespace ScubaDiver
             _vftables = vftables;
         }
 
+        public void AddCustomMethod(MsvcMethod method)
+        {
+            _customMethods.Add(method);
+        }
+
         public override MsvcModule Module => _module;
 
         public override string Name => TypeInfo.Name;
@@ -159,7 +165,12 @@ namespace ScubaDiver
         public override string FullName => TypeInfo.FullTypeName;
 
 
-        public override MsvcMethod[] GetMethods(BindingFlags bindingAttr) => _methods;
+        public override MsvcMethod[] GetMethods(BindingFlags bindingAttr)
+        {
+            if (_methods == null)
+                return _customMethods.ToArray();
+            return _methods.Concat(_customMethods).ToArray();
+        }
         public new MsvcMethod[] GetMethods() => GetMethods(0);
         public VftableInfo[] GetVftables() => _vftables;
         public override MemberInfo[] GetMembers(BindingFlags bindingAttr) => [.. GetVftables(), .. GetMethods()];
@@ -465,6 +476,60 @@ namespace ScubaDiver
                 if (res)
                     1.ToString();
                 return res;
+            }
+        }
+
+        /// <summary>
+        /// Registers a custom function on a type
+        /// </summary>
+        public bool RegisterCustomFunction(
+            string parentTypeFullName,
+            string parentAssembly,
+            string functionName,
+            string moduleName,
+            ulong offset,
+            string returnTypeFullName,
+            string[] argTypeFullNames)
+        {
+            try
+            {
+                // Get the parent type
+                Predicate<string> moduleFilter = Filter.CreatePredicate(parentAssembly);
+                Predicate<string> typeFilter = Filter.CreatePredicate(parentTypeFullName);
+                MsvcTypeStub typeStub = GetType(moduleFilter, typeFilter);
+                if (typeStub == null)
+                    return false;
+
+                MsvcType parentType = typeStub.Upgrade();
+                if (parentType == null)
+                    return false;
+
+                // Find the module base address
+                List<UndecoratedModule> modules = GetUndecoratedModules(Filter.CreatePredicate(moduleName));
+                if (modules.Count == 0)
+                    return false;
+
+                UndecoratedModule targetModule = modules.First();
+                nuint moduleBaseAddress = targetModule.ModuleInfo.BaseAddress;
+
+                // Create a custom undecorated function
+                CustomUndecoratedFunction customFunc = new CustomUndecoratedFunction(
+                    moduleName,
+                    moduleBaseAddress,
+                    offset,
+                    functionName,
+                    returnTypeFullName,
+                    argTypeFullNames);
+
+                // Create an MsvcMethod from the custom function and add it to the type
+                MsvcMethod customMethod = new MsvcMethod(parentType, customFunc);
+                parentType.AddCustomMethod(customMethod);
+
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
     }

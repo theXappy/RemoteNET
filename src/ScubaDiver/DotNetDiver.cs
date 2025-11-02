@@ -1531,6 +1531,18 @@ namespace ScubaDiver
             }
         }
 
+        protected override string MakeRegisterCustomFunctionResponse(ScubaDiverMessage arg)
+        {
+            // Custom function registration is not supported for managed (.NET) targets
+            // This feature is only available for unmanaged (native C++) targets
+            RegisterCustomFunctionResponse response = new RegisterCustomFunctionResponse
+            {
+                Success = false,
+                ErrorMessage = "Custom function registration is not supported for managed (.NET) targets"
+            };
+            return JsonConvert.SerializeObject(response);
+        }
+
         // IDisposable
         public override void Dispose()
         {

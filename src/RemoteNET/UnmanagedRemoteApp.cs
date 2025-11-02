@@ -216,6 +216,55 @@ namespace RemoteNET
         }
 
         //
+        // Custom Functions
+        //
+
+        /// <summary>
+        /// Registers a custom function on a remote type for unmanaged targets
+        /// </summary>
+        /// <param name="parentType">The type to add the function to</param>
+        /// <param name="functionName">Name of the function</param>
+        /// <param name="moduleName">Module name where the function is located (e.g., "MyModule.dll")</param>
+        /// <param name="offset">Offset within the module where the function is located</param>
+        /// <param name="returnType">Return type of the function</param>
+        /// <param name="parameterTypes">Parameter types of the function</param>
+        /// <returns>True if registration was successful, false otherwise</returns>
+        public bool RegisterCustomFunction(
+            Type parentType,
+            string functionName,
+            string moduleName,
+            ulong offset,
+            Type returnType,
+            params Type[] parameterTypes)
+        {
+            if (parentType == null)
+                throw new ArgumentNullException(nameof(parentType));
+            if (string.IsNullOrEmpty(functionName))
+                throw new ArgumentException("Function name cannot be null or empty", nameof(functionName));
+            if (string.IsNullOrEmpty(moduleName))
+                throw new ArgumentException("Module name cannot be null or empty", nameof(moduleName));
+
+            var request = new RegisterCustomFunctionRequest
+            {
+                ParentTypeFullName = parentType.FullName,
+                ParentAssembly = parentType.Assembly?.GetName()?.Name,
+                FunctionName = functionName,
+                ModuleName = moduleName,
+                Offset = offset,
+                ReturnTypeFullName = returnType?.FullName ?? "void",
+                ReturnTypeAssembly = returnType?.Assembly?.GetName()?.Name,
+                Parameters = parameterTypes?.Select((pt, idx) => new RegisterCustomFunctionRequest.ParameterTypeInfo
+                {
+                    Name = $"param{idx}",
+                    TypeFullName = pt.FullName,
+                    Assembly = pt.Assembly?.GetName()?.Name
+                }).ToList() ?? new List<RegisterCustomFunctionRequest.ParameterTypeInfo>()
+            };
+
+            return _unmanagedCommunicator.RegisterCustomFunction(request);
+        }
+
+        //
         // IDisposable
         //
         public override void Dispose()

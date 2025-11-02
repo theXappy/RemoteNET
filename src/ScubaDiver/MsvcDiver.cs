@@ -865,6 +865,56 @@ namespace ScubaDiver
             return QuickError("Not Implemented");
         }
 
+        protected override string MakeRegisterCustomFunctionResponse(ScubaDiverMessage arg)
+        {
+            string body = arg.Body;
+            if (string.IsNullOrEmpty(body))
+            {
+                return QuickError("Missing body");
+            }
+
+            var request = JsonConvert.DeserializeObject<RegisterCustomFunctionRequest>(body);
+            if (request == null)
+            {
+                return QuickError("Failed to deserialize body");
+            }
+
+            Logger.Debug($"[MsvcDiver][MakeRegisterCustomFunctionResponse] Registering custom function: {request.FunctionName} on type {request.ParentTypeFullName}");
+
+            try
+            {
+                // Extract parameter type names from the request
+                string[] argTypeFullNames = request.Parameters?.Select(p => p.TypeFullName).ToArray() ?? new string[0];
+
+                bool success = _typesManager.RegisterCustomFunction(
+                    request.ParentTypeFullName,
+                    request.ParentAssembly,
+                    request.FunctionName,
+                    request.ModuleName,
+                    request.Offset,
+                    request.ReturnTypeFullName,
+                    argTypeFullNames);
+
+                RegisterCustomFunctionResponse response = new RegisterCustomFunctionResponse
+                {
+                    Success = success,
+                    ErrorMessage = success ? null : "Failed to register custom function"
+                };
+
+                return JsonConvert.SerializeObject(response);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"[MsvcDiver][MakeRegisterCustomFunctionResponse] Exception: {ex}");
+                RegisterCustomFunctionResponse response = new RegisterCustomFunctionResponse
+                {
+                    Success = false,
+                    ErrorMessage = ex.Message
+                };
+                return JsonConvert.SerializeObject(response);
+            }
+        }
+
         public override void Dispose()
         {
         }

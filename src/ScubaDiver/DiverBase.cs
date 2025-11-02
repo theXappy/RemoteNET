@@ -62,6 +62,8 @@ namespace ScubaDiver
                 // Hooking
                 {"/hook_method", MakeHookMethodResponse},
                 {"/unhook_method", MakeUnhookMethodResponse},
+                // Custom Functions
+                {"/register_custom_function", MakeRegisterCustomFunctionResponse},
             };
             _remoteHooks = new ConcurrentDictionary<int, RegisteredManagedMethodHookInfo>();
         }
@@ -370,6 +372,7 @@ namespace ScubaDiver
         protected abstract string MakeSetFieldResponse(ScubaDiverMessage arg);
         protected abstract string MakeArrayItemResponse(ScubaDiverMessage arg);
         protected abstract string MakeUnpinResponse(ScubaDiverMessage arg);
+        protected abstract string MakeRegisterCustomFunctionResponse(ScubaDiverMessage arg);
 
         private string MakeDieResponse(ScubaDiverMessage req)
         {

@@ -537,6 +537,22 @@ namespace ScubaDiver.API
 
         public delegate (bool voidReturnType, ObjectOrRemoteAddress res) LocalEventCallback(ObjectOrRemoteAddress[] args, ObjectOrRemoteAddress retVal);
 
+        public bool RegisterCustomFunction(RegisterCustomFunctionRequest request)
+        {
+            var requestJsonBody = JsonConvert.SerializeObject(request);
+            var resJson = SendRequest("register_custom_function", null, requestJsonBody);
+
+            try
+            {
+                RegisterCustomFunctionResponse response = JsonConvert.DeserializeObject<RegisterCustomFunctionResponse>(resJson, _withErrors);
+                return response?.Success ?? false;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to register custom function. Error: {ex.Message}", ex);
+            }
+        }
+
         public void Dispose()
         {
             if (_httpClient != null)
