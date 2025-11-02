@@ -143,6 +143,38 @@ The limitations:
 2. The callback must define the exact number of parameters for that event
 3. Lambda expression are not allowed. The callback must be cast to an `Action<...>`.
 
+### ✳️ Registering Custom Functions (Unmanaged/C++ Targets Only)
+For unmanaged (MSVC C++) targets, you can register custom functions that aren't automatically discovered by the RTTI scanner.  
+This is useful when you know the address of a function in the target process and want to call it through RemoteNET.
+
+```C#
+// Connect to an unmanaged target
+UnmanagedRemoteApp unmanagedApp = (UnmanagedRemoteApp)RemoteAppFactory.Connect("MyNativeTarget.exe", RuntimeType.Unmanaged);
+
+// Get a remote type
+Type remoteType = unmanagedApp.GetRemoteType("MyNamespace::MyClass", "MyModule.dll");
+
+// Register a custom function on the type
+bool success = unmanagedApp.RegisterCustomFunction(
+    parentType: remoteType,
+    functionName: "MyCustomFunction",
+    moduleName: "MyModule.dll",
+    offset: 0x1234,  // Offset from module base address
+    returnType: typeof(int),
+    parameterTypes: new[] { typeof(int), typeof(float) }
+);
+
+// After registration, the function can be invoked like any other remote method
+dynamic dynamicObj = remoteObject.Dynamify();
+int result = dynamicObj.MyCustomFunction(42, 3.14f);
+```
+
+**Notes:**
+- This feature is only available for unmanaged (C++) targets
+- You need to know the module name and offset where the function is located
+- The function will be added to the type's method list and can be invoked normally
+- Parameter and return types should be specified as .NET types
+
 ## TODOs
 1. Static members
 2. Document "Reflection API" (RemoteType, RemoteMethodInfo, ... )
