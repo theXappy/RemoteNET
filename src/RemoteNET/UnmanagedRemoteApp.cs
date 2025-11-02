@@ -6,6 +6,7 @@ using RemoteNET.Common;
 using RemoteNET.Internal;
 using RemoteNET.RttiReflection;
 using ScubaDiver.API;
+using ScubaDiver.API.Interactions;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.API.Utils;
 
