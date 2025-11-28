@@ -1,4 +1,6 @@
+using Microsoft.Diagnostics.Runtime.AbstractDac;
 using ScubaDiver.Rtti;
+using System;
 
 namespace ScubaDiver
 {
@@ -13,20 +15,19 @@ namespace ScubaDiver
         private readonly string[] _argTypes;
 
         public CustomUndecoratedFunction(
-            string moduleName,
-            nuint baseAddress,
+            ModuleInfo module,
             ulong offset,
             string functionName,
             string returnType,
             string[] argTypes)
             : base(functionName, functionName, functionName, argTypes?.Length)
         {
-            _module = new ModuleInfo { Name = moduleName, BaseAddress = baseAddress };
+            _module = module;
             
             // Check for potential overflow when adding baseAddress and offset
             checked
             {
-                _address = baseAddress + offset;
+                _address =  module.BaseAddress + (nuint)offset;
             }
             
             _retType = returnType;

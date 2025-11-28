@@ -130,6 +130,13 @@ namespace ScubaDiver
 
         private void HandleDispatchedRequest(object obj, ScubaDiverMessage request)
         {
+            // Check if the "debug" query parameter is set. If so, launch the debugger
+            if (request.QueryString.Get("debug") == "1")
+            {
+                Logger.Debug("[DiverBase] Debugging enabled");
+                Debugger.Launch();
+            }
+
             Stopwatch sw = Stopwatch.StartNew();
             string body;
             if (_responseBodyCreators.TryGetValue(request.UrlAbsolutePath, out var respBodyGenerator))

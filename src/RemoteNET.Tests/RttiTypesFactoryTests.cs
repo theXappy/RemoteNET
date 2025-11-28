@@ -260,7 +260,7 @@ namespace RemoteNET.Tests
             RemoteApp? fakeApp = new FakeRemoteApp();
 
             // Act
-            RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump, func, childType, false);
+            RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump.Assembly, func, childType, false);
 
             // Assert
             MethodInfo? method = childType.GetMethods().Single();
@@ -291,7 +291,7 @@ namespace RemoteNET.Tests
             RemoteApp? fakeApp = new FakeRemoteApp();
 
             // Act
-            RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump, func, childType, false);
+            RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump.Assembly, func, childType, false);
 
             // Assert
             MethodInfo? method = childType.GetMethods().Single();
@@ -345,7 +345,7 @@ namespace RemoteNET.Tests
             RemoteApp? fakeApp = new FakeRemoteApp();
 
             // Act
-            RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump, func, childType, false);
+            RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump.Assembly, func, childType, false);
 
             // Assert
             // Expecting `AddFunctionImpl` to NOT add that function (not supported yet)

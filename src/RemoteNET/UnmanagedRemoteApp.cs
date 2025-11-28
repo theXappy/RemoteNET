@@ -252,6 +252,42 @@ namespace RemoteNET
                 throw new ArgumentException("The parent type must be a RemoteRttiType. Only remote RTTI types created by UnmanagedRemoteApp can have custom functions registered.", nameof(parentType));
             }
 
+            static RegisterCustomFunctionRequest.ParameterTypeInfo CreateParamInfo(Type pt, int idx)
+            {
+                var typeName = pt?.FullName ?? "void";
+                var assembly = pt.Assembly?.GetName()?.Name;
+
+                if (pt.IsPrimitive)
+                {
+                    typeName = pt.Name;
+                    assembly = "mscorlib";
+
+                    if (pt == typeof(ulong))
+                    {
+                        typeName = "ulong";
+                    }
+                }
+
+                return new RegisterCustomFunctionRequest.ParameterTypeInfo
+                {
+                    Name = $"param{idx}",
+                    TypeFullName = typeName,
+                    Assembly = assembly
+                };
+            }
+
+            var retTypeName = returnType?.FullName ?? "void";
+            var retTypeAssembly = returnType?.Assembly?.GetName()?.Name;
+            if (returnType != null && returnType.IsPrimitive)
+            {
+                retTypeName = returnType.Name;
+                retTypeAssembly = "mscorlib";
+                if (returnType == typeof(ulong))
+                {
+                    retTypeName = "ulong";
+                }
+            }
+
             var request = new RegisterCustomFunctionRequest
             {
                 ParentTypeFullName = rttiType.Namespace + "::" + rttiType.Name, // Use namespace::name format for RTTI types
@@ -259,14 +295,9 @@ namespace RemoteNET
                 FunctionName = functionName,
                 ModuleName = moduleName,
                 Offset = offset,
-                ReturnTypeFullName = returnType?.FullName ?? "void",
-                ReturnTypeAssembly = returnType?.Assembly?.GetName()?.Name,
-                Parameters = parameterTypes?.Select((pt, idx) => new RegisterCustomFunctionRequest.ParameterTypeInfo
-                {
-                    Name = $"param{idx}",
-                    TypeFullName = pt.FullName,
-                    Assembly = pt.Assembly?.GetName()?.Name
-                }).ToList() ?? new List<RegisterCustomFunctionRequest.ParameterTypeInfo>()
+                ReturnTypeFullName = retTypeName,
+                ReturnTypeAssembly = retTypeAssembly,
+                Parameters = parameterTypes?.Select(CreateParamInfo).ToList() ?? new List<RegisterCustomFunctionRequest.ParameterTypeInfo>()
             };
 
             bool success = _unmanagedCommunicator.RegisterCustomFunction(request, out var methodDump);
@@ -285,7 +316,7 @@ namespace RemoteNET
 
             // Use the existing factory method to add the function to the RemoteRttiType
             // AddFunctionImpl returns the newly created MethodInfo
-            return RttiTypesFactory.AddFunctionImpl(this, parentTypeDump, methodDump, rttiType, areConstructors: false);
+            return RttiTypesFactory.AddFunctionImpl(this, parentTypeDump.Assembly, methodDump, rttiType, areConstructors: false) as MethodInfo;
         }
 
         //

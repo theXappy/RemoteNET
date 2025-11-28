@@ -508,16 +508,18 @@ namespace ScubaDiver
                 // Find the module base address
                 List<UndecoratedModule> modules = GetUndecoratedModules(Filter.CreatePredicate(moduleName));
                 if (modules.Count == 0)
-                    return false;
+                {
+                    modules = GetUndecoratedModules(Filter.CreatePredicate(moduleName + ".dll"));
+                    if (modules.Count == 0)
+                        return false;
+                }
 
                 // Since we've verified the list is not empty, we can safely access the first element
                 UndecoratedModule targetModule = modules[0];
-                nuint moduleBaseAddress = targetModule.ModuleInfo.BaseAddress;
 
                 // Create a custom undecorated function
                 CustomUndecoratedFunction customFunc = new CustomUndecoratedFunction(
-                    moduleName,
-                    moduleBaseAddress,
+                    targetModule.ModuleInfo,
                     offset,
                     functionName,
                     returnTypeFullName,

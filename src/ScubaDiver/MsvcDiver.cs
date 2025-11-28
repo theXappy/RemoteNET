@@ -212,7 +212,6 @@ namespace ScubaDiver
 
         protected override HookResponse InvokeHookCallback(IPEndPoint callbacksEndpoint, int token, string stackTrace, object retValue, params object[] parameters)
         {
-            Logger.Debug($"[{nameof(MsvcDiver)}] InvokeHookCallback Entered. EndPoint: {callbacksEndpoint} Token: {token}");
             ReverseCommunicator reverseCommunicator = new(callbacksEndpoint);
 
             ObjectOrRemoteAddress[] remoteParams = new ObjectOrRemoteAddress[parameters.Length];
@@ -296,7 +295,7 @@ namespace ScubaDiver
 
             string typeFilter = req.QueryString.Get("type_filter");
             if (string.IsNullOrWhiteSpace(typeFilter))
-                return QuickError("Missing parameter 'type_filter'");
+                return QuickError("Missing parameter 'type_filter'. Try this: /types?type_filter=*");
             ParseFullTypeName(typeFilter, out var assemblyFilter, out typeFilter);
 
             Predicate<string> typeFilterPredicate = Filter.CreatePredicate(typeFilter);
@@ -339,7 +338,6 @@ namespace ScubaDiver
             {
                 return QuickError("Failed to deserialize body");
             }
-            Logger.Debug($"[MsvcDiver][MakeTypeResponse] Resolving type Name: {request.Assembly} {request.TypeFullName} vftable: 0x{request.MethodTableAddress:x16}");
 
             TypeDump dump;
             if (request.MethodTableAddress != 0)
@@ -499,7 +497,6 @@ namespace ScubaDiver
                 // Check if the object is already frozen
                 if (_freezer.IsFrozen(objAddr))
                 {
-                    Logger.Debug($"[MsvcDiver][MakeObjectResponse] Object at 0x{objAddr:X16} is already frozen.");
                     ObjectDump alreadyFrozenObjDump = new ObjectDump()
                     {
                         Type = fullTypeName,
@@ -556,7 +553,6 @@ namespace ScubaDiver
 
         protected override string MakeInvokeResponse(ScubaDiverMessage arg)
         {
-            Console.WriteLine($"[{nameof(MsvcDiver)}] MakeInvokeResponse Entered (!)");
             if (string.IsNullOrEmpty(arg.Body))
                 return QuickError("Missing body");
 

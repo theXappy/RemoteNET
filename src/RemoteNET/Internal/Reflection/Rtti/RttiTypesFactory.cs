@@ -164,17 +164,15 @@ namespace RemoteNET.RttiReflection
         {
             foreach (TypeDump.TypeMethod func in functions)
             {
-                AddFunctionImpl(app, typeDump, func, declaringType, areConstructors);
+                AddFunctionImpl(app, typeDump.Assembly, func, declaringType, areConstructors);
             }
         }
 
-        public static MethodInfo AddFunctionImpl(RemoteApp app, TypeDump typeDump, TypeDump.TypeMethod func, RemoteRttiType declaringType, bool areConstructors)
+        public static MethodBase AddFunctionImpl(RemoteApp app, string moduleName, TypeDump.TypeMethod func, RemoteRttiType declaringType, bool areConstructors)
         {
             string mangledName = func.DecoratedName;
             if (string.IsNullOrEmpty(mangledName))
                 mangledName = func.Name;
-
-            string moduleName = typeDump.Assembly;
 
             List<LazyRemoteParameterResolver> parameters = new List<LazyRemoteParameterResolver>(func.Parameters.Count);
             int i = 1;
@@ -255,7 +253,7 @@ namespace RemoteNET.RttiReflection
                     if (_shittyCache.TryGetValue(namespaceAndTypeName, out resultType))
                         return resultType;
 
-                    resultType = RttiTypesResolver.Instance.Resolve(typeDump.Assembly, $"{typeDump.Assembly}!{namespaceAndTypeName}");
+                    resultType = RttiTypesResolver.Instance.Resolve(moduleName, $"{moduleName}!{namespaceAndTypeName}");
                     if (resultType != null)
                         return resultType;
 
@@ -284,7 +282,7 @@ namespace RemoteNET.RttiReflection
 
                     // Prefer any matches in the existing assembly
                     var paramTypeInSameAssembly =
-                        possibleParamTypes.Where(t => t.Assembly == typeDump.Assembly).ToArray();
+                        possibleParamTypes.Where(t => t.Assembly == moduleName).ToArray();
                     if (paramTypeInSameAssembly.Length > 0)
                     {
                         if (paramTypeInSameAssembly.Length > 1)
