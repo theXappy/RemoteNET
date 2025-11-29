@@ -28,6 +28,7 @@ namespace ScubaDiver
         {
             _responseBodyCreators["/gc"] = MakeGcHookModuleResponse;
             _responseBodyCreators["/gc_stats"] = MakeGcStatsResponse;
+            _responseBodyCreators["/vftable"] = MakeVftableResponse;
             _typesManager = new MsvcTypesManager();
         }
 
@@ -80,6 +81,173 @@ namespace ScubaDiver
             output["ClassSizes"] = _offensiveGC.ClassSizes;
             output["AddressesSizes"] = _offensiveGC.AddressesSizes;
             return JsonConvert.SerializeObject(output);
+        }
+
+        protected string MakeVftableResponse(ScubaDiverMessage req)
+        {
+            Logger.Debug("[MsvcDiver][MakeVftableResponse] Endpoint called");
+            
+            string vftableAddrStr = req.QueryString.Get("vftable_address");
+            string xoredVftableAddrStr = req.QueryString.Get("xored_vftable_address");
+            
+            Logger.Debug($"[MsvcDiver][MakeVftableResponse] vftable_address parameter: {vftableAddrStr ?? "null"}");
+            Logger.Debug($"[MsvcDiver][MakeVftableResponse] xored_vftable_address parameter: {xoredVftableAddrStr ?? "null"}");
+            
+            if (string.IsNullOrEmpty(vftableAddrStr) && string.IsNullOrEmpty(xoredVftableAddrStr))
+            {
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] ERROR: Both parameters are missing");
+                return QuickError("Missing 'vftable_address' or 'xored_vftable_address' parameter");
+            }
+
+            ulong vftableAddr;
+            
+            if (!string.IsNullOrEmpty(vftableAddrStr))
+            {
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Using regular vftable_address parameter");
+                
+                if (!ulong.TryParse(vftableAddrStr, out vftableAddr))
+                {
+                    Logger.Debug($"[MsvcDiver][MakeVftableResponse] ERROR: Failed to parse vftable_address: {vftableAddrStr}");
+                    return QuickError("Parameter 'vftable_address' could not be parsed as ulong");
+                }
+                
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Parsed vftable address: 0x{vftableAddr:x}");
+            }
+            else
+            {
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Using xored_vftable_address parameter");
+                
+                if (!ulong.TryParse(xoredVftableAddrStr, out ulong xoredVftableAddr))
+                {
+                    Logger.Debug($"[MsvcDiver][MakeVftableResponse] ERROR: Failed to parse xored_vftable_address: {xoredVftableAddrStr}");
+                    return QuickError("Parameter 'xored_vftable_address' could not be parsed as ulong");
+                }
+                
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Parsed xored vftable address: 0x{xoredVftableAddr:x}");
+                
+                const uint XorMask = 0xaabbccdd;
+                vftableAddr = xoredVftableAddr ^ XorMask;
+                
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Un-xored vftable address: 0x{vftableAddr:x} (mask: 0x{XorMask:x})");
+            }
+
+            try
+            {
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Refreshing types manager");
+                _typesManager.RefreshIfNeeded();
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Types manager refreshed");
+
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Getting all undecorated modules");
+                List<UndecoratedModule> allModules = _typesManager.GetUndecoratedModules();
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Found {allModules.Count} modules");
+                
+                ModuleInfo? module = null;
+                RichModuleInfo richModule = default;
+                
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Searching for module containing vftable address");
+                foreach (var undecModule in allModules)
+                {
+                    ModuleInfo modInfo = undecModule.ModuleInfo;
+                    Logger.Debug($"[MsvcDiver][MakeVftableResponse] Checking module: {modInfo.Name} (Base: 0x{modInfo.BaseAddress:x}, Size: 0x{modInfo.Size:x})");
+                    
+                    if (modInfo.BaseAddress <= (nuint)vftableAddr && (nuint)vftableAddr < modInfo.BaseAddress + modInfo.Size)
+                    {
+                        module = modInfo;
+                        richModule = undecModule.RichModule;
+                        Logger.Debug($"[MsvcDiver][MakeVftableResponse] Found containing module: {modInfo.Name}");
+                        break;
+                    }
+                }
+
+                if (module == null)
+                {
+                    Logger.Debug($"[MsvcDiver][MakeVftableResponse] ERROR: Could not find module containing vftable address 0x{vftableAddr:x}");
+                    return QuickError($"Could not find module containing vftable address 0x{vftableAddr:x}");
+                }
+
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Module found: {module.Value.Name}");
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Accessing GetOrCreateModuleExports via reflection");
+                
+                var getOrCreateModuleExportsMethod = typeof(MsvcTypesManager).GetMethod("GetOrCreateModuleExports",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                
+                if (getOrCreateModuleExportsMethod == null)
+                {
+                    Logger.Debug("[MsvcDiver][MakeVftableResponse] ERROR: Failed to access GetOrCreateModuleExports method via reflection");
+                    return QuickError("Failed to access GetOrCreateModuleExports method");
+                }
+
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Invoking GetOrCreateModuleExports");
+                MsvcModuleExports moduleExports = (MsvcModuleExports)getOrCreateModuleExportsMethod.Invoke(_typesManager, new object[] { module.Value, true });
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Module exports retrieved");
+
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Creating dummy FirstClassTypeInfo");
+                Rtti.TypeInfo dummyType = new Rtti.FirstClassTypeInfo(
+                    module.Value.Name,
+                    "",
+                    "UnknownType",
+                    (nuint)vftableAddr,
+                    0);
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Dummy type created: {dummyType.FullTypeName}");
+
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Accessing _tricksterWrapper via reflection");
+                var tricksterWrapperField = typeof(MsvcTypesManager).GetField("_tricksterWrapper",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                
+                if (tricksterWrapperField == null)
+                {
+                    Logger.Debug("[MsvcDiver][MakeVftableResponse] ERROR: Failed to access _tricksterWrapper field via reflection");
+                    return QuickError("Failed to access _tricksterWrapper field");
+                }
+
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Getting TricksterWrapper instance");
+                TricksterWrapper tricksterWrapper = (TricksterWrapper)tricksterWrapperField.GetValue(_typesManager);
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Getting process handle from TricksterWrapper");
+                Windows.Win32.Foundation.HANDLE processHandle = tricksterWrapper.GetProcessHandle();
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Process handle obtained: 0x{processHandle.Value:x}");
+
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Calling VftableParser.AnalyzeVftable");
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Parameters: processHandle=0x{processHandle.Value:x}, module={richModule.ModuleInfo.Name}, vftableAddr=0x{vftableAddr:x}");
+                
+                // ? Pass _typesManager to enable RTTI-based vftable boundary detection
+                List<UndecoratedFunction> virtualMethods = VftableParser.AnalyzeVftable(
+                    processHandle,
+                    richModule,
+                    moduleExports,
+                    dummyType,
+                    (nuint)vftableAddr,
+                    typesManager: _typesManager,
+                    verbose: true);
+
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] VftableParser.AnalyzeVftable completed. Found {virtualMethods.Count} virtual methods");
+                
+                for (int i = 0; i < virtualMethods.Count; i++)
+                {
+                    var method = virtualMethods[i];
+                    Logger.Debug($"[MsvcDiver][MakeVftableResponse] Method[{i}]: {method.UndecoratedFullName} at 0x{method.Address:x}");
+                }
+
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Serializing results to JSON");
+                string result = JsonConvert.SerializeObject(virtualMethods);
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Serialization complete. JSON length: {result.Length} characters");
+                Logger.Debug("[MsvcDiver][MakeVftableResponse] Returning success response");
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] EXCEPTION caught: {ex.GetType().Name}");
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Exception message: {ex.Message}");
+                Logger.Debug($"[MsvcDiver][MakeVftableResponse] Exception stack trace: {ex.StackTrace}");
+                
+                if (ex.InnerException != null)
+                {
+                    Logger.Debug($"[MsvcDiver][MakeVftableResponse] Inner exception: {ex.InnerException.GetType().Name}");
+                    Logger.Debug($"[MsvcDiver][MakeVftableResponse] Inner exception message: {ex.InnerException.Message}");
+                }
+                
+                return QuickError($"Failed to analyze vftable: {ex.Message}", ex.StackTrace);
+            }
         }
 
         private List<SafeHandle> _injectedDlls = new();

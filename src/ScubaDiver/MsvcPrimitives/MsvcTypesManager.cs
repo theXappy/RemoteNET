@@ -36,17 +36,32 @@ namespace ScubaDiver
     public class VftableInfo : FieldInfo, ISymbolBackedMember
     {
         private MsvcType _type;
+        private nuint _address;
+        private string _name;
+        
         public UndecoratedExportedField ExportedField { get; set; }
         UndecoratedSymbol ISymbolBackedMember.Symbol => ExportedField;
 
+        // Constructor for exported vftables
         public VftableInfo(MsvcType msvcType, UndecoratedExportedField symbol)
         {
             _type = msvcType;
             ExportedField = symbol;
+            _address = symbol.Address;
+            _name = symbol.UndecoratedName;
+        }
+        
+        // Constructor for RTTI vftables (not exported)
+        public VftableInfo(MsvcType msvcType, nuint vftableAddress, string name = null)
+        {
+            _type = msvcType;
+            ExportedField = null;
+            _address = vftableAddress;
+            _name = name ?? $"`vftable' (at 0x{vftableAddress:x})";
         }
 
-        public override string Name => ExportedField.UndecoratedName;
-        public ulong Address => (ulong)ExportedField.Address;
+        public override string Name => _name;
+        public ulong Address => (ulong)_address;
         public override Type DeclaringType => _type;
         public override object GetValue(object obj) => Address;
 
@@ -243,6 +258,10 @@ namespace ScubaDiver
         // Vftables cache.
         //  <vftable address : Type>
         Dictionary<nuint, MsvcTypeStub> _vftablesCache = new();
+        
+        // All known vftable addresses from RTTI-discovered types
+        // Populated during GetTypes() to enable boundary detection in VftableParser
+        private HashSet<nuint> _allKnownVftableAddresses = new HashSet<nuint>();
 
         private Dictionary<ModuleInfo, MsvcModuleExports> _exportsCache;
 
@@ -286,7 +305,120 @@ namespace ScubaDiver
         internal void RefreshIfNeeded()
         {
             if (_tricksterWrapper.RefreshRequired())
+            {
                 _tricksterWrapper.Refresh();
+                
+                // Clear vftable cache on refresh since runtime may have changed
+                lock (_getTypesLock)
+                {
+                    _allKnownVftableAddresses.Clear();
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Ensures the vftable address cache is populated with all known vftables from RTTI.
+        /// This method is idempotent - calling it multiple times is safe and efficient (no-op if already populated).
+        /// </summary>
+        /// <param name="verbose">Enable verbose logging for debugging</param>
+        private void EnsureVftableCachePopulated(bool verbose = false)
+        {
+            lock (_getTypesLock)
+            {
+                // If cache is already populated, no work needed
+                if (_allKnownVftableAddresses.Count > 0)
+                {
+                    if (verbose)
+                        Logger.Debug($"[MsvcTypesManager][EnsureVftableCachePopulated] Cache already populated with {_allKnownVftableAddresses.Count} vftables");
+                    return;
+                }
+                
+                if (verbose)
+                    Logger.Debug("[MsvcTypesManager][EnsureVftableCachePopulated] Cache empty, populating from RTTI...");
+                
+                // Get all modules (with refresh if needed)
+                List<UndecoratedModule> modules = GetUndecoratedModules();
+                
+                if (verbose)
+                    Logger.Debug($"[MsvcTypesManager][EnsureVftableCachePopulated] Found {modules.Count} modules");
+                
+                int totalVftablesAdded = 0;
+                
+                // Populate cache from all FirstClassTypeInfo instances across all modules
+                foreach (UndecoratedModule undecoratedModule in modules)
+                {
+                    int moduleVftableCount = 0;
+                    
+                    foreach (Rtti.TypeInfo type in undecoratedModule.Types)
+                    {
+                        if (type is FirstClassTypeInfo firstClass)
+                        {
+                            _allKnownVftableAddresses.Add(firstClass.VftableAddress);
+                            moduleVftableCount++;
+                            totalVftablesAdded++;
+                            
+                            // Also add secondary vftables (multiple inheritance)
+                            if (firstClass.SecondaryVftableAddresses != null)
+                            {
+                                foreach (nuint secondaryVftable in firstClass.SecondaryVftableAddresses)
+                                {
+                                    _allKnownVftableAddresses.Add(secondaryVftable);
+                                    moduleVftableCount++;
+                                    totalVftablesAdded++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (verbose && moduleVftableCount > 0)
+                        Logger.Debug($"[MsvcTypesManager][EnsureVftableCachePopulated] Module '{undecoratedModule.ModuleInfo.Name}': added {moduleVftableCount} vftables");
+                }
+                
+                if (verbose)
+                    Logger.Debug($"[MsvcTypesManager][EnsureVftableCachePopulated] Cache population complete. Total vftables: {totalVftablesAdded}");
+            }
+        }
+        
+        /// <summary>
+        /// Checks if the given address is a known vftable address from RTTI-discovered types.
+        /// Automatically populates the cache on first call if needed.
+        /// </summary>
+        /// <param name="address">The address to check</param>
+        /// <param name="verbose">Enable verbose logging for debugging</param>
+        /// <returns>True if this address is a known vftable</returns>
+        public bool IsKnownVftableAddress(nuint address, bool verbose = false)
+        {
+            // Ensure cache is populated before querying
+            EnsureVftableCachePopulated(verbose);
+            
+            lock (_getTypesLock)
+            {
+                bool found = _allKnownVftableAddresses.Contains(address);
+                
+                if (verbose)
+                {
+                    Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress] Checking address 0x{address:x}");
+                    Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress] Cache size: {_allKnownVftableAddresses.Count} known vftables");
+                    Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress] Result: {found}");
+                    
+                    if (!found && _allKnownVftableAddresses.Count > 0)
+                    {
+                        // Show nearest vftables for debugging
+                        var nearest = _allKnownVftableAddresses
+                            .Select(addr => new { Addr = addr, Distance = addr > address ? addr - address : address - addr })
+                            .OrderBy(x => x.Distance)
+                            .Take(3);
+                        
+                        Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress] Nearest 3 vftables:");
+                        foreach (var n in nearest)
+                        {
+                            Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress]   0x{n.Addr:x} (distance: 0x{n.Distance:x})");
+                        }
+                    }
+                }
+                
+                return found;
+            }
         }
 
         private object _getTypesLock = new object();
@@ -296,9 +428,17 @@ namespace ScubaDiver
             lock (_getTypesLock)
             {
                 RefreshIfNeeded();
+                
+                // PHASE 1: Ensure vftable cache is populated before creating any stubs
+                // This ensures the cache is complete before any AnalyzeVftable calls
+                EnsureVftableCachePopulated(verbose: false);
+                
+                // PHASE 2: Now create stubs (which may lazy-call CreateType → AnalyzeVftable)
+                // At this point, the cache has ALL vftables from all modules
                 moduleFilter ??= new MsvcModuleFilter();
                 typeFilter ??= (s) => true;
                 List<UndecoratedModule> modules = GetUndecoratedModules(moduleFilter);
+                
                 foreach (UndecoratedModule undecoratedModule in modules)
                 {
                     foreach (Rtti.TypeInfo type in undecoratedModule.Types)
@@ -343,8 +483,8 @@ namespace ScubaDiver
                 return null;
 
             // Find the type of the vftable
-            MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.Value);
-            if (!moduleExports.TryGetVftable(vftable, out var vftableSymbol))
+            MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.Value, verbose: true);
+            if (!moduleExports.TryGetVftable(vftable, out var vftableSymbol, verbose: true))
                 return null;
 
             // Extract name of type
@@ -414,32 +554,84 @@ namespace ScubaDiver
             // Create hollow type
             MsvcType finalType = new MsvcType(msvcModule, type);
 
-            // Get all exported members of the requseted type
+            // Get all exported members of the requested type
             List<UndecoratedSymbol> rawMembers = _exportsMaster.GetExportedTypeMembers(module.ModuleInfo, type.NamespaceAndName).ToList();
             List<UndecoratedFunction> exportedFuncs = rawMembers.OfType<UndecoratedFunction>().ToList();
 
-            // Find the first vftable within all members
-            // (TODO: Bug? How can I tell this is the "main" vftable?)
-            UndecoratedExportedField[] vftables = rawMembers.OfType<UndecoratedExportedField>()
+            // Collect all vftable addresses and create VftableInfo objects from two sources:
+            // 1. Exported vftables (with UndecoratedExportedField wrappers) - PRIORITIZED
+            // 2. TypeInfo's vftable (if it's a FirstClassTypeInfo) - Only if not exported
+            
+            List<nuint> allVftableAddresses = new List<nuint>();
+            List<VftableInfo> allVftableInfos = new List<VftableInfo>();
+            
+            // Source 1: Find exported vftables (PRIORITIZED - added first)
+            UndecoratedExportedField[] exportedVftables = rawMembers.OfType<UndecoratedExportedField>()
                                             .Where(member => member.UndecoratedName.EndsWith("`vftable'"))
                                             .ToArray();
-            VftableInfo[] vftableInfos = vftables.Select(vftable => new VftableInfo(finalType, vftable)).ToArray();
-            finalType.SetVftables(vftableInfos);
-
-            // Find all virtual methods (from vftable)
-            List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
-            foreach (UndecoratedExportedField vftable in vftables)
+            
+            foreach (var exportedVftable in exportedVftables)
             {
-                MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.ModuleInfo);
-                virtualFuncs = VftableParser.AnalyzeVftable(_tricksterWrapper.GetProcessHandle(),
+                allVftableAddresses.Add(exportedVftable.Address);
+                allVftableInfos.Add(new VftableInfo(finalType, exportedVftable));
+            }
+            
+            // Source 2: Add RTTI vftable addresses (primary + secondary) ONLY if not already exported
+            if (type is FirstClassTypeInfo firstClass)
+            {
+                // Add primary vftable ONLY if not already in the list (i.e., not exported)
+                if (!allVftableAddresses.Contains(firstClass.VftableAddress))
+                {
+                    allVftableAddresses.Add(firstClass.VftableAddress);
+                    allVftableInfos.Add(new VftableInfo(finalType, firstClass.VftableAddress, $"`vftable' (primary, non-exported)"));
+                }
+                
+                // Add secondary vftables ONLY if not already in the list (i.e., not exported)
+                if (firstClass.SecondaryVftableAddresses != null)
+                {
+                    int secondaryIndex = 0;
+                    foreach (nuint secondaryVftable in firstClass.SecondaryVftableAddresses)
+                    {
+                        if (!allVftableAddresses.Contains(secondaryVftable))
+                        {
+                            allVftableAddresses.Add(secondaryVftable);
+                            allVftableInfos.Add(new VftableInfo(finalType, secondaryVftable, $"`vftable' (secondary #{secondaryIndex}, non-exported)"));
+                            secondaryIndex++;
+                        }
+                        else
+                        {
+                            // Secondary vftable is exported, increment counter anyway for consistent numbering
+                            secondaryIndex++;
+                        }
+                    }
+                }
+            }
+            
+            // Set all vftables (exported ones first, then non-exported RTTI ones)
+            finalType.SetVftables(allVftableInfos.ToArray());
+
+            // Find all virtual methods (from all vftables)
+            List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
+            MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.ModuleInfo, verbose: true);
+            
+            foreach (nuint vftableAddress in allVftableAddresses)
+            {
+                // ✅ Pass 'this' to VftableParser to enable RTTI-based vftable detection
+                List<UndecoratedFunction> methodsFromThisVftable = VftableParser.AnalyzeVftable(
+                    _tricksterWrapper.GetProcessHandle(),
                     module,
                     moduleExports,
                     type,
-                    vftable.Address);
-
-                // Remove duplicates - the methods which are both virtual and exported.
-                virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
+                    vftableAddress,
+                    typesManager: this,
+                    verbose: true);
+                
+                virtualFuncs.AddRange(methodsFromThisVftable);
             }
+
+            // Remove duplicates - the methods which are both virtual and exported
+            virtualFuncs = virtualFuncs.Distinct().ToList();
+            virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
 
             // Finalize methods
             IEnumerable<UndecoratedFunction> allFuncs = exportedFuncs.Concat(virtualFuncs);
@@ -449,14 +641,48 @@ namespace ScubaDiver
             return finalType;
         }
 
-        private MsvcModuleExports GetOrCreateModuleExports(ModuleInfo module)
+        private MsvcModuleExports GetOrCreateModuleExports(ModuleInfo module, bool verbose = false)
         {
+            if (verbose)
+                Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Called for module: {module.Name}");
+            
             if (!_exportsCache.TryGetValue(module, out MsvcModuleExports exports))
             {
+                if (verbose)
+                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Module not in cache, fetching exports from _exportsMaster");
+                
                 IReadOnlyList<UndecoratedSymbol> rawExports = _exportsMaster.GetUndecoratedExports(module);
-                exports = new MsvcModuleExports(rawExports);
+                
+                if (verbose)
+                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Got {rawExports.Count} raw exports from _exportsMaster");
+                
+                if (verbose && rawExports.Count > 0)
+                {
+                    int fieldCount = rawExports.OfType<UndecoratedExportedField>().Count();
+                    int funcCount = rawExports.OfType<UndecoratedFunction>().Count();
+                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Breakdown: {fieldCount} UndecoratedExportedField, {funcCount} UndecoratedFunction");
+                    
+                    // Show first 5 raw exports
+                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Sample of raw exports (first 5):");
+                    for (int i = 0; i < Math.Min(5, rawExports.Count); i++)
+                    {
+                        var exp = rawExports[i];
+                        Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports]   Export[{i}]: Type={exp.GetType().Name}, Name={exp.UndecoratedName}");
+                    }
+                }
+                
+                exports = new MsvcModuleExports(rawExports, verbose);
                 _exportsCache[module] = exports;
+                
+                if (verbose)
+                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Created MsvcModuleExports and added to cache");
             }
+            else
+            {
+                if (verbose)
+                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Module found in cache");
+            }
+            
             return exports;
         }
 
@@ -563,12 +789,87 @@ namespace ScubaDiver
             }
         }
 
-        public bool TryGetVftable(nuint addr, out UndecoratedExportedField undecoratedExport)
+        public MsvcModuleExports(IReadOnlyList<UndecoratedSymbol> exportsList, bool verbose = false)
         {
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][Constructor] Called with {exportsList.Count} exports");
+            
+            _exportedFields = new Dictionary<nuint, UndecoratedExportedField>();
+            _exportedFunctions = new();
+
+            foreach (UndecoratedSymbol exports in exportsList)
+            {
+                if (exports is UndecoratedExportedField exportedField)
+                {
+                    if (verbose)
+                        Logger.Debug($"[MsvcModuleExports][Constructor] Adding UndecoratedExportedField: {exportedField.UndecoratedName}, XoredAddress=0x{exportedField.XoredAddress:x}");
+                    
+                    _exportedFields[exportedField.XoredAddress /* ! */] = exportedField;
+                }
+                else if (exports is UndecoratedFunction exportedFunction)
+                {
+                    if (verbose)
+                        Logger.Debug($"[MsvcModuleExports][Constructor] Adding UndecoratedFunction: {exportedFunction.UndecoratedName}, Address=0x{exportedFunction.Address:x}");
+                    
+                    _exportedFunctions[exportedFunction.Address /* ! */] = exportedFunction;
+                }
+            }
+            
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][Constructor] Final counts: _exportedFields={_exportedFields.Count}, _exportedFunctions={_exportedFunctions.Count}");
+        }
+
+        public bool TryGetVftable(nuint addr, out UndecoratedExportedField undecoratedExport, bool verbose = false)
+        {
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Called with addr=0x{addr:x}");
+            
             nuint xoredAddr = addr ^ UndecoratedExportedField.XorMask;
+            
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][TryGetVftable] XorMask=0x{UndecoratedExportedField.XorMask:x}, xoredAddr=0x{xoredAddr:x}");
+            
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Searching in _exportedFields dictionary (count: {_exportedFields.Count})");
+            
             if (!_exportedFields.TryGetValue(xoredAddr, out undecoratedExport))
+            {
+                if (verbose)
+                    Logger.Debug($"[MsvcModuleExports][TryGetVftable] xoredAddr 0x{xoredAddr:x} NOT found in _exportedFields");
+                
+                if (verbose && _exportedFields.Count > 0)
+                {
+                    Logger.Debug($"[MsvcModuleExports][TryGetVftable] Sample of _exportedFields keys (first 5):");
+                    int count = 0;
+                    foreach (var key in _exportedFields.Keys)
+                    {
+                        if (count >= 5) break;
+                        Logger.Debug($"[MsvcModuleExports][TryGetVftable]   Key[{count}]: 0x{key:x} (un-xored: 0x{(key ^ UndecoratedExportedField.XorMask):x})");
+                        count++;
+                    }
+                }
+                
                 return false;
-            return undecoratedExport.UndecoratedName.Contains("`vftable'");
+            }
+            
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Found exported field at xoredAddr 0x{xoredAddr:x}");
+            
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][TryGetVftable] UndecoratedName: {undecoratedExport.UndecoratedName}");
+            
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][TryGetVftable] UndecoratedFullName: {undecoratedExport.UndecoratedFullName}");
+            
+            bool containsVftable = undecoratedExport.UndecoratedName.Contains("`vftable'");
+            
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Contains '`vftable'': {containsVftable}");
+            
+            if (verbose)
+                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Returning: {containsVftable}");
+            
+            return containsVftable;
         }
 
         public bool TryGetFunc(nuint address, out UndecoratedFunction undecFunc)
