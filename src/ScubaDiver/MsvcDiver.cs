@@ -1,4 +1,4 @@
-using ScubaDiver.API;
+﻿using ScubaDiver.API;
 using ScubaDiver.API.Hooking;
 using ScubaDiver.API.Interactions;
 using ScubaDiver.API.Interactions.Callbacks;
@@ -209,7 +209,7 @@ namespace ScubaDiver
                 Logger.Debug("[MsvcDiver][MakeVftableResponse] Calling VftableParser.AnalyzeVftable");
                 Logger.Debug($"[MsvcDiver][MakeVftableResponse] Parameters: processHandle=0x{processHandle.Value:x}, module={richModule.ModuleInfo.Name}, vftableAddr=0x{vftableAddr:x}");
                 
-                // ? Pass _typesManager to enable RTTI-based vftable boundary detection
+                // ✅ Pass _typesManager to enable RTTI-based vftable boundary detection
                 List<UndecoratedFunction> virtualMethods = VftableParser.AnalyzeVftable(
                     processHandle,
                     richModule,
@@ -496,15 +496,46 @@ namespace ScubaDiver
         protected override string MakeTypeResponse(ScubaDiverMessage req)
         {
             string body = req.Body;
-            if (string.IsNullOrEmpty(body))
-            {
-                return QuickError("Missing body");
-            }
+            TypeDumpRequest request;
 
-            var request = JsonConvert.DeserializeObject<TypeDumpRequest>(body);
-            if (request == null)
+            if (!string.IsNullOrEmpty(body))
             {
-                return QuickError("Failed to deserialize body");
+                request = JsonConvert.DeserializeObject<TypeDumpRequest>(body);
+                if (request == null)
+                {
+                    return QuickError("Failed to deserialize body");
+                }
+            }
+            else
+            {
+                // Try to parse from query string parameters
+                string methodTableAddressStr = req.QueryString.Get("MethodTableAddress");
+                string typeFullName = req.QueryString.Get("TypeFullName");
+                string assembly = req.QueryString.Get("Assembly");
+
+                // Check if at least one required parameter is provided
+                if (string.IsNullOrEmpty(methodTableAddressStr) && string.IsNullOrEmpty(typeFullName))
+                {
+                    return QuickError("Missing body or required query parameters (MethodTableAddress or TypeFullName)");
+                }
+
+                // Parse MethodTableAddress if provided
+                long methodTableAddress = 0;
+                if (!string.IsNullOrEmpty(methodTableAddressStr))
+                {
+                    if (!long.TryParse(methodTableAddressStr, out methodTableAddress))
+                    {
+                        return QuickError("Parameter 'MethodTableAddress' could not be parsed as long");
+                    }
+                }
+
+                // Create request from query parameters
+                request = new TypeDumpRequest
+                {
+                    MethodTableAddress = methodTableAddress,
+                    TypeFullName = typeFullName,
+                    Assembly = assembly
+                };
             }
 
             TypeDump dump;

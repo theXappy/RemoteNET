@@ -44,16 +44,30 @@ namespace ScubaDiver
 
             foreach (VftableInfo vftable in type.GetVftables())
             {
-                UndecoratedExportedField undecField = vftable.ExportedField;
-                HandleVftable(undecField, vftableName, fields);
+                HandleVftable(vftable, vftableName, fields);
 
                 // Keep vftable aside so we can also gather functions from it
-                vftables.Add(new TypeDump.TypeMethodTable
+                // Handle both exported and non-exported vftables
+                if (vftable.ExportedField != null)
                 {
-                    DecoratedName = undecField.DecoratedName,
-                    UndecoratedFullName = undecField.UndecoratedName,
-                    XoredAddress = (long)undecField.XoredAddress,
-                });
+                    // Exported vftable
+                    vftables.Add(new TypeDump.TypeMethodTable
+                    {
+                        DecoratedName = vftable.ExportedField.DecoratedName,
+                        UndecoratedFullName = vftable.ExportedField.UndecoratedName,
+                        XoredAddress = (long)vftable.ExportedField.XoredAddress,
+                    });
+                }
+                else
+                {
+                    // Non-exported vftable (RTTI-based)
+                    vftables.Add(new TypeDump.TypeMethodTable
+                    {
+                        DecoratedName = vftable.Name,
+                        UndecoratedFullName = vftable.Name,
+                        XoredAddress = (long)(vftable.Address ^ FirstClassTypeInfo.XorMask),
+                    });
+                }
                 continue;
             }
 
@@ -92,21 +106,38 @@ namespace ScubaDiver
             }
         }
 
-        private static bool HandleVftable(UndecoratedExportedField undecField, string vftableName,
+        private static bool HandleVftable(VftableInfo vftableInfo, string vftableName,
             List<TypeDump.TypeField> fields)
         {
             // vftable gets a special treatment because we need it outside this func.
-            // TODO: BUG?? What if it's a "special" vfatble for specific parent??
-            if (undecField.UndecoratedFullName != vftableName)
-                return false;
-
-
-            fields.Add(new TypeDump.TypeField()
+            // Handle both exported and non-exported vftables
+            
+            if (vftableInfo.ExportedField != null)
             {
-                Name = "vftable",
-                TypeFullName = undecField.UndecoratedFullName,
-                Visibility = "Public"
-            });
+                // Exported vftable - check the name
+                UndecoratedExportedField undecField = vftableInfo.ExportedField;
+                
+                // TODO: BUG?? What if it's a "special" vftable for specific parent??
+                if (undecField.UndecoratedFullName != vftableName)
+                    return false;
+
+                fields.Add(new TypeDump.TypeField()
+                {
+                    Name = "vftable",
+                    TypeFullName = undecField.UndecoratedFullName,
+                    Visibility = "Public"
+                });
+            }
+            else
+            {
+                // Non-exported vftable (RTTI-based) - just add it without name check
+                fields.Add(new TypeDump.TypeField()
+                {
+                    Name = vftableInfo.Name,
+                    TypeFullName = vftableInfo.Name,
+                    Visibility = "Public"
+                });
+            }
 
             return true;
         }

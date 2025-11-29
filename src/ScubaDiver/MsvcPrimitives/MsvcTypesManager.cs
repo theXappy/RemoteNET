@@ -545,101 +545,209 @@ namespace ScubaDiver
 
         private MsvcType CreateType(RichModuleInfo module, Rtti.TypeInfo type)
         {
+            Logger.Debug($"[MsvcTypesManager][CreateType] ===== BEGIN CreateType for {type.FullTypeName} =====");
+            Logger.Debug($"[MsvcTypesManager][CreateType] Module: {module.ModuleInfo.Name}");
+            
             if (!_modulesCache.TryGetValue(module.ModuleInfo.Name, out MsvcModule msvcModule))
             {
+                Logger.Debug($"[MsvcTypesManager][CreateType] Module not in cache, creating new MsvcModule");
                 msvcModule = new MsvcModule(module.ModuleInfo);
                 _modulesCache[module.ModuleInfo.Name] = msvcModule;
+                Logger.Debug($"[MsvcTypesManager][CreateType] New MsvcModule created and cached");
+            }
+            else
+            {
+                Logger.Debug($"[MsvcTypesManager][CreateType] Module found in cache");
             }
 
             // Create hollow type
+            Logger.Debug($"[MsvcTypesManager][CreateType] Creating hollow MsvcType");
             MsvcType finalType = new MsvcType(msvcModule, type);
+            Logger.Debug($"[MsvcTypesManager][CreateType] Hollow MsvcType created");
 
             // Get all exported members of the requested type
+            Logger.Debug($"[MsvcTypesManager][CreateType] Getting exported type members from _exportsMaster");
             List<UndecoratedSymbol> rawMembers = _exportsMaster.GetExportedTypeMembers(module.ModuleInfo, type.NamespaceAndName).ToList();
+            Logger.Debug($"[MsvcTypesManager][CreateType] Got {rawMembers.Count} raw members");
+            
             List<UndecoratedFunction> exportedFuncs = rawMembers.OfType<UndecoratedFunction>().ToList();
+            Logger.Debug($"[MsvcTypesManager][CreateType] Found {exportedFuncs.Count} exported functions");
 
             // Collect all vftable addresses and create VftableInfo objects from two sources:
             // 1. Exported vftables (with UndecoratedExportedField wrappers) - PRIORITIZED
             // 2. TypeInfo's vftable (if it's a FirstClassTypeInfo) - Only if not exported
             
+            Logger.Debug($"[MsvcTypesManager][CreateType] ===== VFTABLE COLLECTION PHASE =====");
             List<nuint> allVftableAddresses = new List<nuint>();
             List<VftableInfo> allVftableInfos = new List<VftableInfo>();
             
             // Source 1: Find exported vftables (PRIORITIZED - added first)
+            Logger.Debug($"[MsvcTypesManager][CreateType] SOURCE 1: Searching for exported vftables");
             UndecoratedExportedField[] exportedVftables = rawMembers.OfType<UndecoratedExportedField>()
                                             .Where(member => member.UndecoratedName.EndsWith("`vftable'"))
                                             .ToArray();
+            Logger.Debug($"[MsvcTypesManager][CreateType] Found {exportedVftables.Length} exported vftables");
             
             foreach (var exportedVftable in exportedVftables)
             {
+                Logger.Debug($"[MsvcTypesManager][CreateType]   Exported vftable: {exportedVftable.UndecoratedName} at 0x{exportedVftable.Address:x}");
                 allVftableAddresses.Add(exportedVftable.Address);
                 allVftableInfos.Add(new VftableInfo(finalType, exportedVftable));
             }
             
             // Source 2: Add RTTI vftable addresses (primary + secondary) ONLY if not already exported
+            Logger.Debug($"[MsvcTypesManager][CreateType] SOURCE 2: Checking for RTTI vftables");
             if (type is FirstClassTypeInfo firstClass)
             {
+                Logger.Debug($"[MsvcTypesManager][CreateType] Type is FirstClassTypeInfo");
+                Logger.Debug($"[MsvcTypesManager][CreateType] Primary vftable address: 0x{firstClass.VftableAddress:x}");
+                
                 // Add primary vftable ONLY if not already in the list (i.e., not exported)
                 if (!allVftableAddresses.Contains(firstClass.VftableAddress))
                 {
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Primary vftable NOT in exported list, adding as non-exported");
                     allVftableAddresses.Add(firstClass.VftableAddress);
                     allVftableInfos.Add(new VftableInfo(finalType, firstClass.VftableAddress, $"`vftable' (primary, non-exported)"));
+                }
+                else
+                {
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Primary vftable already in exported list, skipping");
                 }
                 
                 // Add secondary vftables ONLY if not already in the list (i.e., not exported)
                 if (firstClass.SecondaryVftableAddresses != null)
                 {
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Type has {firstClass.SecondaryVftableAddresses.Count()} secondary vftables");
                     int secondaryIndex = 0;
                     foreach (nuint secondaryVftable in firstClass.SecondaryVftableAddresses)
                     {
+                        Logger.Debug($"[MsvcTypesManager][CreateType] Secondary vftable #{secondaryIndex}: 0x{secondaryVftable:x}");
                         if (!allVftableAddresses.Contains(secondaryVftable))
                         {
+                            Logger.Debug($"[MsvcTypesManager][CreateType]   NOT in exported list, adding as non-exported");
                             allVftableAddresses.Add(secondaryVftable);
                             allVftableInfos.Add(new VftableInfo(finalType, secondaryVftable, $"`vftable' (secondary #{secondaryIndex}, non-exported)"));
                             secondaryIndex++;
                         }
                         else
                         {
+                            Logger.Debug($"[MsvcTypesManager][CreateType]   Already in exported list, skipping (incrementing counter)");
                             // Secondary vftable is exported, increment counter anyway for consistent numbering
                             secondaryIndex++;
                         }
                     }
                 }
+                else
+                {
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Type has NO secondary vftables");
+                }
+            }
+            else
+            {
+                Logger.Debug($"[MsvcTypesManager][CreateType] Type is NOT FirstClassTypeInfo, skipping RTTI vftables");
             }
             
+            Logger.Debug($"[MsvcTypesManager][CreateType] Total vftables collected: {allVftableAddresses.Count}");
+            Logger.Debug($"[MsvcTypesManager][CreateType] Setting vftables on finalType");
             // Set all vftables (exported ones first, then non-exported RTTI ones)
             finalType.SetVftables(allVftableInfos.ToArray());
+            Logger.Debug($"[MsvcTypesManager][CreateType] Vftables set on finalType");
 
             // Find all virtual methods (from all vftables)
+            Logger.Debug($"[MsvcTypesManager][CreateType] ===== VIRTUAL METHODS PARSING PHASE =====");
             List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
+            Logger.Debug($"[MsvcTypesManager][CreateType] Getting module exports");
             MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.ModuleInfo, verbose: true);
+            Logger.Debug($"[MsvcTypesManager][CreateType] Module exports retrieved");
             
-            foreach (nuint vftableAddress in allVftableAddresses)
+            Logger.Debug($"[MsvcTypesManager][CreateType] About to parse {allVftableAddresses.Count} vftable(s)");
+            for (int i = 0; i < allVftableAddresses.Count; i++)
             {
-                // ✅ Pass 'this' to VftableParser to enable RTTI-based vftable detection
-                List<UndecoratedFunction> methodsFromThisVftable = VftableParser.AnalyzeVftable(
-                    _tricksterWrapper.GetProcessHandle(),
-                    module,
-                    moduleExports,
-                    type,
-                    vftableAddress,
-                    typesManager: this,
-                    verbose: true);
+                nuint vftableAddress = allVftableAddresses[i];
+                Logger.Debug($"[MsvcTypesManager][CreateType] ----- Parsing vftable {i + 1}/{allVftableAddresses.Count}: 0x{vftableAddress:x} -----");
                 
-                virtualFuncs.AddRange(methodsFromThisVftable);
+                try
+                {
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Calling VftableParser.AnalyzeVftable");
+                    Logger.Debug($"[MsvcTypesManager][CreateType]   ProcessHandle: 0x{_tricksterWrapper.GetProcessHandle().Value:x}");
+                    Logger.Debug($"[MsvcTypesManager][CreateType]   Module: {module.ModuleInfo.Name}");
+                    Logger.Debug($"[MsvcTypesManager][CreateType]   Type: {type.FullTypeName}");
+                    Logger.Debug($"[MsvcTypesManager][CreateType]   VftableAddress: 0x{vftableAddress:x}");
+                    Logger.Debug($"[MsvcTypesManager][CreateType]   TypesManager: this (non-null)");
+                    Logger.Debug($"[MsvcTypesManager][CreateType]   Verbose: true");
+                    
+                    // ✅ Pass 'this' to VftableParser to enable RTTI-based vftable detection
+                    List<UndecoratedFunction> methodsFromThisVftable = VftableParser.AnalyzeVftable(
+                        _tricksterWrapper.GetProcessHandle(),
+                        module,
+                        moduleExports,
+                        type,
+                        vftableAddress,
+                        typesManager: this,
+                        verbose: true);
+                    
+                    Logger.Debug($"[MsvcTypesManager][CreateType] VftableParser.AnalyzeVftable returned {methodsFromThisVftable.Count} methods");
+                    
+                    if (methodsFromThisVftable.Count > 0)
+                    {
+                        Logger.Debug($"[MsvcTypesManager][CreateType] Methods from vftable 0x{vftableAddress:x}:");
+                        for (int j = 0; j < methodsFromThisVftable.Count; j++)
+                        {
+                            var method = methodsFromThisVftable[j];
+                            Logger.Debug($"[MsvcTypesManager][CreateType]   [{j}] {method.UndecoratedFullName} at 0x{method.Address:x}");
+                        }
+                    }
+                    else
+                    {
+                        Logger.Debug($"[MsvcTypesManager][CreateType] WARNING: No methods found for vftable 0x{vftableAddress:x}");
+                    }
+                    
+                    virtualFuncs.AddRange(methodsFromThisVftable);
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Methods added to virtualFuncs. Total so far: {virtualFuncs.Count}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"[MsvcTypesManager][CreateType] EXCEPTION while parsing vftable 0x{vftableAddress:x}");
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Exception type: {ex.GetType().Name}");
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Exception message: {ex.Message}");
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Exception stack trace: {ex.StackTrace}");
+                    if (ex.InnerException != null)
+                    {
+                        Logger.Debug($"[MsvcTypesManager][CreateType] Inner exception: {ex.InnerException.GetType().Name}");
+                        Logger.Debug($"[MsvcTypesManager][CreateType] Inner exception message: {ex.InnerException.Message}");
+                    }
+                    Logger.Debug($"[MsvcTypesManager][CreateType] Continuing to next vftable...");
+                }
             }
+            
+            Logger.Debug($"[MsvcTypesManager][CreateType] All vftables parsed. Total virtual functions found: {virtualFuncs.Count}");
 
             // Remove duplicates - the methods which are both virtual and exported
+            Logger.Debug($"[MsvcTypesManager][CreateType] Removing duplicates from virtualFuncs");
+            int beforeDistinct = virtualFuncs.Count;
             virtualFuncs = virtualFuncs.Distinct().ToList();
+            Logger.Debug($"[MsvcTypesManager][CreateType] After Distinct(): {virtualFuncs.Count} (removed {beforeDistinct - virtualFuncs.Count} duplicates)");
+            
+            int beforeExportedFilter = virtualFuncs.Count;
             virtualFuncs = virtualFuncs.Where(method => !exportedFuncs.Contains(method)).ToList();
+            Logger.Debug($"[MsvcTypesManager][CreateType] After removing exported funcs: {virtualFuncs.Count} (removed {beforeExportedFilter - virtualFuncs.Count} that were also exported)");
 
             // Finalize methods
+            Logger.Debug($"[MsvcTypesManager][CreateType] ===== FINALIZING METHODS =====");
+            Logger.Debug($"[MsvcTypesManager][CreateType] Exported functions: {exportedFuncs.Count}");
+            Logger.Debug($"[MsvcTypesManager][CreateType] Virtual functions (non-exported): {virtualFuncs.Count}");
+            
             IEnumerable<UndecoratedFunction> allFuncs = exportedFuncs.Concat(virtualFuncs);
             MsvcMethod[] msvcMethods = allFuncs.Select(func => new MsvcMethod(finalType, func)).ToArray();
+            Logger.Debug($"[MsvcTypesManager][CreateType] Total methods created: {msvcMethods.Length}");
+            
             finalType.SetMethods(msvcMethods);
+            Logger.Debug($"[MsvcTypesManager][CreateType] Methods set on finalType");
 
+            Logger.Debug($"[MsvcTypesManager][CreateType] ===== END CreateType for {type.FullTypeName} =====");
             return finalType;
         }
+
 
         private MsvcModuleExports GetOrCreateModuleExports(ModuleInfo module, bool verbose = false)
         {
