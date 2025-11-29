@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver;
@@ -70,15 +70,15 @@ public static class VftableParser
             if (i != 0)
             {
                 // Hybrid detection: Check both exports AND RTTI cache
-                bool isVftableByExports = moduleExports.TryGetVftable(nextEntryAddress, out _, verbose);
-                bool isVftableByCache = typesManager?.IsKnownVftableAddress(nextEntryAddress, verbose) ?? false;
+                bool isVftableByExports = moduleExports.TryGetVftable(nextEntryAddress, out _);
+                bool isVftableByCache = typesManager?.IsKnownVftableAddress(nextEntryAddress) ?? false;
                 
                 if (verbose)
                 {
                     Logger.Debug($"[VftableParser][AnalyzeVftable] Iteration {i}: isVftableByExports={isVftableByExports}, isVftableByCache={isVftableByCache}");
                 }
                 
-                // ? NEW: Check both exports AND cache
+                // ✅ NEW: Check both exports AND cache
                 if (isVftableByExports || isVftableByCache)
                 {
                     string detectionMethod = isVftableByExports ? "exports" : "cache";

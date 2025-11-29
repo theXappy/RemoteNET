@@ -321,26 +321,16 @@ namespace ScubaDiver
         /// This method is idempotent - calling it multiple times is safe and efficient (no-op if already populated).
         /// </summary>
         /// <param name="verbose">Enable verbose logging for debugging</param>
-        private void EnsureVftableCachePopulated(bool verbose = false)
+        private void EnsureVftableCachePopulated()
         {
             lock (_getTypesLock)
             {
                 // If cache is already populated, no work needed
                 if (_allKnownVftableAddresses.Count > 0)
-                {
-                    if (verbose)
-                        Logger.Debug($"[MsvcTypesManager][EnsureVftableCachePopulated] Cache already populated with {_allKnownVftableAddresses.Count} vftables");
                     return;
-                }
-                
-                if (verbose)
-                    Logger.Debug("[MsvcTypesManager][EnsureVftableCachePopulated] Cache empty, populating from RTTI...");
                 
                 // Get all modules (with refresh if needed)
                 List<UndecoratedModule> modules = GetUndecoratedModules();
-                
-                if (verbose)
-                    Logger.Debug($"[MsvcTypesManager][EnsureVftableCachePopulated] Found {modules.Count} modules");
                 
                 int totalVftablesAdded = 0;
                 
@@ -369,13 +359,7 @@ namespace ScubaDiver
                             }
                         }
                     }
-                    
-                    if (verbose && moduleVftableCount > 0)
-                        Logger.Debug($"[MsvcTypesManager][EnsureVftableCachePopulated] Module '{undecoratedModule.ModuleInfo.Name}': added {moduleVftableCount} vftables");
                 }
-                
-                if (verbose)
-                    Logger.Debug($"[MsvcTypesManager][EnsureVftableCachePopulated] Cache population complete. Total vftables: {totalVftablesAdded}");
             }
         }
         
@@ -386,38 +370,14 @@ namespace ScubaDiver
         /// <param name="address">The address to check</param>
         /// <param name="verbose">Enable verbose logging for debugging</param>
         /// <returns>True if this address is a known vftable</returns>
-        public bool IsKnownVftableAddress(nuint address, bool verbose = false)
+        public bool IsKnownVftableAddress(nuint address)
         {
             // Ensure cache is populated before querying
-            EnsureVftableCachePopulated(verbose);
+            EnsureVftableCachePopulated();
             
             lock (_getTypesLock)
             {
-                bool found = _allKnownVftableAddresses.Contains(address);
-                
-                if (verbose)
-                {
-                    Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress] Checking address 0x{address:x}");
-                    Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress] Cache size: {_allKnownVftableAddresses.Count} known vftables");
-                    Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress] Result: {found}");
-                    
-                    if (!found && _allKnownVftableAddresses.Count > 0)
-                    {
-                        // Show nearest vftables for debugging
-                        var nearest = _allKnownVftableAddresses
-                            .Select(addr => new { Addr = addr, Distance = addr > address ? addr - address : address - addr })
-                            .OrderBy(x => x.Distance)
-                            .Take(3);
-                        
-                        Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress] Nearest 3 vftables:");
-                        foreach (var n in nearest)
-                        {
-                            Logger.Debug($"[MsvcTypesManager][IsKnownVftableAddress]   0x{n.Addr:x} (distance: 0x{n.Distance:x})");
-                        }
-                    }
-                }
-                
-                return found;
+                return _allKnownVftableAddresses.Contains(address);
             }
         }
 
@@ -431,7 +391,7 @@ namespace ScubaDiver
                 
                 // PHASE 1: Ensure vftable cache is populated before creating any stubs
                 // This ensures the cache is complete before any AnalyzeVftable calls
-                EnsureVftableCachePopulated(verbose: false);
+                EnsureVftableCachePopulated();
                 
                 // PHASE 2: Now create stubs (which may lazy-call CreateType → AnalyzeVftable)
                 // At this point, the cache has ALL vftables from all modules
@@ -483,8 +443,8 @@ namespace ScubaDiver
                 return null;
 
             // Find the type of the vftable
-            MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.Value, verbose: true);
-            if (!moduleExports.TryGetVftable(vftable, out var vftableSymbol, verbose: true))
+            MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.Value);
+            if (!moduleExports.TryGetVftable(vftable, out var vftableSymbol))
                 return null;
 
             // Extract name of type
@@ -657,7 +617,7 @@ namespace ScubaDiver
             Logger.Debug($"[MsvcTypesManager][CreateType] ===== VIRTUAL METHODS PARSING PHASE =====");
             List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
             Logger.Debug($"[MsvcTypesManager][CreateType] Getting module exports");
-            MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.ModuleInfo, verbose: true);
+            MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.ModuleInfo);
             Logger.Debug($"[MsvcTypesManager][CreateType] Module exports retrieved");
             
             Logger.Debug($"[MsvcTypesManager][CreateType] About to parse {allVftableAddresses.Count} vftable(s)");
@@ -749,46 +709,13 @@ namespace ScubaDiver
         }
 
 
-        private MsvcModuleExports GetOrCreateModuleExports(ModuleInfo module, bool verbose = false)
-        {
-            if (verbose)
-                Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Called for module: {module.Name}");
-            
+        private MsvcModuleExports GetOrCreateModuleExports(ModuleInfo module)
+        {            
             if (!_exportsCache.TryGetValue(module, out MsvcModuleExports exports))
             {
-                if (verbose)
-                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Module not in cache, fetching exports from _exportsMaster");
-                
                 IReadOnlyList<UndecoratedSymbol> rawExports = _exportsMaster.GetUndecoratedExports(module);
-                
-                if (verbose)
-                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Got {rawExports.Count} raw exports from _exportsMaster");
-                
-                if (verbose && rawExports.Count > 0)
-                {
-                    int fieldCount = rawExports.OfType<UndecoratedExportedField>().Count();
-                    int funcCount = rawExports.OfType<UndecoratedFunction>().Count();
-                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Breakdown: {fieldCount} UndecoratedExportedField, {funcCount} UndecoratedFunction");
-                    
-                    // Show first 5 raw exports
-                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Sample of raw exports (first 5):");
-                    for (int i = 0; i < Math.Min(5, rawExports.Count); i++)
-                    {
-                        var exp = rawExports[i];
-                        Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports]   Export[{i}]: Type={exp.GetType().Name}, Name={exp.UndecoratedName}");
-                    }
-                }
-                
-                exports = new MsvcModuleExports(rawExports, verbose);
+                exports = new MsvcModuleExports(rawExports);
                 _exportsCache[module] = exports;
-                
-                if (verbose)
-                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Created MsvcModuleExports and added to cache");
-            }
-            else
-            {
-                if (verbose)
-                    Logger.Debug($"[MsvcTypesManager][GetOrCreateModuleExports] Module found in cache");
             }
             
             return exports;
@@ -897,86 +824,14 @@ namespace ScubaDiver
             }
         }
 
-        public MsvcModuleExports(IReadOnlyList<UndecoratedSymbol> exportsList, bool verbose = false)
-        {
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][Constructor] Called with {exportsList.Count} exports");
-            
-            _exportedFields = new Dictionary<nuint, UndecoratedExportedField>();
-            _exportedFunctions = new();
-
-            foreach (UndecoratedSymbol exports in exportsList)
-            {
-                if (exports is UndecoratedExportedField exportedField)
-                {
-                    if (verbose)
-                        Logger.Debug($"[MsvcModuleExports][Constructor] Adding UndecoratedExportedField: {exportedField.UndecoratedName}, XoredAddress=0x{exportedField.XoredAddress:x}");
-                    
-                    _exportedFields[exportedField.XoredAddress /* ! */] = exportedField;
-                }
-                else if (exports is UndecoratedFunction exportedFunction)
-                {
-                    if (verbose)
-                        Logger.Debug($"[MsvcModuleExports][Constructor] Adding UndecoratedFunction: {exportedFunction.UndecoratedName}, Address=0x{exportedFunction.Address:x}");
-                    
-                    _exportedFunctions[exportedFunction.Address /* ! */] = exportedFunction;
-                }
-            }
-            
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][Constructor] Final counts: _exportedFields={_exportedFields.Count}, _exportedFunctions={_exportedFunctions.Count}");
-        }
-
-        public bool TryGetVftable(nuint addr, out UndecoratedExportedField undecoratedExport, bool verbose = false)
-        {
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Called with addr=0x{addr:x}");
-            
-            nuint xoredAddr = addr ^ UndecoratedExportedField.XorMask;
-            
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][TryGetVftable] XorMask=0x{UndecoratedExportedField.XorMask:x}, xoredAddr=0x{xoredAddr:x}");
-            
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Searching in _exportedFields dictionary (count: {_exportedFields.Count})");
-            
+        public bool TryGetVftable(nuint addr, out UndecoratedExportedField undecoratedExport)
+        {   
+            nuint xoredAddr = addr ^ UndecoratedExportedField.XorMask;            
             if (!_exportedFields.TryGetValue(xoredAddr, out undecoratedExport))
             {
-                if (verbose)
-                    Logger.Debug($"[MsvcModuleExports][TryGetVftable] xoredAddr 0x{xoredAddr:x} NOT found in _exportedFields");
-                
-                if (verbose && _exportedFields.Count > 0)
-                {
-                    Logger.Debug($"[MsvcModuleExports][TryGetVftable] Sample of _exportedFields keys (first 5):");
-                    int count = 0;
-                    foreach (var key in _exportedFields.Keys)
-                    {
-                        if (count >= 5) break;
-                        Logger.Debug($"[MsvcModuleExports][TryGetVftable]   Key[{count}]: 0x{key:x} (un-xored: 0x{(key ^ UndecoratedExportedField.XorMask):x})");
-                        count++;
-                    }
-                }
-                
                 return false;
             }
-            
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Found exported field at xoredAddr 0x{xoredAddr:x}");
-            
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][TryGetVftable] UndecoratedName: {undecoratedExport.UndecoratedName}");
-            
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][TryGetVftable] UndecoratedFullName: {undecoratedExport.UndecoratedFullName}");
-            
             bool containsVftable = undecoratedExport.UndecoratedName.Contains("`vftable'");
-            
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Contains '`vftable'': {containsVftable}");
-            
-            if (verbose)
-                Logger.Debug($"[MsvcModuleExports][TryGetVftable] Returning: {containsVftable}");
-            
             return containsVftable;
         }
 
