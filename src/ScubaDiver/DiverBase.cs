@@ -31,13 +31,11 @@ namespace ScubaDiver
         private int _nextAvailableCallbackToken;
         protected readonly ConcurrentDictionary<int, RegisteredManagedMethodHookInfo> _remoteHooks;
         protected readonly HookingCenter _hookingCenter;
-        private readonly ConcurrentDictionary<string, object> _harmonyHookLocks;
 
         public DiverBase(IRequestsListener listener)
         {
             _listener = listener;
             _hookingCenter = new HookingCenter();
-            _harmonyHookLocks = new ConcurrentDictionary<string, object>();
             _responseBodyCreators = new Dictionary<string, Func<ScubaDiverMessage, string>>()
             {
                 // Divert maintenance
@@ -145,6 +143,11 @@ namespace ScubaDiver
             string body;
             if (_responseBodyCreators.TryGetValue(request.UrlAbsolutePath, out var respBodyGenerator))
             {
+                Logger.Debug($"[DiverBase] Handling request for {request.UrlAbsolutePath} (delaying)");
+                // Delaying execution by 5000 ms 
+                Thread.Sleep(5000);
+                Logger.Debug($"[DiverBase] Handling request for {request.UrlAbsolutePath} ... GO!");
+
                 try
                 {
                     body = respBodyGenerator(request);
@@ -206,22 +209,8 @@ namespace ScubaDiver
 
             if (_remoteHooks.TryRemove(token, out RegisteredManagedMethodHookInfo rmhi))
             {
-                // Unregister from HookingCenter
-                if (!string.IsNullOrEmpty(rmhi.UniqueHookId))
-                {
-                    _hookingCenter.UnregisterHook(rmhi.UniqueHookId, token);
-                    
-                    // If this was the last hook for this method, unhook from Harmony
-                    if (_hookingCenter.GetHookCount(rmhi.UniqueHookId) == 0)
-                    {
-                        rmhi.UnhookAction();
-                    }
-                }
-                else
-                {
-                    // Old-style hook without instance filtering
-                    rmhi.UnhookAction();
-                }
+                // Unregister from HookingCenter (it will handle Harmony unhooking if needed)
+                _hookingCenter.UnregisterHookAndUninstall(rmhi.UniqueHookId, token);
                 return "{\"status\":\"OK\"}";
             }
 
@@ -284,39 +273,24 @@ namespace ScubaDiver
             };
 
             Logger.Debug($"[DiverBase] Hooking function {req.MethodName}...");
-            Action unhookAction;
             
             try
             {
-                // Use a lock per unique hook ID to prevent race conditions
-                object hookLock = _harmonyHookLocks.GetOrAdd(uniqueHookId, _ => new object());
-                
-                lock (hookLock)
-                {
-                    // Register this callback with the hooking center first
-                    _hookingCenter.RegisterHook(uniqueHookId, req.InstanceAddress, patchCallback, token);
-                    
-                    // Check if we need to install the Harmony hook
-                    if (_hookingCenter.GetHookCount(uniqueHookId) == 1)
-                    {
-                        // First hook for this method - install the actual Harmony hook
-                        // Use the unified callback from HookingCenter
-                        HarmonyWrapper.HookCallback unifiedCallback = _hookingCenter.CreateUnifiedCallback(uniqueHookId, ResolveInstanceAddress);
-                        unhookAction = HookFunction(req, unifiedCallback);
-                    }
-                    else
-                    {
-                        // Additional hook on same method - Harmony hook already installed
-                        // The unified callback will dispatch to all registered callbacks
-                        unhookAction = () => { }; // No-op unhook since we didn't install a new Harmony hook
-                    }
-                }
+                // Register this callback with the hooking center
+                // It will handle installing the Harmony hook if this is the first registration
+                _hookingCenter.RegisterHookAndInstall(
+                    uniqueHookId, 
+                    req.InstanceAddress, 
+                    patchCallback, 
+                    token,
+                    unifiedCallback => HookFunction(req, unifiedCallback),
+                    ResolveInstanceAddress);
             }
             catch (Exception ex)
             {
-                // Hooking filed so we cleanup the Hook Info we inserted beforehand 
+                // Hooking failed so we cleanup the Hook Info we inserted beforehand 
                 _remoteHooks.TryRemove(token, out _);
-                _hookingCenter.UnregisterHook(uniqueHookId, token);
+                _hookingCenter.UnregisterHookAndUninstall(uniqueHookId, token);
 
                 Logger.Debug($"[DiverBase] Failed to hook func {req.MethodName}. Exception: {ex}");
                 return QuickError($"Failed insert the hook for the function. HarmonyWrapper.AddHook failed. Exception: {ex}", ex.StackTrace);
@@ -329,7 +303,6 @@ namespace ScubaDiver
             {
                 Endpoint = endpoint,
                 RegisteredProxy = patchCallback,
-                UnhookAction = unhookAction,
                 UniqueHookId = uniqueHookId
             };
 

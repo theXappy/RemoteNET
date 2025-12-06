@@ -987,15 +987,7 @@ namespace ScubaDiver
             {
                 return nativeObj.Address;
             }
-
-            // Try to get the pinning address if the object is in the freezer
-            if (_freezer != null && _freezer.TryGetPinningAddress(instance, out ulong pinnedAddress))
-            {
-                return pinnedAddress;
-            }
-
-            // Fallback: use hashcode (not ideal but better than nothing)
-            return (ulong)instance.GetHashCode();
+            throw new ArgumentException("Object is not a NativeObject: " + instance.GetType().FullName);
         }
 
     }

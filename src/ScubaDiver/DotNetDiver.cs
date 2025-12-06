@@ -1579,9 +1579,12 @@ namespace ScubaDiver
             {
                 rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
             }
-            foreach (RegisteredManagedMethodHookInfo rmhi in _remoteHooks.Values)
+            foreach (var hookKvp in _remoteHooks)
             {
-                rmhi.UnhookAction();
+                int token = hookKvp.Key;
+                RegisteredManagedMethodHookInfo rmhi = hookKvp.Value;
+                // Unregister from HookingCenter (it will handle Harmony unhooking if needed)
+                _hookingCenter.UnregisterHookAndUninstall(rmhi.UniqueHookId, token);
             }
             _remoteEventHandler.Clear();
             _remoteHooks.Clear();

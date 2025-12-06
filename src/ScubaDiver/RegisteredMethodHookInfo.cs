@@ -1,29 +1,24 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
+using ScubaDiver.Hooking;
 
 namespace ScubaDiver
 {
     public class RegisteredManagedMethodHookInfo
     {
         /// <summary>
-        /// The patch callback that was registered on the method
+        /// Hook callback that was registered with HookingCenter
         /// </summary>
-        public Delegate RegisteredProxy { get; set; }
+        public HarmonyWrapper.HookCallback RegisteredProxy { get; set; }
 
         /// <summary>
-        /// The IP Endpoint listening for invocations
+        /// Endpoint listening for invocations of the hook
         /// </summary>
         public IPEndPoint Endpoint { get; set; }
 
         /// <summary>
-        /// The method that was hooked
-        /// </summary>
-        public Action UnhookAction{ get; set; }
-
-        /// <summary>
-        /// The unique identifier for this hook (method + position)
+        /// Unique identifier for this method hook (method + position)
+        /// Used to coordinate with HookingCenter for unhooking
         /// </summary>
         public string UniqueHookId { get; set; }
-
     }
 }

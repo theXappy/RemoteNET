@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Reflection;
 
 namespace ScubaDiver.Hooking
@@ -22,53 +23,104 @@ namespace ScubaDiver.Hooking
         }
 
         /// <summary>
-        /// Key: Unique hook identifier (method + position)
-        /// Value: Dictionary mapping token to hook registration
+        /// Information about a Harmony hook installation
         /// </summary>
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<int, HookRegistration>> _instanceHooks;
+        private class HarmonyHookInfo
+        {
+            public Action UnhookAction { get; set; }
+            public ConcurrentDictionary<int, HookRegistration> Registrations { get; set; }
+        }
+
+        /// <summary>
+        /// Key: Unique hook identifier (method + position)
+        /// Value: Harmony hook info containing unhook action and registrations
+        /// </summary>
+        private readonly ConcurrentDictionary<string, HarmonyHookInfo> _harmonyHooks;
+        
+        /// <summary>
+        /// Locks for synchronizing hook installation/uninstallation per unique hook ID
+        /// </summary>
+        private readonly ConcurrentDictionary<string, object> _hookLocks;
 
         public HookingCenter()
         {
-            _instanceHooks = new ConcurrentDictionary<string, ConcurrentDictionary<int, HookRegistration>>();
+            _harmonyHooks = new ConcurrentDictionary<string, HarmonyHookInfo>();
+            _hookLocks = new ConcurrentDictionary<string, object>();
         }
 
         /// <summary>
         /// Registers a hook callback for a specific instance (or all instances if instanceAddress is 0)
+        /// and installs the Harmony hook if this is the first registration for this method.
         /// </summary>
         /// <param name="uniqueHookId">Unique identifier for the method hook (includes position)</param>
         /// <param name="instanceAddress">Address of the instance to hook, or 0 for all instances</param>
         /// <param name="callback">The callback to invoke</param>
         /// <param name="token">Token identifying this hook registration</param>
-        public void RegisterHook(string uniqueHookId, ulong instanceAddress, HarmonyWrapper.HookCallback callback, int token)
+        /// <param name="hookInstaller">Function that installs the Harmony hook and returns an unhook action</param>
+        /// <param name="instanceResolver">Function to resolve an object to its address</param>
+        /// <returns>True if this was the first hook and Harmony was installed, false otherwise</returns>
+        public bool RegisterHookAndInstall(string uniqueHookId, ulong instanceAddress, HarmonyWrapper.HookCallback callback, int token, 
+            Func<HarmonyWrapper.HookCallback, Action> hookInstaller, Func<object, ulong> instanceResolver)
         {
-            var registrations = _instanceHooks.GetOrAdd(uniqueHookId, _ => new ConcurrentDictionary<int, HookRegistration>());
-            registrations[token] = new HookRegistration
+            object hookLock = _hookLocks.GetOrAdd(uniqueHookId, _ => new object());
+            
+            lock (hookLock)
             {
-                InstanceAddress = instanceAddress,
-                OriginalCallback = callback,
-                Token = token
-            };
+                // Get or create the harmony hook info
+                var hookInfo = _harmonyHooks.GetOrAdd(uniqueHookId, _ => new HarmonyHookInfo
+                {
+                    Registrations = new ConcurrentDictionary<int, HookRegistration>()
+                });
+                
+                // Add this registration
+                hookInfo.Registrations[token] = new HookRegistration
+                {
+                    InstanceAddress = instanceAddress,
+                    OriginalCallback = callback,
+                    Token = token
+                };
+                
+                // Check if we need to install the Harmony hook
+                bool isFirstHook = hookInfo.Registrations.Count == 1;
+                if (isFirstHook)
+                {
+                    // First hook for this method - install the actual Harmony hook
+                    HarmonyWrapper.HookCallback unifiedCallback = CreateUnifiedCallback(uniqueHookId, instanceResolver);
+                    hookInfo.UnhookAction = hookInstaller(unifiedCallback);
+                    return true;
+                }
+                
+                return false;
+            }
         }
 
         /// <summary>
-        /// Unregisters a hook callback by token
+        /// Unregisters a hook callback by token and uninstalls the Harmony hook if this was the last registration.
         /// </summary>
         /// <param name="uniqueHookId">Unique identifier for the method hook</param>
         /// <param name="token">Token identifying the hook registration to remove</param>
-        public bool UnregisterHook(string uniqueHookId, int token)
+        /// <returns>True if the hook was removed, false if not found</returns>
+        public bool UnregisterHookAndUninstall(string uniqueHookId, int token)
         {
-            if (_instanceHooks.TryGetValue(uniqueHookId, out var registrations))
-            {
-                bool removed = registrations.TryRemove(token, out _);
+            if (!_harmonyHooks.TryGetValue(uniqueHookId, out var hookInfo))
+                return false;
                 
-                if (removed && registrations.IsEmpty)
+            object hookLock = _hookLocks.GetOrAdd(uniqueHookId, _ => new object());
+            
+            lock (hookLock)
+            {
+                bool removed = hookInfo.Registrations.TryRemove(token, out _);
+                
+                if (removed && hookInfo.Registrations.IsEmpty)
                 {
-                    _instanceHooks.TryRemove(uniqueHookId, out _);
+                    // Last hook for this method - uninstall the Harmony hook
+                    hookInfo.UnhookAction?.Invoke();
+                    _harmonyHooks.TryRemove(uniqueHookId, out _);
+                    _hookLocks.TryRemove(uniqueHookId, out _);
                 }
                 
                 return removed;
             }
-            return false;
         }
 
         /// <summary>
@@ -78,11 +130,11 @@ namespace ScubaDiver.Hooking
         /// <param name="uniqueHookId">Unique identifier for the method hook</param>
         /// <param name="instanceResolver">Function to resolve an object to its address</param>
         /// <returns>A callback that handles instance filtering</returns>
-        public HarmonyWrapper.HookCallback CreateUnifiedCallback(string uniqueHookId, Func<object, ulong> instanceResolver)
+        private HarmonyWrapper.HookCallback CreateUnifiedCallback(string uniqueHookId, Func<object, ulong> instanceResolver)
         {
             return (object instance, object[] args, ref object retValue) =>
             {
-                if (!_instanceHooks.TryGetValue(uniqueHookId, out var registrations) || registrations.IsEmpty)
+                if (!_harmonyHooks.TryGetValue(uniqueHookId, out HarmonyHookInfo hookInfo) || hookInfo.Registrations.IsEmpty)
                 {
                     // This should ideally not happen since we only create unified callbacks when hooks exist
                     // If it does, it means hooks were removed between callback creation and invocation
@@ -109,7 +161,7 @@ namespace ScubaDiver.Hooking
                 // Invoke all matching callbacks
                 bool callOriginal = true;
 
-                foreach (var kvp in registrations)
+                foreach (KeyValuePair<int, HookRegistration> kvp in hookInfo.Registrations)
                 {
                     var registration = kvp.Value;
                     // Check if this callback matches
@@ -133,7 +185,7 @@ namespace ScubaDiver.Hooking
         /// </summary>
         public bool HasHooks(string uniqueHookId)
         {
-            return _instanceHooks.TryGetValue(uniqueHookId, out var dict) && !dict.IsEmpty;
+            return _harmonyHooks.TryGetValue(uniqueHookId, out var hookInfo) && !hookInfo.Registrations.IsEmpty;
         }
 
         /// <summary>
@@ -141,9 +193,9 @@ namespace ScubaDiver.Hooking
         /// </summary>
         public int GetHookCount(string uniqueHookId)
         {
-            if (_instanceHooks.TryGetValue(uniqueHookId, out var dict))
+            if (_harmonyHooks.TryGetValue(uniqueHookId, out var hookInfo))
             {
-                return dict.Count;
+                return hookInfo.Registrations.Count;
             }
             return 0;
         }
