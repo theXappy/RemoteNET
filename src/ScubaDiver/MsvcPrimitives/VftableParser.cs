@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver;
@@ -93,7 +93,7 @@ public static class VftableParser
                         undecoratedFullName: $"{type.NamespaceAndName}::{subName}",
                         undecoratedName: subName,
                         address: entryContent,
-                        numArgs: 1, // TODO: This is 99% wrong
+                        numArgs: 10, // TODO: This is 99% wrong, but I think it's ok in Microsoft's "x64 calling convention" to have more args than needed.
                         retType: "void*" // TODO: Also XX% wrong
                         );
                 }
