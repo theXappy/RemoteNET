@@ -72,6 +72,12 @@ public static class VftableParser
                 break;
             }
 
+            if (entryContent == 0)
+            {
+                nullTerminatorFound = true;
+                break;
+            }
+
             if (!moduleExports.TryGetFunc(entryContent, out UndecoratedFunction undecFunc))
             {
                 // Check for anon-exported method of our type. We should still add it to the list.
