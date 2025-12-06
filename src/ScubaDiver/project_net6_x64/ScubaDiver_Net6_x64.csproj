@@ -17,6 +17,7 @@
 		<Compile Include="..\DiverBase.cs" />
 		<Compile Include="..\DllEntry.cs" />
 		<Compile Include="..\Hooking\HarmonyWrapper.cs" Link="Hooking\HarmonyWrapper.cs" />
+		<Compile Include="..\Hooking\HookingCenter.cs" Link="Hooking\HookingCenter.cs" />
 		<Compile Include="..\Hooking\DetoursNetWrapper.cs" Link="Hooking\DetoursNetWrapper.cs" />
 		<Compile Include="..\Logger.cs" />
 		<Compile Include="..\RegisteredEventHandlerInfo.cs" />

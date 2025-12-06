@@ -13,6 +13,11 @@ namespace ScubaDiver.API.Interactions.Callbacks
 
         public string HookPosition { get; set; } // FFS: "Pre" or "Post"
 
+        /// <summary>
+        /// Optional: If specified, only hooks on this specific instance (address). 0 means hook all instances.
+        /// </summary>
+        public ulong InstanceAddress { get; set; }
+
     }
 
 }

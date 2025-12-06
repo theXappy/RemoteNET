@@ -43,6 +43,7 @@
     <Compile Include="..\DiverBase.cs" />
     <Compile Include="..\DllEntry.cs" />
     <Compile Include="..\Hooking\HarmonyWrapper.cs" />
+    <Compile Include="..\Hooking\HookingCenter.cs" />
     <Compile Include="..\Logger.cs" />
     <Compile Include="..\Properties\AssemblyInfo.cs" />
     <Compile Include="..\RegisteredEventHandlerInfo.cs" />

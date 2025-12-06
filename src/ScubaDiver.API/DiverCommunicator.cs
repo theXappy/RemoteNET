@@ -485,7 +485,7 @@ namespace ScubaDiver.API
             }
         }
 
-        public bool HookMethod(MethodBase methodBase, HarmonyPatchPosition pos, LocalHookCallback callback, List<string> parametersTypeFullNames = null)
+        public bool HookMethod(MethodBase methodBase, HarmonyPatchPosition pos, LocalHookCallback callback, List<string> parametersTypeFullNames = null, ulong instanceAddress = 0)
         {
             if (!_listener.IsOpen)
             {
@@ -499,7 +499,8 @@ namespace ScubaDiver.API
                 TypeFullName = methodBase.DeclaringType.FullName,
                 MethodName = methodBase.Name,
                 HookPosition = pos.ToString(),
-                ParametersTypeFullNames = parametersTypeFullNames
+                ParametersTypeFullNames = parametersTypeFullNames,
+                InstanceAddress = instanceAddress
             };
 
             var requestJsonBody = JsonConvert.SerializeObject(req);

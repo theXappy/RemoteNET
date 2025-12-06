@@ -977,5 +977,26 @@ namespace ScubaDiver
         {
         }
 
+        protected override ulong ResolveInstanceAddress(object instance)
+        {
+            if (instance == null)
+                return 0;
+
+            // For MSVC/native objects, check if it's a NativeObject
+            if (instance is NativeObject nativeObj)
+            {
+                return nativeObj.Address;
+            }
+
+            // Try to get the pinning address if the object is in the freezer
+            if (_freezer != null && _freezer.TryGetPinningAddress(instance, out ulong pinnedAddress))
+            {
+                return pinnedAddress;
+            }
+
+            // Fallback: use hashcode (not ideal but better than nothing)
+            return (ulong)instance.GetHashCode();
+        }
+
     }
 }

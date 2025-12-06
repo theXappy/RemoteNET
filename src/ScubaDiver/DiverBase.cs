@@ -30,10 +30,12 @@ namespace ScubaDiver
         protected bool _monitorEndpoints = true;
         private int _nextAvailableCallbackToken;
         protected readonly ConcurrentDictionary<int, RegisteredManagedMethodHookInfo> _remoteHooks;
+        protected readonly HookingCenter _hookingCenter;
 
         public DiverBase(IRequestsListener listener)
         {
             _listener = listener;
+            _hookingCenter = new HookingCenter();
             _responseBodyCreators = new Dictionary<string, Func<ScubaDiverMessage, string>>()
             {
                 // Divert maintenance
@@ -202,7 +204,22 @@ namespace ScubaDiver
 
             if (_remoteHooks.TryRemove(token, out RegisteredManagedMethodHookInfo rmhi))
             {
-                rmhi.UnhookAction();
+                // Unregister from HookingCenter
+                if (!string.IsNullOrEmpty(rmhi.UniqueHookId))
+                {
+                    _hookingCenter.UnregisterHook(rmhi.UniqueHookId, token);
+                    
+                    // If this was the last hook for this method, unhook from Harmony
+                    if (_hookingCenter.GetHookCount(rmhi.UniqueHookId) == 0)
+                    {
+                        rmhi.UnhookAction();
+                    }
+                }
+                else
+                {
+                    // Old-style hook without instance filtering
+                    rmhi.UnhookAction();
+                }
                 return "{\"status\":\"OK\"}";
             }
 
@@ -236,11 +253,25 @@ namespace ScubaDiver
             int token = AssignCallbackToken();
             Logger.Debug($"[DiverBase] Hook Method - Assigned Token: {token}");
             Logger.Debug($"[DiverBase] Hook Method - endpoint: {endpoint}");
+            Logger.Debug($"[DiverBase] Hook Method - Instance Address: {req.InstanceAddress:X}");
 
+            // Generate unique hook ID for this method+position combination
+            string uniqueHookId = GenerateHookId(req);
 
             // Preparing a proxy method that Harmony will invoke
             HarmonyWrapper.HookCallback patchCallback = (object obj, object[] args, ref object retValue) =>
             {
+                // Check if this invocation matches the instance filter (if any)
+                if (req.InstanceAddress != 0)
+                {
+                    ulong instanceAddress = ResolveInstanceAddress(obj);
+                    if (instanceAddress != req.InstanceAddress)
+                    {
+                        // Wrong instance, skip this callback
+                        return true; // Call original
+                    }
+                }
+
                 object[] parameters = new object[args.Length + 1];
                 parameters[0] = obj;
                 Array.Copy(args, 0, parameters, 1, args.Length);
@@ -262,9 +293,26 @@ namespace ScubaDiver
 
             Logger.Debug($"[DiverBase] Hooking function {req.MethodName}...");
             Action unhookAction;
+            
+            // Check if this is the first hook for this method
+            bool isFirstHook = !_hookingCenter.HasHooks(uniqueHookId);
+            
             try
             {
-                unhookAction = HookFunction(req, patchCallback);
+                if (isFirstHook)
+                {
+                    // First hook for this method - install the actual Harmony hook
+                    unhookAction = HookFunction(req, patchCallback);
+                }
+                else
+                {
+                    // Additional hook on same method - no need to install Harmony hook again
+                    // The existing hook will dispatch to all registered callbacks
+                    unhookAction = () => { }; // No-op unhook since we didn't install a new Harmony hook
+                }
+                
+                // Register this callback with the hooking center
+                _hookingCenter.RegisterHook(uniqueHookId, req.InstanceAddress, patchCallback, token);
             }
             catch (Exception ex)
             {
@@ -282,12 +330,21 @@ namespace ScubaDiver
             {
                 Endpoint = endpoint,
                 RegisteredProxy = patchCallback,
-                UnhookAction = unhookAction
+                UnhookAction = unhookAction,
+                UniqueHookId = uniqueHookId
             };
 
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
+
+        private string GenerateHookId(FunctionHookRequest req)
+        {
+            string paramsList = string.Join(";", req.ParametersTypeFullNames ?? new List<string>());
+            return $"{req.TypeFullName}:{paramsList}:{req.MethodName}:{req.HookPosition}";
+        }
+
+        protected abstract ulong ResolveInstanceAddress(object instance);
 
         public abstract object ResolveHookReturnValue(ObjectOrRemoteAddress oora);
 

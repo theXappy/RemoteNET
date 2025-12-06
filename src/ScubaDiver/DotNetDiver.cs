@@ -1587,5 +1587,23 @@ namespace ScubaDiver
             _remoteHooks.Clear();
             Logger.Debug("[DotNetDiver] Removed all event subscriptions & hooks");
         }
+
+        protected override ulong ResolveInstanceAddress(object instance)
+        {
+            if (instance == null)
+                return 0;
+
+            // Try to get the pinning address if the object is pinned
+            if (_freezer.TryGetPinningAddress(instance, out ulong pinnedAddress))
+            {
+                return pinnedAddress;
+            }
+
+            // For unpinned objects, we can't reliably get their address
+            // as it can change due to GC. In this case, we use object reference equality
+            // which is handled by comparing object identity in the callback.
+            // Return a pseudo-address based on the object's identity hash code
+            return (ulong)System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(instance);
+        }
     }
 }

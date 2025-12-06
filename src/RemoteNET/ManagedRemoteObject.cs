@@ -139,5 +139,30 @@ namespace RemoteNET
         {
             throw new NotImplementedException("Not implemented in Managed context");
         }
+
+        /// <summary>
+        /// Hooks a method on this specific instance.
+        /// This is a convenience method that calls app.HookingManager.HookMethod with this instance.
+        /// </summary>
+        /// <param name="methodToHook">The method to hook</param>
+        /// <param name="pos">Position of the hook (Prefix, Postfix, or Finalizer)</param>
+        /// <param name="hookAction">The callback to invoke when the method is called</param>
+        /// <returns>True on success</returns>
+        public bool Hook(System.Reflection.MethodBase methodToHook, ScubaDiver.API.Hooking.HarmonyPatchPosition pos, RemoteNET.Common.DynamifiedHookCallback hookAction)
+        {
+            return _app.HookingManager.HookMethod(methodToHook, pos, hookAction, this);
+        }
+
+        /// <summary>
+        /// Patches a method on this specific instance with prefix, postfix, and/or finalizer hooks.
+        /// This is a convenience method that calls app.HookingManager.Patch with this instance.
+        /// </summary>
+        public void Patch(System.Reflection.MethodBase original,
+            RemoteNET.Common.DynamifiedHookCallback prefix = null,
+            RemoteNET.Common.DynamifiedHookCallback postfix = null,
+            RemoteNET.Common.DynamifiedHookCallback finalizer = null)
+        {
+            _app.HookingManager.Patch(original, prefix, postfix, finalizer, this);
+        }
     }
 }

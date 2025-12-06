@@ -48,8 +48,15 @@ public class RemoteHookingManager
 
     /// <returns>True on success, false otherwise</returns>
 
-    public bool HookMethod(MethodBase methodToHook, HarmonyPatchPosition pos, DynamifiedHookCallback hookAction)
+    public bool HookMethod(MethodBase methodToHook, HarmonyPatchPosition pos, DynamifiedHookCallback hookAction, RemoteObject instance = null)
     {
+        // Extract instance address if provided
+        ulong instanceAddress = 0;
+        if (instance != null)
+        {
+            instanceAddress = instance.RemoteToken;
+        }
+
         // Wrapping the callback which uses `dynamic`s in a callback that handles `ObjectOrRemoteAddresses`
         // and converts them to DROs
         LocalHookCallback wrappedHook = WrapCallback(hookAction);
@@ -65,8 +72,9 @@ public class RemoteHookingManager
         {
             throw new NotImplementedException("Shouldn't use same hook for 2 patches of the same method");
         }
-        if (methodHooks.Any(existingHook => existingHook.Value.Position == pos))
+        if (instanceAddress == 0 && methodHooks.Any(existingHook => existingHook.Value.Position == pos))
         {
+            // Only prevent duplicate hooks if hooking all instances
             throw new NotImplementedException("Can not set 2 hooks in the same position on a single target");
         }
 
@@ -86,7 +94,46 @@ public class RemoteHookingManager
                 methodToHook.GetParameters().Select(prm => prm.ParameterType.FullName).ToList();
         }
 
-        return _app.Communicator.HookMethod(methodToHook, pos, wrappedHook, parametersTypeFullNames);
+        return _app.Communicator.HookMethod(methodToHook, pos, wrappedHook, parametersTypeFullNames, instanceAddress);
+    }
+
+    /// <summary>
+    /// Hook a method on a specific instance using a dynamic object
+    /// </summary>
+    public bool HookMethod(MethodBase methodToHook, HarmonyPatchPosition pos, DynamifiedHookCallback hookAction, dynamic instance)
+    {
+        RemoteObject remoteObj = null;
+        
+        // Try to extract RemoteObject from dynamic
+        if (instance != null)
+        {
+            // If it's already a RemoteObject, use it directly
+            if (instance is RemoteObject ro)
+            {
+                remoteObj = ro;
+            }
+            // Otherwise, try to get the underlying RemoteObject from DynamicRemoteObject
+            else
+            {
+                try
+                {
+                    // DynamicRemoteObject has a GetRemoteObject method or RemoteObject property
+                    var remoteObjProp = instance.GetType().GetProperty("RemoteObject", 
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (remoteObjProp != null)
+                    {
+                        remoteObj = remoteObjProp.GetValue(instance) as RemoteObject;
+                    }
+                }
+                catch
+                {
+                    throw new ArgumentException("Unable to extract RemoteObject from the provided dynamic instance. " +
+                        "Please provide a RemoteObject or DynamicRemoteObject.");
+                }
+            }
+        }
+
+        return HookMethod(methodToHook, pos, hookAction, remoteObj);
     }
 
     private LocalHookCallback WrapCallback(DynamifiedHookCallback hookAction)
@@ -148,7 +195,8 @@ public class RemoteHookingManager
     public void Patch(MethodBase original,
         DynamifiedHookCallback prefix = null,
         DynamifiedHookCallback postfix = null,
-        DynamifiedHookCallback finalizer = null)
+        DynamifiedHookCallback finalizer = null,
+        RemoteObject instance = null)
     {
         if (prefix == null &&
             postfix == null &&
@@ -159,15 +207,15 @@ public class RemoteHookingManager
 
         if (prefix != null)
         {
-            HookMethod(original, HarmonyPatchPosition.Prefix, prefix);
+            HookMethod(original, HarmonyPatchPosition.Prefix, prefix, instance);
         }
         if (postfix != null)
         {
-            HookMethod(original, HarmonyPatchPosition.Postfix, postfix);
+            HookMethod(original, HarmonyPatchPosition.Postfix, postfix, instance);
         }
         if (finalizer != null)
         {
-            HookMethod(original, HarmonyPatchPosition.Finalizer, finalizer);
+            HookMethod(original, HarmonyPatchPosition.Finalizer, finalizer, instance);
         }
     }
 

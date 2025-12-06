@@ -20,5 +20,10 @@ namespace ScubaDiver
         /// </summary>
         public Action UnhookAction{ get; set; }
 
+        /// <summary>
+        /// The unique identifier for this hook (method + position)
+        /// </summary>
+        public string UniqueHookId { get; set; }
+
     }
 }
