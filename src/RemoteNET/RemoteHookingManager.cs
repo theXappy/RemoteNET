@@ -27,16 +27,21 @@ public class RemoteHookingManager
         public DynamifiedHookCallback HookAction { get; set; }
         public LocalHookCallback WrappedHookAction { get; private set; }
         public HarmonyPatchPosition Position { get; private set; }
-        public PositionedLocalHook(DynamifiedHookCallback action, LocalHookCallback callback, HarmonyPatchPosition pos)
+        public ulong InstanceAddress { get; private set; }
+        public PositionedLocalHook(DynamifiedHookCallback action, LocalHookCallback callback, HarmonyPatchPosition pos, ulong instanceAddress)
         {
             HookAction = action;
             WrappedHookAction = callback;
             Position = pos;
+            InstanceAddress = instanceAddress;
         }
     }
     private class MethodHooks : Dictionary<DynamifiedHookCallback, PositionedLocalHook>
     {
     }
+    
+    // Cache for RemoteObject property reflection
+    private static System.Reflection.PropertyInfo _remoteObjectProperty = null;
 
 
     public RemoteHookingManager(RemoteApp app)
@@ -70,15 +75,15 @@ public class RemoteHookingManager
 
         if (methodHooks.ContainsKey(hookAction))
         {
-            throw new NotImplementedException("Shouldn't use same hook for 2 patches of the same method");
+            throw new NotImplementedException("Shouldn't use same hook callback for 2 patches of the same method");
         }
-        if (instanceAddress == 0 && methodHooks.Any(existingHook => existingHook.Value.Position == pos))
+        // Check for duplicate hooks on same instance and position
+        if (methodHooks.Any(existingHook => existingHook.Value.Position == pos && existingHook.Value.InstanceAddress == instanceAddress))
         {
-            // Only prevent duplicate hooks if hooking all instances
-            throw new NotImplementedException("Can not set 2 hooks in the same position on a single target");
+            throw new NotImplementedException($"Can not set 2 hooks in the same position on the same {(instanceAddress == 0 ? "target (all instances)" : "instance")}");
         }
 
-        methodHooks.Add(hookAction, new PositionedLocalHook(hookAction, wrappedHook, pos));
+        methodHooks.Add(hookAction, new PositionedLocalHook(hookAction, wrappedHook, pos, instanceAddress));
 
         List<string> parametersTypeFullNames;
         if (methodToHook is IRttiMethodBase rttiMethod)
@@ -117,12 +122,16 @@ public class RemoteHookingManager
             {
                 try
                 {
-                    // DynamicRemoteObject has a GetRemoteObject method or RemoteObject property
-                    var remoteObjProp = instance.GetType().GetProperty("RemoteObject", 
-                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    if (remoteObjProp != null)
+                    // Cache the PropertyInfo for better performance
+                    if (_remoteObjectProperty == null)
                     {
-                        remoteObj = remoteObjProp.GetValue(instance) as RemoteObject;
+                        _remoteObjectProperty = instance.GetType().GetProperty("RemoteObject", 
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    }
+                    
+                    if (_remoteObjectProperty != null)
+                    {
+                        remoteObj = _remoteObjectProperty.GetValue(instance) as RemoteObject;
                     }
                 }
                 catch

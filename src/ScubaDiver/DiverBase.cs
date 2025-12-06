@@ -31,11 +31,13 @@ namespace ScubaDiver
         private int _nextAvailableCallbackToken;
         protected readonly ConcurrentDictionary<int, RegisteredManagedMethodHookInfo> _remoteHooks;
         protected readonly HookingCenter _hookingCenter;
+        private readonly ConcurrentDictionary<string, object> _harmonyHookLocks;
 
         public DiverBase(IRequestsListener listener)
         {
             _listener = listener;
             _hookingCenter = new HookingCenter();
+            _harmonyHookLocks = new ConcurrentDictionary<string, object>();
             _responseBodyCreators = new Dictionary<string, Func<ScubaDiverMessage, string>>()
             {
                 // Divert maintenance
@@ -294,30 +296,37 @@ namespace ScubaDiver
             Logger.Debug($"[DiverBase] Hooking function {req.MethodName}...");
             Action unhookAction;
             
-            // Check if this is the first hook for this method
-            bool isFirstHook = !_hookingCenter.HasHooks(uniqueHookId);
-            
             try
             {
-                if (isFirstHook)
-                {
-                    // First hook for this method - install the actual Harmony hook
-                    unhookAction = HookFunction(req, patchCallback);
-                }
-                else
-                {
-                    // Additional hook on same method - no need to install Harmony hook again
-                    // The existing hook will dispatch to all registered callbacks
-                    unhookAction = () => { }; // No-op unhook since we didn't install a new Harmony hook
-                }
+                // Use a lock per unique hook ID to prevent race conditions
+                object hookLock = _harmonyHookLocks.GetOrAdd(uniqueHookId, _ => new object());
                 
-                // Register this callback with the hooking center
-                _hookingCenter.RegisterHook(uniqueHookId, req.InstanceAddress, patchCallback, token);
+                lock (hookLock)
+                {
+                    // Register this callback with the hooking center first
+                    _hookingCenter.RegisterHook(uniqueHookId, req.InstanceAddress, patchCallback, token);
+                    
+                    // Check if we need to install the Harmony hook
+                    if (_hookingCenter.GetHookCount(uniqueHookId) == 1)
+                    {
+                        // First hook for this method - install the actual Harmony hook
+                        // Use the unified callback from HookingCenter
+                        HarmonyWrapper.HookCallback unifiedCallback = _hookingCenter.CreateUnifiedCallback(uniqueHookId, ResolveInstanceAddress);
+                        unhookAction = HookFunction(req, unifiedCallback);
+                    }
+                    else
+                    {
+                        // Additional hook on same method - Harmony hook already installed
+                        // The unified callback will dispatch to all registered callbacks
+                        unhookAction = () => { }; // No-op unhook since we didn't install a new Harmony hook
+                    }
+                }
             }
             catch (Exception ex)
             {
                 // Hooking filed so we cleanup the Hook Info we inserted beforehand 
                 _remoteHooks.TryRemove(token, out _);
+                _hookingCenter.UnregisterHook(uniqueHookId, token);
 
                 Logger.Debug($"[DiverBase] Failed to hook func {req.MethodName}. Exception: {ex}");
                 return QuickError($"Failed insert the hook for the function. HarmonyWrapper.AddHook failed. Exception: {ex}", ex.StackTrace);

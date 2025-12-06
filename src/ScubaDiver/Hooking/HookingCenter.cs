@@ -23,13 +23,13 @@ namespace ScubaDiver.Hooking
 
         /// <summary>
         /// Key: Unique hook identifier (method + position)
-        /// Value: List of hook registrations for that method
+        /// Value: Dictionary mapping token to hook registration
         /// </summary>
-        private readonly ConcurrentDictionary<string, ConcurrentBag<HookRegistration>> _instanceHooks;
+        private readonly ConcurrentDictionary<string, ConcurrentDictionary<int, HookRegistration>> _instanceHooks;
 
         public HookingCenter()
         {
-            _instanceHooks = new ConcurrentDictionary<string, ConcurrentBag<HookRegistration>>();
+            _instanceHooks = new ConcurrentDictionary<string, ConcurrentDictionary<int, HookRegistration>>();
         }
 
         /// <summary>
@@ -41,13 +41,13 @@ namespace ScubaDiver.Hooking
         /// <param name="token">Token identifying this hook registration</param>
         public void RegisterHook(string uniqueHookId, ulong instanceAddress, HarmonyWrapper.HookCallback callback, int token)
         {
-            var registrations = _instanceHooks.GetOrAdd(uniqueHookId, _ => new ConcurrentBag<HookRegistration>());
-            registrations.Add(new HookRegistration
+            var registrations = _instanceHooks.GetOrAdd(uniqueHookId, _ => new ConcurrentDictionary<int, HookRegistration>());
+            registrations[token] = new HookRegistration
             {
                 InstanceAddress = instanceAddress,
                 OriginalCallback = callback,
                 Token = token
-            });
+            };
         }
 
         /// <summary>
@@ -59,34 +59,14 @@ namespace ScubaDiver.Hooking
         {
             if (_instanceHooks.TryGetValue(uniqueHookId, out var registrations))
             {
-                // We can't efficiently remove from ConcurrentBag, so we'll mark it for filtering
-                // or recreate the bag without the item
-                var newBag = new ConcurrentBag<HookRegistration>();
-                bool found = false;
-                foreach (var reg in registrations)
+                bool removed = registrations.TryRemove(token, out _);
+                
+                if (removed && registrations.IsEmpty)
                 {
-                    if (reg.Token != token)
-                    {
-                        newBag.Add(reg);
-                    }
-                    else
-                    {
-                        found = true;
-                    }
+                    _instanceHooks.TryRemove(uniqueHookId, out _);
                 }
                 
-                if (found)
-                {
-                    if (newBag.IsEmpty)
-                    {
-                        _instanceHooks.TryRemove(uniqueHookId, out _);
-                    }
-                    else
-                    {
-                        _instanceHooks[uniqueHookId] = newBag;
-                    }
-                    return true;
-                }
+                return removed;
             }
             return false;
         }
@@ -126,8 +106,9 @@ namespace ScubaDiver.Hooking
                 // Invoke all matching callbacks
                 bool callOriginal = true;
 
-                foreach (var registration in registrations)
+                foreach (var kvp in registrations)
                 {
+                    var registration = kvp.Value;
                     // Check if this callback matches
                     bool shouldInvoke = registration.InstanceAddress == 0 || // Global hook (all instances)
                                        registration.InstanceAddress == instanceAddress; // Instance-specific match
@@ -149,7 +130,7 @@ namespace ScubaDiver.Hooking
         /// </summary>
         public bool HasHooks(string uniqueHookId)
         {
-            return _instanceHooks.TryGetValue(uniqueHookId, out var bag) && !bag.IsEmpty;
+            return _instanceHooks.TryGetValue(uniqueHookId, out var dict) && !dict.IsEmpty;
         }
 
         /// <summary>
@@ -157,9 +138,9 @@ namespace ScubaDiver.Hooking
         /// </summary>
         public int GetHookCount(string uniqueHookId)
         {
-            if (_instanceHooks.TryGetValue(uniqueHookId, out var bag))
+            if (_instanceHooks.TryGetValue(uniqueHookId, out var dict))
             {
-                return bag.Count;
+                return dict.Count;
             }
             return 0;
         }
