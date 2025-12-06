@@ -84,7 +84,9 @@ namespace ScubaDiver.Hooking
             {
                 if (!_instanceHooks.TryGetValue(uniqueHookId, out var registrations) || registrations.IsEmpty)
                 {
-                    // No callbacks registered, call original
+                    // This should ideally not happen since we only create unified callbacks when hooks exist
+                    // If it does, it means hooks were removed between callback creation and invocation
+                    Logger.Debug($"[HookingCenter] Warning: Unified callback invoked for {uniqueHookId} but no registrations found");
                     return true;
                 }
 
@@ -96,9 +98,10 @@ namespace ScubaDiver.Hooking
                     {
                         instanceAddress = instanceResolver(instance);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // If resolution fails, treat as 0 (unknown)
+                        // Log the exception for debugging but continue with address 0
+                        Logger.Debug($"[HookingCenter] Failed to resolve instance address for {uniqueHookId}: {ex.Message}");
                         instanceAddress = 0;
                     }
                 }

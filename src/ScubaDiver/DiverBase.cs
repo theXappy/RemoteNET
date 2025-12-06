@@ -261,19 +261,9 @@ namespace ScubaDiver
             string uniqueHookId = GenerateHookId(req);
 
             // Preparing a proxy method that Harmony will invoke
+            // Note: Instance filtering is handled by HookingCenter, not here
             HarmonyWrapper.HookCallback patchCallback = (object obj, object[] args, ref object retValue) =>
             {
-                // Check if this invocation matches the instance filter (if any)
-                if (req.InstanceAddress != 0)
-                {
-                    ulong instanceAddress = ResolveInstanceAddress(obj);
-                    if (instanceAddress != req.InstanceAddress)
-                    {
-                        // Wrong instance, skip this callback
-                        return true; // Call original
-                    }
-                }
-
                 object[] parameters = new object[args.Length + 1];
                 parameters[0] = obj;
                 Array.Copy(args, 0, parameters, 1, args.Length);

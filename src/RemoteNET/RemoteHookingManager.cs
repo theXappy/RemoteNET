@@ -40,8 +40,9 @@ public class RemoteHookingManager
     {
     }
     
-    // Cache for RemoteObject property reflection
+    // Cache for RemoteObject property reflection (thread-safe via lock)
     private static System.Reflection.PropertyInfo _remoteObjectProperty = null;
+    private static readonly object _remoteObjectPropertyLock = new object();
 
 
     public RemoteHookingManager(RemoteApp app)
@@ -122,11 +123,17 @@ public class RemoteHookingManager
             {
                 try
                 {
-                    // Cache the PropertyInfo for better performance
+                    // Cache the PropertyInfo for better performance (thread-safe)
                     if (_remoteObjectProperty == null)
                     {
-                        _remoteObjectProperty = instance.GetType().GetProperty("RemoteObject", 
-                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        lock (_remoteObjectPropertyLock)
+                        {
+                            if (_remoteObjectProperty == null)
+                            {
+                                _remoteObjectProperty = instance.GetType().GetProperty("RemoteObject", 
+                                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                            }
+                        }
                     }
                     
                     if (_remoteObjectProperty != null)

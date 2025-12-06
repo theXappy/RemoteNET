@@ -1600,9 +1600,12 @@ namespace ScubaDiver
             }
 
             // For unpinned objects, we can't reliably get their address
-            // as it can change due to GC. In this case, we use object reference equality
-            // which is handled by comparing object identity in the callback.
-            // Return a pseudo-address based on the object's identity hash code
+            // as it can change due to GC. In this case, we use object identity hash code.
+            // IMPORTANT: RuntimeHelpers.GetHashCode provides stable identity for the lifetime
+            // of an object, but different objects may have the same hash code (collisions).
+            // This means instance-specific hooks on unpinned objects may occasionally trigger
+            // for wrong instances if hash codes collide. For reliable instance-specific hooking,
+            // ensure objects are pinned before hooking.
             return (ulong)System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(instance);
         }
     }
