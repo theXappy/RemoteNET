@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver;
@@ -24,7 +24,7 @@ public static class VftableParser
         RichModuleInfo module, 
         MsvcModuleExports moduleExports, 
         TypeInfo type, 
-        nuint vftableAddress, 
+        nuint xoredVftableAddress, 
         MsvcTypesManager typesManager = null)
     {
         Logger.Debug($"[VftableParser][AnalyzeVftable] Analyzing vftable for type {type.FullTypeName} in module {module.ModuleInfo.Name}");
@@ -39,19 +39,19 @@ public static class VftableParser
             );
 
         bool nextVftableFound = false;
-        
+        bool nullTerminatorFound = false;
         // Assuming at most 99 functions in the vftable.
         for (int i = 0; i < 100; i++)
         {
             // Check if this address is some other type's vftable address.
             // (Not checking the first one, since it's OUR vftable)
-            nuint nextEntryAddress = (nuint)(vftableAddress + (nuint)(i * IntPtr.Size));
+            nuint nextEntryAddress = (nuint)((xoredVftableAddress ^ FirstClassTypeInfo.XorMask) + (nuint)(i * IntPtr.Size));
             
             if (i != 0)
             {
                 // Hybrid detection: Check both exports AND RTTI cache
                 bool isVftableByExports = moduleExports.TryGetVftable(nextEntryAddress, out _);
-                bool isVftableByCache = typesManager?.IsKnownVftableAddress(nextEntryAddress) ?? false;
+                bool isVftableByCache = typesManager?.IsKnownVftableAddress(nextEntryAddress ^ FirstClassTypeInfo.XorMask) ?? false;
                 
                 // ✅ NEW: Check both exports AND cache
                 if (isVftableByExports || isVftableByCache)
@@ -101,7 +101,7 @@ public static class VftableParser
             virtualMethods.Add(undecFunc);
         }
 
-        if (nextVftableFound)
+        if (nextVftableFound || nullTerminatorFound)
         {
             return virtualMethods;
         }

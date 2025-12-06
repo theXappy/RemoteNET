@@ -143,11 +143,6 @@ namespace ScubaDiver
             string body;
             if (_responseBodyCreators.TryGetValue(request.UrlAbsolutePath, out var respBodyGenerator))
             {
-                Logger.Debug($"[DiverBase] Handling request for {request.UrlAbsolutePath} (delaying)");
-                // Delaying execution by 5000 ms 
-                Thread.Sleep(5000);
-                Logger.Debug($"[DiverBase] Handling request for {request.UrlAbsolutePath} ... GO!");
-
                 try
                 {
                     body = respBodyGenerator(request);

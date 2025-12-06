@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 
 namespace ScubaDiver
 {
@@ -36,7 +37,7 @@ namespace ScubaDiver
     public class VftableInfo : FieldInfo, ISymbolBackedMember
     {
         private MsvcType _type;
-        private nuint _address;
+        private nuint _xoredAddress;
         private string _name;
         
         public UndecoratedExportedField ExportedField { get; set; }
@@ -47,21 +48,21 @@ namespace ScubaDiver
         {
             _type = msvcType;
             ExportedField = symbol;
-            _address = symbol.Address;
+            _xoredAddress = symbol.Address;
             _name = symbol.UndecoratedName;
         }
         
         // Constructor for RTTI vftables (not exported)
-        public VftableInfo(MsvcType msvcType, nuint vftableAddress, string name = null)
+        public VftableInfo(MsvcType msvcType, nuint xoredVftableAddress, string name = null)
         {
             _type = msvcType;
             ExportedField = null;
-            _address = vftableAddress;
-            _name = name ?? $"`vftable' (at 0x{vftableAddress:x})";
+            _xoredAddress = xoredVftableAddress;
+            _name = name ?? $"`vftable' (at 0x{xoredVftableAddress ^ FirstClassTypeInfo.XorMask:x})";
         }
 
         public override string Name => _name;
-        public ulong Address => (ulong)_address;
+        public ulong Address => _xoredAddress ^ FirstClassTypeInfo.XorMask;
         public override Type DeclaringType => _type;
         public override object GetValue(object obj) => Address;
 
@@ -258,10 +259,10 @@ namespace ScubaDiver
         // Vftables cache.
         //  <vftable address : Type>
         Dictionary<nuint, MsvcTypeStub> _vftablesCache = new();
-        
+
         // All known vftable addresses from RTTI-discovered types
         // Populated during GetTypes() to enable boundary detection in VftableParser
-        private HashSet<nuint> _allKnownVftableAddresses = new HashSet<nuint>();
+        private HashSet<nuint> _allKnownXoredVftableAddresses = new HashSet<nuint>();
 
         private Dictionary<ModuleInfo, MsvcModuleExports> _exportsCache;
 
@@ -311,7 +312,7 @@ namespace ScubaDiver
                 // Clear vftable cache on refresh since runtime may have changed
                 lock (_getTypesLock)
                 {
-                    _allKnownVftableAddresses.Clear();
+                    _allKnownXoredVftableAddresses.Clear();
                 }
             }
         }
@@ -326,37 +327,25 @@ namespace ScubaDiver
             lock (_getTypesLock)
             {
                 // If cache is already populated, no work needed
-                if (_allKnownVftableAddresses.Count > 0)
+                if (_allKnownXoredVftableAddresses.Count > 0)
                     return;
                 
                 // Get all modules (with refresh if needed)
                 List<UndecoratedModule> modules = GetUndecoratedModules();
-                
-                int totalVftablesAdded = 0;
-                
                 // Populate cache from all FirstClassTypeInfo instances across all modules
                 foreach (UndecoratedModule undecoratedModule in modules)
-                {
-                    int moduleVftableCount = 0;
-                    
+                {   
                     foreach (Rtti.TypeInfo type in undecoratedModule.Types)
                     {
-                        if (type is FirstClassTypeInfo firstClass)
+                        if (type is not FirstClassTypeInfo firstClass)
+                            continue;
+
+                        _allKnownXoredVftableAddresses.Add(firstClass.XoredVftableAddress);
+
+                        // Also add secondary vftables (multiple inheritance)
+                        foreach (nuint xoredSecondaryVftable in firstClass.XoredSecondaryVftableAddresses ?? Enumerable.Empty<nuint>())
                         {
-                            _allKnownVftableAddresses.Add(firstClass.VftableAddress);
-                            moduleVftableCount++;
-                            totalVftablesAdded++;
-                            
-                            // Also add secondary vftables (multiple inheritance)
-                            if (firstClass.SecondaryVftableAddresses != null)
-                            {
-                                foreach (nuint secondaryVftable in firstClass.SecondaryVftableAddresses)
-                                {
-                                    _allKnownVftableAddresses.Add(secondaryVftable);
-                                    moduleVftableCount++;
-                                    totalVftablesAdded++;
-                                }
-                            }
+                            _allKnownXoredVftableAddresses.Add(xoredSecondaryVftable);
                         }
                     }
                 }
@@ -367,17 +356,17 @@ namespace ScubaDiver
         /// Checks if the given address is a known vftable address from RTTI-discovered types.
         /// Automatically populates the cache on first call if needed.
         /// </summary>
-        /// <param name="address">The address to check</param>
+        /// <param name="xoredVftableAddress">The address to check</param>
         /// <param name="verbose">Enable verbose logging for debugging</param>
         /// <returns>True if this address is a known vftable</returns>
-        public bool IsKnownVftableAddress(nuint address)
+        public bool IsKnownVftableAddress(nuint xoredVftableAddress)
         {
             // Ensure cache is populated before querying
             EnsureVftableCachePopulated();
             
             lock (_getTypesLock)
             {
-                return _allKnownVftableAddresses.Contains(address);
+                return _allKnownXoredVftableAddresses.Contains(xoredVftableAddress);
             }
         }
 
@@ -523,7 +512,7 @@ namespace ScubaDiver
             // 1. Exported vftables (with UndecoratedExportedField wrappers) - PRIORITIZED
             // 2. TypeInfo's vftable (if it's a FirstClassTypeInfo) - Only if not exported
             
-            List<nuint> allVftableAddresses = new List<nuint>();
+            List<nuint> allXoredVftableAddresses = new List<nuint>();
             List<VftableInfo> allVftableInfos = new List<VftableInfo>();
             
             // Source 1: Find exported vftables (PRIORITIZED - added first)
@@ -533,7 +522,7 @@ namespace ScubaDiver
             
             foreach (UndecoratedExportedField exportedVftable in exportedVftables)
             {
-                allVftableAddresses.Add(exportedVftable.Address);
+                allXoredVftableAddresses.Add(exportedVftable.XoredAddress);
                 allVftableInfos.Add(new VftableInfo(finalType, exportedVftable));
             }
             
@@ -541,22 +530,22 @@ namespace ScubaDiver
             if (type is FirstClassTypeInfo firstClass)
             {
                 // Add primary vftable ONLY if not already in the list (i.e., not exported)
-                if (!allVftableAddresses.Contains(firstClass.VftableAddress))
+                if (!allXoredVftableAddresses.Contains(firstClass.XoredVftableAddress))
                 {
-                    allVftableAddresses.Add(firstClass.VftableAddress);
-                    allVftableInfos.Add(new VftableInfo(finalType, firstClass.VftableAddress, $"`vftable' (primary, non-exported)"));
+                    allXoredVftableAddresses.Add(firstClass.XoredVftableAddress);
+                    allVftableInfos.Add(new VftableInfo(finalType, firstClass.XoredVftableAddress, $"`vftable' (primary, non-exported)"));
                 }
                 
                 // Add secondary vftables ONLY if not already in the list (i.e., not exported)
                 if (firstClass.SecondaryVftableAddresses != null)
                 {
                     int secondaryIndex = 0;
-                    foreach (nuint secondaryVftable in firstClass.SecondaryVftableAddresses)
+                    foreach (nuint xoredSecondaryVftable in firstClass.XoredSecondaryVftableAddresses)
                     {
-                        if (!allVftableAddresses.Contains(secondaryVftable))
+                        if (!allXoredVftableAddresses.Contains(xoredSecondaryVftable))
                         {
-                            allVftableAddresses.Add(secondaryVftable);
-                            allVftableInfos.Add(new VftableInfo(finalType, secondaryVftable, $"`vftable' (secondary #{secondaryIndex}, non-exported)"));
+                            allXoredVftableAddresses.Add(xoredSecondaryVftable);
+                            allVftableInfos.Add(new VftableInfo(finalType, xoredSecondaryVftable, $"`vftable' (secondary #{secondaryIndex}, non-exported)"));
                             secondaryIndex++;
                         }
                         else
@@ -574,9 +563,9 @@ namespace ScubaDiver
             // Find all virtual methods (from all vftables)
             List<UndecoratedFunction> virtualFuncs = new List<UndecoratedFunction>();
             MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.ModuleInfo);
-            for (int i = 0; i < allVftableAddresses.Count; i++)
+            for (int i = 0; i < allXoredVftableAddresses.Count; i++)
             {
-                nuint vftableAddress = allVftableAddresses[i];                
+                nuint xoredVftableAddress = allXoredVftableAddresses[i];                
                 try
                 {                    
                     // ✅ Pass 'this' to VftableParser to enable RTTI-based vftable detection
@@ -585,7 +574,7 @@ namespace ScubaDiver
                         module,
                         moduleExports,
                         type,
-                        vftableAddress,
+                        xoredVftableAddress,
                         typesManager: this);
                     
                     if (methodsFromThisVftable.Count > 0)
@@ -600,7 +589,7 @@ namespace ScubaDiver
                 }
                 catch (Exception ex)
                 {
-                    Logger.Debug($"[MsvcTypesManager][CreateType] EXCEPTION while parsing vftable 0x{vftableAddress:x}");
+                    Logger.Debug($"[MsvcTypesManager][CreateType] EXCEPTION while parsing vftable 0x{xoredVftableAddress:x}");
                     Logger.Debug($"[MsvcTypesManager][CreateType] Exception type: {ex.GetType().Name}");
                     Logger.Debug($"[MsvcTypesManager][CreateType] Exception message: {ex.Message}");
                     Logger.Debug($"[MsvcTypesManager][CreateType] Exception stack trace: {ex.StackTrace}");
