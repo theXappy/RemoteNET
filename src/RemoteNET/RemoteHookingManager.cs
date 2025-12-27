@@ -167,6 +167,19 @@ public class RemoteHookingManager
                 {
                     try
                     {
+                        if (_app is UnmanagedRemoteApp ura)
+                        {
+                            // {[ObjectOrRemoteAddress] RemoteAddress: 0x000000d1272fb618, Type: libSpen_base.dll!SPen::File}
+                            string module = oora.Assembly;
+                            if (module == null)
+                            {
+                                int separatorPos = oora.Type.IndexOf("!");
+                                if (separatorPos != -1)
+                                    module = oora.Type.Substring(0, separatorPos);
+                            }
+                            if (module != null)
+                                ura.Communicator.StartOffensiveGC(module);
+                        }
                         RemoteObject roInstance = this._app.GetRemoteObject(oora);
                         o = roInstance.Dynamify();
                     }
