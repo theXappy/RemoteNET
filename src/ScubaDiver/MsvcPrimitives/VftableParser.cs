@@ -27,7 +27,6 @@ public static class VftableParser
         nuint xoredVftableAddress, 
         MsvcTypesManager typesManager = null)
     {
-        Logger.Debug($"[VftableParser][AnalyzeVftable] Analyzing vftable for type {type.FullTypeName} in module {module.ModuleInfo.Name}");
         IReadOnlyList<ModuleSection> textSections = module.GetSections(".TEXT").ToList();
         List<UndecoratedFunction> virtualMethods = new List<UndecoratedFunction>();
 
@@ -112,7 +111,6 @@ public static class VftableParser
             return virtualMethods;
         }
 
-        Logger.Debug("[VftableParser][AnalyzeVftable] Returning empty list (no next vftable found)");
         return new();
     }
 

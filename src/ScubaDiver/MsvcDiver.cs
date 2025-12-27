@@ -308,11 +308,6 @@ namespace ScubaDiver
 
             IReadOnlyList<MsvcTypeStub> matchingTypes = _typesManager.GetTypes(msvcModuleFilter, typeFilterPredicate);
 
-            Logger.Debug($"[MsvcDiver] Found GetTypes finished with {matchingTypes.Count} results, waiting 10 seconds");
-            Thread.Sleep(TimeSpan.FromSeconds(10));
-            Logger.Debug($"[MsvcDiver] Found GetTypes finished with {matchingTypes.Count} results ... GO!");
-
-
             List<TypesDump.TypeIdentifiers> types = new();
             foreach (MsvcTypeStub typeStub in matchingTypes)
             {

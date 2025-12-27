@@ -485,7 +485,6 @@ namespace ScubaDiver
         {
             Func<MsvcType> upgrader = () =>
             {
-                Logger.Debug($"[MsvcTypesManager] Upgrading type {type.FullTypeName}");
                 return CreateType(module, type);
             };
             MsvcTypeStub newType = new MsvcTypeStub(type, new Lazy<MsvcType>(upgrader));
