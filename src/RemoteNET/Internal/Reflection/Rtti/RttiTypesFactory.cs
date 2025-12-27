@@ -202,12 +202,13 @@ namespace RemoteNET.RttiReflection
                 func.ReturnTypeFullName,
                 func.ReturnTypeName);
 
+            MethodAttributes attributes = (MethodAttributes)func.Attributes;
             if (areConstructors)
             {
                 // TODO: RTTI ConstructorsType
                 LazyRemoteTypeResolver declaringTypeResolver = new LazyRemoteTypeResolver(declaringType);
                 RemoteRttiConstructorInfo ctorInfo =
-                    new RemoteRttiConstructorInfo(declaringTypeResolver, parameters.ToArray());
+                    new RemoteRttiConstructorInfo(declaringTypeResolver, parameters.ToArray(), attributes);
                 declaringType.AddConstructor(ctorInfo);
                 return ctorInfo;
             }
@@ -229,7 +230,7 @@ namespace RemoteNET.RttiReflection
 
                 RemoteRttiMethodInfo methodInfo =
                     new RemoteRttiMethodInfo(declaringTypeResolver, returnTypeResolver, func.Name, mangledName,
-                        parameters.ToArray(), (MethodAttributes)func.Attributes);
+                        parameters.ToArray(), attributes);
                 declaringType.AddMethod(methodInfo);
                 return methodInfo;
             }
