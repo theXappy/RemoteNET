@@ -208,7 +208,7 @@ namespace RemoteNET.RttiReflection
                 // TODO: RTTI ConstructorsType
                 LazyRemoteTypeResolver declaringTypeResolver = new LazyRemoteTypeResolver(declaringType);
                 RemoteRttiConstructorInfo ctorInfo =
-                    new RemoteRttiConstructorInfo(declaringTypeResolver, parameters.ToArray(), attributes);
+                    new RemoteRttiConstructorInfo(mangledName, declaringTypeResolver, parameters.ToArray(), attributes);
                 declaringType.AddConstructor(ctorInfo);
                 return ctorInfo;
             }

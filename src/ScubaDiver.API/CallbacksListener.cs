@@ -254,11 +254,8 @@ namespace ScubaDiver.API
 
                 ObjectOrRemoteAddress instance = ObjectOrRemoteAddress.Null;
                 IEnumerable<ObjectOrRemoteAddress> args = invokeRequest.Parameters;
-                if (!methodInfo.IsStatic)
-                {
-                    instance = invokeRequest.Parameters.FirstOrDefault();
-                    args = invokeRequest.Parameters.Skip(1);
-                }
+                instance = invokeRequest.Parameters.FirstOrDefault();
+                args = invokeRequest.Parameters.Skip(1);
 
                 hook.Invoke(
                     hookContext, 
