@@ -71,7 +71,14 @@ namespace RemoteNET
 
         ~ManagedRemoteObject()
         {
-            _ref?.RemoteRelease();
+            try
+            {
+                _ref?.RemoteRelease();
+            }
+            catch
+            {
+                // Remote process might be gone; never let finalizer exceptions crash the host.
+            }
             _ref = null;
         }
 
