@@ -76,13 +76,15 @@ namespace RemoteNET.Tests
             tricksterWrapper.Refresh();
 
             // Get all modules that contain "Q_" 
-            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains("Q_", StringComparison.OrdinalIgnoreCase));
+            string targetName = "lib~pen_".Replace('~', 'S');
+            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains(targetName, StringComparison.OrdinalIgnoreCase));
             
             // Assert we found the module
-            Assert.That(modules, Is.Not.Empty, "Should find at least one Q_ module");
-            
-            var Q_Module = modules.FirstOrDefault(m => m.Name.Contains("Q_base", StringComparison.OrdinalIgnoreCase));
-            Assert.That(Q_Module, Is.Not.Null, "Should find Q_base module specifically");
+            Assert.That(modules, Is.Not.Empty, $"Should find at least one {targetName} module");
+
+            string baseName = "lib~pen_base".Replace('~', 'S');
+            var Q_Module = modules.FirstOrDefault(m => m.Name.Contains(baseName, StringComparison.OrdinalIgnoreCase));
+            Assert.That(Q_Module, Is.Not.Null, $"Should find {baseName} module specifically");
             
             Console.WriteLine($"Found module: {Q_Module.Name}");
             Console.WriteLine($"Types in module: {Q_Module.Types.Count()}");
@@ -109,21 +111,23 @@ namespace RemoteNET.Tests
             
             // Act - Force a refresh to pick up newly loaded modules
             tricksterWrapper.Refresh();
-            
-            // Get all modules that contain "Q_" 
-            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains("Q_", StringComparison.OrdinalIgnoreCase));
+
+            // Get all modules that contain "Q_"
+            string targetName = "lib~pen_".Replace('~', 'S');
+            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains(targetName, StringComparison.OrdinalIgnoreCase));
             
             if (!modules.Any())
             {
-                Assert.Inconclusive("No Q_ modules found for this test");
+                Assert.Fail("No Q_ modules found for this test");
             }
-            
-            var Q_Module = modules.FirstOrDefault(m => m.Name.Contains("Q_base", StringComparison.OrdinalIgnoreCase));
+
+            string baseName = "lib~pen_base".Replace('~', 'S');
+            var Q_Module = modules.FirstOrDefault(m => m.Name.Contains(baseName, StringComparison.OrdinalIgnoreCase));
             if (Q_Module == null)
             {
-                Assert.Inconclusive("Q_base module not found for this test");
+                Assert.Fail($"{baseName} module not found for this test");
             }
-            
+
             // Act - Look for any type that is just "SPen" (without namespace qualifiers)
             var incorrectSPenTypes = Q_Module.Types.Where(t => 
                 string.Equals(t.FullTypeName, "SPen", StringComparison.OrdinalIgnoreCase) ||
@@ -149,13 +153,14 @@ namespace RemoteNET.Tests
             // Test if the issue is with exports parsing
             var process = Process.GetCurrentProcess();
             var modules = process.Modules.Cast<ProcessModule>().ToList();
-            
+
+            string baseName = "lib~pen_base".Replace('~', 'S');
             var Q_Module = modules.FirstOrDefault(m => 
-                m.ModuleName.Contains("Q_base", StringComparison.OrdinalIgnoreCase));
+                m.ModuleName.Contains(baseName, StringComparison.OrdinalIgnoreCase));
             
             if (Q_Module == null)
             {
-                Assert.Inconclusive("Q_base module not loaded");
+                Assert.Fail($"{baseName} module not loaded");
             }
             
             var moduleInfo = new ModuleInfo(
