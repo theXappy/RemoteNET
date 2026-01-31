@@ -198,11 +198,13 @@ namespace SourceGenerator.Tests
             // Provided DLLs
             var injectedDlls = new List<string>
             {
-                @"C:\\Program Files\\WindowsApps\\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\\msvcp140_app.dll",
-                @"C:\\Q_base.dll",
-                @"C:\\Q_worddoc.dll",
-                @"C:\\Q_document.dll"
+                @"C:\Program Files\WindowsApps\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\msvcp140_app.dll",
+                @"C:\testkit\lib~pen_base.dll",
+                @"C:\testkit\lib~pen_worddoc.dll",
+                @"C:\testkit\lib~pen_document.dll"
             };
+            injectedDlls = injectedDlls.Select(d => d.Replace("~", "S")).ToList();
+
             // Provided types
             var typesToInspect = new List<string>
             {
@@ -227,33 +229,34 @@ namespace SourceGenerator.Tests
                 "*!SPen::WStringEventListener",
                 "*!SPen::WTextEventListener",
                 "*!SPen::WVoiceDataEventListener",
-                "libSpen_base.dll!SPen::Bundle",
-                "libSpen_base.dll!SPen::List",
-                "libSpen_document.dll!SPen::HistoryData",
-                "libSpen_document.dll!SPen::HistoryManager",
-                "libSpen_document.dll!SPen::HistoryManager::CommandJob",
-                "libSpen_document.dll!SPen::ICursorEventCallback",
-                "libSpen_document.dll!SPen::ILayerEventCallback",
-                "libSpen_document.dll!SPen::IObjectEventCallback",
-                "libSpen_document.dll!SPen::IObjectIndexMovedEventCallback",
-                "libSpen_document.dll!SPen::IPageEventCallback",
-                "libSpen_document.dll!SPen::ITextEventCallback",
-                "libSpen_document.dll!SPen::MediaFileManager",
-                "libSpen_document.dll!SPen::ModelContext",
-                "libSpen_base.dll!SPen::Point",
-                "libSpen_base.dll!SPen::PointD",
-                "libSpen_base.dll!SPen::PointF",
-                "libSpen_base.dll!SPen::Rect",
-                "libSpen_base.dll!SPen::RectD",
-                "libSpen_base.dll!SPen::RectF",
-                "libSpen_document.dll!SPen::StringIDManager",
-                "libSpen_document.dll!SPen::VoiceNameManager",
-                "libSpen_document.dll!SPen::ObjectBase",
-                "libSpen_document.dll!SPen::ObjectList",
-                "libSpen_document.dll!SPen::ObjectSpan",
-                "libSpen_worddoc.dll!SPen::WPage",
-                "libSpen_worddoc.dll!SPen::WNote"
+                "lib~pen_base.dll!SPen::Bundle",
+                "lib~pen_base.dll!SPen::List",
+                "lib~pen_document.dll!SPen::HistoryData",
+                "lib~pen_document.dll!SPen::HistoryManager",
+                "lib~pen_document.dll!SPen::HistoryManager::CommandJob",
+                "lib~pen_document.dll!SPen::ICursorEventCallback",
+                "lib~pen_document.dll!SPen::ILayerEventCallback",
+                "lib~pen_document.dll!SPen::IObjectEventCallback",
+                "lib~pen_document.dll!SPen::IObjectIndexMovedEventCallback",
+                "lib~pen_document.dll!SPen::IPageEventCallback",
+                "lib~pen_document.dll!SPen::ITextEventCallback",
+                "lib~pen_document.dll!SPen::MediaFileManager",
+                "lib~pen_document.dll!SPen::ModelContext",
+                "lib~pen_base.dll!SPen::Point",
+                "lib~pen_base.dll!SPen::PointD",
+                "lib~pen_base.dll!SPen::PointF",
+                "lib~pen_base.dll!SPen::Rect",
+                "lib~pen_base.dll!SPen::RectD",
+                "lib~pen_base.dll!SPen::RectF",
+                "lib~pen_document.dll!SPen::StringIDManager",
+                "lib~pen_document.dll!SPen::VoiceNameManager",
+                "lib~pen_document.dll!SPen::ObjectBase",
+                "lib~pen_document.dll!SPen::ObjectList",
+                "lib~pen_document.dll!SPen::ObjectSpan",
+                "lib~pen_worddoc.dll!SPen::WPage",
+                "lib~pen_worddoc.dll!SPen::WNote"
             };
+            injectedDlls = injectedDlls.Select(d => d.Replace("~", "S")).ToList();
 
             var output = new Dictionary<string, string>();
             biz.UnsafeExecute(injectedDlls, typesToInspect, (name, text) =>
@@ -278,14 +281,16 @@ namespace SourceGenerator.Tests
             // Provided DLLs
             var injectedDlls = new List<string>
             {
-                @"C:\\Program Files\\WindowsApps\\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\\msvcp140_app.dll",
-                @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_worddoc.dll",
-                @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_document.dll"
+                @"C:\Program Files\WindowsApps\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\msvcp140_app.dll",
+                @"C:\testkit\lib~pen_worddoc.dll",
+                @"C:\testkit\lib~pen_document.dll"
             };
+            injectedDlls = injectedDlls.Select(d => d.Replace("~", "S")).ToList();
+
             // Provided types
             var typesToInspect = new List<string>
             {
-                "libSpen_base.dll!SPen::Uuid",
+                "lib~pen_base.dll!SPen::Uuid",
                 "*!SPen::String",
                 "*!SPen::BaseData",
                 //"*!SPen::NoteZip",
@@ -306,33 +311,34 @@ namespace SourceGenerator.Tests
                 "*!SPen::WStringEventListener",
                 "*!SPen::WTextEventListener",
                 "*!SPen::WVoiceDataEventListener",
-                "libSpen_base.dll!SPen::Bundle",
-                "libSpen_base.dll!SPen::List",
-                "libSpen_document.dll!SPen::HistoryData",
-                "libSpen_document.dll!SPen::HistoryManager",
-                "libSpen_document.dll!SPen::HistoryManager::CommandJob",
-                "libSpen_document.dll!SPen::ICursorEventCallback",
-                "libSpen_document.dll!SPen::ILayerEventCallback",
-                "libSpen_document.dll!SPen::IObjectEventCallback",
-                "libSpen_document.dll!SPen::IObjectIndexMovedEventCallback",
-                "libSpen_document.dll!SPen::IPageEventCallback",
-                "libSpen_document.dll!SPen::ITextEventCallback",
-                "libSpen_document.dll!SPen::MediaFileManager",
-                "libSpen_document.dll!SPen::ModelContext",
-                "libSpen_base.dll!SPen::Point",
-                "libSpen_base.dll!SPen::PointD",
-                "libSpen_base.dll!SPen::PointF",
-                "libSpen_base.dll!SPen::Rect",
-                "libSpen_base.dll!SPen::RectD",
-                "libSpen_base.dll!SPen::RectF",
-                "libSpen_document.dll!SPen::StringIDManager",
-                "libSpen_document.dll!SPen::VoiceNameManager",
-                "libSpen_document.dll!SPen::ObjectBase",
-                "libSpen_document.dll!SPen::ObjectList",
-                "libSpen_document.dll!SPen::ObjectSpan",
-                "libSpen_worddoc.dll!SPen::WPage",
-                "libSpen_worddoc.dll!SPen::WNote"
+                "lib~pen_base.dll!SPen::Bundle",
+                "lib~pen_base.dll!SPen::List",
+                "lib~pen_document.dll!SPen::HistoryData",
+                "lib~pen_document.dll!SPen::HistoryManager",
+                "lib~pen_document.dll!SPen::HistoryManager::CommandJob",
+                "lib~pen_document.dll!SPen::ICursorEventCallback",
+                "lib~pen_document.dll!SPen::ILayerEventCallback",
+                "lib~pen_document.dll!SPen::IObjectEventCallback",
+                "lib~pen_document.dll!SPen::IObjectIndexMovedEventCallback",
+                "lib~pen_document.dll!SPen::IPageEventCallback",
+                "lib~pen_document.dll!SPen::ITextEventCallback",
+                "lib~pen_document.dll!SPen::MediaFileManager",
+                "lib~pen_document.dll!SPen::ModelContext",
+                "lib~pen_base.dll!SPen::Point",
+                "lib~pen_base.dll!SPen::PointD",
+                "lib~pen_base.dll!SPen::PointF",
+                "lib~pen_base.dll!SPen::Rect",
+                "lib~pen_base.dll!SPen::RectD",
+                "lib~pen_base.dll!SPen::RectF",
+                "lib~pen_document.dll!SPen::StringIDManager",
+                "lib~pen_document.dll!SPen::VoiceNameManager",
+                "lib~pen_document.dll!SPen::ObjectBase",
+                "lib~pen_document.dll!SPen::ObjectList",
+                "lib~pen_document.dll!SPen::ObjectSpan",
+                "lib~pen_worddoc.dll!SPen::WPage",
+                "lib~pen_worddoc.dll!SPen::WNote"
             };
+            typesToInspect = typesToInspect.Select(t => t.Replace("~", "S")).ToList();
 
             foreach (var type in typesToInspect)
             {
@@ -355,7 +361,7 @@ namespace SourceGenerator.Tests
 
         public static IEnumerable<object[]> UnsafeExecute_TypeCases()
         {
-            yield return new object[] { "libSpen_base.dll!SPen::Uuid" };
+            yield return new object[] { "lib~pen_base.dll!SPen::Uuid" };
             yield return new object[] { "*!SPen::String" };
             yield return new object[] { "*!SPen::BaseData" };
             yield return new object[] { "*!SPen::NoteZip" };
@@ -376,35 +382,35 @@ namespace SourceGenerator.Tests
             yield return new object[] { "*!SPen::WStringEventListener" };
             yield return new object[] { "*!SPen::WTextEventListener" };
             yield return new object[] { "*!SPen::WVoiceDataEventListener" };
-            yield return new object[] { "libSpen_base.dll!SPen::Bundle" };
-            yield return new object[] { "libSpen_base.dll!SPen::List" };
-            yield return new object[] { "libSpen_document.dll!SPen::HistoryData" };
-            yield return new object[] { "libSpen_document.dll!SPen::HistoryManager" };
-            yield return new object[] { "libSpen_document.dll!SPen::HistoryManager::CommandJob" };
-            yield return new object[] { "libSpen_document.dll!SPen::ICursorEventCallback" };
-            yield return new object[] { "libSpen_document.dll!SPen::ILayerEventCallback" };
-            yield return new object[] { "libSpen_document.dll!SPen::IObjectEventCallback" };
-            yield return new object[] { "libSpen_document.dll!SPen::IObjectIndexMovedEventCallback" };
-            yield return new object[] { "libSpen_document.dll!SPen::IPageEventCallback" };
-            yield return new object[] { "libSpen_document.dll!SPen::ITextEventCallback" };
-            yield return new object[] { "libSpen_document.dll!SPen::MediaFileManager" };
-            yield return new object[] { "libSpen_document.dll!SPen::ModelContext" };
-            yield return new object[] { "libSpen_base.dll!SPen::Point" };
-            yield return new object[] { "libSpen_base.dll!SPen::PointD" };
-            yield return new object[] { "libSpen_base.dll!SPen::PointF" };
-            yield return new object[] { "libSpen_base.dll!SPen::Rect" };
-            yield return new object[] { "libSpen_base.dll!SPen::RectD" };
-            yield return new object[] { "libSpen_base.dll!SPen::RectF" };
-            yield return new object[] { "libSpen_document.dll!SPen::StringIDManager" };
-            yield return new object[] { "libSpen_document.dll!SPen::VoiceNameManager" };
-            yield return new object[] { "libSpen_document.dll!SPen::ObjectBase" };
-            yield return new object[] { "libSpen_document.dll!SPen::ObjectList" };
-            yield return new object[] { "libSpen_document.dll!SPen::ObjectSpan" };
-            yield return new object[] { "libSpen_worddoc.dll!SPen::WPage" };
-            yield return new object[] { "libSpen_worddoc.dll!SPen::WNote" };
-            yield return new object[] { "libSpen_base.dll!SPen::ArrayList" };
-            yield return new object[] { "libSpen_document.dll!SPen::HistoryManager" };
-            yield return new object[] { "libSpen_document.dll!SPen::LineColorEffect" };
+            yield return new object[] { "lib~pen_base.dll!SPen::Bundle" };
+            yield return new object[] { "lib~pen_base.dll!SPen::List" };
+            yield return new object[] { "lib~pen_document.dll!SPen::HistoryData" };
+            yield return new object[] { "lib~pen_document.dll!SPen::HistoryManager" };
+            yield return new object[] { "lib~pen_document.dll!SPen::HistoryManager::CommandJob" };
+            yield return new object[] { "lib~pen_document.dll!SPen::ICursorEventCallback" };
+            yield return new object[] { "lib~pen_document.dll!SPen::ILayerEventCallback" };
+            yield return new object[] { "lib~pen_document.dll!SPen::IObjectEventCallback" };
+            yield return new object[] { "lib~pen_document.dll!SPen::IObjectIndexMovedEventCallback" };
+            yield return new object[] { "lib~pen_document.dll!SPen::IPageEventCallback" };
+            yield return new object[] { "lib~pen_document.dll!SPen::ITextEventCallback" };
+            yield return new object[] { "lib~pen_document.dll!SPen::MediaFileManager" };
+            yield return new object[] { "lib~pen_document.dll!SPen::ModelContext" };
+            yield return new object[] { "lib~pen_base.dll!SPen::Point" };
+            yield return new object[] { "lib~pen_base.dll!SPen::PointD" };
+            yield return new object[] { "lib~pen_base.dll!SPen::PointF" };
+            yield return new object[] { "lib~pen_base.dll!SPen::Rect" };
+            yield return new object[] { "lib~pen_base.dll!SPen::RectD" };
+            yield return new object[] { "lib~pen_base.dll!SPen::RectF" };
+            yield return new object[] { "lib~pen_document.dll!SPen::StringIDManager" };
+            yield return new object[] { "lib~pen_document.dll!SPen::VoiceNameManager" };
+            yield return new object[] { "lib~pen_document.dll!SPen::ObjectBase" };
+            yield return new object[] { "lib~pen_document.dll!SPen::ObjectList" };
+            yield return new object[] { "lib~pen_document.dll!SPen::ObjectSpan" };
+            yield return new object[] { "lib~pen_worddoc.dll!SPen::WPage" };
+            yield return new object[] { "lib~pen_worddoc.dll!SPen::WNote" };
+            yield return new object[] { "lib~pen_base.dll!SPen::ArrayList" };
+            yield return new object[] { "lib~pen_document.dll!SPen::HistoryManager" };
+            yield return new object[] { "lib~pen_document.dll!SPen::LineColorEffect" };
         }
 
         [Ignore]
@@ -416,8 +422,8 @@ namespace SourceGenerator.Tests
             var injectedDlls = new List<string>
             {
                 @"C:\\Program Files\\WindowsApps\\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\\msvcp140_app.dll",
-                @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_worddoc.dll",
-                @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_document.dll"
+                @"C:\\Q_worddoc.dll",
+                @"C:\\Q_document.dll"
             };
             var output = new Dictionary<string, string>();
             biz.UnsafeExecute(injectedDlls, new List<string> { type }, (name, text) =>
@@ -440,13 +446,13 @@ namespace SourceGenerator.Tests
             var injectedDlls = new List<string>
             {
                 @"C:\\Program Files\\WindowsApps\\Microsoft.VCLibs.140.00_14.0.33519.0_x64__8wekyb3d8bbwe\\msvcp140_app.dll",
-                @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_worddoc.dll",
-                @"C:\\Users\\Shai\\Desktop\\SAM_NOTES_RES\\inspection\\libSpen_document.dll"
+                @"C:\\Q_worddoc.dll",
+                @"C:\\Q_document.dll"
             };
             // Provided types
             var typesToInspect = new List<string>
             {
-                "libSpen_base.dll!SPen::Uuid",
+                "lib~pen_base.dll!SPen::Uuid",
                 "*!SPen::String",
                 "*!SPen::BaseData",
                 //"*!SPen::NoteZip",
@@ -467,32 +473,32 @@ namespace SourceGenerator.Tests
                 "*!SPen::WStringEventListener",
                 "*!SPen::WTextEventListener",
                 "*!SPen::WVoiceDataEventListener",
-                "libSpen_base.dll!SPen::Bundle",
-                "libSpen_base.dll!SPen::List",
-                "libSpen_document.dll!SPen::HistoryData",
-                "libSpen_document.dll!SPen::HistoryManager",
-                "libSpen_document.dll!SPen::HistoryManager::CommandJob",
-                "libSpen_document.dll!SPen::ICursorEventCallback",
-                "libSpen_document.dll!SPen::ILayerEventCallback",
-                "libSpen_document.dll!SPen::IObjectEventCallback",
-                "libSpen_document.dll!SPen::IObjectIndexMovedEventCallback",
-                "libSpen_document.dll!SPen::IPageEventCallback",
-                "libSpen_document.dll!SPen::ITextEventCallback",
-                "libSpen_document.dll!SPen::MediaFileManager",
-                "libSpen_document.dll!SPen::ModelContext",
-                "libSpen_base.dll!SPen::Point",
-                "libSpen_base.dll!SPen::PointD",
-                "libSpen_base.dll!SPen::PointF",
-                "libSpen_base.dll!SPen::Rect",
-                "libSpen_base.dll!SPen::RectD",
-                "libSpen_base.dll!SPen::RectF",
-                "libSpen_document.dll!SPen::StringIDManager",
-                "libSpen_document.dll!SPen::VoiceNameManager",
-                "libSpen_document.dll!SPen::ObjectBase",
-                "libSpen_document.dll!SPen::ObjectList",
-                "libSpen_document.dll!SPen::ObjectSpan",
-                "libSpen_worddoc.dll!SPen::WPage",
-                "libSpen_worddoc.dll!SPen::WNote"
+                "lib~pen_base.dll!SPen::Bundle",
+                "lib~pen_base.dll!SPen::List",
+                "lib~pen_document.dll!SPen::HistoryData",
+                "lib~pen_document.dll!SPen::HistoryManager",
+                "lib~pen_document.dll!SPen::HistoryManager::CommandJob",
+                "lib~pen_document.dll!SPen::ICursorEventCallback",
+                "lib~pen_document.dll!SPen::ILayerEventCallback",
+                "lib~pen_document.dll!SPen::IObjectEventCallback",
+                "lib~pen_document.dll!SPen::IObjectIndexMovedEventCallback",
+                "lib~pen_document.dll!SPen::IPageEventCallback",
+                "lib~pen_document.dll!SPen::ITextEventCallback",
+                "lib~pen_document.dll!SPen::MediaFileManager",
+                "lib~pen_document.dll!SPen::ModelContext",
+                "lib~pen_base.dll!SPen::Point",
+                "lib~pen_base.dll!SPen::PointD",
+                "lib~pen_base.dll!SPen::PointF",
+                "lib~pen_base.dll!SPen::Rect",
+                "lib~pen_base.dll!SPen::RectD",
+                "lib~pen_base.dll!SPen::RectF",
+                "lib~pen_document.dll!SPen::StringIDManager",
+                "lib~pen_document.dll!SPen::VoiceNameManager",
+                "lib~pen_document.dll!SPen::ObjectBase",
+                "lib~pen_document.dll!SPen::ObjectList",
+                "lib~pen_document.dll!SPen::ObjectSpan",
+                "lib~pen_worddoc.dll!SPen::WPage",
+                "lib~pen_worddoc.dll!SPen::WNote"
             };
 
             // 1. Run UnsafeExecute for all types at once

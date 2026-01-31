@@ -15,7 +15,7 @@ namespace RemoteNET.Tests
     public class RttiScannerTests
     {
         private SafeHandle? _msvcpHandle;
-        private SafeHandle? _libSpenHandle;
+        private SafeHandle? _Q_Handle;
 
         [SetUp]
         public void Setup()
@@ -39,30 +39,30 @@ namespace RemoteNET.Tests
             }
 
             // Load the target DLL
-            var libSpenPath = @"C:\testkit\Q_base.dll";
-            if (!File.Exists(libSpenPath))
+            var Q_Path = @"C:\testkit\lib~pen_base.dll".Replace('~', 'S');
+            if (!File.Exists(Q_Path))
             {
-                Assert.Fail($"Test DLL not found: {libSpenPath}");
+                Assert.Fail($"Test DLL not found: {Q_Path}");
             }
 
-            string libSpenDirectory = Path.GetDirectoryName(libSpenPath);
-            if (!Windows.Win32.PInvoke.SetDllDirectory(libSpenDirectory))
+            string Q_Directory = Path.GetDirectoryName(Q_Path);
+            if (!Windows.Win32.PInvoke.SetDllDirectory(Q_Directory))
             {
-                Console.WriteLine($"SetDllDirectory failed for: {libSpenDirectory} with error code: {Marshal.GetLastWin32Error()}");
+                Console.WriteLine($"SetDllDirectory failed for: {Q_Directory} with error code: {Marshal.GetLastWin32Error()}");
             }
 
-            _libSpenHandle = PInvoke.LoadLibrary(libSpenPath);
-            if (_libSpenHandle.IsInvalid)
+            _Q_Handle = PInvoke.LoadLibrary(Q_Path);
+            if (_Q_Handle.IsInvalid)
             {
                 var error = Marshal.GetLastWin32Error();
-                Assert.Fail($"Failed to load target DLL: {libSpenPath}, Win32Error: {error}");
+                Assert.Fail($"Failed to load target DLL: {Q_Path}, Win32Error: {error}");
             }
         }
 
         [TearDown]
         public void TearDown()
         {
-            _libSpenHandle?.Dispose();
+            _Q_Handle?.Dispose();
             _msvcpHandle?.Dispose();
         }
 
@@ -74,31 +74,31 @@ namespace RemoteNET.Tests
             
             // Act - Force a refresh to pick up newly loaded modules
             tricksterWrapper.Refresh();
-            
-            // Get all modules that contain "libSpen" 
-            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains("libSpen", StringComparison.OrdinalIgnoreCase));
+
+            // Get all modules that contain "Q_" 
+            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains("Q_", StringComparison.OrdinalIgnoreCase));
             
             // Assert we found the module
-            Assert.That(modules, Is.Not.Empty, "Should find at least one libSpen module");
+            Assert.That(modules, Is.Not.Empty, "Should find at least one Q_ module");
             
-            var libSpenModule = modules.FirstOrDefault(m => m.Name.Contains("libSpen_base", StringComparison.OrdinalIgnoreCase));
-            Assert.That(libSpenModule, Is.Not.Null, "Should find libSpen_base module specifically");
+            var Q_Module = modules.FirstOrDefault(m => m.Name.Contains("Q_base", StringComparison.OrdinalIgnoreCase));
+            Assert.That(Q_Module, Is.Not.Null, "Should find Q_base module specifically");
             
-            Console.WriteLine($"Found module: {libSpenModule.Name}");
-            Console.WriteLine($"Types in module: {libSpenModule.Types.Count()}");
+            Console.WriteLine($"Found module: {Q_Module.Name}");
+            Console.WriteLine($"Types in module: {Q_Module.Types.Count()}");
             
             // List all types found
-            foreach (var type in libSpenModule.Types)
+            foreach (var type in Q_Module.Types)
             {
                 Console.WriteLine($"  Found type: {type.FullTypeName}");
             }
             
             // Look specifically for SPen::UwpLog
-            var uwpLogType = libSpenModule.Types.FirstOrDefault(t => 
+            var uwpLogType = Q_Module.Types.FirstOrDefault(t => 
                 t.FullTypeName.Contains("SPen::UwpLog", StringComparison.OrdinalIgnoreCase) ||
                 t.NamespaceAndName.Contains("SPen::UwpLog", StringComparison.OrdinalIgnoreCase));
             
-            Assert.That(uwpLogType, Is.Not.Null, "Should find SPen::UwpLog type in libSpen_base module");
+            Assert.That(uwpLogType, Is.Not.Null, "Should find SPen::UwpLog type in Q_base module");
         }
 
         [Test]
@@ -110,22 +110,22 @@ namespace RemoteNET.Tests
             // Act - Force a refresh to pick up newly loaded modules
             tricksterWrapper.Refresh();
             
-            // Get all modules that contain "libSpen" 
-            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains("libSpen", StringComparison.OrdinalIgnoreCase));
+            // Get all modules that contain "Q_" 
+            var modules = tricksterWrapper.GetUndecoratedModules(name => name.Contains("Q_", StringComparison.OrdinalIgnoreCase));
             
             if (!modules.Any())
             {
-                Assert.Inconclusive("No libSpen modules found for this test");
+                Assert.Inconclusive("No Q_ modules found for this test");
             }
             
-            var libSpenModule = modules.FirstOrDefault(m => m.Name.Contains("libSpen_base", StringComparison.OrdinalIgnoreCase));
-            if (libSpenModule == null)
+            var Q_Module = modules.FirstOrDefault(m => m.Name.Contains("Q_base", StringComparison.OrdinalIgnoreCase));
+            if (Q_Module == null)
             {
-                Assert.Inconclusive("libSpen_base module not found for this test");
+                Assert.Inconclusive("Q_base module not found for this test");
             }
             
             // Act - Look for any type that is just "SPen" (without namespace qualifiers)
-            var incorrectSPenTypes = libSpenModule.Types.Where(t => 
+            var incorrectSPenTypes = Q_Module.Types.Where(t => 
                 string.Equals(t.FullTypeName, "SPen", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(t.NamespaceAndName, "SPen", StringComparison.OrdinalIgnoreCase) ||
                 (t.FullTypeName.EndsWith("SPen", StringComparison.OrdinalIgnoreCase) && 
@@ -150,18 +150,18 @@ namespace RemoteNET.Tests
             var process = Process.GetCurrentProcess();
             var modules = process.Modules.Cast<ProcessModule>().ToList();
             
-            var libSpenModule = modules.FirstOrDefault(m => 
-                m.ModuleName.Contains("libSpen_base", StringComparison.OrdinalIgnoreCase));
+            var Q_Module = modules.FirstOrDefault(m => 
+                m.ModuleName.Contains("Q_base", StringComparison.OrdinalIgnoreCase));
             
-            if (libSpenModule == null)
+            if (Q_Module == null)
             {
-                Assert.Inconclusive("libSpen_base module not loaded");
+                Assert.Inconclusive("Q_base module not loaded");
             }
             
             var moduleInfo = new ModuleInfo(
-                libSpenModule.ModuleName, 
-                (nuint)libSpenModule.BaseAddress, 
-                (nuint)libSpenModule.ModuleMemorySize);
+                Q_Module.ModuleName, 
+                (nuint)Q_Module.BaseAddress, 
+                (nuint)Q_Module.ModuleMemorySize);
             
             var exportsMaster = new ExportsMaster();
             
