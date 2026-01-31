@@ -27,22 +27,22 @@ namespace RemoteNET.Tests
             {
                 string dllDirectory = Path.GetDirectoryName(msvcpPath);
                 if (!Windows.Win32.PInvoke.SetDllDirectory(dllDirectory))
-                {
+                {   
                     Console.WriteLine($"SetDllDirectory failed for: {dllDirectory} with error code: {Marshal.GetLastWin32Error()}");
                 }
 
                 _msvcpHandle = PInvoke.LoadLibrary(msvcpPath);
                 if (_msvcpHandle.IsInvalid)
                 {
-                    Assert.Inconclusive($"Failed to load MSVCP dependency: {msvcpPath}");
+                    Assert.Fail($"Failed to load MSVCP dependency: {msvcpPath}");
                 }
             }
 
             // Load the target DLL
-            var libSpenPath = @"C:\Users\Shai\Desktop\SAM_NOTES_RES\inspection\libSpen_base.dll";
+            var libSpenPath = @"C:\testkit\Q_base.dll";
             if (!File.Exists(libSpenPath))
             {
-                Assert.Inconclusive($"Test DLL not found: {libSpenPath}");
+                Assert.Fail($"Test DLL not found: {libSpenPath}");
             }
 
             string libSpenDirectory = Path.GetDirectoryName(libSpenPath);
@@ -55,7 +55,7 @@ namespace RemoteNET.Tests
             if (_libSpenHandle.IsInvalid)
             {
                 var error = Marshal.GetLastWin32Error();
-                Assert.Inconclusive($"Failed to load target DLL: {libSpenPath}, Win32Error: {error}");
+                Assert.Fail($"Failed to load target DLL: {libSpenPath}, Win32Error: {error}");
             }
         }
 
