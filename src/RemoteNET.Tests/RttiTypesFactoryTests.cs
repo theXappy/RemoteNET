@@ -323,7 +323,7 @@ namespace RemoteNET.Tests
         }
 
         [Test]
-        public void UndecoratingConstRef_ParseType_NoMethod()
+        public void UndecoratingConstRef_ParseType_AddsMethod()
         {
             // Arrange
             ScubaDiver.Rtti.ModuleInfo module = new ModuleInfo("libPeek_lies.dll", 0xaabbccdd, 0xaabbccdd);
@@ -348,8 +348,8 @@ namespace RemoteNET.Tests
             RttiTypesFactory.AddFunctionImpl(fakeApp, typeDump.Assembly, func, childType, false);
 
             // Assert
-            // Expecting `AddFunctionImpl` to NOT add that function (not supported yet)
-            Assert.That(childType.GetMethods(), Is.Empty);
+            var methods = childType.GetMethods();
+            Assert.That(methods, Is.Not.Empty);
         }
     }
 }
