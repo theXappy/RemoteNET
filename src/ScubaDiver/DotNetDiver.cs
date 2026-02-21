@@ -484,9 +484,34 @@ namespace ScubaDiver
             }
 
             List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
+            List<TypesDump.AssemblyLoadError> loadErrors = new List<TypesDump.AssemblyLoadError>();
             foreach (Assembly matchingAssembly in matchingAssemblies)
             {
-                foreach (Type type in matchingAssembly.GetTypes())
+                IEnumerable<Type> assemblyTypes;
+                try
+                {
+                    assemblyTypes = matchingAssembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    assemblyTypes = ex.Types.Where(type => type != null);
+                    loadErrors.Add(new TypesDump.AssemblyLoadError
+                    {
+                        Assembly = matchingAssembly.GetName().Name,
+                        Error = CreateDiverError(ex)
+                    });
+                }
+                catch (Exception ex)
+                {
+                    loadErrors.Add(new TypesDump.AssemblyLoadError
+                    {
+                        Assembly = matchingAssembly.GetName().Name,
+                        Error = CreateDiverError(ex)
+                    });
+                    continue;
+                }
+
+                foreach (Type type in assemblyTypes)
                 {
                     // TODO: Is checking both FullName and Name overkill?
                     if (!typeFilterPredicate(type.FullName) && !typeFilterPredicate(type.Name))
@@ -501,7 +526,8 @@ namespace ScubaDiver
 
             TypesDump dump = new()
             {
-                Types = types
+                Types = types,
+                LoadErrors = loadErrors
             };
 
             return JsonConvert.SerializeObject(dump);

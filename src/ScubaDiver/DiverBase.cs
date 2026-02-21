@@ -135,7 +135,7 @@ namespace ScubaDiver
             return JsonConvert.SerializeObject(errResults);
         }
 
-        private static DiverError CreateDiverError(Exception ex, string errorOverride = null)
+        protected static DiverError CreateDiverError(Exception ex, string errorOverride = null)
         {
             string error = errorOverride ?? ex?.Message;
             string stackTrace = ex?.StackTrace ?? (new StackTrace(true)).ToString();
