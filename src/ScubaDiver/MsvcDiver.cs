@@ -116,7 +116,7 @@ namespace ScubaDiver
             }
             catch (Exception ex)
             {
-                return QuickError(ex.Message, ex.StackTrace);
+                return QuickError(ex);
             }
         }
 
