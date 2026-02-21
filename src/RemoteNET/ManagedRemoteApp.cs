@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using RemoteNET.Internal;
 using RemoteNET.Internal.Reflection.DotNet;
+using RemoteNET.Utils;
 using ScubaDiver.API;
 using ScubaDiver.API.Interactions.Dumps;
 using ScubaDiver.API.Utils;
@@ -127,23 +128,16 @@ namespace RemoteNET
 
         public override IEnumerable<CandidateType> QueryTypes(string typeFullNameFilter)
         {
-            List<TypesDump.TypeIdentifiers> typeIdentifiers;
             try
             {
-                typeIdentifiers = _managedCommunicator.DumpTypes(typeFullNameFilter).Types;
+                List<TypesDump.TypeIdentifiers> typeIdentifiers = _managedCommunicator.DumpTypes(typeFullNameFilter, out _).Types;
+                return TypesDumpHelpers.ToCandidateTypes(typeIdentifiers);
             }
             catch
             {
                 // TODO:
                 Debug.WriteLine($"[{nameof(ManagedRemoteApp)}][{nameof(QueryTypes)}] Exception thrown when Querying for Type filter: {typeFullNameFilter}");
-                yield break;
-            }
-            foreach (TypesDump.TypeIdentifiers type in typeIdentifiers)
-            {
-                ulong? xoredMethodTable = null;
-                if (type.XoredMethodTable.HasValue)
-                    xoredMethodTable = type.XoredMethodTable ^ TypesDump.TypeIdentifiers.XorMask;
-                yield return new CandidateType(RuntimeType.Managed, type.FullTypeName, type.Assembly, xoredMethodTable);
+                return new List<CandidateType>();
             }
         }
 
