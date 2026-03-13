@@ -24,7 +24,7 @@
 			<PrivateAssets>None</PrivateAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-		<PackageReference Include="System.Management" Version="9.0.0" />
+		<PackageReference Include="System.Management" Version="10.0.2" />
 		<PackageReference Include="Vanara.PInvoke.IpHlpApi" Version="4.1.1" />
 	</ItemGroup>
 
