@@ -116,7 +116,7 @@ namespace ScubaDiver
             }
             catch (Exception ex)
             {
-                return QuickError(ex.Message, ex.StackTrace);
+                return QuickError(ex);
             }
         }
 
@@ -306,7 +306,7 @@ namespace ScubaDiver
                 ImportingModule = importerModule
             };
 
-            IEnumerable<MsvcTypeStub> matchingTypes = _typesManager.GetTypes(msvcModuleFilter, typeFilterPredicate);
+            IReadOnlyList<MsvcTypeStub> matchingTypes = _typesManager.GetTypes(msvcModuleFilter, typeFilterPredicate);
 
             List<TypesDump.TypeIdentifiers> types = new();
             foreach (MsvcTypeStub typeStub in matchingTypes)
@@ -975,6 +975,19 @@ namespace ScubaDiver
 
         public override void Dispose()
         {
+        }
+
+        protected override ulong ResolveInstanceAddress(object instance)
+        {
+            if (instance == null)
+                return 0;
+
+            // For MSVC/native objects, check if it's a NativeObject
+            if (instance is NativeObject nativeObj)
+            {
+                return nativeObj.Address;
+            }
+            throw new ArgumentException("Object is not a NativeObject: " + instance.GetType().FullName);
         }
 
     }

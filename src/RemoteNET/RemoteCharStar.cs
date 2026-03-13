@@ -1,5 +1,8 @@
 using System;
+using System.Reflection;
+using RemoteNET.Common;
 using ScubaDiver.API;
+using ScubaDiver.API.Hooking;
 
 namespace RemoteNET;
 
@@ -34,5 +37,10 @@ public class RemoteCharStar : RemoteObject
     public override RemoteObject Cast(Type t)
     {
         throw new NotImplementedException("Not implemented for char* remote objects");
+    }
+
+    public override bool Hook(MethodBase methodToHook, HarmonyPatchPosition pos, DynamifiedHookCallback hookAction)
+    {
+        throw new NotImplementedException();
     }
 }

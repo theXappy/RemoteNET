@@ -484,9 +484,34 @@ namespace ScubaDiver
             }
 
             List<TypesDump.TypeIdentifiers> types = new List<TypesDump.TypeIdentifiers>();
+            List<TypesDump.AssemblyLoadError> loadErrors = new List<TypesDump.AssemblyLoadError>();
             foreach (Assembly matchingAssembly in matchingAssemblies)
             {
-                foreach (Type type in matchingAssembly.GetTypes())
+                IEnumerable<Type> assemblyTypes;
+                try
+                {
+                    assemblyTypes = matchingAssembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    assemblyTypes = ex.Types.Where(type => type != null);
+                    loadErrors.Add(new TypesDump.AssemblyLoadError
+                    {
+                        Assembly = matchingAssembly.GetName().Name,
+                        Error = CreateDiverError(ex)
+                    });
+                }
+                catch (Exception ex)
+                {
+                    loadErrors.Add(new TypesDump.AssemblyLoadError
+                    {
+                        Assembly = matchingAssembly.GetName().Name,
+                        Error = CreateDiverError(ex)
+                    });
+                    continue;
+                }
+
+                foreach (Type type in assemblyTypes)
                 {
                     // TODO: Is checking both FullName and Name overkill?
                     if (!typeFilterPredicate(type.FullName) && !typeFilterPredicate(type.Name))
@@ -501,7 +526,8 @@ namespace ScubaDiver
 
             TypesDump dump = new()
             {
-                Types = types
+                Types = types,
+                LoadErrors = loadErrors
             };
 
             return JsonConvert.SerializeObject(dump);
@@ -1579,13 +1605,37 @@ namespace ScubaDiver
             {
                 rehi.EventInfo.RemoveEventHandler(rehi.Target, rehi.RegisteredProxy);
             }
-            foreach (RegisteredManagedMethodHookInfo rmhi in _remoteHooks.Values)
+            foreach (var hookKvp in _remoteHooks)
             {
-                rmhi.UnhookAction();
+                int token = hookKvp.Key;
+                RegisteredManagedMethodHookInfo rmhi = hookKvp.Value;
+                // Unregister from HookingCenter (it will handle Harmony unhooking if needed)
+                _hookingCenter.UnregisterHookAndUninstall(rmhi.UniqueHookId, token);
             }
             _remoteEventHandler.Clear();
             _remoteHooks.Clear();
             Logger.Debug("[DotNetDiver] Removed all event subscriptions & hooks");
+        }
+
+        protected override ulong ResolveInstanceAddress(object instance)
+        {
+            if (instance == null)
+                return 0;
+
+            // Try to get the pinning address if the object is pinned
+            if (_freezer.TryGetPinningAddress(instance, out ulong pinnedAddress))
+            {
+                return pinnedAddress;
+            }
+
+            // For unpinned objects, we can't reliably get their address
+            // as it can change due to GC. In this case, we use object identity hash code.
+            // IMPORTANT: RuntimeHelpers.GetHashCode provides stable identity for the lifetime
+            // of an object, but different objects may have the same hash code (collisions).
+            // This means instance-specific hooks on unpinned objects may occasionally trigger
+            // for wrong instances if hash codes collide. For reliable instance-specific hooking,
+            // ensure objects are pinned before hooking.
+            return (ulong)System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(instance);
         }
     }
 }

@@ -17,6 +17,7 @@
 		<Compile Include="..\DiverBase.cs" />
 		<Compile Include="..\DllEntry.cs" />
 		<Compile Include="..\Hooking\HarmonyWrapper.cs" Link="Hooking\HarmonyWrapper.cs" />
+		<Compile Include="..\Hooking\HookingCenter.cs" Link="Hooking\HookingCenter.cs" />
 		<Compile Include="..\Hooking\DetoursNetWrapper.cs" Link="Hooking\DetoursNetWrapper.cs" />
 		<Compile Include="..\Logger.cs" />
 		<Compile Include="..\RegisteredEventHandlerInfo.cs" />
@@ -89,8 +90,8 @@
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="Lib.Harmony" Version="2.3.5" />
 		<PackageReference Include="NtApiDotNet" Version="1.1.33" />
-		<PackageReference Include="System.Drawing.Common" Version="10.0.1" />
-		<PackageReference Include="System.Formats.Asn1" Version="8.0.1" />
+		<PackageReference Include="System.Drawing.Common" Version="10.0.2" />
+		<PackageReference Include="System.Formats.Asn1" Version="10.0.2" />
 		<PackageReference Include="System.Text.Json" Version="10.0.2" />
 	</ItemGroup>
 

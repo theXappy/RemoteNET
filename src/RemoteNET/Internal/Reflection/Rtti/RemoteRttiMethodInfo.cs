@@ -19,6 +19,7 @@ namespace RemoteNET.Internal.Reflection
 
         public override ICustomAttributeProvider ReturnTypeCustomAttributes => throw new NotImplementedException();
         public override string Name { get; }
+        public string MangledName { get; }
 
         protected LazyRemoteTypeResolver _lazyDeclaringType;
         public LazyRemoteTypeResolver LazyDeclaringType => _lazyDeclaringType;
@@ -33,7 +34,6 @@ namespace RemoteNET.Internal.Reflection
         public override bool IsGenericMethodDefinition => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
         public override bool ContainsGenericParameters => AssignedGenericArgs.Length > 0 && AssignedGenericArgs.All(t => t is DummyGenericType);
         public override Type[] GetGenericArguments() => AssignedGenericArgs;
-        public string MangledName { get; private set; }
 
         public Type[] AssignedGenericArgs { get; }
 

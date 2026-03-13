@@ -596,7 +596,7 @@ public abstract class DynamicRemoteObject : DynamicObject
         }
 
         // No "ToString" method, target is not a .NET object
-        return __type.ToString();
+        return __type.ToString() + $" (0x{this.__ro.RemoteToken:x16})";
     }
 
     public override int GetHashCode()

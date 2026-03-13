@@ -167,6 +167,11 @@ namespace ScubaDiver.API
 
         public TypesDump DumpTypes(string typeFullNameFilter, string importerModule = null)
         {
+            return DumpTypes(typeFullNameFilter, out _, importerModule);
+        }
+
+        public TypesDump DumpTypes(string typeFullNameFilter, out List<TypesDump.AssemblyLoadError> loadErrors, string importerModule = null)
+        {
             Dictionary<string, string> queryParams = new() { };
             queryParams["type_filter"] = typeFullNameFilter;
             if (!string.IsNullOrEmpty(importerModule))
@@ -176,6 +181,7 @@ namespace ScubaDiver.API
 
             string body = SendRequest("types", queryParams);
             TypesDump? results = JsonConvert.DeserializeObject<TypesDump>(body, _withErrors);
+            loadErrors = results?.LoadErrors ?? new List<TypesDump.AssemblyLoadError>();
 
             return results;
         }
@@ -485,7 +491,7 @@ namespace ScubaDiver.API
             }
         }
 
-        public bool HookMethod(MethodBase methodBase, HarmonyPatchPosition pos, LocalHookCallback callback, List<string> parametersTypeFullNames = null)
+        public bool HookMethod(MethodBase methodBase, HarmonyPatchPosition pos, LocalHookCallback callback, List<string> parametersTypeFullNames = null, ulong instanceAddress = 0)
         {
             if (!_listener.IsOpen)
             {
@@ -499,7 +505,8 @@ namespace ScubaDiver.API
                 TypeFullName = methodBase.DeclaringType.FullName,
                 MethodName = methodBase.Name,
                 HookPosition = pos.ToString(),
-                ParametersTypeFullNames = parametersTypeFullNames
+                ParametersTypeFullNames = parametersTypeFullNames,
+                InstanceAddress = instanceAddress
             };
 
             var requestJsonBody = JsonConvert.SerializeObject(req);

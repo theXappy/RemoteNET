@@ -19,6 +19,7 @@ public interface IRttiMethodBase
     /// </summary>
     LazyRemoteParameterResolver[] LazyParamInfos { get; }
     string Name { get; }
+    string MangledName { get; }
 
     public string UndecoratedSignature
     {

@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using RemoteNET.Common;
 using RemoteNET.Internal;
 using ScubaDiver.API;
+using ScubaDiver.API.Hooking;
 using ScubaDiver.API.Interactions;
 using ScubaDiver.API.Interactions.Dumps;
 
@@ -138,6 +141,19 @@ namespace RemoteNET
         public override RemoteObject Cast(Type t)
         {
             throw new NotImplementedException("Not implemented in Managed context");
+        }
+
+        /// <summary>
+        /// Hooks a method on this specific instance.
+        /// This is a convenience method that calls app.HookingManager.HookMethod with this instance.
+        /// </summary>
+        /// <param name="methodToHook">The method to hook</param>
+        /// <param name="pos">Position of the hook (Prefix, Postfix, or Finalizer)</param>
+        /// <param name="hookAction">The callback to invoke when the method is called</param>
+        /// <returns>True on success</returns>
+        public override bool Hook(MethodBase methodToHook, HarmonyPatchPosition pos, DynamifiedHookCallback hookAction)
+        {
+            return _app.HookingManager.HookMethod(methodToHook, pos, hookAction, this);
         }
     }
 }
