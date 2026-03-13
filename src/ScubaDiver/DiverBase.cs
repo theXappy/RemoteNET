@@ -30,10 +30,12 @@ namespace ScubaDiver
         protected bool _monitorEndpoints = true;
         private int _nextAvailableCallbackToken;
         protected readonly ConcurrentDictionary<int, RegisteredManagedMethodHookInfo> _remoteHooks;
+        protected readonly HookingCenter _hookingCenter;
 
         public DiverBase(IRequestsListener listener)
         {
             _listener = listener;
+            _hookingCenter = new HookingCenter();
             _responseBodyCreators = new Dictionary<string, Func<ScubaDiverMessage, string>>()
             {
                 // Divert maintenance
@@ -114,14 +116,39 @@ namespace ScubaDiver
             return ass;
         }
 
-        public string QuickError(string error, string stackTrace = null)
+        public string QuickError(string error)
         {
-            if (stackTrace == null)
-            {
-                stackTrace = (new StackTrace(true)).ToString();
-            }
+            string stackTrace = (new StackTrace(true)).ToString();
             DiverError errResults = new(error, stackTrace);
             return JsonConvert.SerializeObject(errResults);
+        }
+
+        public string QuickError(Exception ex)
+        {
+            DiverError errResults = CreateDiverError(ex);
+            return JsonConvert.SerializeObject(errResults);
+        }
+
+        public string QuickError(string error, Exception ex)
+        {
+            DiverError errResults = CreateDiverError(ex, error);
+            return JsonConvert.SerializeObject(errResults);
+        }
+
+        protected static DiverError CreateDiverError(Exception ex, string errorOverride = null)
+        {
+            string error = errorOverride ?? ex?.Message;
+            string stackTrace = ex?.StackTrace ?? (new StackTrace(true)).ToString();
+            DiverError errResults = new(error, stackTrace);
+            if (ex is ReflectionTypeLoadException rtlEx && rtlEx.LoaderExceptions != null)
+            {
+                errResults.LoaderExceptions = rtlEx.LoaderExceptions
+                    .Where(loaderException => loaderException != null)
+                    .Select(loaderException => CreateDiverError(loaderException))
+                    .ToArray();
+            }
+
+            return errResults;
         }
 
         #endregion
@@ -147,7 +174,7 @@ namespace ScubaDiver
                 }
                 catch (Exception ex)
                 {
-                    body = QuickError(ex.Message, ex.StackTrace);
+                    body = QuickError(ex);
                 }
             }
             else
@@ -182,7 +209,7 @@ namespace ScubaDiver
             }
             catch (Exception ex)
             {
-                return QuickError(ex.Message, ex.StackTrace);
+                return QuickError(ex);
             }
         }
 
@@ -202,7 +229,8 @@ namespace ScubaDiver
 
             if (_remoteHooks.TryRemove(token, out RegisteredManagedMethodHookInfo rmhi))
             {
-                rmhi.UnhookAction();
+                // Unregister from HookingCenter (it will handle Harmony unhooking if needed)
+                _hookingCenter.UnregisterHookAndUninstall(rmhi.UniqueHookId, token);
                 return "{\"status\":\"OK\"}";
             }
 
@@ -236,9 +264,13 @@ namespace ScubaDiver
             int token = AssignCallbackToken();
             Logger.Debug($"[DiverBase] Hook Method - Assigned Token: {token}");
             Logger.Debug($"[DiverBase] Hook Method - endpoint: {endpoint}");
+            Logger.Debug($"[DiverBase] Hook Method - Instance Address: {req.InstanceAddress:X}");
 
+            // Generate unique hook ID for this method+position combination
+            string uniqueHookId = GenerateHookId(req);
 
             // Preparing a proxy method that Harmony will invoke
+            // Note: Instance filtering is handled by HookingCenter, not here
             HarmonyWrapper.HookCallback patchCallback = (object obj, object[] args, ref object retValue) =>
             {
                 object[] parameters = new object[args.Length + 1];
@@ -261,18 +293,27 @@ namespace ScubaDiver
             };
 
             Logger.Debug($"[DiverBase] Hooking function {req.MethodName}...");
-            Action unhookAction;
+            
             try
             {
-                unhookAction = HookFunction(req, patchCallback);
+                // Register this callback with the hooking center
+                // It will handle installing the Harmony hook if this is the first registration
+                _hookingCenter.RegisterHookAndInstall(
+                    uniqueHookId, 
+                    req.InstanceAddress, 
+                    patchCallback, 
+                    token,
+                    unifiedCallback => HookFunction(req, unifiedCallback),
+                    ResolveInstanceAddress);
             }
             catch (Exception ex)
             {
-                // Hooking filed so we cleanup the Hook Info we inserted beforehand 
+                // Hooking failed so we cleanup the Hook Info we inserted beforehand 
                 _remoteHooks.TryRemove(token, out _);
+                _hookingCenter.UnregisterHookAndUninstall(uniqueHookId, token);
 
                 Logger.Debug($"[DiverBase] Failed to hook func {req.MethodName}. Exception: {ex}");
-                return QuickError($"Failed insert the hook for the function. HarmonyWrapper.AddHook failed. Exception: {ex}", ex.StackTrace);
+                return QuickError($"Failed insert the hook for the function. HarmonyWrapper.AddHook failed. Exception: {ex}", ex);
             }
 
             Logger.Debug($"[DiverBase] Hooked func {req.MethodName}!");
@@ -282,12 +323,20 @@ namespace ScubaDiver
             {
                 Endpoint = endpoint,
                 RegisteredProxy = patchCallback,
-                UnhookAction = unhookAction
+                UniqueHookId = uniqueHookId
             };
 
             EventRegistrationResults erResults = new() { Token = token };
             return JsonConvert.SerializeObject(erResults);
         }
+
+        private string GenerateHookId(FunctionHookRequest req)
+        {
+            string paramsList = string.Join(";", req.ParametersTypeFullNames ?? new List<string>());
+            return $"{req.TypeFullName}:{paramsList}:{req.MethodName}:{req.HookPosition}";
+        }
+
+        protected abstract ulong ResolveInstanceAddress(object instance);
 
         public abstract object ResolveHookReturnValue(ObjectOrRemoteAddress oora);
 
@@ -362,7 +411,7 @@ namespace ScubaDiver
             }
             catch (Exception ex)
             {
-                return QuickError(ex.Message, ex.StackTrace);
+                return QuickError(ex);
             }
         }
 

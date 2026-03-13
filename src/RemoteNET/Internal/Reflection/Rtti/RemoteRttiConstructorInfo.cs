@@ -15,7 +15,8 @@ public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
     protected LazyRemoteParameterResolver[] _lazyParamInfosImpl;
     public LazyRemoteParameterResolver[] LazyParamInfos => _lazyParamInfosImpl;
 
-    public override MethodAttributes Attributes => throw new NotImplementedException();
+    private MethodAttributes _attributes;
+    public override MethodAttributes Attributes => _attributes;
 
     public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
 
@@ -24,15 +25,18 @@ public class RemoteRttiConstructorInfo : ConstructorInfo, IRttiMethodBase
     public override Type DeclaringType => LazyDeclaringType.Value;
 
     public override string Name => DeclaringType.Name;
+    public string MangledName { get; }
 
     public override Type ReflectedType => throw new NotImplementedException();
 
     private RemoteApp App => (DeclaringType as RemoteRttiType)?.App;
 
-    public RemoteRttiConstructorInfo(LazyRemoteTypeResolver declaringType, LazyRemoteParameterResolver[] paramInfos)
+    public RemoteRttiConstructorInfo(string mangledName, LazyRemoteTypeResolver declaringType, LazyRemoteParameterResolver[] paramInfos, MethodAttributes attributes)
     {
+        MangledName = mangledName;
         _lazyDeclaringType = declaringType;
         _lazyParamInfosImpl = paramInfos;
+        _attributes = attributes;
     }
 
     public override object[] GetCustomAttributes(bool inherit)

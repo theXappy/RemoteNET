@@ -243,63 +243,50 @@ public static class DetoursMethodGenerator
     /// <returns>Boolean indicating 'skipOriginal'</returns>
     static bool RunPatchInPosition(HarmonyPatchPosition position, DetouredFuncInfo hookedFunc, object[] args, ref object retValue)
     {
-        if (args.Length == 0) throw new Exception("Bad arguments to unmanaged HookCallback. Expecting at least 1 (for 'this').");
+        object self;
+        int firstNonSelfArgIndex;
+        if (hookedFunc.Target is UndecoratedExportedFunc uef && uef.IsStatic)
+        {
+            // Static method
+            self = null;
+            firstNonSelfArgIndex = 0;
+        }
+        else
+        {
+            // Instance method (probably)
+            if (args.Length == 0)
+                throw new Exception("Bad arguments to unmanaged HookCallback. Expecting at least 1 (for 'this').");
 
-        object self = new NativeObject((nuint)args.FirstOrDefault(), hookedFunc.DeclaringClass);
+            self = new NativeObject((nuint)args.FirstOrDefault(), hookedFunc.DeclaringClass);
+            firstNonSelfArgIndex = 1;
+        }
 
         // Args without self
-        object[] argsToForward = new object[args.Length - 1];
+        object[] argsToForward = new object[args.Length - firstNonSelfArgIndex];
         for (int i = 0; i < argsToForward.Length; i++)
         {
-            if (args[i + 1] is nuint arg)
-            {
-                string argType = hookedFunc.Target.ArgTypes[i + 1];
-                if (argType == "char*" || argType == "char *")
-                {
-                    if (arg != 0)
-                    {
-                        string cString = Marshal.PtrToStringAnsi(new IntPtr((long)arg));
-                        argsToForward[i] = new CharStar(arg, cString);
-                    }
-                    else
-                    {
-                        argsToForward[i] = arg;
-                    }
-                }
-                else if (argType.EndsWith('*'))
-                {
-                    // If the argument is a pointer, indicate it with a NativeObject
-                    // TODO: SecondClassTypeInfo is abused here
-                    string fixedArgType = argType[..^1].Trim();
+            int argIndex = i + firstNonSelfArgIndex;
+            object currentArg = args[argIndex];
 
-                    // split fixedArgType to namespace and name
-                    // Look for last index of "::" and split around it
-                    int lastIndexOfColonColon = fixedArgType.LastIndexOf("::");
-                    // take into consideration that "::" might no be present at all, and the namespace is empty
-                    string namespaceName = lastIndexOfColonColon == -1 ? "" : fixedArgType.Substring(0, lastIndexOfColonColon);
-                    string typeName = lastIndexOfColonColon == -1 ? fixedArgType : fixedArgType.Substring(lastIndexOfColonColon + 2);
-
-                    SecondClassTypeInfo typeInfo = new SecondClassTypeInfo(hookedFunc.DeclaringClass.ModuleName, namespaceName, typeName);
-                    argsToForward[i] = new NativeObject(arg, typeInfo);
-                }
-                else
-                {
-                    // Primitive or struct or something else crazy
-                    argsToForward[i] = arg;
-                }
-            }
-            else if (args[i + 1] is double doubleArg)
+            object valueToAssign;
+            if (currentArg is nuint arg)
             {
-                argsToForward[i] = doubleArg;
+                valueToAssign = ConvertNuintArg(hookedFunc, argIndex, arg);
             }
-            else if (args[i + 1] is float floatArg)
+            else if (currentArg is double doubleArg)
             {
-                argsToForward[i] = floatArg;
+                valueToAssign = doubleArg;
+            }
+            else if (currentArg is float floatArg)
+            {
+                valueToAssign = floatArg;
             }
             else
             {
                 throw new Exception($"Unexpected argument type from generated detour hook. Expected nuint or double, got: {args[i + 1].GetType().FullName}, Arg Num: {i}");
             }
+
+            argsToForward[i] = valueToAssign;
         }
 
 
@@ -350,6 +337,47 @@ public static class DetoursMethodGenerator
         }
 
         return skipOriginal;
+
+        static object ConvertNuintArg(DetouredFuncInfo hookedFunc, int argIndex, nuint arg)
+        {
+            object valueToAssign;
+            string argType = hookedFunc.Target.ArgTypes[argIndex];
+            if (argType == "char*" || argType == "char *")
+            {
+                if (arg != 0)
+                {
+                    string cString = Marshal.PtrToStringAnsi(new IntPtr((long)arg));
+                    valueToAssign = new CharStar(arg, cString);
+                }
+                else
+                {
+                    valueToAssign = arg;
+                }
+            }
+            else if (argType.EndsWith('*'))
+            {
+                // If the argument is a pointer, indicate it with a NativeObject
+                // TODO: SecondClassTypeInfo is abused here
+                string fixedArgType = argType[..^1].Trim();
+
+                // split fixedArgType to namespace and name
+                // Look for last index of "::" and split around it
+                int lastIndexOfColonColon = fixedArgType.LastIndexOf("::");
+                // take into consideration that "::" might no be present at all, and the namespace is empty
+                string namespaceName = lastIndexOfColonColon == -1 ? "" : fixedArgType.Substring(0, lastIndexOfColonColon);
+                string typeName = lastIndexOfColonColon == -1 ? fixedArgType : fixedArgType.Substring(lastIndexOfColonColon + 2);
+
+                SecondClassTypeInfo typeInfo = new SecondClassTypeInfo(hookedFunc.DeclaringClass.ModuleName, namespaceName, typeName);
+                valueToAssign = new NativeObject(arg, typeInfo);
+            }
+            else
+            {
+                // Primitive or struct or something else crazy
+                valueToAssign = arg;
+            }
+
+            return valueToAssign;
+        }
     }
 
 }

@@ -13,6 +13,7 @@
 		<Compile Include="..\DiverBase.cs" />
 		<Compile Include="..\DllEntry.cs" />
 		<Compile Include="..\Hooking\HarmonyWrapper.cs" />
+		<Compile Include="..\Hooking\HookingCenter.cs" />
 		<Compile Include="..\Logger.cs" />
 		<Compile Include="..\RegisteredEventHandlerInfo.cs" />
 		<Compile Include="..\RegisteredMethodHookInfo.cs" />

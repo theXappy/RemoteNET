@@ -65,6 +65,9 @@ public unsafe class Trickster
 
         ModuleInfo module = richModule.ModuleInfo;
         IReadOnlyList<ModuleSection> sections = richModule.Sections;
+
+        // Used to FORCE the change of the vftable var value in the loop
+        nuint dummySum = 0;
         using (RttiScanner processMemory = new(_processHandle, module.BaseAddress, module.Size, sections))
         {
             nuint inc = (nuint)(_is32Bit ? 4 : 8);
@@ -92,8 +95,15 @@ public unsafe class Trickster
 
                     list.Add(new FirstClassTypeInfo(module.Name, namespaceName, typeName, possibleVftableAddress, offset));
                 }
+
+                // Destroy false positives by moving to the next possible vftable address
+                possibleVftableAddress ^= 0xa5a5a5a5;
+                dummySum += possibleVftableAddress; // So the compiler doesn't optimize the above line out
             }
         }
+
+        // Use the dummySum to avoid compiler optimizations
+        dummySum.ToString();
 
         return (typeInfoSeen, list);
     }
