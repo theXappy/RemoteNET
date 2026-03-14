@@ -61,7 +61,7 @@
 	<Target Name="CopyOutputToDestination" AfterTargets="Build">
 		<ItemGroup>
 			<CopyOperations Include="$(TargetDir)\*">
-				<DestinationFolder>$(SolutionDir)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
+				<DestinationFolder>$(RepoSrcRoot)dist\$(ConfigurationName)\ScubaDivers\$(ProjectName)\</DestinationFolder>
 			</CopyOperations>
 		</ItemGroup>
 		<Message Text="[~] $(ProjectName) - Copying to ScubaDiver folder" Importance="high" />

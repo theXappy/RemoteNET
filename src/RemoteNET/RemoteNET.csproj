@@ -59,10 +59,10 @@
 
 	<Target Name="CopyDlls" BeforeTargets="BeforeBuild">
 		<ItemGroup>
-			<CopyOperations Include="$(SolutionDir)\dist\$(Configuration)\Win32\**\*.exe;$(SolutionDir)\dist\$(Configuration)\Win32\**\*.dll;$(SolutionDir)\dist\$(Configuration)\Win32\**\*.pdb">
+			<CopyOperations Include="$(RepoSrcRoot)dist\$(Configuration)\Win32\**\*.exe;$(RepoSrcRoot)dist\$(Configuration)\Win32\**\*.dll;$(RepoSrcRoot)dist\$(Configuration)\Win32\**\*.pdb">
 				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
 			</CopyOperations>
-			<CopyOperations Include="$(SolutionDir)\dist\$(Configuration)\x64\**\*.exe;$(SolutionDir)\dist\$(Configuration)\x64\**\*.dll;$(SolutionDir)\dist\$(Configuration)\x64\**\*.pdb">
+			<CopyOperations Include="$(RepoSrcRoot)dist\$(Configuration)\x64\**\*.exe;$(RepoSrcRoot)dist\$(Configuration)\x64\**\*.dll;$(RepoSrcRoot)dist\$(Configuration)\x64\**\*.pdb">
 				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
 			</CopyOperations>
 			<CopyOperations Include="$(ProjectDir)\..\InjectableDummy\bin\$(Configuration)\net6.0-windows\**\*">
@@ -79,7 +79,7 @@
 			<ZipOperations Include="$(ProjectDir)\..\Lifeboat\bin\$(Configuration)\net8.0">
 				<ZipFileName>$(ProjectDir)\Resources\Lifeboat.zip</ZipFileName>
 			</ZipOperations>
-			<ZipOperations Include="$(SolutionDir)\dist\$(Configuration)\ScubaDivers">
+			<ZipOperations Include="$(RepoSrcRoot)dist\$(Configuration)\ScubaDivers">
 				<ZipFileName>$(ProjectDir)\Resources\ScubaDivers.zip</ZipFileName>
 			</ZipOperations>
 			<!-- Detours - choose one of 2 directories based on configuration -->

@@ -18,7 +18,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RemoteNET", "RemoteNET\Remo
 		{E9771628-EF64-4DD8-9906-E7B1990A0FB9} = {E9771628-EF64-4DD8-9906-E7B1990A0FB9}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScubaDiver_NetFramework", "ScubaDiver\project_netframework\ScubaDiver_NetFramework.csproj", "{8DF5D538-941D-44E8-803E-9E135926EBE8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScubaDiver_NetFramework", "ScubaDiver\project_netframework\ScubaDiver_NetFramework.csproj", "{8DF5D538-941D-44E8-803E-9E135926EBE8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScubaDiver_NetCore", "ScubaDiver\project_netcore\ScubaDiver_NetCore.csproj", "{A0CC829C-E3B5-419B-A303-5A710389B74D}"
 EndProject
@@ -242,14 +242,14 @@ Global
 		{52FBCBDC-C347-4A0A-BE58-29E749A755A3}.Release|Mixed.Build.0 = Release|Any CPU
 		{52FBCBDC-C347-4A0A-BE58-29E749A755A3}.RelWithDebInfo|Mixed.ActiveCfg = Release|Any CPU
 		{52FBCBDC-C347-4A0A-BE58-29E749A755A3}.RelWithDebInfo|Mixed.Build.0 = Release|Any CPU
-		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.Debug|Mixed.ActiveCfg = Debug|x64
-		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.Debug|Mixed.Build.0 = Debug|x64
-		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.MinSizeRel|Mixed.ActiveCfg = MinSizeRel|x64
-		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.MinSizeRel|Mixed.Build.0 = MinSizeRel|x64
-		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.Release|Mixed.ActiveCfg = RelWithDebInfo|x64
-		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.Release|Mixed.Build.0 = RelWithDebInfo|x64
-		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.RelWithDebInfo|Mixed.ActiveCfg = RelWithDebInfo|x64
-		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.RelWithDebInfo|Mixed.Build.0 = RelWithDebInfo|x64
+		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.Debug|Mixed.ActiveCfg = Debug|Any CPU
+		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.Debug|Mixed.Build.0 = Debug|Any CPU
+		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.MinSizeRel|Mixed.ActiveCfg = Release|Any CPU
+		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.MinSizeRel|Mixed.Build.0 = Release|Any CPU
+		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.Release|Mixed.ActiveCfg = Release|Any CPU
+		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.Release|Mixed.Build.0 = Release|Any CPU
+		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.RelWithDebInfo|Mixed.ActiveCfg = Release|Any CPU
+		{2823B68C-0B36-3BDA-857B-CF8C5ECD95B9}.RelWithDebInfo|Mixed.Build.0 = Release|Any CPU
 		{9B25E3D2-91A8-4784-A3A3-39C1BE36A52A}.Debug|Mixed.ActiveCfg = Debug|Any CPU
 		{9B25E3D2-91A8-4784-A3A3-39C1BE36A52A}.Debug|Mixed.Build.0 = Debug|Any CPU
 		{9B25E3D2-91A8-4784-A3A3-39C1BE36A52A}.MinSizeRel|Mixed.ActiveCfg = Debug|Any CPU
