@@ -103,18 +103,7 @@
 		<ZipDirectory SourceDirectory="@(ZipOperations)" DestinationFile="%(ZipOperations.ZipFileName)" Overwrite="true" Condition="$([MSBuild]::VersionLessThan('$(MSBuildVersion)', '18.0'))" />
 	</Target>
 
-	<Target Name="DeleteDebugSymbolFile" AfterTargets="Build" Condition="'$(GITHUB_ACTIONS)' != 'true'">
-		<ItemGroup>
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.exe" />
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.dll" />
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.pdb" />
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.json" />
-			<FilesToDelete Include="$(ProjectDir)\Resources\*.zip" />
-		</ItemGroup>
-		<Message Text="[~] Cleaning up copied Resources" Importance="high" />
-		<Message Text="[~] Deleting Files: @(FilesToDelete)" Importance="high" />
-		<Delete Files="@(FilesToDelete)" />
-	</Target>
+
 
 	<ItemGroup>
 	  <NativeLibs Remove="RemoteAppFactory.cs" />
