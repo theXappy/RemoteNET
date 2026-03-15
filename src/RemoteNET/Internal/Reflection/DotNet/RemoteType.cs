@@ -250,10 +250,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             throw new NotImplementedException();
         }
 
-        protected override bool IsPrimitiveImpl()
-        {
-            throw new NotImplementedException();
-        }
+        protected override bool IsPrimitiveImpl() => false;
 
         protected override bool IsCOMObjectImpl()
         {
