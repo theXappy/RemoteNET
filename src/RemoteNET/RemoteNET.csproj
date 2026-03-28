@@ -57,21 +57,58 @@
 		</None>
 	</ItemGroup>
 
-	<Target Name="CopyDlls" BeforeTargets="BeforeBuild">
+	<PropertyGroup>
+		<InjectorBinDir>$(ProjectDir)..\Injector\bin\$(Configuration)</InjectorBinDir>
+		<AdapterBinDir>$(ProjectDir)..\UnmanagedAdapterDLL\bin\$(Configuration)</AdapterBinDir>
+	</PropertyGroup>
+	
+	<Target Name="CopyInjector" BeforeTargets="BeforeBuild">
 		<ItemGroup>
-			<CopyOperations Include="$(RepoSrcRoot)dist\$(Configuration)\Win32\**\*.exe;$(RepoSrcRoot)dist\$(Configuration)\Win32\**\*.dll;$(RepoSrcRoot)dist\$(Configuration)\Win32\**\*.pdb">
+			<CopyOperationsWin32 Include="$(InjectorBinDir)\Win32\**\*.exe;$(InjectorBinDir)\Win32\**\*.dll;$(InjectorBinDir)\Win32\**\*.pdb">
 				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
-			</CopyOperations>
-			<CopyOperations Include="$(RepoSrcRoot)dist\$(Configuration)\x64\**\*.exe;$(RepoSrcRoot)dist\$(Configuration)\x64\**\*.dll;$(RepoSrcRoot)dist\$(Configuration)\x64\**\*.pdb">
+			</CopyOperationsWin32>
+			<CopyOperationsX64 Include="$(InjectorBinDir)\x64\**\*.exe;$(InjectorBinDir)\x64\**\*.dll;$(InjectorBinDir)\x64\**\*.pdb">
 				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
-			</CopyOperations>
-			<CopyOperations Include="$(ProjectDir)\..\InjectableDummy\bin\$(Configuration)\net6.0-windows\**\*">
-				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
-			</CopyOperations>
+			</CopyOperationsX64>
 		</ItemGroup>
-		<Message Text="[~] Copying resources" Importance="high" />
-		<Message Text="[~] Resources List: @(CopyOperations)" Importance="high" />
-		<Copy SourceFiles="@(CopyOperations)" DestinationFolder="%(CopyOperations.DestinationFolder)" />
+		<Message Text="[~] === Copying Injector (Win32) ===" Importance="high" />
+		<Message Text="[~] Injector Win32 Files List: @(CopyOperationsWin32)" Importance="high" />
+		<Error Condition=" '@(CopyOperationsWin32)' == '' " Text="[!] No Win32 resource files found to copy. Pattern: $(ProjectDir)..\Injector\bin\$(Configuration)\Win32\**\*.exe"/>
+		<Copy SourceFiles="@(CopyOperationsWin32)" DestinationFolder="%(CopyOperationsWin32.DestinationFolder)" />
+		<Message Text="[~] === Copying Injector (x64) ===" Importance="high" />
+		<Message Text="[~] Injector x64 Files List: @(CopyOperationsX64)" Importance="high" />
+		<Error Condition=" '@(CopyOperationsX64)' == '' " Text="[!] No x64 resource files found to copy. Pattern: $(ProjectDir)..\Injector\bin\$(Configuration)\x64\**\*.exe"/>
+		<Copy SourceFiles="@(CopyOperationsX64)" DestinationFolder="%(CopyOperationsX64.DestinationFolder)" />
+	</Target>
+
+	<Target Name="CopyAdapterWin32" BeforeTargets="BeforeBuild">
+		<ItemGroup>
+			<CopyOperationsUnmanagedWin32 Include="$(AdapterBinDir)\Win32\**\*.exe;$(AdapterBinDir)\Win32\**\*.dll;$(AdapterBinDir)\Win32\**\*.pdb">
+				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
+			</CopyOperationsUnmanagedWin32>
+			<CopyOperationsUnmanagedX64 Include="$(AdapterBinDir)\x64\**\*.exe;$(AdapterBinDir)\x64\**\*.dll;$(AdapterBinDir)\x64\**\*.pdb">
+				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
+			</CopyOperationsUnmanagedX64>
+		</ItemGroup>
+		<Message Text="[~] === Copying UnmanagedAdapterDLL (Win32) ===" Importance="high" />
+		<Message Text="[~] UnmanagedAdapterDLL Win32 Files List: @(CopyOperationsUnmanagedWin32)" Importance="high" />
+		<Error Condition=" '@(CopyOperationsUnmanagedWin32)' == '' " Text="[!] No UnmanagedAdapterDLL Win32 resource files found to copy. Pattern: $(ProjectDir)..\UnmanagedAdapterDLL\bin\$(Configuration)\Win32\**\*.exe"/>
+		<Copy SourceFiles="@(CopyOperationsUnmanagedWin32)" DestinationFolder="%(CopyOperationsUnmanagedWin32.DestinationFolder)" />
+		<Message Text="[~] === Copying UnmanagedAdapterDLL (x64) ===" Importance="high" />
+		<Message Text="[~] UnmanagedAdapterDLL x64 Files List: @(CopyOperationsUnmanagedX64)" Importance="high" />
+		<Error Condition=" '@(CopyOperationsUnmanagedX64)' == '' " Text="[!] No UnmanagedAdapterDLL x64 resource files found to copy. Pattern: $(ProjectDir)..\UnmanagedAdapterDLL\bin\$(Configuration)\x64\**\*.exe"/>
+		<Copy SourceFiles="@(CopyOperationsUnmanagedX64)" DestinationFolder="%(CopyOperationsUnmanagedX64.DestinationFolder)" />
+	</Target>
+
+	<Target Name="CopyDllsInjectableDummy" BeforeTargets="BeforeBuild">
+		<ItemGroup>
+			<CopyOperationsDummy Include="$(ProjectDir)\..\InjectableDummy\bin\$(Configuration)\net6.0-windows\**\*">
+				<DestinationFolder>$(ProjectDir)\Resources\%(RecursiveDir)</DestinationFolder>
+			</CopyOperationsDummy>
+		</ItemGroup>
+		<Message Text="[~] === Copying InjectableDummy ===" Importance="high" />
+		<Message Text="[~] InjectableDummy Resources List: @(CopyOperationsDummy)" Importance="high" />
+		<Copy SourceFiles="@(CopyOperationsDummy)" DestinationFolder="%(CopyOperationsDummy.DestinationFolder)" Condition=" '@(CopyOperationsDummy)' != '' " />
 	</Target>
 	
 	<Target Name="ZipFolders" BeforeTargets="BeforeBuild">
