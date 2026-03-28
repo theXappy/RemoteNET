@@ -166,22 +166,29 @@ namespace ScubaDiver
 
             Stopwatch sw = Stopwatch.StartNew();
             string body;
-            if (_responseBodyCreators.TryGetValue(request.UrlAbsolutePath, out var respBodyGenerator))
+            Logger.Debug($"[DiverBase][@@@] Fetching func for {request.UrlAbsolutePath}");
+            if (_responseBodyCreators.TryGetValue(request.UrlAbsolutePath, out Func<ScubaDiverMessage, string> respBodyGenerator))
             {
+                Logger.Debug($"[DiverBase][@@@] Got back func for {request.UrlAbsolutePath}: {respBodyGenerator}");
                 try
                 {
+                    Logger.Debug($"[DiverBase][@@@] Executing func for {request.UrlAbsolutePath}: {respBodyGenerator}");
                     body = respBodyGenerator(request);
+                    Logger.Debug($"[DiverBase][@@@] Finished executing func for {request.UrlAbsolutePath}");
                 }
                 catch (Exception ex)
                 {
+                    Logger.Debug($"[DiverBase][@@@] Exception while executing func for {request.UrlAbsolutePath}: {ex}");
                     body = QuickError(ex);
                 }
             }
             else
             {
+                Logger.Debug($"[DiverBase][@@@] No func found for {request.UrlAbsolutePath}");
                 body = QuickError("Unknown Command");
             }
             sw.Stop();
+            Logger.Debug($"[DiverBase][@@@] Sending response for {request.UrlAbsolutePath}. Time taken: {sw.ElapsedMilliseconds} ms");
 
             request.ResponseSender(body);
         }
