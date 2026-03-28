@@ -7,8 +7,6 @@
     {
         public string Assembly { get; set; }
         public string TypeFullName { get; set; }
-        public long MethodTableAddress { get; set; }
-
+        public ulong XoredMethodTableAddress { get; set; }
     }
-
 }

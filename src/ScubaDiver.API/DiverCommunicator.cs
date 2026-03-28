@@ -207,7 +207,7 @@ namespace ScubaDiver.API
         {
             TypeDumpRequest dumpRequest = new()
             {
-                MethodTableAddress = methodTableAddress
+                XoredMethodTableAddress = (ulong)methodTableAddress ^ TypesDump.TypeIdentifiers.XorMask
             };
             var requestJsonBody = JsonConvert.SerializeObject(dumpRequest);
 

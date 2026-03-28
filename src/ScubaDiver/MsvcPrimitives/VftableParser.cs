@@ -49,8 +49,9 @@ public static class VftableParser
             if (i != 0)
             {
                 // Hybrid detection: Check both exports AND RTTI cache
-                bool isVftableByExports = moduleExports.TryGetVftable(nextEntryAddress, out _);
-                bool isVftableByCache = typesManager?.IsKnownVftableAddress(nextEntryAddress ^ FirstClassTypeInfo.XorMask) ?? false;
+                nuint xoredNextEntryAddress = nextEntryAddress ^ FirstClassTypeInfo.XorMask;
+                bool isVftableByExports = moduleExports.TryGetVftable(xoredNextEntryAddress, out _);
+                bool isVftableByCache = typesManager?.IsKnownVftableAddress(xoredNextEntryAddress) ?? false;
                 
                 // ✅ NEW: Check both exports AND cache
                 if (isVftableByExports || isVftableByCache)

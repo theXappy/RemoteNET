@@ -258,7 +258,7 @@ namespace ScubaDiver
 
         // Vftables cache.
         //  <vftable address : Type>
-        Dictionary<nuint, MsvcTypeStub> _vftablesCache = new();
+        Dictionary<nuint, MsvcTypeStub> _xoredVftablesCache = new();
 
         // All known vftable addresses from RTTI-discovered types
         // Populated during GetTypes() to enable boundary detection in VftableParser
@@ -420,20 +420,22 @@ namespace ScubaDiver
         public MsvcTypeStub GetType(Predicate<string> moduleNameFilter, Predicate<string> typeFilter) => GetType(new MsvcModuleFilter() { NamePredicate = moduleNameFilter }, typeFilter);
         public MsvcTypeStub GetType(string moduleName, string typeName) => GetType((s) => s == moduleName, (s) => s == typeName);
 
-        public MsvcTypeStub GetType(nuint vftable)
+        public MsvcTypeStub GetType(nuint xoredVftable)
         {
             RefreshIfNeeded();
-            if (_vftablesCache.TryGetValue(vftable, out MsvcTypeStub cachedType))
+            if (_xoredVftablesCache.TryGetValue(xoredVftable, out MsvcTypeStub cachedType))
                 return cachedType;
 
             // Find the module and type of the vftable
-            ModuleInfo? module = GetContainingModule(vftable);
+            nuint adjacentAddress = xoredVftable ^ 0x01;
+            adjacentAddress = adjacentAddress ^ UndecoratedExportedField.XorMask;
+            ModuleInfo? module = GetContainingModule(adjacentAddress);
             if (module == null)
                 return null;
 
             // Find the type of the vftable
             MsvcModuleExports moduleExports = GetOrCreateModuleExports(module.Value);
-            if (!moduleExports.TryGetVftable(vftable, out var vftableSymbol))
+            if (!moduleExports.TryGetVftable(xoredVftable, out UndecoratedExportedField vftableSymbol))
                 return null;
 
             // Extract name of type
@@ -447,12 +449,12 @@ namespace ScubaDiver
 
             // Cache and return
             if (res != null)
-                _vftablesCache[vftable] = res;
+                _xoredVftablesCache[xoredVftable] = res;
             return res;
 
             ModuleInfo? GetContainingModule(nuint address)
             {
-                foreach (var module in _tricksterWrapper.GetModules())
+                foreach (ModuleInfo module in _tricksterWrapper.GetModules())
                 {
                     if (module.BaseAddress <= address && address < module.BaseAddress + module.Size)
                         return module;
@@ -731,9 +733,8 @@ namespace ScubaDiver
             }
         }
 
-        public bool TryGetVftable(nuint addr, out UndecoratedExportedField undecoratedExport)
-        {   
-            nuint xoredAddr = addr ^ UndecoratedExportedField.XorMask;            
+        public bool TryGetVftable(nuint xoredAddr, out UndecoratedExportedField undecoratedExport)
+        {              
             if (!_exportedFields.TryGetValue(xoredAddr, out undecoratedExport))
             {
                 return false;

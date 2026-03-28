@@ -341,21 +341,21 @@ namespace ScubaDiver
             else
             {
                 // Try to parse from query string parameters
-                string methodTableAddressStr = req.QueryString.Get("MethodTableAddress");
+                string xoredMethodTableAddressStr = req.QueryString.Get("XoredMethodTableAddress");
                 string typeFullName = req.QueryString.Get("TypeFullName");
                 string assembly = req.QueryString.Get("Assembly");
 
                 // Check if at least one required parameter is provided
-                if (string.IsNullOrEmpty(methodTableAddressStr) && string.IsNullOrEmpty(typeFullName))
+                if (string.IsNullOrEmpty(xoredMethodTableAddressStr) && string.IsNullOrEmpty(typeFullName))
                 {
                     return QuickError("Missing body or required query parameters (MethodTableAddress or TypeFullName)");
                 }
 
                 // Parse MethodTableAddress if provided
-                long methodTableAddress = 0;
-                if (!string.IsNullOrEmpty(methodTableAddressStr))
+                long xoredMethodTableAddress = 0;
+                if (!string.IsNullOrEmpty(xoredMethodTableAddressStr))
                 {
-                    if (!long.TryParse(methodTableAddressStr, out methodTableAddress))
+                    if (!long.TryParse(xoredMethodTableAddressStr, out xoredMethodTableAddress))
                     {
                         return QuickError("Parameter 'MethodTableAddress' could not be parsed as long");
                     }
@@ -364,16 +364,16 @@ namespace ScubaDiver
                 // Create request from query parameters
                 request = new TypeDumpRequest
                 {
-                    MethodTableAddress = methodTableAddress,
+                    XoredMethodTableAddress = (ulong)xoredMethodTableAddress,
                     TypeFullName = typeFullName,
                     Assembly = assembly
                 };
             }
 
             TypeDump dump;
-            if (request.MethodTableAddress != 0)
+            if (request.XoredMethodTableAddress != FirstClassTypeInfo.XorMask)
             {
-                dump = GetTypeDump((nuint)request.MethodTableAddress);
+                dump = GetTypeDump((nuint)request.XoredMethodTableAddress);
             }
             else
             {
@@ -386,9 +386,9 @@ namespace ScubaDiver
             return QuickError("Failed to find type in searched assemblies");
         }
 
-        private TypeDump GetTypeDump(nuint methodTableAddress)
+        private TypeDump GetTypeDump(nuint xoredMethodTableAddress)
         {
-            MsvcType matchingType = _typesManager.GetType(methodTableAddress)?.Upgrade();
+            MsvcType matchingType = _typesManager.GetType(xoredMethodTableAddress)?.Upgrade();
             if (matchingType == null)
                 return null;
             return TypeDumpFactory.ConvertMsvcTypeToTypeDump(matchingType);
@@ -540,8 +540,8 @@ namespace ScubaDiver
 
                 // Search by vftable
                 // TODO: Wrong for x86
-                long vftable = Marshal.ReadInt64(new IntPtr((long)objAddr));
-                MsvcType matchingType = _typesManager.GetType((nuint)vftable)?.Upgrade();
+                ulong xoredVftable = (ulong)Marshal.ReadInt64(new IntPtr((long)objAddr)) ^ FirstClassTypeInfo.XorMask;
+                MsvcType matchingType = _typesManager.GetType((nuint)xoredVftable)?.Upgrade();
                 if (matchingType == null)
                 {
                     // Search by name instead
@@ -824,8 +824,8 @@ namespace ScubaDiver
                 {
                     // This vftable resolution USED to work, but I think it broke in the great "types" refactor.
                     // TODO: Wrong for x86
-                    long vftable = Marshal.ReadInt64(new IntPtr((long)resultsNuint.Value));
-                    _typesManager.GetType((nuint)vftable)?.Upgrade();
+                    ulong xoredVftable = (ulong)Marshal.ReadInt64(new IntPtr((long)resultsNuint.Value)) ^ FirstClassTypeInfo.XorMask;
+                    _typesManager.GetType((nuint)xoredVftable)?.Upgrade();
                 }
                 Rtti.TypeInfo retTypeInfo = matchingType?.TypeInfo;
 
