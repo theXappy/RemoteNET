@@ -16,12 +16,12 @@ namespace ScubaDiver
             if(DebugInRelease.Value)
 #endif
             {
-                Console.WriteLine(s);
+                Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {s}");
             }
 
             if (Debugger.IsAttached)
             {
-                System.Diagnostics.Debug.WriteLine(s);
+                System.Diagnostics.Debug.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {s}");
             }
 
         }
