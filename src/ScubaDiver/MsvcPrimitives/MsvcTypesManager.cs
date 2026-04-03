@@ -280,21 +280,21 @@ namespace ScubaDiver
                 _tricksterWrapper.Refresh();
 
             filter ??= new MsvcModuleFilter();
-            var results = _tricksterWrapper.GetUndecoratedModules(filter.NamePredicate);
+            List<UndecoratedModule> matchingModules = _tricksterWrapper.GetUndecoratedModules(filter.NamePredicate);
             if (filter.ImportingModule != null)
             {
                 IReadOnlyList<DllImport> imports = _tricksterWrapper.ExportsMaster.GetImports(filter.ImportingModule);
                 if (imports == null)
                 {
                     // TODO: Something else where no modules could be found in the imports table??
-                    results = new List<UndecoratedModule>();
+                    matchingModules = new List<UndecoratedModule>();
                 }
                 else
                 {
-                    results = results.Where(module => IsImportedInto(module.ModuleInfo.Name, imports)).ToList();
+                    matchingModules = matchingModules.Where(module => IsImportedInto(module.ModuleInfo.Name, imports)).ToList();
                 }
             }
-            return results;
+            return matchingModules;
 
             bool IsImportedInto(string moduleName, IReadOnlyList<DllImport> imports)
             {

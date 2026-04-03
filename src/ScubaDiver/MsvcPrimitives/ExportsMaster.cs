@@ -6,55 +6,63 @@ namespace ScubaDiver;
 
 public class ExportsMaster : IReadOnlyExportsMaster
 {
-    private Dictionary<string, List<DllExport>> _exportsCache = new();
+    private IReadOnlyDictionary<string, List<DllExport>> _exportsCache = new Dictionary<string, List<DllExport>>();
     private Dictionary<string, List<DllImport>> _importsCache = new();
 
     private Dictionary<Rtti.ModuleInfo, List<UndecoratedSymbol>> _undecExportsCache = new();
     private Dictionary<Rtti.ModuleInfo, List<DllExport>> _leftoverExportsCache = new();
 
 
-    public void LoadExportsImports(string moduleName)
+    public (List<DllExport>, List<DllImport>) LoadExportsImports(string moduleName)
     {
-        if (!_exportsCache.ContainsKey(moduleName))
+        if (_exportsCache.TryGetValue(moduleName, out List<DllExport> exp) &&
+            _importsCache.TryGetValue(moduleName, out List<DllImport> imp))
         {
-            try
+            return (exp, imp);
+        }
+
+        List<DllExport> exports;
+        List<DllImport> imports;
+        try
+        {
+            var lib = SafeLoadLibraryHandle.GetModuleHandle(moduleName);
+            exports = lib.Exports.ToList();
+            imports = lib.Imports.ToList();
+
+        }
+        catch (NtApiDotNet.Win32.SafeWin32Exception ex)
+        {
+            if (ex.Message == "The specified module could not be found.")
             {
-                var lib = SafeLoadLibraryHandle.GetModuleHandle(moduleName);
-                _exportsCache[moduleName] = lib.Exports.ToList();
-                _importsCache[moduleName] = lib.Imports.ToList();
+                // fuck it
+                exports = new List<DllExport>();
+                imports = new List<DllImport>();
 
             }
-            catch (NtApiDotNet.Win32.SafeWin32Exception ex)
+            else
             {
-                if (ex.Message == "The specified module could not be found.")
-                {
-                    // fuck it
-                    _exportsCache[moduleName] = new List<DllExport>();
-                    _importsCache[moduleName] = new List<DllImport>();
-                }
-                else
-                {
-                    throw;
-                }
+                throw;
             }
         }
+
+        // Temporary disabled cuz I think it pollutes vftables.
+        // _exportsCache[moduleName] = exports;
+        _importsCache[moduleName] = imports;
+        return (exports, imports);
     }
+
     public IReadOnlyList<DllExport> GetExports(string moduleName)
     {
-        LoadExportsImports(moduleName);
-        return _exportsCache[moduleName];
+        (List<DllExport> exp, _) = LoadExportsImports(moduleName);
+        return exp;
     }
 
     public IReadOnlyList<DllExport> GetExports(Rtti.ModuleInfo modInfo) => GetExports(modInfo.Name);
 
     public IReadOnlyList<DllImport> GetImports(string moduleName)
     {
-        LoadExportsImports(moduleName);
-        if (_importsCache.TryGetValue(moduleName, out var list))
-        {
-            return list;
-        }
-        return null;
+        (_, List<DllImport> imp) = LoadExportsImports(moduleName);
+        return imp;
     }
 
     public IReadOnlyList<DllImport> GetImports(Rtti.ModuleInfo modInfo) => GetImports(modInfo.Name);
@@ -104,7 +112,7 @@ public class ExportsMaster : IReadOnlyExportsMaster
     {
         string membersPrefix = $"{typeFullName}::";
         ProcessExports(module);
-        return _undecExportsCache[module].Where(sym => 
+        return _undecExportsCache[module].Where(sym =>
             sym.UndecoratedFullName.StartsWith(membersPrefix) &&
             sym.UndecoratedFullName.IndexOf("::", startIndex: membersPrefix.Length) == -1 // Only direct members, no nested types
             );
@@ -118,7 +126,7 @@ public class ExportsMaster : IReadOnlyExportsMaster
     {
         nuint valueAtAddress = 0; // TODO: Read content at <address>, avoiding access violations!!
         nuint xoredValue = (nuint)(valueAtAddress) ^ UndecoratedExportedField.XorMask;
-        uint ordinal = 0; // TODO: Read ordinal at <address + ptr_size>, avoiding access violations!!
+        //uint ordinal = 0; // TODO: Read ordinal at <address + ptr_size>, avoiding access violations!!
 
         foreach (KeyValuePair<Rtti.ModuleInfo, List<UndecoratedSymbol>> kvp in _undecExportsCache)
         {
@@ -132,8 +140,8 @@ public class ExportsMaster : IReadOnlyExportsMaster
                     continue;
                 if (export is not UndecoratedExportedField undecField)
                     continue;
-                if (undecField.Export.Ordinal != ordinal)
-                    continue;
+                //if (undecField.Export.Ordinal != ordinal)
+                //    continue;
 
                 return export;
             }

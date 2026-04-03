@@ -12,13 +12,13 @@ public class UndecoratedExportedField : UndecoratedSymbol
 
     private ModuleInfo _module;
     public override ModuleInfo Module => _module;
-    public DllExport Export { get; set; }
+    //public DllExport Export { get; set; }
 
     public UndecoratedExportedField(nuint address, string undecoratedName, string undecoratedFullName, DllExport export, ModuleInfo module)
         : base(export.Name, undecoratedName, undecoratedFullName)
     {
         XoredAddress = address ^ XorMask;
-        Export = export;
+        //Export = export;
         _module = module;
     }
 
