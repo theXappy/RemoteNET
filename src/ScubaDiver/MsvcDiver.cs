@@ -327,18 +327,15 @@ namespace ScubaDiver
 
         protected override string MakeTypeResponse(ScubaDiverMessage req)
         {
-            Logger.Debug($"[DiverBase][@@@] <MakeTypeResponse> called");
-            Thread.Sleep(1000);
+            
             string body = req.Body;
             TypeDumpRequest request;
 
             if (!string.IsNullOrEmpty(body))
             {
-                Logger.Debug($"[DiverBase][@@@] <MakeTypeResponse> Deserializing JSON body");
-                Thread.Sleep(1000);
+                
                 request = JsonConvert.DeserializeObject<TypeDumpRequest>(body);
-                Logger.Debug($"[DiverBase][@@@] <MakeTypeResponse> Finished deserializing JSON body");
-                Thread.Sleep(1000);
+                
                 if (request == null)
                 {
                     return QuickError("Failed to deserialize body");
@@ -346,8 +343,7 @@ namespace ScubaDiver
             }
             else
             {
-                Logger.Debug($"[DiverBase][@@@] <MakeTypeResponse> Parsing query string parameters");
-                Thread.Sleep(1000);
+                
                 // Try to parse from query string parameters
                 string xoredMethodTableAddressStr = req.QueryString.Get("XoredMethodTableAddress");
                 string typeFullName = req.QueryString.Get("TypeFullName");
@@ -379,43 +375,41 @@ namespace ScubaDiver
             }
 
             TypeDump dump;
-            if (request.XoredMethodTableAddress != FirstClassTypeInfo.XorMask)
+            // XoredMethodTableAddress == 0 means no method table was provided; prefer TypeFullName+Assembly
+            if (request.XoredMethodTableAddress == FirstClassTypeInfo.XorMask)
             {
-                Logger.Debug($"[DiverBase][@@@] <MakeTypeResponse> Getting type dump by MethodTableAddress: {request.MethodTableAddress}");
+                Logger.Debug("[!!!] WARNING: Xored Method Table Address is 0 after XOR. But we also expect before-xor to be 0. Something up.");
+            }
+
+            if (request.XoredMethodTableAddress != 0)
+            {
                 dump = GetTypeDump((nuint)request.XoredMethodTableAddress);
             }
             else
             {
-                Logger.Debug($"[DiverBase][@@@] <MakeTypeResponse> Getting type dump by TypeFullName: {request.TypeFullName} and Assembly: {request.Assembly}");
                 dump = GetRttiType(request.TypeFullName, request.Assembly);
             }
 
             if (dump != null)
             {
-                Logger.Debug($"[DiverBase][@@@] <MakeTypeResponse> Successfully got type dump for {dump.FullTypeName} in assembly {dump.Assembly}");
                 return JsonConvert.SerializeObject(dump);
             }
 
-            Logger.Debug($"[DiverBase][@@@] <MakeTypeResponse> Failed to find type dump for request. MethodTableAddress: {request.MethodTableAddress}, TypeFullName: {request.TypeFullName}, Assembly: {request.Assembly}");
             return QuickError("Failed to find type in searched assemblies");
         }
 
         private TypeDump GetTypeDump(nuint xoredMethodTableAddress)
         {
-            Logger.Debug($"[DiverBase][@@@] <GetTypeDump> Searching for type with MethodTableAddress: {methodTableAddress}");
-            Thread.Sleep(1000);
+            
             MsvcTypeStub stub = _typesManager.GetType(xoredMethodTableAddress);
-            Logger.Debug($"[DiverBase][@@@] <GetTypeDump> Found type stub: {stub}");
-            Thread.Sleep(1000);
+            
             MsvcType matchingType = stub?.Upgrade();
-            Logger.Debug($"[DiverBase][@@@] <GetTypeDump> Upgraded type: {matchingType}");
-            Thread.Sleep(1000);
+            
             if (matchingType == null)
                 return null;
 
             TypeDump res = TypeDumpFactory.ConvertMsvcTypeToTypeDump(matchingType);
-            Logger.Debug($"[DiverBase][@@@] <GetTypeDump> Converted type dump: {res}");
-            Thread.Sleep(1000);
+            
             return res;
         }
 
