@@ -65,7 +65,7 @@ namespace ScubaDiver
                     {
                         DecoratedName = vftable.Name,
                         UndecoratedFullName = vftable.Name,
-                        XoredAddress = (long)(vftable.Address),
+                        XoredAddress = (long)vftable.XoredAddress,
                     });
                 }
                 continue;

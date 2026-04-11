@@ -48,7 +48,7 @@ namespace ScubaDiver
         {
             _type = msvcType;
             ExportedField = symbol;
-            _xoredAddress = symbol.Address;
+            _xoredAddress = symbol.XoredAddress;
             _name = symbol.UndecoratedName;
         }
         
@@ -62,6 +62,7 @@ namespace ScubaDiver
         }
 
         public override string Name => _name;
+        public nuint XoredAddress => _xoredAddress;
         public ulong Address => _xoredAddress ^ FirstClassTypeInfo.XorMask;
         public override Type DeclaringType => _type;
         public override object GetValue(object obj) => Address;
