@@ -54,6 +54,7 @@ public unsafe struct RttiScanner : IDisposable
 
     public void Dispose()
     {
+        Unsafe.InitBlockUnaligned(_pointer, 0, (uint)_size);
         NativeMemory.Free(_pointer);
     }
 
@@ -109,7 +110,14 @@ public unsafe struct RttiScanner : IDisposable
         byte* buffer = stackalloc byte[BUFFER_SIZE];
         buffer[0] = (byte)'?';
         if (!TryRead(class_name, BUFFER_SIZE - 1, buffer + 1)) return null;
-        return UnDecorateSymbolNameWrapper(buffer);
+        string result = UnDecorateSymbolNameWrapper(buffer);
+        if (result == null)
+            return null;
+        // UnDecorateSymbolName silently passes through input it can't demangle — detect that.
+        string input = new string((sbyte*)buffer);
+        if (result == input)
+            return null;
+        return result;
     }
 
     private static object _dbgHelpLock = new object();
@@ -144,7 +152,14 @@ public unsafe struct RttiScanner : IDisposable
         {
             byte* target = stackalloc byte[BUFFER_SIZE];
             uint len = PInvoke.UnDecorateSymbolName(new PCSTR(buffer), new PSTR(target), BUFFER_SIZE, 0x1000);
-            return len != 0 ? Encoding.UTF8.GetString(target, (int)len) : null;
+            if (len == 0)
+                return null;
+            string result = Encoding.UTF8.GetString(target, (int)len);
+            // UnDecorateSymbolName silently passes through input it can't demangle — detect that.
+            string input = new string((sbyte*)buffer);
+            if (result == input)
+                return null;
+            return result;
         }
     }
 }

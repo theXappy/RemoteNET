@@ -84,6 +84,11 @@ public unsafe class Trickster
                     if (fullClassName.Contains('\a'))
                         continue;
 
+                    // A demangled C++ type name never starts with '?'.
+                    // If we see one it means demangling failed and we got a raw mangled fragment (e.g. "?4").
+                    if (fullClassName[0] == '?')
+                        continue;
+
                     if (fullClassName == "type_info")
                         typeInfoSeen = true;
 
