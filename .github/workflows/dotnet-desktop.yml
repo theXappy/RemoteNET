@@ -50,6 +50,7 @@ jobs:
         mkdir detours_build
         cd detours_build
         cmake ..\detours.net
+        msbuild /t:restore,build ALL_BUILD.vcxproj
 
     # Restore the application to populate the obj folder with RuntimeIdentifiers
     - name: Restore the application
