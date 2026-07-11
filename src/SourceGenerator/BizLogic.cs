@@ -98,8 +98,19 @@ public class BizLogic
         {
             Log("[!!!] Cache hit. Loading stdout from cache.\n");
             stdout = File.ReadAllText(stdoutCachePath);
+            var parsedForValidation = ParseGeneratedFiles(stdout);
+            if (!AreGeneratedFilesPresent(parsedForValidation))
+            {
+                string warning = "RemoteNET Source Generator: Cache is stale — previously generated output files are missing from disk. Invalidating cache and re-running analysis. This may take a moment.";
+                Log($"[!!!] STALE CACHE: {warning}\n");
+                reportError?.Invoke(warning);
+                InvalidateCache(cacheFolder);
+                cacheHit = false;
+                stdout = null;
+            }
         }
-        else
+
+        if (!cacheHit)
         {
             Log("[!!!] Cache MISS :( key mismatch or no cache yet.....\n");
             Log(">> Starting to spawn and analyze...\n");
@@ -113,6 +124,7 @@ public class BizLogic
                 return;
             WriteCache(keyFilePath, stdoutCachePath, currentKey, stdout);
         }
+
         Dictionary<string, string> generatedFiles = ParseGeneratedFiles(stdout);
         AddGeneratedSources(generatedFiles, addSourceFile);
         Log(">> Done writing files\n");
@@ -165,6 +177,20 @@ public class BizLogic
     {
         File.WriteAllText(keyFilePath, key);
         File.WriteAllText(stdoutCachePath, stdout);
+    }
+
+    public bool AreGeneratedFilesPresent(Dictionary<string, string> generatedFiles)
+    {
+        return generatedFiles.Values.All(filePath => File.Exists(filePath));
+    }
+
+    public void InvalidateCache(string cacheFolder)
+    {
+        if (Directory.Exists(cacheFolder))
+        {
+            Directory.Delete(cacheFolder, recursive: true);
+            Log($"[!!!] Cache invalidated: deleted '{cacheFolder}'\n");
+        }
     }
 
     // Refactored to return <classFullName, filePath> mappings
