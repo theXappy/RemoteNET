@@ -101,6 +101,10 @@ namespace RemoteNET.Internal.Reflection.DotNet
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Returns a method signature string representation in the format: "ReturnType MethodName<GenericArgs>(Parameters)".
+        /// This includes the return type, method name, any generic type arguments, and parameter list.
+        /// </summary>
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();

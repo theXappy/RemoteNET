@@ -367,7 +367,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
                 if (areConstructors)
                 {
                     RemoteConstructorInfo ctorInfo =
-                        new RemoteConstructorInfo(declaringType, parameters.ToArray());
+                        new RemoteConstructorInfo(declaringType, parameters.ToArray(), (MethodAttributes)func.Attributes);
                     declaringType.AddConstructor(ctorInfo);
                 }
                 else

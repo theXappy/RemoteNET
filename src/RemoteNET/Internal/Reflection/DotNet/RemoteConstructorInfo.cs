@@ -1,15 +1,16 @@
-﻿using System;
+﻿using RemoteNET.Common;
+using System;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using RemoteNET.Common;
+using System.Xml.Linq;
 
 namespace RemoteNET.Internal.Reflection.DotNet
 {
     public class RemoteConstructorInfo : ConstructorInfo
     {
-        public override MethodAttributes Attributes => throw new NotImplementedException();
-
+        private MethodAttributes _attributes;
+        public override MethodAttributes Attributes => _attributes;
         public override RuntimeMethodHandle MethodHandle => throw new NotImplementedException();
 
         public override Type DeclaringType { get; }
@@ -21,15 +22,16 @@ namespace RemoteNET.Internal.Reflection.DotNet
         private readonly ParameterInfo[] _paramInfos;
         private ManagedRemoteApp App => (DeclaringType as RemoteType)?.App;
 
-        public RemoteConstructorInfo(Type declaringType, ParameterInfo[] paramInfos)
+        public RemoteConstructorInfo(Type declaringType, ParameterInfo[] paramInfos, MethodAttributes attributes)
         {
             DeclaringType = declaringType;
             _paramInfos = paramInfos;
+            _attributes = attributes;
         }
 
         public RemoteConstructorInfo(RemoteType declaringType, ConstructorInfo ci) :
             this(declaringType,
-                 ci.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray())
+                 ci.GetParameters().Select(pi => new RemoteParameterInfo(pi)).Cast<ParameterInfo>().ToArray(), ci.Attributes)
         {
         }
 
