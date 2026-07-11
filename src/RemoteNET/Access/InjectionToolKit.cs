@@ -116,12 +116,34 @@ public class InjectionToolKit
         var matches = scubaDestDirInfo.EnumerateFiles().Where(scubaFile => scubaFile.Name.EndsWith($"{targetDiver}.dll"));
         if (matches.Count() != 1)
         {
+            // Check if the DLL is missing from the embedded resource (common build issue)
+            var allFilesInDir = scubaDestDirInfo.EnumerateFiles();
+            var dllFiles = allFilesInDir.Where(f => f.Name.EndsWith(".dll")).ToList();
+
+            if (dllFiles.Count == 0)
+            {
+                throw new Exception(
+                    $"CRITICAL BUILD ERROR: ScubaDiver DLL for '{targetDiver}' is missing!\n\n" +
+                    $"The embedded ScubaDivers.zip resource does not contain '{targetDiver}.dll'.\n" +
+                    $"Only symbol files (.pdb) were found.\n\n" +
+                    $"This indicates a problem with the build process:\n" +
+                    $"1. The ScubaDiver projects may not have been compiled before RemoteNET\n" +
+                    $"2. The post-build script that packages the DLLs into ScubaDivers.zip may have failed\n" +
+                    $"3. Verify that RemoteNET\\src\\ScubaDiver\\project_netframework\\ScubaDiver_NetFramework.csproj was built successfully\n\n" +
+                    $"Target Framework: {targetDotNetVer}\n" +
+                    $"Target Diver Name: {targetDiver}\n" +
+                    $"Destination Directory: {scubaDestDirInfo.FullName}\n" +
+                    $"Files found:\n" +
+                    String.Join("\n", allFilesInDir.Select(f => "  - " + f.Name))
+                );
+            }
+
             Debugger.Launch();
             throw new Exception($"Expected exactly 1 ScubaDiver dll to match '{targetDiver}' but found: " +
                                 matches.Count() + "\n" +
                                 "Results: \n" +
-                                String.Join("\n", matches.Select(m => m.FullName)) +
-                                "Target Framework Parameter: " +
+                                String.Join("\n", allFilesInDir.Select(m => m.FullName)) +
+                                "\nTarget Framework Parameter: " +
                                 targetDotNetVer
             );
         }
