@@ -280,9 +280,13 @@ namespace ScubaDiver
                 // Shift control to remote hook (Other process)
                 HookResponse res = InvokeHookCallback(endpoint, token, new StackTrace().ToString(), retValue, parameters: parameters);
 
-                // Remote hook returned, examine it's return value.
+                // Remote hook returned, examine its return value.
                 bool skipOriginal = res.SkipOriginal;
-                if (res.ReturnValue != null)
+
+                // Only resolve the return value if we're actually skipping the original method.
+                // If skipOriginal is False, the original method will execute and provide its own return value,
+                // so any return value from the hook should be ignored.
+                if (skipOriginal && res.ReturnValue != null)
                 {
                     retValue = ResolveHookReturnValue(res.ReturnValue);
                 }

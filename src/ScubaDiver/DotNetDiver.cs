@@ -962,9 +962,28 @@ namespace ScubaDiver
         public override object ResolveHookReturnValue(ObjectOrRemoteAddress oora)
         {
             if (!oora.IsRemoteAddress)
+            {
                 return PrimitivesEncoder.Decode(oora.EncodedObject, oora.Type);
+            }
 
-            return GetObject(oora.RemoteAddress, false, oora.Type).instance;
+            // Handle null addresses gracefully
+            if (oora.RemoteAddress == 0)
+            {
+                Console.WriteLine("[ResolveHookReturnValue] WARNING: RemoteAddress is NULL (0x0). This typically means a hook tried to return null. Returning null.");
+                return null;
+            }
+
+            try
+            {
+                return GetObject(oora.RemoteAddress, false, oora.Type).instance;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[ResolveHookReturnValue] EXCEPTION in GetObject: " + ex.GetType().Name + " - " + ex.Message);
+                Console.WriteLine("[ResolveHookReturnValue] Address was: 0x" + oora.RemoteAddress.ToString("X16"));
+                Console.WriteLine("[ResolveHookReturnValue] Type was: " + oora.Type);
+                throw;
+            }
         }
 
         protected override string MakeCreateObjectResponse(ScubaDiverMessage arg)

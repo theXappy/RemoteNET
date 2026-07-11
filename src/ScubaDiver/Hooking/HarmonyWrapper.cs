@@ -302,7 +302,6 @@ namespace ScubaDiver.Hooking
             {
                 // Whoops looks like we patched a method used in the 'ScubaDvier framework code'
                 // Luckily, this if clause allows us to avoid recursion
-
                 return true; // Don't skip original
             }
 
@@ -318,8 +317,20 @@ namespace ScubaDiver.Hooking
                 else
                 {
                     Console.WriteLine("!ERROR! No such hooked func");
+                    Console.WriteLine("[SingleHook] Available hooks count: " + _actualHooks.Count);
+                    Console.WriteLine("[SingleHook] Searched uniqueId: " + uniqueId);
+                    foreach (var key in _actualHooks.Keys)
+                    {
+                        Console.WriteLine("[SingleHook] Available hook key: " + key);
+                    }
                     return true; // Don't skip original
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[SingleHook] EXCEPTION: " + ex.GetType().Name + " - " + ex.Message);
+                Console.WriteLine("[SingleHook] StackTrace: " + ex.StackTrace);
+                throw;
             }
             finally
             {
