@@ -175,7 +175,7 @@ namespace ScubaDiver.API
             {
                 body = HandleEventCallback(request);
             }
-            if (request.Url.AbsolutePath == "/invoke_hook_callback")
+            else if (request.Url.AbsolutePath == "/invoke_hook_callback")
             {
                 body = HandleHookCallback(request);
             }
