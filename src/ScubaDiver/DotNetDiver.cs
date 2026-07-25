@@ -1304,7 +1304,11 @@ namespace ScubaDiver
             InvocationResults invocResults;
             {
                 ObjectOrRemoteAddress returnValue;
-                if (results.GetType().IsPrimitiveEtc())
+                if (results == null)
+                {
+                    returnValue = ObjectOrRemoteAddress.Null;
+                }
+                else if (results.GetType().IsPrimitiveEtc())
                 {
                     returnValue = ObjectOrRemoteAddress.FromObj(results);
                 }
