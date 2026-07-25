@@ -581,6 +581,20 @@ public abstract class DynamicRemoteObject : DynamicObject
 
     public override string ToString()
     {
+        if (__type?.ToStringHook != null)
+        {
+            try
+            {
+                var hooked = __type.ToStringHook(this);
+                if (hooked != null)
+                    return hooked;
+            }
+            catch
+            {
+                // Fall through to the existing behavior.
+            }
+        }
+
         if (GetSingleMethod(nameof(ToString)) != null)
         {
             try
