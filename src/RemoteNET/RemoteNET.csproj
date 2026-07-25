@@ -150,4 +150,8 @@
 	  <NativeLibs Remove="ManagedRemoteApp.cs" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Formatting\" />
+	</ItemGroup>
+
 </Project>
