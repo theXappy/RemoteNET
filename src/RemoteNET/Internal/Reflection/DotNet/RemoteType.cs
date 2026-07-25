@@ -165,7 +165,7 @@ namespace RemoteNET.Internal.Reflection.DotNet
             if (types == null)
             {
                 // Parameters unknown from caller. Hope we have only one method to return.
-                return methodGroup.Single();
+                return methodGroup.SingleOrDefault();
             }
 
             bool overloadsComparer(MethodInfo method)
