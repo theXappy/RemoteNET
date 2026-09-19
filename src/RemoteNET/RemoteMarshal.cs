@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 using System.Reflection;
-using System.Runtime.InteropServices;
+using System.Text;
 using ScubaDiver.API.Memory;
 
 namespace RemoteNET;
@@ -91,4 +91,38 @@ public class RemoteMarshal
 
         return _remotePtrToStringAnsi.Invoke(null, [ptr]) as string;
     }
+
+
+    public nuint CreateRemoteString(string s, Encoding encoding = null)
+    {
+        encoding ??= Encoding.ASCII;
+
+        // Allocate memory for the string, assuming ASCII
+        byte[] encodedBytes = encoding.GetBytes(s + '\x00');
+        nint remoteBuf = AllocHGlobal(encodedBytes.Length);
+        // Copy the string to the remote buffer
+        Write(encodedBytes, 0, remoteBuf, encodedBytes.Length);
+        return (nuint)remoteBuf;
+    }
+
+    public ulong ReadQword(ulong address)
+    {
+        // Read a 64-bit value from the remote process
+        byte[] buffer = Read((nint)address, 8);
+        if (buffer.Length < 8)
+            throw new Exception("Failed to read 64-bit value");
+        return (nuint)BitConverter.ToUInt64(buffer, 0);
+    }
+
+    public ulong ReadQword(UIntPtr address) => ReadQword((ulong)address);
+
+    public void WriteQword(ulong address, ulong value)
+    {
+        // Convert the 64-bit value to a byte array
+        byte[] buffer = BitConverter.GetBytes(value);
+        // Write the byte array to the remote process
+        Write(buffer, 0, (nint)address, buffer.Length);
+    }
+    public void WriteQword(UIntPtr address, ulong value) => WriteQword((ulong)address, value);
+
 }
