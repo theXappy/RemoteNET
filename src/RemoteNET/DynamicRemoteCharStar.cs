@@ -108,7 +108,7 @@ public class DynamicRemoteCharStar : DynamicObject
 
     public override string ToString()
     {
-        return _innerString.ToString();
+        return _innerString.ToString() + $" (Address: 0x{Address:X16})";
     }
 
     public override int GetHashCode()
